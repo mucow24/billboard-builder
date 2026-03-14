@@ -48,6 +48,7 @@ interface LineItemViewProps {
   stageSize: { width: number; height: number };
   shapeRef: (node: Konva.Node | null) => void;
   onGuidesChange: (guides: GuideLine[]) => void;
+  onPreviewItem: (preview: LineCanvasItem | null) => void;
   onSelectItem: (itemId?: string) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
 }
@@ -61,6 +62,17 @@ interface ShapeItemViewProps {
   onGuidesChange: (guides: GuideLine[]) => void;
   onSelectItem: (itemId?: string) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
+}
+
+function applyLinePreview<T extends CanvasItem>(
+  item: T,
+  preview: LineCanvasItem | null
+): T {
+  if (!preview || item.kind !== 'line' || item.id !== preview.id) {
+    return item;
+  }
+
+  return preview as T;
 }
 
 function buildHandleDebug(clientRect: {
@@ -138,12 +150,14 @@ function LineHandles({
   siblingItems,
   stageSize,
   onGuidesChange,
+  onPreviewItem,
   onUpdateItem,
 }: {
   item: LineCanvasItem;
   siblingItems: CanvasItem[];
   stageSize: { width: number; height: number };
   onGuidesChange: (guides: GuideLine[]) => void;
+  onPreviewItem: (preview: LineCanvasItem | null) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
 }) {
   const handles = [
@@ -178,10 +192,20 @@ function LineHandles({
           x: snapped.rect.x + 1,
           y: snapped.rect.y + 1,
         });
+        const nextX = snapped.rect.x + 1;
+        const nextY = snapped.rect.y + 1;
+        onPreviewItem({
+          ...item,
+          startX: handle.key === 'start' ? nextX : item.startX,
+          startY: handle.key === 'start' ? nextY : item.startY,
+          endX: handle.key === 'end' ? nextX : item.endX,
+          endY: handle.key === 'end' ? nextY : item.endY,
+        });
         onGuidesChange(snapped.guides);
       }}
       onDragEnd={(event) => {
         onGuidesChange([]);
+        onPreviewItem(null);
         if (handle.key === 'start') {
           onUpdateItem(item.id, {
             startX: event.target.x(),
@@ -206,12 +230,13 @@ function LineItemView({
   stageSize,
   shapeRef,
   onGuidesChange,
+  onPreviewItem,
   onSelectItem,
   onUpdateItem,
 }: LineItemViewProps) {
   return (
     <>
-      <Line
+        <Line
         ref={shapeRef}
         points={[item.startX, item.startY, item.endX, item.endY]}
         stroke={item.stroke}
@@ -262,6 +287,7 @@ function LineItemView({
           siblingItems={siblingItems}
           stageSize={stageSize}
           onGuidesChange={onGuidesChange}
+          onPreviewItem={onPreviewItem}
           onUpdateItem={onUpdateItem}
         />
       ) : null}
@@ -392,6 +418,7 @@ export function CanvasStage({
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef(new Map<string, Konva.Node>());
   const [transformPreview, setTransformPreview] = useState<TransformPreview | null>(null);
+  const [linePreview, setLinePreview] = useState<LineCanvasItem | null>(null);
 
   const selectedItemId = document.selectedItemIds[0];
   const orderedItems = useMemo(
@@ -399,8 +426,11 @@ export function CanvasStage({
     [document.items]
   );
   const renderedItems = useMemo(
-    () => orderedItems.map((item) => applyPreviewToItem(item, transformPreview)),
-    [orderedItems, transformPreview]
+    () =>
+      orderedItems.map((item) =>
+        applyLinePreview(applyPreviewToItem(item, transformPreview), linePreview)
+      ),
+    [orderedItems, transformPreview, linePreview]
   );
 
   const selectedDocumentItem = orderedItems.find((item) => item.id === selectedItemId);
@@ -411,6 +441,12 @@ export function CanvasStage({
       setTransformPreview(null);
     }
   }, [selectedItemId, transformPreview]);
+
+  useEffect(() => {
+    if (linePreview && linePreview.id !== selectedItemId) {
+      setLinePreview(null);
+    }
+  }, [selectedItemId, linePreview]);
 
   useEffect(() => {
     if (!transformerRef.current) {
@@ -504,7 +540,15 @@ export function CanvasStage({
           id: selectedDocumentItem.id,
         }
       : null,
-    previewItem: transformPreview,
+    previewItem:
+      transformPreview ??
+      (selectedRenderedItem?.kind === 'line' && linePreview
+        ? {
+            ...getRenderBox(selectedRenderedItem),
+            kind: selectedRenderedItem.kind,
+            id: selectedRenderedItem.id,
+          }
+        : null),
     node: selectedNode
       ? {
           x: selectedNode.x(),
@@ -518,7 +562,7 @@ export function CanvasStage({
     anchorClientRects: getTransformerAnchorRects(transformerRef.current, stageRef.current),
     handles: nodeClientRect ? buildHandleDebug(nodeClientRect) : null,
     lineHandleRects:
-      selectedDocumentItem?.kind === 'line' ? getLineHandleRects(selectedDocumentItem) : null,
+      selectedRenderedItem?.kind === 'line' ? getLineHandleRects(selectedRenderedItem) : null,
   };
 
   return (
@@ -574,6 +618,7 @@ export function CanvasStage({
                       shapeRefs.current.set(item.id, node);
                     }}
                     onGuidesChange={onGuidesChange}
+                    onPreviewItem={setLinePreview}
                     onSelectItem={onSelectItem}
                     onUpdateItem={onUpdateItem}
                   />

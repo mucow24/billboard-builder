@@ -98,10 +98,31 @@ test('@p1 drags line endpoints directly on the canvas', async ({ page }) => {
   await page.mouse.move(stageBox.x + startHandleCenter.x + 80, stageBox.y + startHandleCenter.y + 40, {
     steps: 16,
   });
+
+  const previewDebug = await editor.getSelectedItemDebug();
+  const previewItem = previewDebug.previewItem as
+    | { x: number; y: number; width: number; height: number }
+    | null;
+  const previewHandles = previewDebug.lineHandleRects as
+    | {
+        start: { x: number; y: number; width: number; height: number };
+      }
+    | null;
+  if (!previewItem || !previewHandles) {
+    throw new Error('Missing live line preview geometry');
+  }
+
+  expect(previewHandles.start.x).toBeGreaterThan(lineHandleRects.start.x + 70);
+  expect(previewHandles.start.y).toBeGreaterThan(lineHandleRects.start.y + 30);
+  expect(previewItem.width).toBeLessThan(Number(debugBefore.documentItem?.width));
+  expect(previewItem.x).toBeGreaterThan(Number(debugBefore.documentItem?.x));
+
   await page.mouse.up();
 
   const debugAfter = await editor.getSelectedItemDebug();
   const documentItem = debugAfter.documentItem as { width: number; height: number; x: number; y: number };
+  expect(documentItem.width).toBeCloseTo(previewItem.width, 0);
+  expect(documentItem.x).toBeCloseTo(previewItem.x, 0);
   expect(documentItem.width).toBeLessThan(Number(debugBefore.documentItem?.width));
   expect(documentItem.x).toBeGreaterThan(Number(debugBefore.documentItem?.x));
 });
