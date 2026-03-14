@@ -2,6 +2,9 @@ import type { CanvasItem, GuideLine, SnapRect } from '../model/types';
 
 const SNAP_THRESHOLD = 8;
 
+type VerticalGuideKey = 'left' | 'center' | 'right';
+type HorizontalGuideKey = 'top' | 'middle' | 'bottom';
+
 interface SnapLineCandidate {
   orientation: 'vertical' | 'horizontal';
   position: number;
@@ -20,6 +23,48 @@ function getRectGuides(rect: SnapRect) {
       { key: 'bottom', value: rect.y + rect.height },
     ] as const,
   };
+}
+
+function getBestSnapDelta(
+  guideValue: number,
+  orientation: 'vertical' | 'horizontal',
+  candidateLines: SnapLineCandidate[],
+  threshold: number
+) {
+  return candidateLines
+    .filter((line) => line.orientation === orientation)
+    .map((line) => ({
+      delta: line.position - guideValue,
+      position: line.position,
+    }))
+    .filter((candidate) => Math.abs(candidate.delta) <= threshold)
+    .sort((left, right) => Math.abs(left.delta) - Math.abs(right.delta))[0];
+}
+
+function getResizeSnapKeys(activeAnchor: string | null | undefined): {
+  vertical?: VerticalGuideKey;
+  horizontal?: HorizontalGuideKey;
+} {
+  switch (activeAnchor) {
+    case 'top-left':
+      return { vertical: 'left', horizontal: 'top' };
+    case 'top-center':
+      return { horizontal: 'top' };
+    case 'top-right':
+      return { vertical: 'right', horizontal: 'top' };
+    case 'middle-left':
+      return { vertical: 'left' };
+    case 'middle-right':
+      return { vertical: 'right' };
+    case 'bottom-left':
+      return { vertical: 'left', horizontal: 'bottom' };
+    case 'bottom-center':
+      return { horizontal: 'bottom' };
+    case 'bottom-right':
+      return { vertical: 'right', horizontal: 'bottom' };
+    default:
+      return {};
+  }
 }
 
 export function getItemRect(item: CanvasItem): SnapRect {
@@ -135,6 +180,85 @@ export function getSnappedRect(
 
   return {
     rect: nextRect,
+    guides: nextGuides,
+  };
+}
+
+export function getResizeSnappedRect(
+  rect: SnapRect,
+  siblingItems: CanvasItem[],
+  stageRect: SnapRect,
+  activeAnchor: string | null | undefined,
+  threshold = SNAP_THRESHOLD
+): SnapResult {
+  const candidateLines = [
+    ...getStageCandidates(stageRect),
+    ...getItemCandidates(siblingItems),
+  ];
+  const guideKeys = getResizeSnapKeys(activeAnchor);
+  const guides = getRectGuides(rect);
+  const nextGuides: GuideLine[] = [];
+  const originalEdges = {
+    left: rect.x,
+    right: rect.x + rect.width,
+    top: rect.y,
+    bottom: rect.y + rect.height,
+  };
+  const nextEdges = { ...originalEdges };
+
+  if (guideKeys.vertical) {
+    const guide = guides.vertical.find((entry) => entry.key === guideKeys.vertical);
+    if (guide) {
+      const bestVertical = getBestSnapDelta(
+        guide.value,
+        'vertical',
+        candidateLines,
+        threshold
+      );
+      if (bestVertical) {
+        if (guideKeys.vertical === 'left') {
+          nextEdges.left = originalEdges.left + bestVertical.delta;
+        } else if (guideKeys.vertical === 'right') {
+          nextEdges.right = originalEdges.right + bestVertical.delta;
+        }
+        nextGuides.push({
+          orientation: 'vertical',
+          position: bestVertical.position,
+        });
+      }
+    }
+  }
+
+  if (guideKeys.horizontal) {
+    const guide = guides.horizontal.find((entry) => entry.key === guideKeys.horizontal);
+    if (guide) {
+      const bestHorizontal = getBestSnapDelta(
+        guide.value,
+        'horizontal',
+        candidateLines,
+        threshold
+      );
+      if (bestHorizontal) {
+        if (guideKeys.horizontal === 'top') {
+          nextEdges.top = originalEdges.top + bestHorizontal.delta;
+        } else if (guideKeys.horizontal === 'bottom') {
+          nextEdges.bottom = originalEdges.bottom + bestHorizontal.delta;
+        }
+        nextGuides.push({
+          orientation: 'horizontal',
+          position: bestHorizontal.position,
+        });
+      }
+    }
+  }
+
+  return {
+    rect: {
+      x: nextEdges.left,
+      y: nextEdges.top,
+      width: nextEdges.right - nextEdges.left,
+      height: nextEdges.bottom - nextEdges.top,
+    },
     guides: nextGuides,
   };
 }

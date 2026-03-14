@@ -212,3 +212,57 @@ test('@p1 preserves image aspect ratio until the user disables it', async ({ pag
   expect(unlockedItem.width).toBeGreaterThan(lockedItem.width);
   expect(Math.abs(unlockedItem.height - lockedItem.height)).toBeLessThan(3);
 });
+
+test('@p0 keeps the fixed edge pinned while top-center resize snapping hits a sibling guide', async ({
+  page,
+}) => {
+  const editor = new EditorPage(page);
+  await editor.goto();
+
+  await editor.createItem('Ellipse');
+  await editor.dragSelectedItemBy(-260, 160);
+
+  await editor.createItem('Rect');
+  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await editor.dragSelectedItemBy(220, 140);
+
+  const beforeDebug = await editor.getSelectedItemDebug();
+  const beforeItem = beforeDebug.documentItem as { x: number; y: number; width: number; height: number };
+  const ellipseRow = page.locator('.layer-row', { hasText: 'Ellipse' });
+  await ellipseRow.click();
+  const siblingItem = (await editor.getSelectedItemDebug()).documentItem as {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+
+  const targetTop = siblingItem.y + siblingItem.height / 2;
+  const expectedBottom = beforeItem.y + beforeItem.height;
+  const dragStart = await editor.startSelectedAnchorDrag('top-center');
+  const deltaY = targetTop - beforeItem.y;
+
+  await page.mouse.move(
+    dragStart.stageBox.x + dragStart.center.x,
+    dragStart.stageBox.y + dragStart.center.y + deltaY,
+    { steps: 20 }
+  );
+
+  await expect(page.getByTestId('guide-count')).not.toHaveText('Guides: 0');
+  const midDebug = await editor.getSelectedItemDebug();
+  const previewItem = midDebug.previewItem as { y: number; height: number } | null;
+  if (!previewItem) {
+    throw new Error('Expected preview geometry during resize');
+  }
+  expect(previewItem.y).toBeCloseTo(targetTop, 0);
+  expect(previewItem.y + previewItem.height).toBeCloseTo(expectedBottom, 0);
+
+  await page.mouse.up();
+
+  const afterDebug = await editor.getSelectedItemDebug();
+  const afterItem = afterDebug.documentItem as { y: number; height: number };
+  expect(afterItem.y).toBeCloseTo(targetTop, 0);
+  expect(afterItem.y + afterItem.height).toBeCloseTo(expectedBottom, 0);
+  await expect(page.getByTestId('guide-count')).toHaveText('Guides: 0');
+});

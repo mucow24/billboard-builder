@@ -13,7 +13,7 @@ import {
 } from 'react-konva';
 import type Konva from 'konva';
 
-import { getSnappedRect } from './snapping';
+import { getResizeSnappedRect, getSnappedRect } from './snapping';
 import {
   applyPreviewToItem,
   buildTransformCommit,
@@ -643,7 +643,7 @@ export function CanvasStage({
                     onGuidesChange([]);
                     return newBox;
                   }
-                  const snapped = getSnappedRect(
+                  const snapped = getResizeSnappedRect(
                     {
                       x: newBox.x,
                       y: newBox.y,
@@ -651,7 +651,8 @@ export function CanvasStage({
                       height: Math.max(newBox.height, 20),
                     },
                     renderedItems.filter((item) => item.id !== selectedRenderedItem.id),
-                    { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }
+                    { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height },
+                    activeAnchor
                   );
                   onGuidesChange(snapped.guides);
                   return {

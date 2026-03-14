@@ -130,6 +130,27 @@ export class EditorPage {
     await this.page.mouse.up();
   }
 
+  async startSelectedAnchorDrag(anchorName: string) {
+    const debug = await this.getSelectedItemDebug();
+    const anchorRect = debug.anchorClientRects?.[anchorName];
+    if (!anchorRect) {
+      throw new Error(`Missing ${anchorName} anchor bounds`);
+    }
+    const center = getRectCenter(anchorRect);
+    const stageBox = await this.stageBox();
+
+    await this.page.mouse.move(stageBox.x + center.x, stageBox.y + center.y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(stageBox.x + center.x + 2, stageBox.y + center.y + 2, {
+      steps: 2,
+    });
+
+    return {
+      stageBox,
+      center,
+    };
+  }
+
   async setCanvasPreset(value: string) {
     await this.page.getByLabel('Canvas preset').selectOption(value);
   }

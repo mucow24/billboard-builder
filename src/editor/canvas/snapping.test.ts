@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createLineItem, createRectangleItem } from '../model/defaults';
-import { getItemRect, getSnappedRect } from './snapping';
+import { getItemRect, getResizeSnappedRect, getSnappedRect } from './snapping';
 
 describe('snapping geometry', () => {
   it('snaps to the stage center when the moving item is close enough', () => {
@@ -69,5 +69,55 @@ describe('snapping geometry', () => {
       width: 300,
       height: 120,
     });
+  });
+
+  it('snaps only the moving top edge during a top-center resize', () => {
+    const stageRect = { x: 0, y: 0, width: 1200, height: 600 };
+    const sibling = createRectangleItem({
+      x: 320,
+      y: 180,
+      width: 200,
+      height: 120,
+    });
+    const movingRect = { x: 600, y: 186, width: 200, height: 120 };
+
+    const result = getResizeSnappedRect(
+      movingRect,
+      [sibling],
+      stageRect,
+      'top-center'
+    );
+
+    expect(result.rect).toEqual({
+      x: 600,
+      y: 180,
+      width: 200,
+      height: 126,
+    });
+    expect(result.guides).toContainEqual({
+      orientation: 'horizontal',
+      position: 180,
+    });
+  });
+
+  it('ignores non-moving center guides during a top-center resize', () => {
+    const stageRect = { x: 0, y: 0, width: 1200, height: 600 };
+    const sibling = createRectangleItem({
+      x: 320,
+      y: 100,
+      width: 200,
+      height: 120,
+    });
+    const movingRect = { x: 600, y: 40, width: 200, height: 120 };
+
+    const result = getResizeSnappedRect(
+      movingRect,
+      [sibling],
+      stageRect,
+      'top-center'
+    );
+
+    expect(result.rect).toEqual(movingRect);
+    expect(result.guides).toEqual([]);
   });
 });
