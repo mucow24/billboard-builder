@@ -16,6 +16,10 @@ function getRectCenter(rect: { x: number; y: number; width: number; height: numb
   };
 }
 
+function getBottomEdge(box: { y: number; height: number }) {
+  return box.y + box.height;
+}
+
 test('@p1 keeps a dragged item visible near the right edge of the canvas', async ({ page }) => {
   const editor = new EditorPage(page);
   await editor.goto();
@@ -243,11 +247,19 @@ test('@p0 keeps the fixed edge pinned while top-center resize snapping hits a si
   const dragStart = await editor.startSelectedAnchorDrag('top-center');
   const deltaY = targetTop - beforeItem.y;
 
-  await page.mouse.move(
-    dragStart.stageBox.x + dragStart.center.x,
-    dragStart.stageBox.y + dragStart.center.y + deltaY,
-    { steps: 20 }
-  );
+  let minPreviewBottom = Number.POSITIVE_INFINITY;
+  let maxPreviewBottom = Number.NEGATIVE_INFINITY;
+  for (let step = 1; step <= 20; step += 1) {
+    await editor.moveActiveDragBy(dragStart, 0, (deltaY / 20) * step);
+    const stepDebug = await editor.getSelectedItemDebug();
+    const previewItem = stepDebug.previewItem as { y: number; height: number } | null;
+    if (!previewItem) {
+      throw new Error('Expected preview geometry during live resize');
+    }
+    const previewBottom = getBottomEdge(previewItem);
+    minPreviewBottom = Math.min(minPreviewBottom, previewBottom);
+    maxPreviewBottom = Math.max(maxPreviewBottom, previewBottom);
+  }
 
   await expect(page.getByTestId('guide-count')).not.toHaveText('Guides: 0');
   const midDebug = await editor.getSelectedItemDebug();
@@ -257,12 +269,67 @@ test('@p0 keeps the fixed edge pinned while top-center resize snapping hits a si
   }
   expect(previewItem.y).toBeCloseTo(targetTop, 0);
   expect(previewItem.y + previewItem.height).toBeCloseTo(expectedBottom, 0);
+  expect(maxPreviewBottom - minPreviewBottom).toBeLessThanOrEqual(1.5);
 
-  await page.mouse.up();
+  await editor.finishActiveDrag();
 
   const afterDebug = await editor.getSelectedItemDebug();
   const afterItem = afterDebug.documentItem as { y: number; height: number };
   expect(afterItem.y).toBeCloseTo(targetTop, 0);
   expect(afterItem.y + afterItem.height).toBeCloseTo(expectedBottom, 0);
   await expect(page.getByTestId('guide-count')).toHaveText('Guides: 0');
+});
+
+test('@p0 inverts a top-center resize after it crosses the opposite edge', async ({ page }) => {
+  const editor = new EditorPage(page);
+  await editor.goto();
+
+  await editor.createItem('Rect');
+  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await editor.dragSelectedItemBy(180, 140);
+
+  const beforeDebug = await editor.getSelectedItemDebug();
+  const beforeItem = beforeDebug.documentItem as {
+    y: number;
+    height: number;
+  };
+  const originalTop = beforeItem.y;
+  const originalBottom = getBottomEdge(beforeItem);
+
+  const dragStart = await editor.startSelectedAnchorDrag('top-center');
+  const collapseDelta = beforeItem.height - 6;
+  await editor.moveActiveDragBy(dragStart, 0, collapseDelta, 20);
+
+  const collapsedPreview = (await editor.getSelectedItemDebug()).previewItem as {
+    y: number;
+    height: number;
+  } | null;
+  if (!collapsedPreview) {
+    throw new Error('Expected preview geometry near collapse');
+  }
+  expect(getBottomEdge(collapsedPreview)).toBeCloseTo(originalBottom, 0);
+  expect(collapsedPreview.height).toBeLessThan(10);
+
+  await editor.moveActiveDragBy(dragStart, 0, beforeItem.height + 80, 20);
+
+  const crossedPreview = (await editor.getSelectedItemDebug()).previewItem as {
+    y: number;
+    height: number;
+  } | null;
+  if (!crossedPreview) {
+    throw new Error('Expected preview geometry after crossing through zero');
+  }
+  expect(crossedPreview.y).toBeCloseTo(originalBottom, 0);
+  expect(crossedPreview.height).toBeGreaterThan(60);
+  expect(getBottomEdge(crossedPreview)).toBeGreaterThan(originalBottom + 60);
+  expect(crossedPreview.y).toBeGreaterThan(originalTop);
+
+  await editor.finishActiveDrag();
+
+  const afterItem = (await editor.getSelectedItemDebug()).documentItem as {
+    y: number;
+    height: number;
+  };
+  expect(afterItem.y).toBeCloseTo(crossedPreview.y, 0);
+  expect(afterItem.height).toBeCloseTo(crossedPreview.height, 0);
 });

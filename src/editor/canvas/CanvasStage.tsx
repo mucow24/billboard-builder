@@ -619,7 +619,7 @@ export function CanvasStage({
               <Transformer
                 ref={transformerRef}
                 rotateEnabled
-                flipEnabled={false}
+                flipEnabled
                 onTransformStart={() => {
                   if (!selectedRenderedItem || selectedRenderedItem.kind === 'line') {
                     return;
@@ -644,19 +644,14 @@ export function CanvasStage({
                     return newBox;
                   }
                   const snapped = getResizeSnappedRect(
-                    {
-                      x: newBox.x,
-                      y: newBox.y,
-                      width: Math.max(newBox.width, 20),
-                      height: Math.max(newBox.height, 20),
-                    },
+                    newBox,
                     renderedItems.filter((item) => item.id !== selectedRenderedItem.id),
                     { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height },
                     activeAnchor
                   );
                   onGuidesChange(snapped.guides);
                   return {
-                    ...oldBox,
+                    ...newBox,
                     x: snapped.rect.x,
                     y: snapped.rect.y,
                     width: snapped.rect.width,

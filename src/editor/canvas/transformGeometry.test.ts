@@ -43,6 +43,36 @@ describe('transform geometry helpers', () => {
     });
   });
 
+  it('normalizes negative transformer scales into a positive persisted box', () => {
+    expect(
+      buildTransformCommit(
+        {
+          x: 120,
+          y: 80,
+          width: 240,
+          height: 100,
+        },
+        {
+          x: 180,
+          y: 90,
+          width: 240,
+          height: 100,
+          scaleX: -0.5,
+          scaleY: -1.25,
+          rotation: 30,
+        }
+      )
+    ).toEqual({
+      x: 60,
+      y: -35,
+      width: 120,
+      height: 125,
+      rotation: 30,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  });
+
   it('applies local preview geometry without mutating unrelated item fields', () => {
     const item = createTextItem({ text: 'Hello there' });
 
@@ -84,7 +114,7 @@ describe('transform geometry helpers', () => {
     });
   });
 
-  it('clamps transformed dimensions and computes a render box for line items', () => {
+  it('preserves transformed dimensions and computes a render box for line items', () => {
     const line = createLineItem({
       startX: 240,
       startY: 120,
@@ -111,8 +141,8 @@ describe('transform geometry helpers', () => {
         }
       )
     ).toMatchObject({
-      width: 20,
-      height: 20,
+      width: 5,
+      height: 8,
     });
 
     expect(getRenderBox(line)).toEqual({
@@ -120,6 +150,33 @@ describe('transform geometry helpers', () => {
       y: 120,
       width: 80,
       height: 30,
+    });
+  });
+
+  it('persists an exact zero-sized release as a 1px box', () => {
+    expect(
+      buildTransformCommit(
+        {
+          x: 20,
+          y: 30,
+          width: 100,
+          height: 80,
+        },
+        {
+          x: 120,
+          y: 110,
+          width: 100,
+          height: 80,
+          scaleX: 0,
+          scaleY: 0,
+          rotation: 0,
+        }
+      )
+    ).toMatchObject({
+      x: 120,
+      y: 110,
+      width: 1,
+      height: 1,
     });
   });
 

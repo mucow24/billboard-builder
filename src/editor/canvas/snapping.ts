@@ -2,8 +2,7 @@ import type { CanvasItem, GuideLine, SnapRect } from '../model/types';
 
 const SNAP_THRESHOLD = 8;
 
-type VerticalGuideKey = 'left' | 'center' | 'right';
-type HorizontalGuideKey = 'top' | 'middle' | 'bottom';
+type ResizeEdgeKey = 'start' | 'end';
 
 interface SnapLineCandidate {
   orientation: 'vertical' | 'horizontal';
@@ -42,26 +41,26 @@ function getBestSnapDelta(
 }
 
 function getResizeSnapKeys(activeAnchor: string | null | undefined): {
-  vertical?: VerticalGuideKey;
-  horizontal?: HorizontalGuideKey;
+  vertical?: ResizeEdgeKey;
+  horizontal?: ResizeEdgeKey;
 } {
   switch (activeAnchor) {
     case 'top-left':
-      return { vertical: 'left', horizontal: 'top' };
+      return { vertical: 'start', horizontal: 'start' };
     case 'top-center':
-      return { horizontal: 'top' };
+      return { horizontal: 'start' };
     case 'top-right':
-      return { vertical: 'right', horizontal: 'top' };
+      return { vertical: 'end', horizontal: 'start' };
     case 'middle-left':
-      return { vertical: 'left' };
+      return { vertical: 'start' };
     case 'middle-right':
-      return { vertical: 'right' };
+      return { vertical: 'end' };
     case 'bottom-left':
-      return { vertical: 'left', horizontal: 'bottom' };
+      return { vertical: 'start', horizontal: 'end' };
     case 'bottom-center':
-      return { horizontal: 'bottom' };
+      return { horizontal: 'end' };
     case 'bottom-right':
-      return { vertical: 'right', horizontal: 'bottom' };
+      return { vertical: 'end', horizontal: 'end' };
     default:
       return {};
   }
@@ -196,68 +195,65 @@ export function getResizeSnappedRect(
     ...getItemCandidates(siblingItems),
   ];
   const guideKeys = getResizeSnapKeys(activeAnchor);
-  const guides = getRectGuides(rect);
   const nextGuides: GuideLine[] = [];
   const originalEdges = {
-    left: rect.x,
-    right: rect.x + rect.width,
-    top: rect.y,
-    bottom: rect.y + rect.height,
+    startX: rect.x,
+    endX: rect.x + rect.width,
+    startY: rect.y,
+    endY: rect.y + rect.height,
   };
   const nextEdges = { ...originalEdges };
 
   if (guideKeys.vertical) {
-    const guide = guides.vertical.find((entry) => entry.key === guideKeys.vertical);
-    if (guide) {
-      const bestVertical = getBestSnapDelta(
-        guide.value,
-        'vertical',
-        candidateLines,
-        threshold
-      );
-      if (bestVertical) {
-        if (guideKeys.vertical === 'left') {
-          nextEdges.left = originalEdges.left + bestVertical.delta;
-        } else if (guideKeys.vertical === 'right') {
-          nextEdges.right = originalEdges.right + bestVertical.delta;
-        }
-        nextGuides.push({
-          orientation: 'vertical',
-          position: bestVertical.position,
-        });
+    const guideValue =
+      guideKeys.vertical === 'start' ? originalEdges.startX : originalEdges.endX;
+    const bestVertical = getBestSnapDelta(
+      guideValue,
+      'vertical',
+      candidateLines,
+      threshold
+    );
+    if (bestVertical) {
+      if (guideKeys.vertical === 'start') {
+        nextEdges.startX = originalEdges.startX + bestVertical.delta;
+      } else {
+        nextEdges.endX = originalEdges.endX + bestVertical.delta;
       }
+      nextGuides.push({
+        orientation: 'vertical',
+        position: bestVertical.position,
+      });
     }
   }
 
   if (guideKeys.horizontal) {
-    const guide = guides.horizontal.find((entry) => entry.key === guideKeys.horizontal);
-    if (guide) {
-      const bestHorizontal = getBestSnapDelta(
-        guide.value,
-        'horizontal',
-        candidateLines,
-        threshold
-      );
-      if (bestHorizontal) {
-        if (guideKeys.horizontal === 'top') {
-          nextEdges.top = originalEdges.top + bestHorizontal.delta;
-        } else if (guideKeys.horizontal === 'bottom') {
-          nextEdges.bottom = originalEdges.bottom + bestHorizontal.delta;
-        }
-        nextGuides.push({
-          orientation: 'horizontal',
-          position: bestHorizontal.position,
-        });
+    const guideValue =
+      guideKeys.horizontal === 'start' ? originalEdges.startY : originalEdges.endY;
+    const bestHorizontal = getBestSnapDelta(
+      guideValue,
+      'horizontal',
+      candidateLines,
+      threshold
+    );
+    if (bestHorizontal) {
+      if (guideKeys.horizontal === 'start') {
+        nextEdges.startY = originalEdges.startY + bestHorizontal.delta;
+      } else {
+        nextEdges.endY = originalEdges.endY + bestHorizontal.delta;
       }
+      nextGuides.push({
+        orientation: 'horizontal',
+        position: bestHorizontal.position,
+      });
     }
   }
 
   return {
     rect: {
-      x: nextEdges.left,
-      y: nextEdges.top,
-      width: nextEdges.right - nextEdges.left,
-      height: nextEdges.bottom - nextEdges.top,
+      x: nextEdges.startX,
+      y: nextEdges.startY,
+      width: nextEdges.endX - nextEdges.startX,
+      height: nextEdges.endY - nextEdges.startY,
     },
     guides: nextGuides,
   };

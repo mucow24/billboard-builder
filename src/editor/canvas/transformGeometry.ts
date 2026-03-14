@@ -18,6 +18,11 @@ export interface TransformSnapshot extends RenderBox {
   rotation: number;
 }
 
+interface NormalizedAxisTransform {
+  position: number;
+  size: number;
+}
+
 export function getRenderBox(item: CanvasItem): RenderBox {
   if (item.kind === 'line') {
     return {
@@ -36,16 +41,50 @@ export function getRenderBox(item: CanvasItem): RenderBox {
   };
 }
 
+function normalizeAxisTransform(
+  position: number,
+  baseSize: number,
+  scale: number,
+  zeroSize = 1
+): NormalizedAxisTransform {
+  const scaledSize = baseSize * scale;
+  if (scaledSize === 0) {
+    return {
+      position,
+      size: zeroSize,
+    };
+  }
+
+  const nextEdge = position + scaledSize;
+  return {
+    position: Math.min(position, nextEdge),
+    size: Math.abs(scaledSize),
+  };
+}
+
 export function buildTransformCommit(
   baseBox: RenderBox,
   snapshot: TransformSnapshot,
-  minSize = 20
+  zeroSize = 1
 ) {
+  const normalizedX = normalizeAxisTransform(
+    snapshot.x,
+    baseBox.width,
+    snapshot.scaleX,
+    zeroSize
+  );
+  const normalizedY = normalizeAxisTransform(
+    snapshot.y,
+    baseBox.height,
+    snapshot.scaleY,
+    zeroSize
+  );
+
   return {
-    x: snapshot.x,
-    y: snapshot.y,
-    width: Math.max(minSize, baseBox.width * snapshot.scaleX),
-    height: Math.max(minSize, baseBox.height * snapshot.scaleY),
+    x: normalizedX.position,
+    y: normalizedY.position,
+    width: normalizedX.size,
+    height: normalizedY.size,
     rotation: snapshot.rotation,
     scaleX: 1,
     scaleY: 1,

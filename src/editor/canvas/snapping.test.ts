@@ -120,4 +120,57 @@ describe('snapping geometry', () => {
     expect(result.rect).toEqual(movingRect);
     expect(result.guides).toEqual([]);
   });
+
+  it('keeps the fixed bottom edge pinned when the top edge snaps', () => {
+    const stageRect = { x: 0, y: 0, width: 1200, height: 600 };
+    const sibling = createRectangleItem({
+      x: 320,
+      y: 190,
+      width: 200,
+      height: 120,
+    });
+    const movingRect = { x: 600, y: 184, width: 200, height: 120 };
+
+    const result = getResizeSnappedRect(
+      movingRect,
+      [sibling],
+      stageRect,
+      'top-center'
+    );
+
+    expect(result.rect.y).toBe(190);
+    expect(result.rect.height).toBe(114);
+    expect(result.rect.y + result.rect.height).toBe(
+      movingRect.y + movingRect.height
+    );
+  });
+
+  it('snaps the moving edge after a top-center resize crosses through zero', () => {
+    const stageRect = { x: 0, y: 0, width: 1200, height: 600 };
+    const sibling = createRectangleItem({
+      x: 320,
+      y: 330,
+      width: 200,
+      height: 120,
+    });
+    const crossedRect = { x: 600, y: 324, width: 200, height: -104 };
+
+    const result = getResizeSnappedRect(
+      crossedRect,
+      [sibling],
+      stageRect,
+      'top-center'
+    );
+
+    expect(result.rect).toEqual({
+      x: 600,
+      y: 330,
+      width: 200,
+      height: -110,
+    });
+    expect(result.guides).toContainEqual({
+      orientation: 'horizontal',
+      position: 330,
+    });
+  });
 });

@@ -7,7 +7,7 @@ interface ClientRectJson {
   height: number;
 }
 
-interface StageDebugJson {
+export interface StageDebugJson {
   stageSize: {
     width: number;
     height: number;
@@ -149,6 +149,23 @@ export class EditorPage {
       stageBox,
       center,
     };
+  }
+
+  async moveActiveDragBy(
+    dragStart: { stageBox: { x: number; y: number }; center: { x: number; y: number } },
+    deltaX: number,
+    deltaY: number,
+    steps = 1
+  ) {
+    await this.page.mouse.move(
+      dragStart.stageBox.x + dragStart.center.x + deltaX,
+      dragStart.stageBox.y + dragStart.center.y + deltaY,
+      { steps }
+    );
+  }
+
+  async finishActiveDrag() {
+    await this.page.mouse.up();
   }
 
   async setCanvasPreset(value: string) {
