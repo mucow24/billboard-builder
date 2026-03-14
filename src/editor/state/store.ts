@@ -110,7 +110,6 @@ export function applyEditorCommand(
         selectedItemIds: [],
       };
     case 'update_item':
-    case 'update_item_live':
       return {
         ...document,
         items: document.items.map((item) =>
@@ -156,12 +155,7 @@ export function applyEditorCommand(
 }
 
 function shouldRecordHistory(command: EditorCommand): boolean {
-  return ![
-    'select_items',
-    'clear_selection',
-    'register_font',
-    'update_item_live',
-  ].includes(command.type);
+  return !['select_items', 'clear_selection', 'register_font'].includes(command.type);
 }
 
 function createItemForKind(

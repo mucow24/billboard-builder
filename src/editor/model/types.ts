@@ -119,7 +119,6 @@ export type EditorCommand =
   | { type: 'select_items'; itemIds: string[] }
   | { type: 'clear_selection' }
   | { type: 'update_item'; itemId: string; changes: Partial<CanvasItem> }
-  | { type: 'update_item_live'; itemId: string; changes: Partial<CanvasItem> }
   | { type: 'set_canvas_size'; canvas: CanvasSize }
   | { type: 'set_background'; background: string }
   | { type: 'reorder_item'; itemId: string; mode: ReorderMode }

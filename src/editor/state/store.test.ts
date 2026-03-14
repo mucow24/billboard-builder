@@ -164,22 +164,6 @@ describe('editor store history', () => {
     expect(updatedItem.height).toBe(256);
   });
 
-  it('applies live updates without recording an undo snapshot for every frame', () => {
-    const item = createRectangleItem();
-    useEditorStore.getState().dispatch({ type: 'add_item', item });
-
-    const historyLengthBefore = useEditorStore.getState().historyPast.length;
-    useEditorStore.getState().dispatch({
-      type: 'update_item_live',
-      itemId: item.id,
-      changes: { width: 480, rotation: 15 },
-    });
-
-    expect(useEditorStore.getState().document.items[0].width).toBe(480);
-    expect(useEditorStore.getState().document.items[0].rotation).toBe(15);
-    expect(useEditorStore.getState().historyPast).toHaveLength(historyLengthBefore);
-  });
-
   it('supports convenience actions for selection, reorder, export scale, and reset', () => {
     const firstItem = createTextItem({ zIndex: 0 });
     const secondItem = createRectangleItem({ zIndex: 1 });

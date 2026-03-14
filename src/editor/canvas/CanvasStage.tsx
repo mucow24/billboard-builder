@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Circle,
   Ellipse,
+  Group,
   Image as KonvaImage,
   Layer,
   Line,
@@ -13,6 +14,14 @@ import {
 import type Konva from 'konva';
 
 import { getSnappedRect } from './snapping';
+import {
+  applyPreviewToItem,
+  buildTransformCommit,
+  getRenderBox,
+  type TransformPreview,
+  type TransformSnapshot,
+} from './transformGeometry';
+import { shouldApplyLiveTransform } from './transformMode';
 import { useImageElement } from './useImageElement';
 import type {
   CanvasItem,
@@ -26,22 +35,81 @@ interface CanvasStageProps {
   document: ProjectDocumentV1;
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
-  onLiveUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
   onSelectItem: (itemId?: string) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
-interface ItemViewProps {
+interface LineItemViewProps {
   activeTool: CanvasStageProps['activeTool'];
   isSelected: boolean;
-  item: CanvasItem;
+  item: LineCanvasItem;
   siblingItems: CanvasItem[];
   stageSize: { width: number; height: number };
   shapeRef: (node: Konva.Node | null) => void;
   onGuidesChange: (guides: GuideLine[]) => void;
   onSelectItem: (itemId?: string) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
+}
+
+interface ShapeItemViewProps {
+  activeTool: CanvasStageProps['activeTool'];
+  item: Exclude<CanvasItem, LineCanvasItem>;
+  siblingItems: CanvasItem[];
+  stageSize: { width: number; height: number };
+  shapeRef: (node: Konva.Node | null) => void;
+  onGuidesChange: (guides: GuideLine[]) => void;
+  onSelectItem: (itemId?: string) => void;
+  onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
+}
+
+function buildHandleDebug(clientRect: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
+  return {
+    rightMiddle: {
+      x: clientRect.x + clientRect.width,
+      y: clientRect.y + clientRect.height / 2,
+    },
+    rotater: {
+      x: clientRect.x + clientRect.width / 2,
+      y: clientRect.y - 50,
+    },
+  };
+}
+
+function getTransformerAnchorRects(
+  transformer: Konva.Transformer | null,
+  stage: Konva.Stage | null
+) {
+  if (!transformer || !stage) {
+    return null;
+  }
+
+  const anchorNames = [
+    'top-left',
+    'top-center',
+    'top-right',
+    'middle-left',
+    'middle-right',
+    'bottom-left',
+    'bottom-center',
+    'bottom-right',
+    'rotater',
+  ] as const;
+
+  return Object.fromEntries(
+    anchorNames.map((anchorName) => {
+      const anchor = transformer.findOne(`.${anchorName}`);
+      if (!anchor) {
+        return [anchorName, null];
+      }
+      return [anchorName, anchor.getClientRect({ relativeTo: stage })];
+    })
+  );
 }
 
 function LineHandles({
@@ -79,11 +147,12 @@ function LineHandles({
           width: 2,
           height: 2,
         };
-        const snapped = getSnappedRect(
-          handleRect,
-          siblingItems,
-          { x: 0, y: 0, width: stageSize.width, height: stageSize.height }
-        );
+        const snapped = getSnappedRect(handleRect, siblingItems, {
+          x: 0,
+          y: 0,
+          width: stageSize.width,
+          height: stageSize.height,
+        });
         event.target.position({
           x: snapped.rect.x + 1,
           y: snapped.rect.y + 1,
@@ -108,7 +177,7 @@ function LineHandles({
   ));
 }
 
-function ItemView({
+function LineItemView({
   activeTool,
   isSelected,
   item,
@@ -118,109 +187,129 @@ function ItemView({
   onGuidesChange,
   onSelectItem,
   onUpdateItem,
-}: ItemViewProps) {
-  const imageElement = useImageElement(item.kind === 'image' ? item.src : '');
-
-  if (item.kind === 'line') {
-    return (
-      <>
-        <Line
-          ref={shapeRef}
-          points={[item.startX, item.startY, item.endX, item.endY]}
-          stroke={item.stroke}
-          strokeWidth={item.strokeWidth}
-          opacity={item.opacity}
-          visible={!item.hidden}
-          hitStrokeWidth={Math.max(item.strokeWidth + 12, 20)}
-          draggable={activeTool === 'select' && !item.locked}
-          onClick={() => onSelectItem(item.id)}
-          onTap={() => onSelectItem(item.id)}
-          onDragMove={(event) => {
-            const deltaX = event.target.x();
-            const deltaY = event.target.y();
-            const rect = {
-              x: Math.min(item.startX, item.endX) + deltaX,
-              y: Math.min(item.startY, item.endY) + deltaY,
-              width: Math.abs(item.endX - item.startX),
-              height: Math.abs(item.endY - item.startY),
-            };
-            const snapped = getSnappedRect(
-              rect,
-              siblingItems,
-              { x: 0, y: 0, width: stageSize.width, height: stageSize.height }
-            );
-            event.target.position({
-              x: snapped.rect.x - Math.min(item.startX, item.endX),
-              y: snapped.rect.y - Math.min(item.startY, item.endY),
-            });
-            onGuidesChange(snapped.guides);
-          }}
-          onDragEnd={(event) => {
-            const deltaX = event.target.x();
-            const deltaY = event.target.y();
-            event.target.position({ x: 0, y: 0 });
-            onGuidesChange([]);
-            onUpdateItem(item.id, {
-              startX: item.startX + deltaX,
-              startY: item.startY + deltaY,
-              endX: item.endX + deltaX,
-              endY: item.endY + deltaY,
-            });
-          }}
+}: LineItemViewProps) {
+  return (
+    <>
+      <Line
+        ref={shapeRef}
+        points={[item.startX, item.startY, item.endX, item.endY]}
+        stroke={item.stroke}
+        strokeWidth={item.strokeWidth}
+        opacity={item.opacity}
+        visible={!item.hidden}
+        hitStrokeWidth={Math.max(item.strokeWidth + 12, 20)}
+        draggable={activeTool === 'select' && !item.locked}
+        onClick={() => onSelectItem(item.id)}
+        onTap={() => onSelectItem(item.id)}
+        onDragMove={(event) => {
+          const deltaX = event.target.x();
+          const deltaY = event.target.y();
+          const rect = {
+            x: Math.min(item.startX, item.endX) + deltaX,
+            y: Math.min(item.startY, item.endY) + deltaY,
+            width: Math.abs(item.endX - item.startX),
+            height: Math.abs(item.endY - item.startY),
+          };
+          const snapped = getSnappedRect(rect, siblingItems, {
+            x: 0,
+            y: 0,
+            width: stageSize.width,
+            height: stageSize.height,
+          });
+          event.target.position({
+            x: snapped.rect.x - Math.min(item.startX, item.endX),
+            y: snapped.rect.y - Math.min(item.startY, item.endY),
+          });
+          onGuidesChange(snapped.guides);
+        }}
+        onDragEnd={(event) => {
+          const deltaX = event.target.x();
+          const deltaY = event.target.y();
+          event.target.position({ x: 0, y: 0 });
+          onGuidesChange([]);
+          onUpdateItem(item.id, {
+            startX: item.startX + deltaX,
+            startY: item.startY + deltaY,
+            endX: item.endX + deltaX,
+            endY: item.endY + deltaY,
+          });
+        }}
+      />
+      {isSelected ? (
+        <LineHandles
+          item={item}
+          siblingItems={siblingItems}
+          stageSize={stageSize}
+          onGuidesChange={onGuidesChange}
+          onUpdateItem={onUpdateItem}
         />
-        {isSelected ? (
-          <LineHandles
-            item={item}
-            siblingItems={siblingItems}
-            stageSize={stageSize}
-            onGuidesChange={onGuidesChange}
-            onUpdateItem={onUpdateItem}
-          />
-        ) : null}
-      </>
-    );
-  }
+      ) : null}
+    </>
+  );
+}
 
-  const commonProps = {
-    ref: shapeRef,
-    x: item.x,
-    y: item.y,
-    rotation: item.rotation,
-    opacity: item.opacity,
-    draggable: activeTool === 'select' && !item.locked,
-    visible: !item.hidden,
-    onClick: () => onSelectItem(item.id),
-    onTap: () => onSelectItem(item.id),
-    onDragMove: (event: Konva.KonvaEventObject<DragEvent>) => {
-      const node = event.target;
-      const rect = {
-        x: node.x(),
-        y: node.y(),
-        width: item.width * item.scaleX,
-        height: item.height * item.scaleY,
-      };
-      const snapped = getSnappedRect(
-        rect,
-        siblingItems,
-        { x: 0, y: 0, width: stageSize.width, height: stageSize.height }
-      );
-      node.position({ x: snapped.rect.x, y: snapped.rect.y });
-      onGuidesChange(snapped.guides);
-    },
-    onDragEnd: (event: Konva.KonvaEventObject<DragEvent>) => {
-      onGuidesChange([]);
-      onUpdateItem(item.id, {
-        x: event.target.x(),
-        y: event.target.y(),
-      });
-    },
-  };
+function ShapeItemView({
+  activeTool,
+  item,
+  siblingItems,
+  stageSize,
+  shapeRef,
+  onGuidesChange,
+  onSelectItem,
+  onUpdateItem,
+}: ShapeItemViewProps) {
+  const imageElement = useImageElement(item.kind === 'image' ? item.src : '');
+  const renderBox = getRenderBox(item);
 
-  switch (item.kind) {
-    case 'text':
-      return (
+  return (
+    <Group
+      ref={shapeRef}
+      x={renderBox.x}
+      y={renderBox.y}
+      rotation={item.rotation}
+      opacity={item.opacity}
+      draggable={activeTool === 'select' && !item.locked}
+      visible={!item.hidden}
+      onClick={() => onSelectItem(item.id)}
+      onTap={() => onSelectItem(item.id)}
+      onDragMove={(event) => {
+        const node = event.target;
+        const rect = {
+          x: node.x(),
+          y: node.y(),
+          width: renderBox.width,
+          height: renderBox.height,
+        };
+        const snapped = getSnappedRect(rect, siblingItems, {
+          x: 0,
+          y: 0,
+          width: stageSize.width,
+          height: stageSize.height,
+        });
+        node.position({ x: snapped.rect.x, y: snapped.rect.y });
+        onGuidesChange(snapped.guides);
+      }}
+      onDragEnd={(event) => {
+        onGuidesChange([]);
+        onUpdateItem(item.id, {
+          x: event.target.x(),
+          y: event.target.y(),
+        });
+      }}
+    >
+      <Rect
+        x={0}
+        y={0}
+        width={renderBox.width}
+        height={renderBox.height}
+        fill="rgba(0,0,0,0)"
+        strokeEnabled={false}
+        listening={false}
+      />
+      {item.kind === 'text' ? (
         <Text
-          {...commonProps}
+          x={0}
+          y={0}
           fill={item.fill}
           fontFamily={item.fontFamily}
           fontSize={item.fontSize}
@@ -229,53 +318,45 @@ function ItemView({
           lineHeight={item.lineHeight}
           letterSpacing={item.letterSpacing}
           text={item.text}
-          width={item.width}
-          scaleX={item.scaleX}
-          scaleY={item.scaleY}
+          width={renderBox.width}
+          height={renderBox.height}
           perfectDrawEnabled={false}
         />
-      );
-    case 'rectangle':
-      return (
+      ) : null}
+      {item.kind === 'rectangle' ? (
         <Rect
-          {...commonProps}
+          x={0}
+          y={0}
           fill={item.fill}
           stroke={item.stroke}
           strokeWidth={item.strokeWidth}
           cornerRadius={item.cornerRadius}
-          width={item.width}
-          height={item.height}
-          scaleX={item.scaleX}
-          scaleY={item.scaleY}
+          width={renderBox.width}
+          height={renderBox.height}
         />
-      );
-    case 'ellipse':
-      return (
+      ) : null}
+      {item.kind === 'ellipse' ? (
         <Ellipse
-          {...commonProps}
+          x={renderBox.width / 2}
+          y={renderBox.height / 2}
           fill={item.fill}
           stroke={item.stroke}
           strokeWidth={item.strokeWidth}
-          radiusX={item.width / 2}
-          radiusY={item.height / 2}
-          offsetX={-item.width / 2}
-          offsetY={-item.height / 2}
-          scaleX={item.scaleX}
-          scaleY={item.scaleY}
+          radiusX={renderBox.width / 2}
+          radiusY={renderBox.height / 2}
         />
-      );
-    case 'image':
-      return (
+      ) : null}
+      {item.kind === 'image' ? (
         <KonvaImage
-          {...commonProps}
+          x={0}
+          y={0}
           image={imageElement ?? undefined}
-          width={item.width}
-          height={item.height}
-          scaleX={item.scaleX}
-          scaleY={item.scaleY}
+          width={renderBox.width}
+          height={renderBox.height}
         />
-      );
-  }
+      ) : null}
+    </Group>
+  );
 }
 
 export function CanvasStage({
@@ -283,21 +364,38 @@ export function CanvasStage({
   document,
   guides,
   onGuidesChange,
-  onLiveUpdateItem,
   onSelectItem,
   onUpdateItem,
   stageRef,
 }: CanvasStageProps) {
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef(new Map<string, Konva.Node>());
+  const [transformPreview, setTransformPreview] = useState<TransformPreview | null>(null);
+
   const selectedItemId = document.selectedItemIds[0];
-  const selectedItem = document.items.find((item) => item.id === selectedItemId);
+  const orderedItems = useMemo(
+    () => document.items.slice().sort((left, right) => left.zIndex - right.zIndex),
+    [document.items]
+  );
+  const renderedItems = useMemo(
+    () => orderedItems.map((item) => applyPreviewToItem(item, transformPreview)),
+    [orderedItems, transformPreview]
+  );
+
+  const selectedDocumentItem = orderedItems.find((item) => item.id === selectedItemId);
+  const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId);
+
+  useEffect(() => {
+    if (transformPreview && transformPreview.itemId !== selectedItemId) {
+      setTransformPreview(null);
+    }
+  }, [selectedItemId, transformPreview]);
 
   useEffect(() => {
     if (!transformerRef.current) {
       return;
     }
-    if (!selectedItemId || selectedItem?.kind === 'line') {
+    if (!selectedItemId || selectedRenderedItem?.kind === 'line') {
       transformerRef.current.nodes([]);
       transformerRef.current.getLayer()?.batchDraw();
       return;
@@ -308,39 +406,97 @@ export function CanvasStage({
     }
     transformerRef.current.nodes([node]);
     transformerRef.current.keepRatio(
-      selectedItem?.kind === 'image' ? selectedItem.preserveAspectRatio : false
+      selectedRenderedItem?.kind === 'image'
+        ? selectedRenderedItem.preserveAspectRatio
+        : false
     );
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedItem, selectedItemId]);
+  }, [selectedItemId, selectedRenderedItem]);
 
-  const orderedItems = useMemo(
-    () => document.items.slice().sort((left, right) => left.zIndex - right.zIndex),
-    [document.items]
-  );
-
-  function getTransformerChanges() {
-    if (!selectedItemId || !selectedItem || selectedItem.kind === 'line') {
+  function readSelectedNodeSnapshot() {
+    if (!selectedItemId || !selectedRenderedItem || selectedRenderedItem.kind === 'line') {
       return null;
     }
+
     const node = shapeRefs.current.get(selectedItemId);
     if (!node) {
       return null;
     }
 
-    const width = Math.max(20, node.width() * node.scaleX());
-    const height = Math.max(20, node.height() * node.scaleY());
-    const changes: Partial<CanvasItem> = {
+    const renderBox = getRenderBox(selectedRenderedItem);
+    const snapshot: TransformSnapshot = {
       x: node.x(),
       y: node.y(),
-      width,
-      height,
+      width: renderBox.width,
+      height: renderBox.height,
+      scaleX: node.scaleX(),
+      scaleY: node.scaleY(),
       rotation: node.rotation(),
     };
 
-    node.scaleX(1);
-    node.scaleY(1);
-    return changes;
+    return {
+      node,
+      renderBox,
+      snapshot,
+    };
   }
+
+  function updatePreviewFromNode() {
+    const current = readSelectedNodeSnapshot();
+    if (!current || !selectedItemId) {
+      return null;
+    }
+
+    const commit = buildTransformCommit(current.renderBox, current.snapshot);
+    current.node.scaleX(1);
+    current.node.scaleY(1);
+
+    const preview = {
+      itemId: selectedItemId,
+      x: commit.x,
+      y: commit.y,
+      width: commit.width,
+      height: commit.height,
+      rotation: commit.rotation,
+    };
+
+    setTransformPreview(preview);
+    return commit;
+  }
+
+  const selectedNode = selectedItemId ? shapeRefs.current.get(selectedItemId) : null;
+  const nodeClientRect =
+    selectedNode && stageRef.current
+      ? selectedNode.getClientRect({ relativeTo: stageRef.current })
+      : null;
+  const debugInfo = {
+    stageSize: {
+      width: document.canvas.width,
+      height: document.canvas.height,
+    },
+    activeAnchor: transformerRef.current?.getActiveAnchor() ?? null,
+    documentItem: selectedDocumentItem
+      ? {
+          ...getRenderBox(selectedDocumentItem),
+          rotation: selectedDocumentItem.rotation,
+          kind: selectedDocumentItem.kind,
+          id: selectedDocumentItem.id,
+        }
+      : null,
+    previewItem: transformPreview,
+    node: selectedNode
+      ? {
+          x: selectedNode.x(),
+          y: selectedNode.y(),
+          rotation: selectedNode.rotation(),
+          scaleX: selectedNode.scaleX(),
+          scaleY: selectedNode.scaleY(),
+        }
+      : null,
+    nodeClientRect,
+    anchorClientRects: getTransformerAnchorRects(transformerRef.current, stageRef.current),
+    handles: nodeClientRect ? buildHandleDebug(nodeClientRect) : null,
+  };
 
   return (
     <div className="canvas-frame">
@@ -351,7 +507,7 @@ export function CanvasStage({
         <span data-testid="guide-count">Guides: {guides.length}</span>
       </div>
       <div className="canvas-scroll">
-        <div className="stage-shell">
+        <div className="stage-shell" data-testid="canvas-transform-debug">
           <Stage
             ref={stageRef}
             width={document.canvas.width}
@@ -378,26 +534,46 @@ export function CanvasStage({
                 height={document.canvas.height}
                 fill={document.background}
               />
-              {orderedItems.map((item) => (
-                <ItemView
-                  key={item.id}
-                  activeTool={activeTool}
-                  isSelected={item.id === selectedItemId}
-                  item={item}
-                  siblingItems={orderedItems.filter((entry) => entry.id !== item.id)}
-                  stageSize={document.canvas}
-                  shapeRef={(node) => {
-                    if (!node) {
-                      shapeRefs.current.delete(item.id);
-                      return;
-                    }
-                    shapeRefs.current.set(item.id, node);
-                  }}
-                  onGuidesChange={onGuidesChange}
-                  onSelectItem={onSelectItem}
-                  onUpdateItem={onUpdateItem}
-                />
-              ))}
+              {renderedItems.map((item) =>
+                item.kind === 'line' ? (
+                  <LineItemView
+                    key={item.id}
+                    activeTool={activeTool}
+                    isSelected={item.id === selectedItemId}
+                    item={item}
+                    siblingItems={renderedItems.filter((entry) => entry.id !== item.id)}
+                    stageSize={document.canvas}
+                    shapeRef={(node) => {
+                      if (!node) {
+                        shapeRefs.current.delete(item.id);
+                        return;
+                      }
+                      shapeRefs.current.set(item.id, node);
+                    }}
+                    onGuidesChange={onGuidesChange}
+                    onSelectItem={onSelectItem}
+                    onUpdateItem={onUpdateItem}
+                  />
+                ) : (
+                  <ShapeItemView
+                    key={item.id}
+                    activeTool={activeTool}
+                    item={item}
+                    siblingItems={renderedItems.filter((entry) => entry.id !== item.id)}
+                    stageSize={document.canvas}
+                    shapeRef={(node) => {
+                      if (!node) {
+                        shapeRefs.current.delete(item.id);
+                        return;
+                      }
+                      shapeRefs.current.set(item.id, node);
+                    }}
+                    onGuidesChange={onGuidesChange}
+                    onSelectItem={onSelectItem}
+                    onUpdateItem={onUpdateItem}
+                  />
+                )
+              )}
               {guides.map((guide) =>
                 guide.orientation === 'vertical' ? (
                   <Line
@@ -421,8 +597,27 @@ export function CanvasStage({
                 ref={transformerRef}
                 rotateEnabled
                 flipEnabled={false}
+                onTransformStart={() => {
+                  if (!selectedRenderedItem || selectedRenderedItem.kind === 'line') {
+                    return;
+                  }
+                  const renderBox = getRenderBox(selectedRenderedItem);
+                  setTransformPreview({
+                    itemId: selectedRenderedItem.id,
+                    x: renderBox.x,
+                    y: renderBox.y,
+                    width: renderBox.width,
+                    height: renderBox.height,
+                    rotation: selectedRenderedItem.rotation,
+                  });
+                }}
                 boundBoxFunc={(oldBox, newBox) => {
-                  if (!selectedItem || selectedItem.kind === 'line') {
+                  if (!selectedRenderedItem || selectedRenderedItem.kind === 'line') {
+                    return newBox;
+                  }
+                  const activeAnchor = transformerRef.current?.getActiveAnchor() ?? null;
+                  if (!shouldApplyLiveTransform(activeAnchor)) {
+                    onGuidesChange([]);
                     return newBox;
                   }
                   const snapped = getSnappedRect(
@@ -432,7 +627,7 @@ export function CanvasStage({
                       width: Math.max(newBox.width, 20),
                       height: Math.max(newBox.height, 20),
                     },
-                    orderedItems.filter((item) => item.id !== selectedItem.id),
+                    renderedItems.filter((item) => item.id !== selectedRenderedItem.id),
                     { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }
                   );
                   onGuidesChange(snapped.guides);
@@ -445,23 +640,25 @@ export function CanvasStage({
                   };
                 }}
                 onTransform={() => {
-                  const changes = getTransformerChanges();
-                  if (!changes || !selectedItemId) {
-                    return;
-                  }
-                  onLiveUpdateItem(selectedItemId, changes);
+                  updatePreviewFromNode();
                 }}
                 onTransformEnd={() => {
-                  const changes = getTransformerChanges();
-                  if (!changes || !selectedItemId) {
+                  const commit = updatePreviewFromNode();
+                  if (!commit || !selectedItemId) {
+                    setTransformPreview(null);
                     return;
                   }
                   onGuidesChange([]);
-                  onUpdateItem(selectedItemId, changes);
+                  onUpdateItem(selectedItemId, commit);
+                  setTransformPreview(null);
                 }}
               />
             </Layer>
           </Stage>
+        </div>
+        <div className="canvas-debug" aria-hidden="true">
+          <pre data-testid="stage-debug">{JSON.stringify(debugInfo)}</pre>
+          <pre data-testid="selected-item-debug">{JSON.stringify(debugInfo)}</pre>
         </div>
       </div>
     </div>

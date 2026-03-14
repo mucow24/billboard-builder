@@ -243,9 +243,6 @@ export default function App() {
             document={document}
             guides={guides}
             onGuidesChange={setGuides}
-            onLiveUpdateItem={(itemId, changes) => {
-              dispatch({ type: 'update_item_live', itemId, changes });
-            }}
             onSelectItem={selectSingleItem}
             onUpdateItem={(itemId, changes) => {
               dispatch({ type: 'update_item', itemId, changes });
