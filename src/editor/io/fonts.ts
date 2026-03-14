@@ -1,6 +1,6 @@
 import type { DocumentFontReference, UploadedFont } from '../model/types';
 
-const bundledFontUrls = import.meta.glob('../assets/fonts/*.{ttf,otf,woff,woff2}', {
+const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,woff2}', {
   query: '?url',
   import: 'default',
   eager: true,
@@ -33,16 +33,27 @@ export async function registerFontFile(file: File): Promise<UploadedFont> {
   return registerFontSource(family, file.name, arrayBuffer);
 }
 
-export async function loadBundledFonts(): Promise<UploadedFont[]> {
-  const fontEntries = Object.entries(bundledFontUrls);
-  const fonts = await Promise.all(
+export async function loadFontEntries(
+  fontEntries: Array<[string, string]>
+): Promise<UploadedFont[]> {
+  const loadedFonts = await Promise.allSettled(
     fontEntries.map(async ([path, url]) => {
       const sourceName = path.split('/').at(-1) ?? 'Bundled Font';
       return registerFontSource(fontFamilyFromSourceName(sourceName), sourceName, url);
     })
   );
 
-  return fonts;
+  return loadedFonts.flatMap((result) => {
+    if (result.status === 'fulfilled') {
+      return [result.value];
+    }
+    console.warn('Skipping bundled font that failed to load.', result.reason);
+    return [];
+  });
+}
+
+export async function loadBundledFonts(): Promise<UploadedFont[]> {
+  return loadFontEntries(Object.entries(bundledFontUrls));
 }
 
 export function toFontReference(font: UploadedFont): DocumentFontReference {
