@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CANVAS_PRESETS,
+  DUPLICATE_ITEM_OFFSET,
+  cloneCanvasItem,
   createEllipseItem,
   createImageItem,
   createLineItem,
@@ -63,5 +65,35 @@ describe('default item factories', () => {
       [512, 1024],
       [512, 512],
     ]);
+  });
+
+  it('clones regular and line items with new ids and a visible offset', () => {
+    const rectangleItem = createRectangleItem({ x: 40, y: 60 });
+    const clonedRectangle = cloneCanvasItem(rectangleItem);
+    const lineItem = createLineItem({
+      x: 10,
+      y: 20,
+      startX: 10,
+      startY: 20,
+      endX: 110,
+      endY: 120,
+    });
+    const clonedLine = cloneCanvasItem(lineItem);
+
+    expect(clonedRectangle.id).not.toBe(rectangleItem.id);
+    expect(clonedRectangle.x).toBe(rectangleItem.x + DUPLICATE_ITEM_OFFSET);
+    expect(clonedRectangle.y).toBe(rectangleItem.y + DUPLICATE_ITEM_OFFSET);
+
+    expect(clonedLine.id).not.toBe(lineItem.id);
+    expect(clonedLine.x).toBe(lineItem.x + DUPLICATE_ITEM_OFFSET);
+    expect(clonedLine.y).toBe(lineItem.y + DUPLICATE_ITEM_OFFSET);
+    expect(clonedLine.kind).toBe('line');
+    if (clonedLine.kind !== 'line') {
+      throw new Error('Expected a line item clone');
+    }
+    expect(clonedLine.startX).toBe(lineItem.startX + DUPLICATE_ITEM_OFFSET);
+    expect(clonedLine.startY).toBe(lineItem.startY + DUPLICATE_ITEM_OFFSET);
+    expect(clonedLine.endX).toBe(lineItem.endX + DUPLICATE_ITEM_OFFSET);
+    expect(clonedLine.endY).toBe(lineItem.endY + DUPLICATE_ITEM_OFFSET);
   });
 });

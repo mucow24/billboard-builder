@@ -31,6 +31,8 @@ export const WEB_SAFE_FONTS = [
   'Verdana',
 ] as const;
 
+export const DUPLICATE_ITEM_OFFSET = 24;
+
 const DEFAULT_CANVAS: CanvasSize = {
   width: 1024,
   height: 1024,
@@ -154,4 +156,31 @@ export function createImageItem(
     preserveAspectRatio: true,
     ...input,
   };
+}
+
+export function cloneCanvasItem(
+  item: CanvasItem,
+  offset: { x: number; y: number } = {
+    x: DUPLICATE_ITEM_OFFSET,
+    y: DUPLICATE_ITEM_OFFSET,
+  }
+): CanvasItem {
+  const clonedItem: CanvasItem = {
+    ...item,
+    id: crypto.randomUUID(),
+    x: item.x + offset.x,
+    y: item.y + offset.y,
+  };
+
+  if (item.kind === 'line') {
+    return {
+      ...clonedItem,
+      startX: item.startX + offset.x,
+      startY: item.startY + offset.y,
+      endX: item.endX + offset.x,
+      endY: item.endY + offset.y,
+    };
+  }
+
+  return clonedItem;
 }

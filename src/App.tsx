@@ -5,7 +5,7 @@ import { CanvasStage } from './editor/canvas/CanvasStage';
 import { ToolPalette } from './editor/components/ToolPalette';
 import { Toolbar } from './editor/components/Toolbar';
 import { PropertiesPanel } from './editor/components/PropertiesPanel';
-import { createImageItem } from './editor/model/defaults';
+import { cloneCanvasItem, createImageItem } from './editor/model/defaults';
 import { downloadStageAsPng } from './editor/io/exportPng';
 import {
   findMissingFonts,
@@ -29,6 +29,16 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.isContentEditable ||
+    ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+  );
+}
+
 export default function App() {
   const stageRef = useRef<Konva.Stage | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -36,6 +46,7 @@ export default function App() {
   const openInputRef = useRef<HTMLInputElement | null>(null);
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [clipboardItem, setClipboardItem] = useState<CanvasItem | null>(null);
 
   const {
     activeTool,
@@ -102,6 +113,10 @@ export default function App() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      const hasModifier = event.ctrlKey || event.metaKey;
+      const isEditable = isEditableTarget(event.target);
+      const pressedKey = event.key.toLowerCase();
+
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         if (event.shiftKey) {
@@ -116,12 +131,47 @@ export default function App() {
         redo();
         return;
       }
+      if (hasModifier && !isEditable && pressedKey === 'c') {
+        event.preventDefault();
+        if (selectedItem) {
+          setClipboardItem(selectedItem);
+        }
+        return;
+      }
+      if (hasModifier && !isEditable && pressedKey === 'v') {
+        event.preventDefault();
+        if (clipboardItem) {
+          dispatch({ type: 'add_item', item: cloneCanvasItem(clipboardItem) });
+        }
+        return;
+      }
+      if (hasModifier && !isEditable && pressedKey === 'x') {
+        event.preventDefault();
+        if (selectedItem) {
+          setClipboardItem(selectedItem);
+          deleteSelectedItems();
+        }
+        return;
+      }
+      if (hasModifier && !isEditable && pressedKey === 'd') {
+        event.preventDefault();
+        if (selectedItem) {
+          dispatch({ type: 'add_item', item: cloneCanvasItem(selectedItem) });
+        }
+        return;
+      }
+      if (hasModifier && !isEditable && event.key === 'ArrowUp') {
+        event.preventDefault();
+        reorderSelectedItem(event.shiftKey ? 'front' : 'forward');
+        return;
+      }
+      if (hasModifier && !isEditable && event.key === 'ArrowDown') {
+        event.preventDefault();
+        reorderSelectedItem(event.shiftKey ? 'back' : 'backward');
+        return;
+      }
       if (event.key === 'Delete' || event.key === 'Backspace') {
-        const target = event.target as HTMLElement | null;
-        const isInputFocused = target
-          ? ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-          : false;
-        if (isInputFocused) {
+        if (isEditable) {
           return;
         }
         event.preventDefault();
@@ -139,8 +189,10 @@ export default function App() {
         setActiveTool('select');
         return;
       }
-      const pressedKey = event.key.toLowerCase() as 'v' | 't' | 'r' | 'o' | 'l';
-      const tool = hotkeyMap.get(pressedKey);
+      if (hasModifier || isEditable) {
+        return;
+      }
+      const tool = hotkeyMap.get(pressedKey as 'v' | 't' | 'r' | 'o' | 'l');
       if (tool) {
         setActiveTool(tool);
       }
@@ -148,7 +200,16 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [deleteSelectedItems, redo, setActiveTool, undo]);
+  }, [
+    clipboardItem,
+    deleteSelectedItems,
+    dispatch,
+    redo,
+    reorderSelectedItem,
+    selectedItem,
+    setActiveTool,
+    undo,
+  ]);
 
   async function handleImageUpload(files: FileList | null) {
     const file = files?.[0];

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
 import {
+  DUPLICATE_ITEM_OFFSET,
   createDefaultProjectDocument,
   createRectangleItem,
   createTextItem,
@@ -95,6 +96,89 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: /Arrow/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('copies, pastes, cuts, and duplicates the selected item with keyboard shortcuts', async () => {
+    const user = userEvent.setup();
+    const rectangleItem = createRectangleItem({ x: 40, y: 60 });
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [rectangleItem],
+        selectedItemIds: [rectangleItem.id],
+      },
+    });
+    render(<App />);
+
+    await user.keyboard('{Control>}c{/Control}');
+    await user.keyboard('{Control>}v{/Control}');
+
+    let items = useEditorStore.getState().document.items;
+    expect(items).toHaveLength(2);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[1].id]);
+    expect(items[1].x).toBe(rectangleItem.x + DUPLICATE_ITEM_OFFSET);
+    expect(items[1].y).toBe(rectangleItem.y + DUPLICATE_ITEM_OFFSET);
+
+    await user.keyboard('{Control>}d{/Control}');
+
+    items = useEditorStore.getState().document.items;
+    expect(items).toHaveLength(3);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[2].id]);
+    expect(items[2].x).toBe(items[1].x + DUPLICATE_ITEM_OFFSET);
+    expect(items[2].y).toBe(items[1].y + DUPLICATE_ITEM_OFFSET);
+
+    await user.keyboard('{Control>}x{/Control}');
+    expect(useEditorStore.getState().document.items).toHaveLength(2);
+
+    await user.keyboard('{Control>}v{/Control}');
+    items = useEditorStore.getState().document.items;
+    expect(items).toHaveLength(3);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[2].id]);
+    expect(items[2].x).toBe(items[1].x + DUPLICATE_ITEM_OFFSET);
+    expect(items[2].y).toBe(items[1].y + DUPLICATE_ITEM_OFFSET);
+  });
+
+  it('reorders the selected item with keyboard shortcuts', async () => {
+    const user = userEvent.setup();
+    const firstItem = createRectangleItem({ name: 'Bottom', zIndex: 0 });
+    const secondItem = createRectangleItem({ name: 'Middle', zIndex: 1 });
+    const thirdItem = createRectangleItem({ name: 'Top', zIndex: 2 });
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [firstItem, secondItem, thirdItem],
+        selectedItemIds: [secondItem.id],
+      },
+    });
+    render(<App />);
+
+    await user.keyboard('{Control>}{ArrowUp}{/Control}');
+    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
+      firstItem.id,
+      thirdItem.id,
+      secondItem.id,
+    ]);
+
+    await user.keyboard('{Control>}{ArrowDown}{/Control}');
+    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
+      firstItem.id,
+      secondItem.id,
+      thirdItem.id,
+    ]);
+
+    await user.keyboard('{Control>}{Shift>}{ArrowUp}{/Shift}{/Control}');
+    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
+      firstItem.id,
+      thirdItem.id,
+      secondItem.id,
+    ]);
+
+    await user.keyboard('{Control>}{Shift>}{ArrowDown}{/Shift}{/Control}');
+    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
+      secondItem.id,
+      firstItem.id,
+      thirdItem.id,
+    ]);
+  });
+
   it('does not delete the selected item while a text field is focused', async () => {
     const user = userEvent.setup();
     const textItem = createTextItem();
@@ -114,6 +198,46 @@ describe('App shell', () => {
     expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
     expect(document.querySelectorAll('.layer-row')).toHaveLength(1);
     expect(screen.getByLabelText('Text content')).toBeInTheDocument();
+  });
+
+  it('ignores clipboard and reorder shortcuts while a text field is focused', async () => {
+    const user = userEvent.setup();
+    const textItem = createTextItem();
+    const secondItem = createRectangleItem({ name: 'Rectangle', zIndex: 1 });
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [textItem, secondItem],
+        selectedItemIds: [textItem.id],
+      },
+    });
+    render(<App />);
+
+    const textarea = screen.getByLabelText('Text content');
+    await user.click(textarea);
+    await user.keyboard('{Control>}c{/Control}');
+    await user.keyboard('{Control>}v{/Control}');
+    await user.keyboard('{Control>}x{/Control}');
+    await user.keyboard('{Control>}{ArrowUp}{/Control}');
+
+    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
+      textItem.id,
+      secondItem.id,
+    ]);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([textItem.id]);
+  });
+
+  it('treats clipboard shortcuts without selection or clipboard contents as no-ops', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.keyboard('{Control>}c{/Control}');
+    await user.keyboard('{Control>}v{/Control}');
+    await user.keyboard('{Control>}x{/Control}');
+    await user.keyboard('{Control>}d{/Control}');
+
+    expect(useEditorStore.getState().document.items).toHaveLength(0);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([]);
   });
 
   it('cancels create mode with escape', async () => {
