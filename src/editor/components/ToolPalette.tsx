@@ -11,10 +11,9 @@ const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string }> = [
 interface ToolPaletteProps {
   activeTool: CanvasTool;
   onChange: (tool: CanvasTool) => void;
-  onCreate: (tool: Exclude<CanvasTool, 'select'>) => void;
 }
 
-export function ToolPalette({ activeTool, onChange, onCreate }: ToolPaletteProps) {
+export function ToolPalette({ activeTool, onChange }: ToolPaletteProps) {
   return (
     <aside className="tool-palette" aria-label="Tools">
       {TOOLS.map((tool) => (
@@ -23,11 +22,7 @@ export function ToolPalette({ activeTool, onChange, onCreate }: ToolPaletteProps
           className={tool.id === activeTool ? 'tool-button active' : 'tool-button'}
           type="button"
           onClick={() => {
-            if (tool.id === 'select') {
-              onChange(tool.id);
-              return;
-            }
-            onCreate(tool.id);
+            onChange(tool.id);
           }}
           aria-pressed={tool.id === activeTool}
         >

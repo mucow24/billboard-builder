@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
-import { createDefaultProjectDocument, createRectangleItem } from './editor/model/defaults';
+import {
+  createDefaultProjectDocument,
+  createRectangleItem,
+  createTextItem,
+} from './editor/model/defaults';
 import { serializeProjectDocument } from './editor/model/schema';
 import { AUTOSAVE_KEY } from './editor/io/projectFile';
 import { useEditorStore } from './editor/state/store';
@@ -50,14 +54,14 @@ describe('App shell', () => {
     resetEditorStore();
   });
 
-  it('places a rectangle from the tool palette and returns to arrow mode', async () => {
+  it('switches into rectangle creation mode from the tool palette', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: /Rect/ }));
 
-    expect(screen.getAllByText('Rectangle')).toHaveLength(2);
-    expect(screen.getByTestId('mock-stage')).toHaveTextContent('Tool: select / Items: 1');
+    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('mock-stage')).toHaveTextContent('Tool: rectangle / Items: 0');
   });
 
   it('starts with a transparent background and exposes alpha controls', () => {
@@ -87,24 +91,21 @@ describe('App shell', () => {
     await user.keyboard('t');
     expect(screen.getByRole('button', { name: /Text/ })).toHaveAttribute('aria-pressed', 'true');
 
-    await user.click(screen.getByRole('button', { name: /Rect/ }));
-    expect(screen.getAllByText('Rectangle')).toHaveLength(2);
-
-    await user.keyboard('{Control>}z{/Control}');
-    expect(screen.queryByText('Rectangle')).not.toBeInTheDocument();
-
-    await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
-    expect(screen.getAllByText('Rectangle')).toHaveLength(2);
-
-    await user.keyboard('{Control>}y{/Control}');
-    expect(screen.getAllByText('Rectangle')).toHaveLength(2);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: /Arrow/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('does not delete the selected item while a text field is focused', async () => {
     const user = userEvent.setup();
+    const textItem = createTextItem();
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [textItem],
+        selectedItemIds: [textItem.id],
+      },
+    });
     render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /Text/ }));
 
     const textarea = screen.getByLabelText('Text content');
     await user.click(textarea);
@@ -113,6 +114,17 @@ describe('App shell', () => {
     expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
     expect(document.querySelectorAll('.layer-row')).toHaveLength(1);
     expect(screen.getByLabelText('Text content')).toBeInTheDocument();
+  });
+
+  it('cancels create mode with escape', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.keyboard('r');
+    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: /Arrow/ })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows a visible error when opening an invalid project file', async () => {

@@ -1,0 +1,19 @@
+Please do:
+- Keyboard shortcuts:
+  Control-c : Copy
+  Control-v : Paste
+  Control-x : Cut
+  Control-d : Duplicate
+  Control-Up : bring item forward
+  Control-Shift-Up: bring item to top
+  Control-Down : push item back 
+  Control-Shift-Down: push item to bottom
+- A real color picker with:
+  - A color wheel
+  - hex input / output
+  - HSL sliders
+  - I'd love to not have to roll our own for this?
+- Font list should show font previews
+==== Ignore for now
+- Drag layers to rearrange them
+- Ability to name layers

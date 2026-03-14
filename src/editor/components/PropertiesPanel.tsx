@@ -354,7 +354,7 @@ export function PropertiesPanel({
       ) : (
         <section className="panel-section empty-panel">
           <h2>No selection</h2>
-          <p>Select an item to edit it. Tool buttons place a new item immediately.</p>
+          <p>Select an item to edit it, or choose a tool and drag a new item onto the canvas.</p>
           {availableFonts.length > 0 ? (
             <p>{availableFonts.length} uploaded font(s) ready in this session.</p>
           ) : null}

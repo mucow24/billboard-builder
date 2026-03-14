@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import { DEFAULT_CREATE_SIZES, DEFAULT_CREATE_START } from './editorFixtures';
+
 interface ClientRectJson {
   x: number;
   y: number;
@@ -12,6 +14,8 @@ export interface StageDebugJson {
     width: number;
     height: number;
   };
+  sessionKind?: string | null;
+  sessionHandle?: string | null;
   activeAnchor: string | null;
   documentItem: Record<string, unknown> | null;
   previewItem: Record<string, unknown> | null;
@@ -75,8 +79,65 @@ export class EditorPage {
     return box;
   }
 
+  async waitForSelectedItemReady() {
+    await expect
+      .poll(async () => {
+        const debug = await this.getSelectedItemDebug();
+        return {
+          kind: debug.documentItem?.kind ?? null,
+          hasRect: Boolean(debug.nodeClientRect),
+        };
+      })
+      .toEqual(
+        expect.objectContaining({
+          hasRect: true,
+        })
+      );
+  }
+
   async createItem(buttonName: 'Rect' | 'Text' | 'Ellipse' | 'Line') {
-    await this.page.locator('.tool-palette').getByRole('button', { name: new RegExp(buttonName) }).click();
+    const toolButton = this.page
+      .locator('.tool-palette')
+      .getByRole('button', { name: new RegExp(buttonName) });
+    await toolButton.click();
+    await expect(toolButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(this.stage).toHaveCSS('cursor', 'crosshair');
+    const size = DEFAULT_CREATE_SIZES[buttonName];
+    const stageBox = await this.stageBox();
+    const startX = stageBox.x + DEFAULT_CREATE_START.x;
+    const startY = stageBox.y + DEFAULT_CREATE_START.y;
+    const endX = startX + size.width;
+    const endY = startY + size.height;
+    await this.page.mouse.move(startX, startY);
+    await this.page.mouse.down();
+    await this.page.mouse.move(endX, endY, { steps: 16 });
+    await this.page.mouse.up();
+    await this.waitForSelectedItemReady();
+    await expect(this.page.getByRole('button', { name: 'Arrow' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  }
+
+  async dragCreateItem(
+    buttonName: 'Rect' | 'Text' | 'Ellipse' | 'Line',
+    start: { x: number; y: number },
+    delta: { x: number; y: number }
+  ) {
+    const toolButton = this.page
+      .locator('.tool-palette')
+      .getByRole('button', { name: new RegExp(buttonName) });
+    await toolButton.click();
+    await expect(toolButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(this.stage).toHaveCSS('cursor', 'crosshair');
+    const stageBox = await this.stageBox();
+    await this.page.mouse.move(stageBox.x + start.x, stageBox.y + start.y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(stageBox.x + start.x + delta.x, stageBox.y + start.y + delta.y, {
+      steps: 16,
+    });
+    await this.page.mouse.up();
+    await this.waitForSelectedItemReady();
   }
 
   async clickCanvasBackground() {

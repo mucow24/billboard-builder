@@ -17,7 +17,11 @@ test('@p0 covers tool switching and canvas selection flows', async ({ page }) =>
   await page.keyboard.press('KeyV');
   await expect(page.getByRole('button', { name: 'Arrow' })).toHaveAttribute('aria-pressed', 'true');
 
-  await editor.createItem('Rect');
+  await editor.dragCreateItem(
+    'Rect',
+    { x: 300, y: 260 },
+    { x: 240, y: 120 }
+  );
   await expect(page.getByRole('button', { name: 'Arrow' })).toHaveAttribute('aria-pressed', 'true');
   await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
   const selectedBeforeDeselect = await editor.getSelectedItemDebug();
@@ -30,12 +34,46 @@ test('@p0 covers tool switching and canvas selection flows', async ({ page }) =>
   await expect(page.getByText('No selection')).toBeVisible();
 
   const center = getRectCenter(selectedRect);
-  await editor.stage.locator('canvas').click({
-    position: {
-      x: center.x,
-      y: center.y,
-    },
-  });
+  const stageBox = await editor.stageBox();
+  await page.mouse.click(stageBox.x + center.x, stageBox.y + center.y);
+  await expect
+    .poll(async () => {
+      const debug = await editor.getSelectedItemDebug();
+      return debug.documentItem ? (debug.documentItem.kind as string) : null;
+    })
+    .toBe('rectangle');
+});
+
+test('@p0 enters create mode with a crosshair and returns to arrow after drag-create', async ({
+  page,
+}) => {
+  const editor = new EditorPage(page);
+  await editor.goto();
+
+  await page.getByRole('button', { name: 'Rect' }).click();
+  await expect(page.getByRole('button', { name: 'Rect' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(editor.stage).toHaveCSS('cursor', 'crosshair');
+
+  const stageBox = await editor.stageBox();
+  await page.mouse.move(stageBox.x + 180, stageBox.y + 160);
+  await page.mouse.down();
+  await page.mouse.move(stageBox.x + 420, stageBox.y + 320, { steps: 20 });
+
+  const midDebug = await editor.getSelectedItemDebug();
+  const previewItem = midDebug.previewItem as
+    | { kind: string; width: number; height: number }
+    | null;
+  if (!previewItem) {
+    throw new Error('Expected preview item while drag-creating');
+  }
+  expect(previewItem.kind).toBe('rectangle');
+  expect(previewItem.width).toBeGreaterThan(200);
+  expect(previewItem.height).toBeGreaterThan(100);
+
+  await page.mouse.up();
+
+  await expect(page.getByRole('button', { name: 'Arrow' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(editor.layerRows).toHaveCount(1);
   await expect
     .poll(async () => {
       const debug = await editor.getSelectedItemDebug();
@@ -65,9 +103,17 @@ test('@p1 snaps a dragged rectangle onto a sibling alignment target', async ({ p
 
   await page.mouse.move(stageBox.x + center.x, stageBox.y + center.y);
   await page.mouse.down();
-  await page.mouse.move(stageBox.x + center.x + targetDeltaX, stageBox.y + center.y, {
-    steps: 20,
-  });
+  let guideEngaged = false;
+  for (let step = 1; step <= 20; step += 1) {
+    await page.mouse.move(stageBox.x + center.x + (targetDeltaX / 20) * step, stageBox.y + center.y, {
+      steps: 1,
+    });
+    if ((await page.getByTestId('guide-count').textContent()) !== 'Guides: 0') {
+      guideEngaged = true;
+      break;
+    }
+  }
+  expect(guideEngaged).toBe(true);
   await page.mouse.up();
 
   const snappedRect = (await editor.getSelectedItemDebug()).documentItem as { x: number; y: number };

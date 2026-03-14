@@ -25,13 +25,6 @@ function getPointerCenteredPosition(x: number, y: number) {
   };
 }
 
-function getCanvasCenteredPosition(width: number, height: number) {
-  return {
-    x: Math.max(16, width / 2 - 120),
-    y: Math.max(16, height / 2 - 60),
-  };
-}
-
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -67,7 +60,6 @@ export default function App() {
     setMissingFontFamilies,
     undo,
     updateSelectedItem,
-    createItemAt,
   } = useEditorStore();
 
   const selectedItem = document.items.find(
@@ -143,6 +135,10 @@ export default function App() {
         ['o', 'ellipse'],
         ['l', 'line'],
       ] as const);
+      if (event.key === 'Escape') {
+        setActiveTool('select');
+        return;
+      }
       const pressedKey = event.key.toLowerCase() as 'v' | 't' | 'r' | 'o' | 'l';
       const tool = hotkeyMap.get(pressedKey);
       if (tool) {
@@ -248,21 +244,14 @@ export default function App() {
         <ToolPalette
           activeTool={activeTool}
           onChange={setActiveTool}
-          onCreate={(tool) => {
-            const position = getCanvasCenteredPosition(
-              document.canvas.width,
-              document.canvas.height
-            );
-            createItemAt(tool, position.x, position.y);
-          }}
         />
 
         <main className="canvas-workspace">
           <section className="canvas-callout">
             <h1>Billboard Builder</h1>
             <p>
-              Tool buttons place a new item at center stage. Use Arrow to move, resize, rotate,
-              or edit endpoints for lines.
+              Choose a tool, drag out a new item on the canvas, and then use Arrow to move,
+              resize, rotate, or edit endpoints for lines.
             </p>
           </section>
           <CanvasStage
@@ -274,6 +263,8 @@ export default function App() {
             onUpdateItem={(itemId, changes) => {
               dispatch({ type: 'update_item', itemId, changes });
             }}
+            onAddItem={(item) => dispatch({ type: 'add_item', item })}
+            onSetActiveTool={setActiveTool}
             stageRef={stageRef}
           />
         </main>
