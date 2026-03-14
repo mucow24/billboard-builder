@@ -266,9 +266,86 @@ button {
   color: #cbd5e1;
 }
 
+.field-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  color: #cbd5e1;
+}
+
 .properties-panel textarea {
   min-height: 84px;
   resize: vertical;
+}
+
+.font-family-picker {
+  position: relative;
+}
+
+.font-family-picker-trigger {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #f8fafc;
+}
+
+.font-family-picker-trigger:focus-visible,
+.font-family-picker-listbox:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.8);
+  outline-offset: 2px;
+}
+
+.font-family-picker-trigger-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.font-family-picker-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: 10;
+}
+
+.font-family-picker-listbox {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.98);
+  box-shadow:
+    0 20px 32px rgba(15, 23, 42, 0.45),
+    inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+.font-family-picker-option {
+  min-height: 48px;
+  padding: 0.75rem 0.85rem;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.font-family-picker-option:hover,
+.font-family-picker-option.active {
+  background: rgba(14, 165, 233, 0.14);
+}
+
+.font-family-picker-option.selected {
+  background: rgba(56, 189, 248, 0.2);
+}
+
+.font-family-picker-option-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .color-control {

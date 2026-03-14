@@ -165,22 +165,25 @@ export function cloneCanvasItem(
     y: DUPLICATE_ITEM_OFFSET,
   }
 ): CanvasItem {
-  const clonedItem: CanvasItem = {
-    ...item,
-    id: crypto.randomUUID(),
-    x: item.x + offset.x,
-    y: item.y + offset.y,
-  };
-
   if (item.kind === 'line') {
-    return {
-      ...clonedItem,
+    const clonedLineItem: LineCanvasItem = {
+      ...item,
+      id: crypto.randomUUID(),
+      x: item.x + offset.x,
+      y: item.y + offset.y,
       startX: item.startX + offset.x,
       startY: item.startY + offset.y,
       endX: item.endX + offset.x,
       endY: item.endY + offset.y,
     };
+
+    return clonedLineItem;
   }
 
-  return clonedItem;
+  return {
+    ...item,
+    id: crypto.randomUUID(),
+    x: item.x + offset.x,
+    y: item.y + offset.y,
+  };
 }

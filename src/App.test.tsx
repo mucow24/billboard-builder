@@ -124,6 +124,7 @@ describe('App shell', () => {
     expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[2].id]);
     expect(items[2].x).toBe(items[1].x + DUPLICATE_ITEM_OFFSET);
     expect(items[2].y).toBe(items[1].y + DUPLICATE_ITEM_OFFSET);
+    const cutItem = items[2];
 
     await user.keyboard('{Control>}x{/Control}');
     expect(useEditorStore.getState().document.items).toHaveLength(2);
@@ -132,8 +133,8 @@ describe('App shell', () => {
     items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(3);
     expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[2].id]);
-    expect(items[2].x).toBe(items[1].x + DUPLICATE_ITEM_OFFSET);
-    expect(items[2].y).toBe(items[1].y + DUPLICATE_ITEM_OFFSET);
+    expect(items[2].x).toBe(cutItem.x + DUPLICATE_ITEM_OFFSET);
+    expect(items[2].y).toBe(cutItem.y + DUPLICATE_ITEM_OFFSET);
   });
 
   it('reorders the selected item with keyboard shortcuts', async () => {
@@ -268,5 +269,56 @@ describe('App shell', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Failed to open project');
     });
+  });
+
+  it('keeps tool hotkeys and escape scoped away from the open font picker', async () => {
+    const user = userEvent.setup();
+    const textItem = createTextItem();
+    useEditorStore.setState({
+      activeTool: 'rectangle',
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [textItem],
+        selectedItemIds: [textItem.id],
+      },
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+    expect(screen.getByRole('listbox', { name: 'Font family' })).toBeInTheDocument();
+
+    await user.keyboard('t');
+    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('ignores delete, clipboard, and reorder shortcuts while the font picker is open', async () => {
+    const user = userEvent.setup();
+    const textItem = createTextItem();
+    const secondItem = createRectangleItem({ name: 'Rectangle', zIndex: 1 });
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [textItem, secondItem],
+        selectedItemIds: [textItem.id],
+      },
+    });
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+    await user.keyboard('{Backspace}');
+    await user.keyboard('{Control>}c{/Control}');
+    await user.keyboard('{Control>}v{/Control}');
+    await user.keyboard('{Control>}x{/Control}');
+    await user.keyboard('{Control>}{ArrowUp}{/Control}');
+
+    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
+      textItem.id,
+      secondItem.id,
+    ]);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([textItem.id]);
   });
 });

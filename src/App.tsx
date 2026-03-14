@@ -35,6 +35,7 @@ function isEditableTarget(target: EventTarget | null) {
   }
   return (
     target.isContentEditable ||
+    Boolean(target.closest('[data-editor-interactive="true"]')) ||
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
   );
 }
@@ -186,6 +187,9 @@ export default function App() {
         ['l', 'line'],
       ] as const);
       if (event.key === 'Escape') {
+        if (isEditable) {
+          return;
+        }
         setActiveTool('select');
         return;
       }

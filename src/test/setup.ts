@@ -23,3 +23,8 @@ Object.defineProperty(document, 'fonts', {
 });
 
 vi.stubGlobal('FontFace', TestFontFace);
+
+Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+  configurable: true,
+  value: vi.fn(),
+});

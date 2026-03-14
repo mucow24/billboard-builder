@@ -87,7 +87,14 @@ describe('PropertiesPanel', () => {
       />
     );
 
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+
     expect(screen.getAllByRole('option', { name: 'Session Sans' })).toHaveLength(1);
+    expect(screen.getByRole('option', { name: 'Session Sans' }).getAttribute('style')).toContain(
+      'Session Sans'
+    );
+
+    await user.click(screen.getByRole('option', { name: 'Arial' }));
 
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Headline' },
@@ -97,6 +104,7 @@ describe('PropertiesPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Bring front' }));
 
     expect(onItemChange).toHaveBeenCalledWith({ text: 'Headline' });
+    expect(onItemChange).toHaveBeenCalledWith({ fontFamily: 'Arial' });
     expect(onItemChange).toHaveBeenCalledWith({ align: 'center' });
     expect(onItemChange).toHaveBeenCalledWith({
       fontWeight: 'bold',

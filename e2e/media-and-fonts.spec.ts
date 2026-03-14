@@ -16,7 +16,12 @@ test('@p1 reopens uploaded-font projects with a missing-font warning and keeps e
 
   await editor.uploadFont(FONT_PATH);
   await editor.createItem('Text');
-  await page.getByLabel('Font family').selectOption('DejaVuSans');
+  await editor.selectFontFamily('DejaVuSans');
+  const fontTrigger = page.getByTestId('font-family-picker-trigger');
+  await expect(fontTrigger).toContainText('DejaVuSans');
+  await expect
+    .poll(async () => fontTrigger.evaluate((element) => getComputedStyle(element).fontFamily))
+    .toMatch(/DejaVuSans/i);
 
   const projectDownload = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save' }).click();

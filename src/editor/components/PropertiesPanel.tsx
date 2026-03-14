@@ -1,6 +1,9 @@
+import { useId } from 'react';
+
 import { parseHexColor, toHexColorWithAlpha } from '../model/colors';
 import { DEFAULT_FONT_FAMILY, WEB_SAFE_FONTS } from '../model/defaults';
 import type { CanvasItem, DocumentFontReference, UploadedFont } from '../model/types';
+import { FontFamilyPicker } from './FontFamilyPicker';
 
 interface PropertiesPanelProps {
   availableFonts: UploadedFont[];
@@ -94,6 +97,7 @@ export function PropertiesPanel({
   onReorder,
   onSelectItem,
 }: PropertiesPanelProps) {
+  const fontLabelId = useId();
   const fontOptions = [
     ...WEB_SAFE_FONTS.map((family) => ({
       family,
@@ -266,20 +270,15 @@ export function PropertiesPanel({
                   onChange={(event) => onItemChange({ text: event.target.value })}
                 />
               </label>
-              <label>
-                Font
-                <select
-                  aria-label="Font family"
+              <div className="field-label-group">
+                <span id={fontLabelId}>Font family</span>
+                <FontFamilyPicker
+                  fonts={fontOptions}
+                  labelId={fontLabelId}
                   value={selectedItem.fontFamily || DEFAULT_FONT_FAMILY}
-                  onChange={(event) => onItemChange({ fontFamily: event.target.value })}
-                >
-                  {fontOptions.map((font) => (
-                    <option key={`${font.kind}-${font.family}`} value={font.family}>
-                      {font.family}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onChange={(fontFamily) => onItemChange({ fontFamily })}
+                />
+              </div>
               <NumberInput
                 label="Font size"
                 min={8}

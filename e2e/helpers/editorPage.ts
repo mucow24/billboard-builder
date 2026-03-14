@@ -241,6 +241,11 @@ export class EditorPage {
     await this.page.getByTestId('font-upload-input').setInputFiles(file);
   }
 
+  async selectFontFamily(familyName: string) {
+    await this.page.getByTestId('font-family-picker-trigger').click();
+    await this.page.getByRole('option', { name: familyName }).click();
+  }
+
   async openProject(file: { name: string; mimeType: string; buffer: Buffer } | string) {
     await this.page.getByTestId('project-open-input').setInputFiles(file);
   }
