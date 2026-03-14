@@ -5,7 +5,12 @@ import {
   buildTransformCommit,
   getRenderBox,
 } from './transformGeometry';
-import { createEllipseItem, createRectangleItem, createTextItem } from '../model/defaults';
+import {
+  createEllipseItem,
+  createLineItem,
+  createRectangleItem,
+  createTextItem,
+} from '../model/defaults';
 
 describe('transform geometry helpers', () => {
   it('normalizes a transformer snapshot into a persisted commit', () => {
@@ -77,5 +82,66 @@ describe('transform geometry helpers', () => {
       width: 240,
       height: 80,
     });
+  });
+
+  it('clamps transformed dimensions and computes a render box for line items', () => {
+    const line = createLineItem({
+      startX: 240,
+      startY: 120,
+      endX: 160,
+      endY: 150,
+    });
+
+    expect(
+      buildTransformCommit(
+        {
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 80,
+        },
+        {
+          x: 20,
+          y: 30,
+          width: 100,
+          height: 80,
+          scaleX: 0.05,
+          scaleY: 0.1,
+          rotation: 45,
+        }
+      )
+    ).toMatchObject({
+      width: 20,
+      height: 20,
+    });
+
+    expect(getRenderBox(line)).toEqual({
+      x: 160,
+      y: 120,
+      width: 80,
+      height: 30,
+    });
+  });
+
+  it('does not apply a preview to different items or line items', () => {
+    const textItem = createTextItem();
+    const lineItem = createLineItem();
+
+    const preview = {
+      itemId: 'another-item',
+      x: 10,
+      y: 20,
+      width: 50,
+      height: 60,
+      rotation: 90,
+    };
+
+    expect(applyPreviewToItem(textItem, preview)).toBe(textItem);
+    expect(
+      applyPreviewToItem(lineItem, {
+        ...preview,
+        itemId: lineItem.id,
+      })
+    ).toBe(lineItem);
   });
 });

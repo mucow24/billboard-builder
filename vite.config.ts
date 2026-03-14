@@ -12,10 +12,14 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
       include: [
+        'src/App.tsx',
         'src/editor/model/**/*.ts',
         'src/editor/state/**/*.ts',
         'src/editor/canvas/**/*.ts',
+        'src/editor/components/**/*.tsx',
+        'src/editor/io/**/*.ts',
       ],
+      exclude: ['src/main.tsx'],
     },
   },
 });

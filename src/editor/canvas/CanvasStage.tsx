@@ -81,6 +81,27 @@ function buildHandleDebug(clientRect: {
   };
 }
 
+function getLineHandleRects(item: LineCanvasItem | undefined) {
+  if (!item) {
+    return null;
+  }
+
+  return {
+    start: {
+      x: item.startX - 8,
+      y: item.startY - 8,
+      width: 16,
+      height: 16,
+    },
+    end: {
+      x: item.endX - 8,
+      y: item.endY - 8,
+      width: 16,
+      height: 16,
+    },
+  };
+}
+
 function getTransformerAnchorRects(
   transformer: Konva.Transformer | null,
   stage: Konva.Stage | null
@@ -496,6 +517,8 @@ export function CanvasStage({
     nodeClientRect,
     anchorClientRects: getTransformerAnchorRects(transformerRef.current, stageRef.current),
     handles: nodeClientRect ? buildHandleDebug(nodeClientRect) : null,
+    lineHandleRects:
+      selectedDocumentItem?.kind === 'line' ? getLineHandleRects(selectedDocumentItem) : null,
   };
 
   return (

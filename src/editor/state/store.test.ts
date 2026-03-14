@@ -217,4 +217,52 @@ describe('editor store history', () => {
     expect(useEditorStore.getState().historyPast.length).toBeGreaterThan(0);
     expect(useEditorStore.getState().activeTool).toBe('select');
   });
+
+  it('treats empty undo, redo, and selection convenience actions as no-ops', () => {
+    useEditorStore.getState().undo();
+    useEditorStore.getState().redo();
+    useEditorStore.getState().updateSelectedItem({ width: 320 });
+    useEditorStore.getState().deleteSelectedItems();
+    useEditorStore.getState().reorderSelectedItem('front');
+
+    expect(useEditorStore.getState().document).toEqual(createDefaultProjectDocument());
+    expect(useEditorStore.getState().canRedo()).toBe(false);
+  });
+
+  it('clears the redo stack after a new mutation and deduplicates document fonts', () => {
+    const firstItem = createRectangleItem();
+    const secondItem = createTextItem();
+
+    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().canRedo()).toBe(true);
+
+    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    expect(useEditorStore.getState().canRedo()).toBe(false);
+
+    useEditorStore.getState().dispatch({
+      type: 'register_font',
+      font: {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans.ttf',
+        kind: 'uploaded',
+      },
+    });
+    useEditorStore.getState().dispatch({
+      type: 'register_font',
+      font: {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans.ttf',
+        kind: 'uploaded',
+      },
+    });
+
+    expect(useEditorStore.getState().document.fonts).toEqual([
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans.ttf',
+        kind: 'uploaded',
+      },
+    ]);
+  });
 });

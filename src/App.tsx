@@ -32,12 +32,17 @@ function getCanvasCenteredPosition(width: number, height: number) {
   };
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export default function App() {
   const stageRef = useRef<Konva.Stage | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const fontInputRef = useRef<HTMLInputElement | null>(null);
   const openInputRef = useRef<HTMLInputElement | null>(null);
   const [guides, setGuides] = useState<GuideLine[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     activeTool,
@@ -154,17 +159,22 @@ export default function App() {
     if (!file) {
       return;
     }
-    const image = await importImageFile(file);
-    const imageItem = createImageItem({
-      src: image.src,
-      mimeType: image.mimeType,
-      originalWidth: image.width,
-      originalHeight: image.height,
-      name: image.sourceName,
-      ...getPointerCenteredPosition(180, 180),
-    });
-    addImageItem(imageItem);
-    setActiveTool('select');
+    try {
+      const image = await importImageFile(file);
+      const imageItem = createImageItem({
+        src: image.src,
+        mimeType: image.mimeType,
+        originalWidth: image.width,
+        originalHeight: image.height,
+        name: image.sourceName,
+        ...getPointerCenteredPosition(180, 180),
+      });
+      addImageItem(imageItem);
+      setActiveTool('select');
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(`Failed to import image: ${getErrorMessage(error, 'Unknown error.')}`);
+    }
   }
 
   async function handleFontUpload(files: FileList | null) {
@@ -172,12 +182,17 @@ export default function App() {
     if (!file) {
       return;
     }
-    const uploadedFont = await registerFontFile(file);
-    registerAvailableFont(uploadedFont);
-    dispatch({
-      type: 'register_font',
-      font: toFontReference(uploadedFont),
-    });
+    try {
+      const uploadedFont = await registerFontFile(file);
+      registerAvailableFont(uploadedFont);
+      dispatch({
+        type: 'register_font',
+        font: toFontReference(uploadedFont),
+      });
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(`Failed to register font: ${getErrorMessage(error, 'Unknown error.')}`);
+    }
   }
 
   async function handleOpenProject(files: FileList | null) {
@@ -185,8 +200,13 @@ export default function App() {
     if (!file) {
       return;
     }
-    const projectDocument = await readProjectFile(file);
-    loadDocument(projectDocument);
+    try {
+      const projectDocument = await readProjectFile(file);
+      loadDocument(projectDocument);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(`Failed to open project: ${getErrorMessage(error, 'Unknown error.')}`);
+    }
   }
 
   return (
@@ -210,12 +230,19 @@ export default function App() {
         onLoad={() => openInputRef.current?.click()}
         onNewProject={() => {
           setGuides([]);
+          setErrorMessage(null);
           resetDocument();
         }}
         onRedo={redo}
         onSave={() => downloadProject(document)}
         onUndo={undo}
       />
+
+      {errorMessage ? (
+        <div className="app-status app-status-error" role="alert">
+          {errorMessage}
+        </div>
+      ) : null}
 
       <div className="editor-layout">
         <ToolPalette
@@ -267,6 +294,7 @@ export default function App() {
 
       <input
         ref={imageInputRef}
+        data-testid="image-upload-input"
         hidden
         type="file"
         accept="image/*"
@@ -277,6 +305,7 @@ export default function App() {
       />
       <input
         ref={fontInputRef}
+        data-testid="font-upload-input"
         hidden
         type="file"
         accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
@@ -287,6 +316,7 @@ export default function App() {
       />
       <input
         ref={openInputRef}
+        data-testid="project-open-input"
         hidden
         type="file"
         accept="application/json,.json"
