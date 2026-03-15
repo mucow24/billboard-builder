@@ -646,12 +646,12 @@ function finalizeCreatedItem<T extends CanvasItem>(item: T): T {
 
 export function isCreateTool(
   tool: CanvasTool
-): tool is Exclude<CanvasTool, 'select'> {
-  return tool !== 'select';
+): tool is Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'> {
+  return tool === 'text' || tool === 'rectangle' || tool === 'ellipse' || tool === 'line';
 }
 
 export function buildCreatedItem(
-  tool: Exclude<CanvasTool, 'select'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
   startPointer: Point,
   currentPointer: Point
 ): CanvasItem {
@@ -701,7 +701,7 @@ export function buildCreatedItem(
 }
 
 export function getCreatePreview(
-  tool: Exclude<CanvasTool, 'select'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
   startPointer: Point,
   currentPointer: Point
 ) {

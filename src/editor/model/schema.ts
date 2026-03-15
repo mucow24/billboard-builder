@@ -29,6 +29,7 @@ const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   fontWeight: z.enum(['normal', 'bold']),
   fill: z.string(),
   align: z.enum(['left', 'center', 'right']),
+  verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
   lineHeight: z.number().positive(),
   letterSpacing: z.number().optional(),
 });

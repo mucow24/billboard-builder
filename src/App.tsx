@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
 import { CanvasStage } from './editor/canvas/CanvasStage';
@@ -48,6 +48,8 @@ export default function App() {
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [clipboardItem, setClipboardItem] = useState<CanvasItem | null>(null);
+  const [topbarHeight, setTopbarHeight] = useState(56);
+  const topbarRef = useRef<HTMLDivElement | null>(null);
 
   const {
     activeTool,
@@ -58,6 +60,7 @@ export default function App() {
     historyPast,
     missingFontFamilies,
     addImageItem,
+    deleteItem,
     deleteSelectedItems,
     dispatch,
     loadDocument,
@@ -181,6 +184,8 @@ export default function App() {
       }
       const hotkeyMap = new Map([
         ['v', 'select'],
+        ['h', 'pan'],
+        ['z', 'zoom'],
         ['t', 'text'],
         ['r', 'rectangle'],
         ['o', 'ellipse'],
@@ -209,7 +214,6 @@ export default function App() {
     deleteSelectedItems,
     dispatch,
     redo,
-    reorderSelectedItem,
     selectedItem,
     setActiveTool,
     undo,
@@ -256,6 +260,28 @@ export default function App() {
     }
   }
 
+
+  useLayoutEffect(() => {
+    const element = topbarRef.current;
+    if (!element) {
+      return;
+    }
+
+    const updateHeight = () => {
+      setTopbarHeight(Math.ceil(element.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(element);
+    window.addEventListener('resize', updateHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
+
   async function handleOpenProject(files: FileList | null) {
     const file = files?.[0];
     if (!file) {
@@ -272,81 +298,84 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Toolbar
-        canvas={document.canvas}
-        exportScale={exportScale}
-        canUndo={historyPast.length > 0}
-        canRedo={historyFuture.length > 0}
-        onCanvasSizeChange={setCanvasSize}
-        onDelete={deleteSelectedItems}
-        onExport={() => {
-          if (!stageRef.current) {
-            return;
-          }
-          downloadStageAsPng(stageRef.current, exportScale);
-        }}
-        onExportScaleChange={setExportScale}
-        onFontUpload={() => fontInputRef.current?.click()}
-        onImageUpload={() => imageInputRef.current?.click()}
-        onLoad={() => openInputRef.current?.click()}
-        onNewProject={() => {
-          setGuides([]);
-          setErrorMessage(null);
-          resetDocument();
-        }}
-        onRedo={redo}
-        onSave={() => downloadProject(document)}
-        onUndo={undo}
-      />
-
-      {errorMessage ? (
-        <div className="app-status app-status-error" role="alert">
-          {errorMessage}
-        </div>
-      ) : null}
-
-      <div className="editor-layout">
-        <ToolPalette
+      <main className="editor-layout editor-layout-overlay">
+        <CanvasStage
           activeTool={activeTool}
-          onChange={setActiveTool}
-        />
-
-        <main className="canvas-workspace">
-          <section className="canvas-callout">
-            <h1>Billboard Builder</h1>
-            <p>
-              Choose a tool, drag out a new item on the canvas, and then use Arrow to move,
-              resize, rotate, or edit endpoints for lines.
-            </p>
-          </section>
-          <CanvasStage
-            activeTool={activeTool}
-            document={document}
-            guides={guides}
-            onGuidesChange={setGuides}
-            onSelectItem={selectSingleItem}
-            onUpdateItem={(itemId, changes) => {
-              dispatch({ type: 'update_item', itemId, changes });
-            }}
-            onAddItem={(item) => dispatch({ type: 'add_item', item })}
-            onSetActiveTool={setActiveTool}
-            stageRef={stageRef}
-          />
-        </main>
-
-        <PropertiesPanel
-          availableFonts={availableFonts}
-          background={document.background}
-          fonts={document.fonts}
-          items={document.items}
-          missingFontFamilies={missingFontFamilies}
-          selectedItem={selectedItem}
-          onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
-          onItemChange={(changes: Partial<CanvasItem>) => updateSelectedItem(changes)}
-          onReorder={reorderSelectedItem}
+          document={document}
+          guides={guides}
+          onGuidesChange={setGuides}
           onSelectItem={selectSingleItem}
+          onUpdateItem={(itemId, changes) => {
+            dispatch({ type: 'update_item', itemId, changes });
+          }}
+          onAddItem={(item) => dispatch({ type: 'add_item', item })}
+          onSetActiveTool={setActiveTool}
+          stageRef={stageRef}
         />
-      </div>
+
+        <div
+          className="editor-overlays"
+          style={{ ['--overlay-topbar-height' as string]: `${topbarHeight}px` }}
+        >
+          <div ref={topbarRef} className="overlay-topbar">
+            <Toolbar
+              canvas={document.canvas}
+              exportScale={exportScale}
+              canUndo={historyPast.length > 0}
+              canRedo={historyFuture.length > 0}
+              canReorderSelection={document.selectedItemIds.length > 0}
+              onCanvasSizeChange={setCanvasSize}
+              onDelete={deleteSelectedItems}
+              onExport={() => {
+                if (!stageRef.current) {
+                  return;
+                }
+                downloadStageAsPng(stageRef.current, exportScale);
+              }}
+              onExportScaleChange={setExportScale}
+              onFontUpload={() => fontInputRef.current?.click()}
+              onImageUpload={() => imageInputRef.current?.click()}
+              onLoad={() => openInputRef.current?.click()}
+              onNewProject={() => {
+                setGuides([]);
+                setErrorMessage(null);
+                resetDocument();
+              }}
+              onRedo={redo}
+              onReorder={reorderSelectedItem}
+              onSave={() => downloadProject(document)}
+              onUndo={undo}
+            />
+          </div>
+
+          {errorMessage ? (
+            <div className="app-status app-status-error overlay-status" role="alert">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          <div className="overlay-tools">
+            <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
+          </div>
+
+          <div className="overlay-properties">
+            <div className="overlay-properties-panel">
+              <PropertiesPanel
+                availableFonts={availableFonts}
+                background={document.background}
+                fonts={document.fonts}
+                items={document.items}
+                missingFontFamilies={missingFontFamilies}
+                selectedItem={selectedItem}
+                onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
+                onDeleteItem={deleteItem}
+                onItemChange={(changes: Partial<CanvasItem>) => updateSelectedItem(changes)}
+                onSelectItem={selectSingleItem}
+              />
+            </div>
+          </div>
+        </div>
+      </main>
 
       <input
         ref={imageInputRef}

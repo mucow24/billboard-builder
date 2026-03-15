@@ -84,7 +84,7 @@ describe('FontFamilyPicker', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
 
     await user.click(trigger);
-    await user.keyboard('{Escape}');
+    fireEvent.keyDown(screen.getByRole('listbox', { name: 'Font family' }), { key: 'Escape' });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     await waitFor(() => {
       expect(trigger).toHaveFocus();

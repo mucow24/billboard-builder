@@ -22,13 +22,15 @@ test('@p0 handles undo, redo, delete, and redo-stack reset flows', async ({ page
   await expect(editor.layerRows).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
 
-  await page.locator('.layer-row', { hasText: 'Ellipse' }).click();
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Ellipse' }).click();
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(editor.layerRows).toHaveCount(1);
 
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
-  await page.keyboard.press('Delete');
+  await page.getByRole('button', { name: 'Delete Rectangle' }).click();
   await expect(editor.layerRows).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(editor.layerRows).toHaveCount(1);
 });
 
 test('@p1 ignores destructive hotkeys while text inputs are focused', async ({ page }) => {
@@ -63,7 +65,7 @@ test('@p1 handles clipboard and z-order keyboard shortcuts', async ({ page }) =>
   await page.keyboard.press('Control+V');
   await expect(editor.layerRows).toHaveCount(3);
 
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).last().click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).last().click();
   await page.keyboard.press('Control+Shift+ArrowUp');
   await expect(editor.layerRows.first()).toContainText('Rectangle');
 

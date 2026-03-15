@@ -23,7 +23,7 @@ test('@p0 covers tool switching and canvas selection flows', async ({ page }) =>
     { x: 240, y: 120 }
   );
   await expect(page.getByRole('button', { name: 'Arrow' })).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).click();
   const selectedBeforeDeselect = await editor.getSelectedItemDebug();
   const selectedRect = selectedBeforeDeselect.nodeClientRect;
   if (!selectedRect) {
@@ -90,7 +90,7 @@ test('@p1 snaps a dragged rectangle onto a sibling alignment target', async ({ p
   await editor.dragSelectedItemBy(-220, 0);
   const firstRect = (await editor.getSelectedItemDebug()).documentItem as { x: number; y: number };
   await editor.createItem('Rect');
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).last().click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).last().click();
 
   const selectedRect = (await editor.getSelectedItemDebug()).nodeClientRect;
   const secondRectBefore = (await editor.getSelectedItemDebug()).documentItem as { x: number; y: number };

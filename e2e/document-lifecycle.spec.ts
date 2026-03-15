@@ -27,11 +27,11 @@ test('@p0 creates, autosaves, saves, reloads, and exports a project', async ({ p
 
   await editor.createItem('Line');
   await expect(editor.layerRows).toHaveCount(4);
-  await page.locator('.layer-row', { hasText: 'Line' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Line' }).click();
   await page.getByLabel('End X').fill('900');
   await expect(page.getByLabel('End X')).toHaveValue('900');
 
-  await page.locator('.layer-row', { hasText: 'Text' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Text' }).click();
   await page.getByRole('button', { name: 'Send back' }).click();
   await expect(page.locator('.layer-row').last()).toContainText('Text');
 

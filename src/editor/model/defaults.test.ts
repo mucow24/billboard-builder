@@ -25,6 +25,7 @@ describe('default item factories', () => {
     expect(textItem.x).toBe(12);
     expect(textItem.y).toBe(34);
     expect(textItem.letterSpacing).toBe(0);
+    expect(textItem.verticalAlign).toBe('top');
     expect(rectangleItem.cornerRadius).toBeGreaterThan(0);
     expect(ellipseItem.kind).toBe('ellipse');
     expect(lineItem.strokeWidth).toBeGreaterThan(0);

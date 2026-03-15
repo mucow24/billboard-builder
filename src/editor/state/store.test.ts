@@ -218,6 +218,26 @@ describe('editor store history', () => {
     expect(useEditorStore.getState().activeTool).toBe('select');
   });
 
+  it('deletes a specific item by id while preserving unrelated selection and undo history', () => {
+    const firstItem = createRectangleItem({ zIndex: 0 });
+    const secondItem = createTextItem({ zIndex: 1 });
+
+    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    useEditorStore.getState().selectSingleItem(secondItem.id);
+
+    useEditorStore.getState().deleteItem(firstItem.id);
+
+    expect(useEditorStore.getState().document.items).toHaveLength(1);
+    expect(useEditorStore.getState().document.items[0].id).toBe(secondItem.id);
+    expect(useEditorStore.getState().document.selectedItemIds).toEqual([secondItem.id]);
+    expect(useEditorStore.getState().canUndo()).toBe(true);
+
+    useEditorStore.getState().undo();
+
+    expect(useEditorStore.getState().document.items).toHaveLength(2);
+  });
+
   it('treats empty undo, redo, and selection convenience actions as no-ops', () => {
     useEditorStore.getState().undo();
     useEditorStore.getState().redo();

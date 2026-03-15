@@ -1,5 +1,7 @@
 export type CanvasTool =
   | 'select'
+  | 'pan'
+  | 'zoom'
   | 'text'
   | 'rectangle'
   | 'ellipse'
@@ -11,6 +13,10 @@ export type CanvasItemKind =
   | 'rectangle'
   | 'ellipse'
   | 'line';
+
+export type TextAlign = 'left' | 'center' | 'right';
+
+export type TextVerticalAlign = 'top' | 'middle' | 'bottom';
 
 export interface CanvasSize {
   width: number;
@@ -54,7 +60,8 @@ export interface TextCanvasItem extends BaseCanvasItem {
   fontStyle: 'normal' | 'italic';
   fontWeight: 'normal' | 'bold';
   fill: string;
-  align: 'left' | 'center' | 'right';
+  align: TextAlign;
+  verticalAlign: TextVerticalAlign;
   lineHeight: number;
   letterSpacing: number;
 }

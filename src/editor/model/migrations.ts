@@ -18,6 +18,7 @@ function normalizeItem(item: CanvasItem, index: number): CanvasItem {
     ...(item.kind === 'text'
       ? {
           letterSpacing: item.letterSpacing ?? 0,
+          verticalAlign: item.verticalAlign ?? 'top',
         }
       : {}),
     ...(item.kind === 'line'

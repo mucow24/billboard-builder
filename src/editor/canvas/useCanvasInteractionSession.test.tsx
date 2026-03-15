@@ -95,6 +95,20 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session?.previewItem).toBeNull();
   });
 
+
+  it('starts a create session from checkerboard surface clicks', () => {
+    const params = createHookParams({
+      activeTool: 'rectangle',
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleStageMouseDown(makeStageEvent({ x: 120, y: 160 }, 'canvas-surface'));
+    });
+
+    expect(result.current.session?.kind).toBe('create');
+  });
+
   it('commits a created item and returns to arrow mode on mouse up', () => {
     const params = createHookParams({
       activeTool: 'rectangle',

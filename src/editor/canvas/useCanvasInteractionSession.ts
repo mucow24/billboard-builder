@@ -32,7 +32,7 @@ interface InteractionSessionBase {
 
 interface CreateSession extends InteractionSessionBase {
   kind: 'create';
-  tool: Exclude<CanvasTool, 'select'>;
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>;
   previewItem: CanvasItem | null;
 }
 
@@ -102,6 +102,7 @@ function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
 interface UseCanvasInteractionSessionParams {
   activeTool: CanvasTool;
   document: ProjectDocumentV1;
+  viewport?: { zoom: number; panX: number; panY: number };
   onGuidesChange: (guides: GuideLine[]) => void;
   onSelectItem: (itemId?: string) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
@@ -113,6 +114,7 @@ interface UseCanvasInteractionSessionParams {
 export function useCanvasInteractionSession({
   activeTool,
   document,
+  viewport = { zoom: 1, panX: 0, panY: 0 },
   onGuidesChange,
   onSelectItem,
   onUpdateItem,
@@ -158,7 +160,7 @@ export function useCanvasInteractionSession({
   }, []);
 
   useEffect(() => {
-    if (activeTool === 'select' && session?.kind === 'create') {
+    if ((activeTool === 'select' || activeTool === 'pan' || activeTool === 'zoom') && session?.kind === 'create') {
       updateSession(null);
       onGuidesChange([]);
     }
@@ -170,9 +172,16 @@ export function useCanvasInteractionSession({
         return null;
       }
       stageRef.current.setPointersPositions(event);
-      return stageRef.current.getPointerPosition();
+      const pointer = stageRef.current.getPointerPosition();
+      if (!pointer) {
+        return null;
+      }
+      return {
+        x: (pointer.x - viewport.panX) / viewport.zoom,
+        y: (pointer.y - viewport.panY) / viewport.zoom,
+      };
     },
-    [stageRef]
+    [stageRef, viewport.panX, viewport.panY, viewport.zoom]
   );
 
   const resolveSession = useCallback(
@@ -308,7 +317,7 @@ export function useCanvasInteractionSession({
   }, [commitActiveSession, getCurrentPointer, onGuidesChange, resolveSession, session, updateSession]);
 
   const beginCreate = useCallback(
-    (tool: Exclude<CanvasTool, 'select'>, pointer: Point) => {
+    (tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
       updateSession({
         kind: 'create',
         tool,
@@ -411,8 +420,21 @@ export function useCanvasInteractionSession({
     (event: Konva.KonvaEventObject<MouseEvent>) => {
       const target = event.target;
       const stage = event.target.getStage();
-      const pointer = stage?.getPointerPosition();
-      const isCanvasSurface = target === stage || target.name() === 'canvas-background';
+      const rawPointer = stage?.getPointerPosition();
+      const pointer = rawPointer
+        ? {
+            x: (rawPointer.x - viewport.panX) / viewport.zoom,
+            y: (rawPointer.y - viewport.panY) / viewport.zoom,
+          }
+        : null;
+      const isCanvasSurface =
+        target === stage ||
+        target.hasName?.('canvas-surface') ||
+        target.hasName?.('canvas-background') ||
+        target.hasName?.('canvas-backdrop') ||
+        target.name() === 'canvas-surface' ||
+        target.name() === 'canvas-background' ||
+        target.name() === 'canvas-backdrop';
       if (!pointer || !isCanvasSurface) {
         return;
       }
@@ -423,7 +445,7 @@ export function useCanvasInteractionSession({
       onGuidesChange([]);
       onSelectItem(undefined);
     },
-    [activeTool, beginCreate, onGuidesChange, onSelectItem]
+    [activeTool, beginCreate, onGuidesChange, onSelectItem, viewport.panX, viewport.panY, viewport.zoom]
   );
 
   const handleStageMouseUp = useCallback(
@@ -431,10 +453,16 @@ export function useCanvasInteractionSession({
       if (!sessionRef.current) {
         return;
       }
-      const pointer = event.target.getStage()?.getPointerPosition() ?? null;
+      const rawPointer = event.target.getStage()?.getPointerPosition() ?? null;
+      const pointer = rawPointer
+        ? {
+            x: (rawPointer.x - viewport.panX) / viewport.zoom,
+            y: (rawPointer.y - viewport.panY) / viewport.zoom,
+          }
+        : null;
       commitActiveSession(pointer);
     },
-    [commitActiveSession]
+    [commitActiveSession, viewport.panX, viewport.panY, viewport.zoom]
   );
 
   return {

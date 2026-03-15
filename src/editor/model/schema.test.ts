@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { createDefaultProjectDocument, createLineItem, createRectangleItem } from './defaults';
+import {
+  createDefaultProjectDocument,
+  createLineItem,
+  createRectangleItem,
+  createTextItem,
+} from './defaults';
 import { migrateProjectDocument } from './migrations';
 import { parseProjectDocument, serializeProjectDocument } from './schema';
 
@@ -37,6 +42,10 @@ describe('project document schema', () => {
           name: '',
         },
         {
+          ...createTextItem(),
+          verticalAlign: undefined as unknown as 'top',
+        },
+        {
           ...createLineItem(),
           name: '',
           startX: undefined as unknown as number,
@@ -54,11 +63,26 @@ describe('project document schema', () => {
       name: 'rectangle-1',
     });
     expect(migratedDocument.items[1]).toMatchObject({
-      startX: migratedDocument.items[1].x,
-      startY: migratedDocument.items[1].y,
-      endX: migratedDocument.items[1].x + migratedDocument.items[1].width,
-      endY: migratedDocument.items[1].y + migratedDocument.items[1].height,
-      name: 'line-2',
+      verticalAlign: 'top',
+    });
+    expect(migratedDocument.items[2]).toMatchObject({
+      startX: migratedDocument.items[2].x,
+      startY: migratedDocument.items[2].y,
+      endX: migratedDocument.items[2].x + migratedDocument.items[2].width,
+      endY: migratedDocument.items[2].y + migratedDocument.items[2].height,
+      name: 'line-3',
+    });
+  });
+
+  it('parses and preserves explicit text vertical alignment values', () => {
+    const document = createDefaultProjectDocument();
+    document.items = [createTextItem({ verticalAlign: 'bottom' })];
+
+    const parsedDocument = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+
+    expect(parsedDocument.items[0]).toMatchObject({
+      kind: 'text',
+      verticalAlign: 'bottom',
     });
   });
 });

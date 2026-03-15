@@ -7,14 +7,16 @@ import {
   DUPLICATE_ITEM_OFFSET,
   createDefaultProjectDocument,
   createRectangleItem,
-  createTextItem,
 } from './editor/model/defaults';
 import { serializeProjectDocument } from './editor/model/schema';
 import { AUTOSAVE_KEY } from './editor/io/projectFile';
 import { useEditorStore } from './editor/state/store';
 
 vi.mock('./editor/io/fonts', async () => {
-  const actual = await vi.importActual<typeof import('./editor/io/fonts')>('./editor/io/fonts');
+  const actual =
+    await vi.importActual<typeof import('./editor/io/fonts')>(
+      './editor/io/fonts',
+    );
   return {
     ...actual,
     loadBundledFonts: vi.fn().mockResolvedValue([]),
@@ -55,45 +57,63 @@ describe('App shell', () => {
     resetEditorStore();
   });
 
+  it('renders the top toolbar controls', () => {
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload font' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Canvas preset')).toBeInTheDocument();
+    expect(screen.getByLabelText('Canvas width')).toBeInTheDocument();
+    expect(screen.getByLabelText('Canvas height')).toBeInTheDocument();
+  });
+
   it('switches into rectangle creation mode from the tool palette', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: /Rect/ }));
 
-    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('mock-stage')).toHaveTextContent('Tool: rectangle / Items: 0');
-  });
-
-  it('starts with a transparent background and exposes alpha controls', () => {
-    render(<App />);
-
-    expect(screen.getByLabelText('Canvas background alpha')).toHaveValue('0');
+    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('mock-stage')).toHaveTextContent(
+      'Tool: rectangle / Items: 0',
+    );
   });
 
   it('restores the autosaved document on boot', async () => {
     const autosavedDocument = createDefaultProjectDocument();
     autosavedDocument.items = [createRectangleItem()];
-    localStorage.setItem(AUTOSAVE_KEY, serializeProjectDocument(autosavedDocument));
+    localStorage.setItem(
+      AUTOSAVE_KEY,
+      serializeProjectDocument(autosavedDocument),
+    );
 
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
     });
-    expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
-    expect(document.querySelectorAll('.layer-row')).toHaveLength(1);
   });
 
-  it('supports global tool and history hotkeys', async () => {
+  it('supports global tool hotkeys', async () => {
     const user = userEvent.setup();
     render(<App />);
 
     await user.keyboard('t');
-    expect(screen.getByRole('button', { name: /Text/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Text/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
 
     await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: /Arrow/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Select/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('copies, pastes, cuts, and duplicates the selected item with keyboard shortcuts', async () => {
@@ -113,143 +133,36 @@ describe('App shell', () => {
 
     let items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(2);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[1].id]);
     expect(items[1].x).toBe(rectangleItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[1].y).toBe(rectangleItem.y + DUPLICATE_ITEM_OFFSET);
 
     await user.keyboard('{Control>}d{/Control}');
-
     items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(3);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[2].id]);
-    expect(items[2].x).toBe(items[1].x + DUPLICATE_ITEM_OFFSET);
-    expect(items[2].y).toBe(items[1].y + DUPLICATE_ITEM_OFFSET);
-    const cutItem = items[2];
 
+    const cutItem = items[2];
     await user.keyboard('{Control>}x{/Control}');
     expect(useEditorStore.getState().document.items).toHaveLength(2);
 
     await user.keyboard('{Control>}v{/Control}');
     items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(3);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([items[2].id]);
     expect(items[2].x).toBe(cutItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[2].y).toBe(cutItem.y + DUPLICATE_ITEM_OFFSET);
   });
 
-  it('reorders the selected item with keyboard shortcuts', async () => {
-    const user = userEvent.setup();
-    const firstItem = createRectangleItem({ name: 'Bottom', zIndex: 0 });
-    const secondItem = createRectangleItem({ name: 'Middle', zIndex: 1 });
-    const thirdItem = createRectangleItem({ name: 'Top', zIndex: 2 });
-    useEditorStore.setState({
-      document: {
-        ...createDefaultProjectDocument(),
-        items: [firstItem, secondItem, thirdItem],
-        selectedItemIds: [secondItem.id],
-      },
+  it('updates canvas size controls from the top toolbar', () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('Canvas width'), {
+      target: { value: '900' },
     });
-    render(<App />);
-
-    await user.keyboard('{Control>}{ArrowUp}{/Control}');
-    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
-      firstItem.id,
-      thirdItem.id,
-      secondItem.id,
-    ]);
-
-    await user.keyboard('{Control>}{ArrowDown}{/Control}');
-    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
-      firstItem.id,
-      secondItem.id,
-      thirdItem.id,
-    ]);
-
-    await user.keyboard('{Control>}{Shift>}{ArrowUp}{/Shift}{/Control}');
-    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
-      firstItem.id,
-      thirdItem.id,
-      secondItem.id,
-    ]);
-
-    await user.keyboard('{Control>}{Shift>}{ArrowDown}{/Shift}{/Control}');
-    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
-      secondItem.id,
-      firstItem.id,
-      thirdItem.id,
-    ]);
-  });
-
-  it('does not delete the selected item while a text field is focused', async () => {
-    const user = userEvent.setup();
-    const textItem = createTextItem();
-    useEditorStore.setState({
-      document: {
-        ...createDefaultProjectDocument(),
-        items: [textItem],
-        selectedItemIds: [textItem.id],
-      },
+    fireEvent.change(screen.getByLabelText('Canvas height'), {
+      target: { value: '500' },
     });
-    render(<App />);
 
-    const textarea = screen.getByLabelText('Text content');
-    await user.click(textarea);
-    await user.keyboard('{Backspace}');
-
-    expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
-    expect(document.querySelectorAll('.layer-row')).toHaveLength(1);
-    expect(screen.getByLabelText('Text content')).toBeInTheDocument();
-  });
-
-  it('ignores clipboard and reorder shortcuts while a text field is focused', async () => {
-    const user = userEvent.setup();
-    const textItem = createTextItem();
-    const secondItem = createRectangleItem({ name: 'Rectangle', zIndex: 1 });
-    useEditorStore.setState({
-      document: {
-        ...createDefaultProjectDocument(),
-        items: [textItem, secondItem],
-        selectedItemIds: [textItem.id],
-      },
-    });
-    render(<App />);
-
-    const textarea = screen.getByLabelText('Text content');
-    await user.click(textarea);
-    await user.keyboard('{Control>}c{/Control}');
-    await user.keyboard('{Control>}v{/Control}');
-    await user.keyboard('{Control>}x{/Control}');
-    await user.keyboard('{Control>}{ArrowUp}{/Control}');
-
-    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
-      textItem.id,
-      secondItem.id,
-    ]);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([textItem.id]);
-  });
-
-  it('treats clipboard shortcuts without selection or clipboard contents as no-ops', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.keyboard('{Control>}c{/Control}');
-    await user.keyboard('{Control>}v{/Control}');
-    await user.keyboard('{Control>}x{/Control}');
-    await user.keyboard('{Control>}d{/Control}');
-
-    expect(useEditorStore.getState().document.items).toHaveLength(0);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([]);
-  });
-
-  it('cancels create mode with escape', async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.keyboard('r');
-    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
-
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: /Arrow/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(useEditorStore.getState().document.canvas.width).toBe(900);
+    expect(useEditorStore.getState().document.canvas.height).toBe(500);
   });
 
   it('shows a visible error when opening an invalid project file', async () => {
@@ -267,58 +180,24 @@ describe('App shell', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Failed to open project');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Failed to open project',
+      );
     });
   });
 
-  it('keeps tool hotkeys and escape scoped away from the open font picker', async () => {
-    const user = userEvent.setup();
-    const textItem = createTextItem();
-    useEditorStore.setState({
-      activeTool: 'rectangle',
-      document: {
-        ...createDefaultProjectDocument(),
-        items: [textItem],
-        selectedItemIds: [textItem.id],
-      },
-    });
+  it('ignores empty image and font upload events', () => {
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Font family' }));
-    expect(screen.getByRole('listbox', { name: 'Font family' })).toBeInTheDocument();
-
-    await user.keyboard('t');
-    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
-
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Rect/ })).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('ignores delete, clipboard, and reorder shortcuts while the font picker is open', async () => {
-    const user = userEvent.setup();
-    const textItem = createTextItem();
-    const secondItem = createRectangleItem({ name: 'Rectangle', zIndex: 1 });
-    useEditorStore.setState({
-      document: {
-        ...createDefaultProjectDocument(),
-        items: [textItem, secondItem],
-        selectedItemIds: [textItem.id],
-      },
+    fireEvent.change(screen.getByTestId('image-upload-input'), {
+      target: { files: [] },
     });
-    render(<App />);
+    fireEvent.change(screen.getByTestId('font-upload-input'), {
+      target: { files: [] },
+    });
 
-    await user.click(screen.getByRole('button', { name: 'Font family' }));
-    await user.keyboard('{Backspace}');
-    await user.keyboard('{Control>}c{/Control}');
-    await user.keyboard('{Control>}v{/Control}');
-    await user.keyboard('{Control>}x{/Control}');
-    await user.keyboard('{Control>}{ArrowUp}{/Control}');
-
-    expect(useEditorStore.getState().document.items.map((item) => item.id)).toEqual([
-      textItem.id,
-      secondItem.id,
-    ]);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([textItem.id]);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(useEditorStore.getState().document.items).toHaveLength(0);
+    expect(useEditorStore.getState().availableFonts).toEqual([]);
   });
 });

@@ -25,7 +25,7 @@ test('@p1 keeps a dragged item visible near the right edge of the canvas', async
   await editor.goto();
 
   await editor.createItem('Rect');
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).click();
 
   const stageBox = await editor.stageBox();
   const debugBefore = await editor.getSelectedItemDebug();
@@ -62,7 +62,7 @@ test('@p1 rotates an item without disappearing or teleporting away', async ({ pa
   await editor.goto();
 
   await editor.createItem('Rect');
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).click();
 
   const debugBefore = await editor.getSelectedItemDebug();
   const beforeRect = debugBefore.nodeClientRect;
@@ -108,7 +108,7 @@ test('@p1 reflows multiline text live while resizing narrower', async ({ page })
   await editor.goto();
 
   await editor.createItem('Text');
-  await page.locator('.layer-row', { hasText: 'Text' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Text' }).click();
   await page.getByLabel('Text content').fill(
     'One two three four five six seven eight nine ten eleven twelve.'
   );
@@ -227,12 +227,12 @@ test('@p0 keeps the fixed edge pinned while top-center resize snapping hits a si
   await editor.dragSelectedItemBy(-260, 160);
 
   await editor.createItem('Rect');
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).click();
   await editor.dragSelectedItemBy(220, 140);
 
   const beforeDebug = await editor.getSelectedItemDebug();
   const beforeItem = beforeDebug.documentItem as { x: number; y: number; width: number; height: number };
-  const ellipseRow = page.locator('.layer-row', { hasText: 'Ellipse' });
+  const ellipseRow = page.locator('.layer-row-select', { hasText: 'Ellipse' });
   await ellipseRow.click();
   const siblingItem = (await editor.getSelectedItemDebug()).documentItem as {
     x: number;
@@ -240,7 +240,7 @@ test('@p0 keeps the fixed edge pinned while top-center resize snapping hits a si
     width: number;
     height: number;
   };
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).click();
 
   const targetTop = siblingItem.y + siblingItem.height / 2;
   const expectedBottom = beforeItem.y + beforeItem.height;
@@ -285,7 +285,7 @@ test('@p0 inverts a top-center resize after it crosses the opposite edge', async
   await editor.goto();
 
   await editor.createItem('Rect');
-  await page.locator('.layer-row', { hasText: 'Rectangle' }).click();
+  await page.locator('.layer-row-select', { hasText: 'Rectangle' }).click();
   await editor.dragSelectedItemBy(180, 140);
 
   const beforeDebug = await editor.getSelectedItemDebug();

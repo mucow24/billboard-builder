@@ -189,6 +189,7 @@ export interface EditorState {
   createItemAt: (kind: Exclude<CanvasItemKind, 'image'>, x: number, y: number) => void;
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   selectSingleItem: (itemId?: string) => void;
+  deleteItem: (itemId: string) => void;
   deleteSelectedItems: () => void;
   reorderSelectedItem: (mode: ReorderMode) => void;
   undo: () => void;
@@ -241,6 +242,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().dispatch(
       itemId ? { type: 'select_items', itemIds: [itemId] } : { type: 'clear_selection' }
     ),
+  deleteItem: (itemId) => {
+    get().dispatch({ type: 'delete_items', itemIds: [itemId] });
+  },
   deleteSelectedItems: () => {
     const selectedIds = get().document.selectedItemIds;
     if (selectedIds.length === 0) {

@@ -1,11 +1,13 @@
 import type { CanvasTool } from '../model/types';
 
-const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string }> = [
-  { id: 'select', label: 'Arrow', hotkey: 'V' },
-  { id: 'text', label: 'Text', hotkey: 'T' },
-  { id: 'rectangle', label: 'Rect', hotkey: 'R' },
-  { id: 'ellipse', label: 'Ellipse', hotkey: 'O' },
-  { id: 'line', label: 'Line', hotkey: 'L' },
+const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; icon: string }> = [
+  { id: 'select', label: 'Select', hotkey: 'V', icon: '↖' },
+  { id: 'pan', label: 'Hand', hotkey: 'H', icon: '✋' },
+  { id: 'zoom', label: 'Zoom', hotkey: 'Z', icon: '⌕' },
+  { id: 'text', label: 'Text', hotkey: 'T', icon: 'T' },
+  { id: 'rectangle', label: 'Rect', hotkey: 'R', icon: '▭' },
+  { id: 'ellipse', label: 'Ellipse', hotkey: 'O', icon: '◯' },
+  { id: 'line', label: 'Line', hotkey: 'L', icon: '／' },
 ];
 
 interface ToolPaletteProps {
@@ -15,7 +17,7 @@ interface ToolPaletteProps {
 
 export function ToolPalette({ activeTool, onChange }: ToolPaletteProps) {
   return (
-    <aside className="tool-palette" aria-label="Tools">
+    <div className="tool-palette" role="toolbar" aria-label="Tools">
       {TOOLS.map((tool) => (
         <button
           key={tool.id}
@@ -24,12 +26,16 @@ export function ToolPalette({ activeTool, onChange }: ToolPaletteProps) {
           onClick={() => {
             onChange(tool.id);
           }}
+          aria-label={`${tool.label} (${tool.hotkey})`}
+          title={`${tool.label} (${tool.hotkey})`}
           aria-pressed={tool.id === activeTool}
         >
-          <span>{tool.label}</span>
-          <small>{tool.hotkey}</small>
+          <span className="tool-button-icon" aria-hidden="true">
+            {tool.icon}
+          </span>
+          <span className="sr-only">{tool.label}</span>
         </button>
       ))}
-    </aside>
+    </div>
   );
 }

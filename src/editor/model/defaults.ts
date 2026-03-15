@@ -95,6 +95,7 @@ export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasIt
     fontWeight: 'bold',
     fill: '#111827',
     align: 'left',
+    verticalAlign: 'top',
     lineHeight: 1.1,
     letterSpacing: 0,
     ...position,
