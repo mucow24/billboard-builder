@@ -1,7 +1,5 @@
-import { parseProjectDocument, serializeProjectDocument } from '../model/schema';
-import type { ProjectDocumentV1 } from '../model/types';
-
-export const AUTOSAVE_KEY = 'billboard-builder.autosave';
+import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
+import type { ProjectDocumentV1 } from '../document/documentTypes';
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -25,20 +23,3 @@ export async function readProjectFile(file: File): Promise<ProjectDocumentV1> {
   return parseProjectDocument(json);
 }
 
-export function saveAutosave(document: ProjectDocumentV1) {
-  localStorage.setItem(AUTOSAVE_KEY, serializeProjectDocument(document));
-}
-
-export function readAutosave(): ProjectDocumentV1 | null {
-  const rawDocument = localStorage.getItem(AUTOSAVE_KEY);
-  if (!rawDocument) {
-    return null;
-  }
-
-  try {
-    return parseProjectDocument(JSON.parse(rawDocument));
-  } catch {
-    localStorage.removeItem(AUTOSAVE_KEY);
-    return null;
-  }
-}

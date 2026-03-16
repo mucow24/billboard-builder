@@ -1,8 +1,0 @@
-Please do:
-- Keyboard shortcuts:
-  Up/Down/Left/Right : Nudge selected item by 1px
-  Shift-{Up/Down/Left/Right} : Grow item in that direction by 1px
-  Alt-Shift-{Up/Down/Left/Right} : Shrink item in that direction by 1px
-==== Ignore for now
-- Drag layers to rearrange them
-- Ability to name layers

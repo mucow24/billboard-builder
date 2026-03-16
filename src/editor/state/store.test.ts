@@ -5,7 +5,8 @@ import {
   createLineItem,
   createRectangleItem,
   createTextItem,
-} from '../model/defaults';
+} from '../document/documentDefaults';
+import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
 import { applyEditorCommand, useEditorStore } from './store';
 
 describe('editor command reducer', () => {
@@ -19,7 +20,6 @@ describe('editor command reducer', () => {
     });
 
     expect(nextDocument.items).toHaveLength(1);
-    expect(nextDocument.selectedItemIds).toEqual([item.id]);
   });
 
   it('reorders items and renormalizes z-indices', () => {
@@ -75,7 +75,7 @@ describe('editor command reducer', () => {
       presetId: 'custom',
     });
     expect(fontDocument.background).toBe('#101010');
-    expect(fontDocument.selectedItemIds).toEqual([]);
+    expect(useEditorStore.getState().selectedItemIds).toEqual([]);
     expect(fontDocument.fonts).toHaveLength(1);
   });
 
@@ -85,7 +85,6 @@ describe('editor command reducer', () => {
     const seededDocument = {
       ...createDefaultProjectDocument(),
       items: [firstItem, secondItem],
-      selectedItemIds: [firstItem.id, secondItem.id],
     };
     const prunedDocument = applyEditorCommand(seededDocument, {
       type: 'delete_items',
@@ -97,7 +96,6 @@ describe('editor command reducer', () => {
     });
 
     expect(prunedDocument.items).toHaveLength(1);
-    expect(prunedDocument.selectedItemIds).toEqual([secondItem.id]);
     expect(loadedDocument.items).toHaveLength(0);
   });
 
@@ -125,6 +123,127 @@ describe('editor command reducer', () => {
     expect(nextItem.x).toBe(10);
     expect(nextItem.y).toBe(20);
   });
+
+  it('clamps runtime values back into the persisted document invariants', () => {
+    const rectangleItem = createRectangleItem({
+      opacity: 1,
+      shadow: {
+        color: '#000000',
+        blur: 2,
+        offsetX: 4,
+        offsetY: 5,
+        opacity: 0.4,
+      },
+    });
+    const document = {
+      ...createDefaultProjectDocument(),
+      items: [rectangleItem],
+    };
+
+    const nextDocument = applyEditorCommand(document, {
+      type: 'update_item',
+      itemId: rectangleItem.id,
+      changes: {
+        width: 0,
+        height: Number.NaN,
+        opacity: 2,
+        shadow: {
+          ...rectangleItem.shadow,
+          blur: -10,
+          opacity: -0.5,
+        },
+      },
+    });
+    const nextItem = nextDocument.items[0];
+
+    expect(nextItem.width).toBe(1);
+    expect(nextItem.height).toBe(1);
+    expect(nextItem.opacity).toBe(1);
+    expect(nextItem.shadow.blur).toBe(0);
+    expect(nextItem.shadow.opacity).toBe(0);
+    expect(() =>
+      parseProjectDocument(JSON.parse(serializeProjectDocument(nextDocument)))
+    ).not.toThrow();
+  });
+
+  it('keeps line stroke width positive and derives line bounds from endpoints', () => {
+    const lineItem = createLineItem({
+      startX: 40,
+      startY: 50,
+      endX: 20,
+      endY: 10,
+      strokeWidth: 6,
+    });
+    const document = {
+      ...createDefaultProjectDocument(),
+      items: [lineItem],
+    };
+
+    const nextDocument = applyEditorCommand(document, {
+      type: 'update_item',
+      itemId: lineItem.id,
+      changes: {
+        endX: 5,
+        endY: 0,
+        strokeWidth: 0,
+      },
+    });
+    const nextLine = nextDocument.items[0];
+
+    expect(nextLine.kind).toBe('line');
+    if (nextLine.kind !== 'line') {
+      throw new Error('Expected normalized line item.');
+    }
+    expect(nextLine.strokeWidth).toBe(1);
+    expect(nextLine.x).toBe(5);
+    expect(nextLine.y).toBe(0);
+    expect(nextLine.width).toBe(35);
+    expect(nextLine.height).toBe(50);
+  });
+
+  it('normalizes loaded documents through the same invariant gate as command updates', () => {
+    const liveItem = createRectangleItem({ zIndex: 0 });
+    const orphanedSelection = createRectangleItem({
+      id: 'loaded-1',
+      zIndex: 5,
+      opacity: 4,
+      shadow: {
+        color: '#000000',
+        blur: 3,
+        offsetX: 0,
+        offsetY: 0,
+        opacity: 2,
+      },
+    });
+    const secondItem = createTextItem({
+      id: 'loaded-2',
+      zIndex: 2,
+      shadow: undefined as never,
+    });
+    const loadedDocument = {
+      ...createDefaultProjectDocument(),
+      items: [orphanedSelection, secondItem],
+    };
+
+    useEditorStore.getState().dispatch({ type: 'add_item', item: liveItem });
+    useEditorStore.getState().loadDocument(loadedDocument);
+
+    const document = useEditorStore.getState().document;
+
+    expect(document.items.map((item) => item.id)).toEqual(['loaded-2', 'loaded-1']);
+    expect(document.items.map((item) => item.zIndex)).toEqual([0, 1]);
+    expect(useEditorStore.getState().selectedItemIds).toEqual([]);
+    expect(document.items[0].shadow).toEqual({
+      color: '#000000',
+      blur: 0,
+      offsetX: 0,
+      offsetY: 0,
+      opacity: 0,
+    });
+    expect(document.items[1].opacity).toBe(1);
+    expect(document.items[1].shadow.opacity).toBe(1);
+    expect(useEditorStore.getState().canUndo()).toBe(false);
+  });
 });
 
 describe('editor store history', () => {
@@ -135,6 +254,7 @@ describe('editor store history', () => {
       availableFonts: [],
       missingFontFamilies: [],
       exportScale: 2,
+      selectedItemIds: [],
       historyPast: [],
       historyFuture: [],
     });
@@ -186,13 +306,20 @@ describe('editor store history', () => {
     useEditorStore.getState().resetDocument();
 
     expect(useEditorStore.getState().document.items).toHaveLength(0);
-    expect(useEditorStore.getState().canUndo()).toBe(false);
+    expect(useEditorStore.getState().canUndo()).toBe(true);
+
+    useEditorStore.getState().undo();
+
+    expect(useEditorStore.getState().document.items).toHaveLength(2);
   });
 
   it('deduplicates available fonts and supports explicit document loading', () => {
     const uploadedFont = {
       family: 'Session Sans',
       sourceName: 'SessionSans.ttf',
+      weight: '400' as const,
+      style: 'normal' as const,
+      kind: 'uploaded' as const,
     };
     const loadedDocument = {
       ...createDefaultProjectDocument(),
@@ -205,7 +332,7 @@ describe('editor store history', () => {
 
     expect(useEditorStore.getState().availableFonts).toEqual([uploadedFont]);
     expect(useEditorStore.getState().document.background).toBe('#222222');
-    expect(useEditorStore.getState().canUndo()).toBe(true);
+    expect(useEditorStore.getState().canUndo()).toBe(false);
   });
 
   it('creates items by kind and can delete the current selection', () => {
@@ -230,7 +357,7 @@ describe('editor store history', () => {
 
     expect(useEditorStore.getState().document.items).toHaveLength(1);
     expect(useEditorStore.getState().document.items[0].id).toBe(secondItem.id);
-    expect(useEditorStore.getState().document.selectedItemIds).toEqual([secondItem.id]);
+    expect(useEditorStore.getState().selectedItemIds).toEqual([secondItem.id]);
     expect(useEditorStore.getState().canUndo()).toBe(true);
 
     useEditorStore.getState().undo();

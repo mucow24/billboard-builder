@@ -1,21 +1,28 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+// These tests intentionally mock the canvas surface and only cover App shell wiring.
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
 import {
   DUPLICATE_ITEM_OFFSET,
   createDefaultProjectDocument,
   createRectangleItem,
-} from './editor/model/defaults';
-import { serializeProjectDocument } from './editor/model/schema';
-import { AUTOSAVE_KEY } from './editor/io/projectFile';
+} from './editor/document/documentDefaults';
 import { useEditorStore } from './editor/state/store';
 
-vi.mock('./editor/io/fonts', async () => {
+const { mockCanvasPersistenceService } = vi.hoisted(() => ({
+  mockCanvasPersistenceService: {
+    load: vi.fn().mockResolvedValue(null),
+    save: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('./editor/fonts', async () => {
   const actual =
-    await vi.importActual<typeof import('./editor/io/fonts')>(
-      './editor/io/fonts',
+    await vi.importActual<typeof import('./editor/fonts')>(
+      './editor/fonts',
     );
   return {
     ...actual,
@@ -23,7 +30,12 @@ vi.mock('./editor/io/fonts', async () => {
   };
 });
 
-vi.mock('./editor/canvas/CanvasStage', () => ({
+
+vi.mock('./editor/persistence/canvasPersistenceService', () => ({
+  defaultCanvasPersistenceService: mockCanvasPersistenceService,
+}));
+
+vi.mock('./editor/rendering/CanvasStage', () => ({
   CanvasStage: ({
     activeTool,
     document,
@@ -45,7 +57,8 @@ function resetEditorStore() {
     activeTool: 'select',
     availableFonts: [],
     missingFontFamilies: [],
-    exportScale: 2,
+    exportScale: 1,
+    selectedItemIds: [],
     historyPast: [],
     historyFuture: [],
   });
@@ -53,8 +66,14 @@ function resetEditorStore() {
 
 describe('App shell', () => {
   beforeEach(() => {
-    localStorage.clear();
+    mockCanvasPersistenceService.load.mockResolvedValue(null);
+    mockCanvasPersistenceService.save.mockResolvedValue(undefined);
+    mockCanvasPersistenceService.clear.mockResolvedValue(undefined);
     resetEditorStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders the top toolbar controls', () => {
@@ -84,19 +103,35 @@ describe('App shell', () => {
     );
   });
 
-  it('restores the autosaved document on boot', async () => {
-    const autosavedDocument = createDefaultProjectDocument();
-    autosavedDocument.items = [createRectangleItem()];
-    localStorage.setItem(
-      AUTOSAVE_KEY,
-      serializeProjectDocument(autosavedDocument),
-    );
+  it('restores the persisted document on boot', async () => {
+    const persistedDocument = createDefaultProjectDocument();
+    persistedDocument.items = [createRectangleItem()];
+    mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
 
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
     });
+  });
+
+  it('persists the latest canvas snapshot after edits', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    act(() => {
+      useEditorStore.getState().dispatch({ type: 'add_item', item: createRectangleItem() });
+    });
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.save).toHaveBeenCalled();
+    });
+
+    const latestSavedDocument = mockCanvasPersistenceService.save.mock.calls.at(-1)?.[0];
+    expect(latestSavedDocument.items).toHaveLength(1);
   });
 
   it('supports global tool hotkeys', async () => {
@@ -123,8 +158,8 @@ describe('App shell', () => {
       document: {
         ...createDefaultProjectDocument(),
         items: [rectangleItem],
-        selectedItemIds: [rectangleItem.id],
       },
+      selectedItemIds: [rectangleItem.id],
     });
     render(<App />);
 
@@ -149,6 +184,27 @@ describe('App shell', () => {
     expect(items).toHaveLength(3);
     expect(items[2].x).toBe(cutItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[2].y).toBe(cutItem.y + DUPLICATE_ITEM_OFFSET);
+  });
+
+
+
+  it('nudges the selected item with arrow keys', async () => {
+    const user = userEvent.setup();
+    const rectangleItem = createRectangleItem({ x: 40, y: 60 });
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [rectangleItem],
+      },
+      selectedItemIds: [rectangleItem.id],
+    });
+    render(<App />);
+
+    await user.keyboard('{ArrowRight}');
+    expect(useEditorStore.getState().document.items[0].x).toBe(41);
+
+    await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
+    expect(useEditorStore.getState().document.items[0].y).toBe(65);
   });
 
   it('updates canvas size controls from the top toolbar', () => {
