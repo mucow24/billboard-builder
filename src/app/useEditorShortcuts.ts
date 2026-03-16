@@ -158,17 +158,17 @@ export function useEditorShortcuts({
       if (isEditableTarget(event.target)) {
         return;
       }
+      const imageFile = getFirstImageFileFromClipboardData(event.clipboardData);
+      if (imageFile) {
+        event.preventDefault();
+        void onPasteImageFile(imageFile);
+        return;
+      }
       if (clipboardItem) {
         event.preventDefault();
         dispatch({ type: 'add_item', item: cloneCanvasItem(clipboardItem) });
         return;
       }
-      const imageFile = getFirstImageFileFromClipboardData(event.clipboardData);
-      if (!imageFile) {
-        return;
-      }
-      event.preventDefault();
-      void onPasteImageFile(imageFile);
     }
 
     window.addEventListener('keydown', handleKeyDown);

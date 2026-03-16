@@ -95,7 +95,7 @@ describe('useEditorShortcuts', () => {
     expect(harness.dispatch).not.toHaveBeenCalled();
   });
 
-  it('prefers the internal clipboard item over a system clipboard image', () => {
+  it('prefers the current system clipboard image over a stale internal clipboard item', () => {
     const clipboardItem = createRectangleItem({ x: 10, y: 20 });
     const imageFile = new File(['image'], 'clipboard.png', { type: 'image/png' });
     const harness = createShortcutHarness();
@@ -109,8 +109,8 @@ describe('useEditorShortcuts', () => {
     );
 
     expect(wasUnhandled).toBe(false);
-    expect(harness.dispatch).toHaveBeenCalledOnce();
-    expect(harness.onPasteImageFile).not.toHaveBeenCalled();
+    expect(harness.onPasteImageFile).toHaveBeenCalledWith(imageFile);
+    expect(harness.dispatch).not.toHaveBeenCalled();
   });
 
   it('ignores paste events from editable targets', () => {

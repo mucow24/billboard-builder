@@ -259,6 +259,71 @@ describe('App shell', () => {
     );
   });
 
+  it('uses the current clipboard image instead of a stale internally copied image item', async () => {
+    const user = userEvent.setup();
+    const firstImageFile = new File(['image-a'], 'first-image.png', { type: 'image/png' });
+    const secondImageFile = new File(['image-b'], 'second-image.png', { type: 'image/png' });
+
+    mockImportImageFile
+      .mockResolvedValueOnce({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        width: 640,
+        height: 320,
+        sourceName: 'first-image.png',
+      })
+      .mockResolvedValueOnce({
+        src: 'data:image/png;base64,BBB',
+        mimeType: 'image/png',
+        width: 800,
+        height: 400,
+        sourceName: 'second-image.png',
+      });
+
+    render(<App />);
+
+    fireEvent.paste(document.body, {
+      clipboardData: makeClipboardData({
+        items: [makeClipboardItem(firstImageFile)],
+      }),
+    });
+
+    await waitFor(() => {
+      expect(useEditorStore.getState().document.items).toHaveLength(1);
+    });
+
+    await user.keyboard('{Control>}c{/Control}');
+
+    fireEvent.paste(document.body, {
+      clipboardData: makeClipboardData({
+        items: [makeClipboardItem(secondImageFile)],
+      }),
+    });
+
+    await waitFor(() => {
+      expect(mockImportImageFile).toHaveBeenNthCalledWith(2, secondImageFile);
+    });
+
+    const items = useEditorStore.getState().document.items;
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        kind: 'image',
+        name: 'first-image.png',
+        originalWidth: 640,
+        originalHeight: 320,
+      }),
+    );
+    expect(items[1]).toEqual(
+      expect.objectContaining({
+        kind: 'image',
+        name: 'second-image.png',
+        originalWidth: 800,
+        originalHeight: 400,
+      }),
+    );
+  });
+
 
 
   it('nudges the selected item with arrow keys', async () => {
