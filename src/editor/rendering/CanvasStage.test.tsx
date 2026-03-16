@@ -1,18 +1,18 @@
 // This file intentionally mocks Konva and the interaction session; it only covers viewport chrome wiring.
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import React, { createRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRef } from 'react';
 
 import { CanvasStage } from './CanvasStage';
 import { createDefaultProjectDocument } from '../document/documentDefaults';
 import type Konva from 'konva';
 
 vi.mock('react-konva', () => {
-  const React = require('react');
+  type MockKonvaProps = React.PropsWithChildren<Record<string, unknown>>;
   const make = (name: string) =>
-    React.forwardRef(({ children, ...props }: any, ref: any) =>
-      React.createElement('div', { ref, 'data-konva-node': name, ...props }, children),
+    React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) =>
+      React.createElement('div', { ref, 'data-konva-node': name, ...props }, children as React.ReactNode),
     );
 
   return {

@@ -23,6 +23,7 @@ import type {
 } from '../document/documentTypes';
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
+type SessionWithModifiers = InteractionSession & { shiftConstrain?: boolean };
 
 interface InteractionSessionBase {
   kind: 'create' | 'drag' | 'resize' | 'rotate' | 'line-handle';
@@ -193,6 +194,8 @@ export function useCanvasInteractionSession({
 
   const resolveSession = useCallback(
     (current: InteractionSession, pointer: Point): InteractionSession => {
+      const currentWithModifiers = current as SessionWithModifiers;
+
       switch (current.kind) {
         case 'create':
           return {
@@ -212,7 +215,7 @@ export function useCanvasInteractionSession({
               axisLock = (current as DragSession).axisLock;
             }
           }
-          if ((current as DragSession) && (current as DragSession).kind === 'drag' && (current as any).shiftConstrain) {
+          if ((current as DragSession) && (current as DragSession).kind === 'drag' && currentWithModifiers.shiftConstrain) {
             if (!axisLock && Math.hypot(deltaX, deltaY) >= 6) {
               axisLock = Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
             }
@@ -258,7 +261,7 @@ export function useCanvasInteractionSession({
             current.originalItem as ShapeItem,
             current.pointerStart,
             pointer,
-            Boolean((current as any).shiftConstrain)
+            Boolean(currentWithModifiers.shiftConstrain)
           );
           return {
             ...current,
@@ -336,7 +339,7 @@ export function useCanvasInteractionSession({
         ...current,
         snapDisabled: current.kind === 'drag' || current.kind === 'line-handle' ? event.ctrlKey : current.snapDisabled,
         shiftConstrain: event.shiftKey,
-      } as InteractionSession & { shiftConstrain?: boolean }, pointer);
+      } as SessionWithModifiers, pointer);
       onGuidesChange(next.guides);
       updateSession(next);
     }

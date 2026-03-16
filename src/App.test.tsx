@@ -11,12 +11,13 @@ import {
 } from './editor/document/documentDefaults';
 import { useEditorStore } from './editor/state/store';
 
-const { mockCanvasPersistenceService } = vi.hoisted(() => ({
+const { mockCanvasPersistenceService, mockImportImageFile } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
     load: vi.fn().mockResolvedValue(null),
     save: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn().mockResolvedValue(undefined),
   },
+  mockImportImageFile: vi.fn(),
 }));
 
 vi.mock('./editor/fonts', async () => {
@@ -34,6 +35,17 @@ vi.mock('./editor/fonts', async () => {
 vi.mock('./editor/persistence/canvasPersistenceService', () => ({
   defaultCanvasPersistenceService: mockCanvasPersistenceService,
 }));
+
+vi.mock('./editor/io/images', async () => {
+  const actual =
+    await vi.importActual<typeof import('./editor/io/images')>(
+      './editor/io/images',
+    );
+  return {
+    ...actual,
+    importImageFile: mockImportImageFile,
+  };
+});
 
 vi.mock('./editor/rendering/CanvasStage', () => ({
   CanvasStage: ({
@@ -64,11 +76,33 @@ function resetEditorStore() {
   });
 }
 
+function makeClipboardItem(file: File | null, type = file?.type ?? 'image/png'): DataTransferItem {
+  return {
+    kind: file ? 'file' : 'string',
+    type,
+    getAsFile: () => file,
+  } as DataTransferItem;
+}
+
+function makeClipboardData({
+  items = [],
+  files = [],
+}: {
+  items?: DataTransferItem[];
+  files?: File[];
+} = {}): DataTransfer {
+  return {
+    items,
+    files,
+  } as unknown as DataTransfer;
+}
+
 describe('App shell', () => {
   beforeEach(() => {
     mockCanvasPersistenceService.load.mockResolvedValue(null);
     mockCanvasPersistenceService.save.mockResolvedValue(undefined);
     mockCanvasPersistenceService.clear.mockResolvedValue(undefined);
+    mockImportImageFile.mockReset();
     resetEditorStore();
   });
 
@@ -151,7 +185,7 @@ describe('App shell', () => {
     );
   });
 
-  it('copies, pastes, cuts, and duplicates the selected item with keyboard shortcuts', async () => {
+  it('copies, pastes, cuts, and duplicates the selected item with editor shortcuts', async () => {
     const user = userEvent.setup();
     const rectangleItem = createRectangleItem({ x: 40, y: 60 });
     useEditorStore.setState({
@@ -164,7 +198,9 @@ describe('App shell', () => {
     render(<App />);
 
     await user.keyboard('{Control>}c{/Control}');
-    await user.keyboard('{Control>}v{/Control}');
+    fireEvent.paste(document.body, {
+      clipboardData: makeClipboardData(),
+    });
 
     let items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(2);
@@ -179,11 +215,48 @@ describe('App shell', () => {
     await user.keyboard('{Control>}x{/Control}');
     expect(useEditorStore.getState().document.items).toHaveLength(2);
 
-    await user.keyboard('{Control>}v{/Control}');
+    fireEvent.paste(document.body, {
+      clipboardData: makeClipboardData(),
+    });
     items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(3);
     expect(items[2].x).toBe(cutItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[2].y).toBe(cutItem.y + DUPLICATE_ITEM_OFFSET);
+  });
+
+  it('pastes clipboard images into the canvas through the shared import flow', async () => {
+    const imageFile = new File(['image'], 'clipboard.png', { type: 'image/png' });
+    mockImportImageFile.mockResolvedValue({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      width: 640,
+      height: 320,
+      sourceName: 'clipboard.png',
+    });
+
+    render(<App />);
+
+    fireEvent.paste(document.body, {
+      clipboardData: makeClipboardData({
+        items: [makeClipboardItem(imageFile)],
+      }),
+    });
+
+    await waitFor(() => {
+      expect(mockImportImageFile).toHaveBeenCalledWith(imageFile);
+    });
+
+    const items = useEditorStore.getState().document.items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toEqual(
+      expect.objectContaining({
+        kind: 'image',
+        mimeType: 'image/png',
+        name: 'clipboard.png',
+        originalWidth: 640,
+        originalHeight: 320,
+      }),
+    );
   });
 
 

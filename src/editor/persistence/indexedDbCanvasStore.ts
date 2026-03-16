@@ -86,7 +86,9 @@ export class NoopCanvasStore implements RawCanvasStore {
     return null;
   }
 
-  async write(_serializedDocument: string): Promise<void> {}
+  async write(serializedDocument: string): Promise<void> {
+    void serializedDocument;
+  }
 
   async clear(): Promise<void> {}
 }

@@ -1,6 +1,5 @@
 import type {
   CanvasTool,
-  DocumentFontReference,
   EditorCommand,
   UploadedFont,
 } from '../document/documentTypes';

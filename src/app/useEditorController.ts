@@ -3,7 +3,7 @@ import type Konva from 'konva';
 
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
-import { useEditorHotkeys } from './useEditorHotkeys';
+import { useEditorShortcuts } from './useEditorShortcuts';
 import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
@@ -77,10 +77,11 @@ export function useEditorController() {
 
   useCanvasPersistence({ document, persistenceReady });
 
-  useEditorHotkeys({
+  useEditorShortcuts({
     clipboardItem,
     deleteSelectedItems,
     dispatch,
+    onPasteImageFile: handleImageFile,
     redo,
     reorderSelectedItem,
     selectedItem: selectedItemOrNull,
@@ -89,11 +90,7 @@ export function useEditorController() {
     undo,
   });
 
-  async function handleImageUpload(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) {
-      return;
-    }
+  async function handleImageFile(file: File) {
     try {
       const image = await importImageFile(file);
       const imageItem = createImageItem({
@@ -110,6 +107,14 @@ export function useEditorController() {
     } catch (error) {
       setErrorMessage(`Failed to import image: ${getErrorMessage(error, 'Unknown error.')}`);
     }
+  }
+
+  async function handleImageUpload(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+    await handleImageFile(file);
   }
 
   async function handleFontUpload(files: FileList | null) {

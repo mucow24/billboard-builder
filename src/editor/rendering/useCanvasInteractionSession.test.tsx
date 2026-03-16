@@ -50,7 +50,8 @@ function makeStageEvent(
   } as unknown as Konva.KonvaEventObject<MouseEvent>;
 }
 
-function createDocument(items: CanvasItem[] = [], _selectedItemIds: string[] = []) {
+function createDocument(items: CanvasItem[] = [], selectedItemIds: string[] = []) {
+  void selectedItemIds;
   return {
     ...createDefaultProjectDocument(),
     items,

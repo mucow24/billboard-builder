@@ -8,7 +8,10 @@ describe('document normalizer', () => {
     const normalized = normalizeProjectDocument({
       version: 1,
       items: [
-        createRectangleItem({ zIndex: 4, shadow: { color: '#000000ff' } }),
+        {
+          ...createRectangleItem({ zIndex: 4 }),
+          shadow: { color: '#000000ff' },
+        } as ReturnType<typeof createRectangleItem>,
         createTextItem({ zIndex: 1 }),
         createLineItem({ zIndex: 2 }),
       ],

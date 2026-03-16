@@ -285,7 +285,7 @@ export function PropertiesPanel({
   useEffect(() => {
     const key = selectedItem ? 'properties' : activeTab;
     setActiveTab((current) => (current === 'layers' ? current : key));
-  }, [selectedItem]);
+  }, [activeTab, selectedItem]);
 
   useEffect(() => {
     const target = activeTab === 'layers' ? layersScrollRef.current : propertiesScrollRef.current;

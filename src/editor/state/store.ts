@@ -3,10 +3,8 @@ import { create } from 'zustand';
 import { createDefaultEditorState } from '../core/editorState';
 import { selectCanRedo, selectCanUndo, selectPrimarySelectedItemId } from '../core/selectors';
 import {
-  applyEditorCommand,
   createItemForKind,
   createResetDocumentTransaction,
-  ensureFontRegistered,
   reduceEditorState,
 } from '../core/editorReducer';
 import { toEditorAction, type EditorAction } from '../core/editorActions';

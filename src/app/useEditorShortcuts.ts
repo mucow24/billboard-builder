@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 
 import { cloneCanvasItem } from '../editor/document/documentDefaults';
+import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import type { CanvasItem, CanvasTool } from '../editor/document/documentTypes';
 import type { EditorStoreState } from '../editor/state/store';
 
@@ -15,10 +16,11 @@ function isEditableTarget(target: EventTarget | null) {
   );
 }
 
-interface UseEditorHotkeysArgs {
+interface UseEditorShortcutsArgs {
   clipboardItem: CanvasItem | null;
   deleteSelectedItems: EditorStoreState['deleteSelectedItems'];
   dispatch: EditorStoreState['dispatch'];
+  onPasteImageFile: (file: File) => void | Promise<void>;
   redo: EditorStoreState['redo'];
   selectedItem: CanvasItem | null;
   setActiveTool: EditorStoreState['setActiveTool'];
@@ -27,17 +29,18 @@ interface UseEditorHotkeysArgs {
   reorderSelectedItem: EditorStoreState['reorderSelectedItem'];
 }
 
-export function useEditorHotkeys({
+export function useEditorShortcuts({
   clipboardItem,
   deleteSelectedItems,
   dispatch,
+  onPasteImageFile,
   redo,
   selectedItem,
   setActiveTool,
   setClipboardItem,
   undo,
   reorderSelectedItem,
-}: UseEditorHotkeysArgs) {
+}: UseEditorShortcutsArgs) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       const hasModifier = event.ctrlKey || event.metaKey;
@@ -62,13 +65,6 @@ export function useEditorHotkeys({
         event.preventDefault();
         if (selectedItem) {
           setClipboardItem(selectedItem);
-        }
-        return;
-      }
-      if (hasModifier && !isEditable && pressedKey === 'v') {
-        event.preventDefault();
-        if (clipboardItem) {
-          dispatch({ type: 'add_item', item: cloneCanvasItem(clipboardItem) });
         }
         return;
       }
@@ -158,12 +154,34 @@ export function useEditorHotkeys({
       }
     }
 
+    function handlePaste(event: ClipboardEvent) {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+      if (clipboardItem) {
+        event.preventDefault();
+        dispatch({ type: 'add_item', item: cloneCanvasItem(clipboardItem) });
+        return;
+      }
+      const imageFile = getFirstImageFileFromClipboardData(event.clipboardData);
+      if (!imageFile) {
+        return;
+      }
+      event.preventDefault();
+      void onPasteImageFile(imageFile);
+    }
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('paste', handlePaste);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('paste', handlePaste);
+    };
   }, [
     clipboardItem,
     deleteSelectedItems,
     dispatch,
+    onPasteImageFile,
     redo,
     reorderSelectedItem,
     selectedItem,
