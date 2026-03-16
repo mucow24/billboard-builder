@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
 
+import {
+  readSelectionFromClipboardData,
+  writeSelectionToClipboardData,
+} from './clipboard';
 import { cloneCanvasItem } from '../editor/document/documentDefaults';
 import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import type { CanvasItem, CanvasTool } from '../editor/document/documentTypes';
@@ -17,27 +21,23 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 interface UseEditorShortcutsArgs {
-  clipboardItem: CanvasItem | null;
   deleteSelectedItems: EditorStoreState['deleteSelectedItems'];
   dispatch: EditorStoreState['dispatch'];
   onPasteImageFile: (file: File) => void | Promise<void>;
   redo: EditorStoreState['redo'];
   selectedItem: CanvasItem | null;
   setActiveTool: EditorStoreState['setActiveTool'];
-  setClipboardItem: (item: CanvasItem | null) => void;
   undo: EditorStoreState['undo'];
   reorderSelectedItem: EditorStoreState['reorderSelectedItem'];
 }
 
 export function useEditorShortcuts({
-  clipboardItem,
   deleteSelectedItems,
   dispatch,
   onPasteImageFile,
   redo,
   selectedItem,
   setActiveTool,
-  setClipboardItem,
   undo,
   reorderSelectedItem,
 }: UseEditorShortcutsArgs) {
@@ -59,21 +59,6 @@ export function useEditorShortcuts({
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') {
         event.preventDefault();
         redo();
-        return;
-      }
-      if (hasModifier && !isEditable && pressedKey === 'c') {
-        event.preventDefault();
-        if (selectedItem) {
-          setClipboardItem(selectedItem);
-        }
-        return;
-      }
-      if (hasModifier && !isEditable && pressedKey === 'x') {
-        event.preventDefault();
-        if (selectedItem) {
-          setClipboardItem(selectedItem);
-          deleteSelectedItems();
-        }
         return;
       }
       if (hasModifier && !isEditable && pressedKey === 'd') {
@@ -154,8 +139,37 @@ export function useEditorShortcuts({
       }
     }
 
+    function handleCopy(event: ClipboardEvent) {
+      if (isEditableTarget(event.target) || !selectedItem) {
+        return;
+      }
+      if (!writeSelectionToClipboardData(event.clipboardData, [selectedItem])) {
+        return;
+      }
+      event.preventDefault();
+    }
+
+    function handleCut(event: ClipboardEvent) {
+      if (isEditableTarget(event.target) || !selectedItem) {
+        return;
+      }
+      if (!writeSelectionToClipboardData(event.clipboardData, [selectedItem])) {
+        return;
+      }
+      event.preventDefault();
+      deleteSelectedItems();
+    }
+
     function handlePaste(event: ClipboardEvent) {
       if (isEditableTarget(event.target)) {
+        return;
+      }
+      const copiedItems = readSelectionFromClipboardData(event.clipboardData);
+      if (copiedItems) {
+        event.preventDefault();
+        for (const item of copiedItems) {
+          dispatch({ type: 'add_item', item: cloneCanvasItem(item) });
+        }
         return;
       }
       const imageFile = getFirstImageFileFromClipboardData(event.clipboardData);
@@ -164,21 +178,19 @@ export function useEditorShortcuts({
         void onPasteImageFile(imageFile);
         return;
       }
-      if (clipboardItem) {
-        event.preventDefault();
-        dispatch({ type: 'add_item', item: cloneCanvasItem(clipboardItem) });
-        return;
-      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('copy', handleCopy);
+    window.addEventListener('cut', handleCut);
     window.addEventListener('paste', handlePaste);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('copy', handleCopy);
+      window.removeEventListener('cut', handleCut);
       window.removeEventListener('paste', handlePaste);
     };
   }, [
-    clipboardItem,
     deleteSelectedItems,
     dispatch,
     onPasteImageFile,
@@ -186,7 +198,6 @@ export function useEditorShortcuts({
     reorderSelectedItem,
     selectedItem,
     setActiveTool,
-    setClipboardItem,
     undo,
   ]);
 }

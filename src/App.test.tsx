@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from './App';
+import { APP_CLIPBOARD_MIME_TYPE } from './app/clipboard';
 import {
   DUPLICATE_ITEM_OFFSET,
   createDefaultProjectDocument,
@@ -85,15 +86,23 @@ function makeClipboardItem(file: File | null, type = file?.type ?? 'image/png'):
 }
 
 function makeClipboardData({
+  initialData = {},
   items = [],
   files = [],
 }: {
+  initialData?: Record<string, string>;
   items?: DataTransferItem[];
   files?: File[];
 } = {}): DataTransfer {
+  const data = new Map(Object.entries(initialData));
+
   return {
     items,
     files,
+    getData: (type: string) => data.get(type) ?? '',
+    setData: (type: string, value: string) => {
+      data.set(type, value);
+    },
   } as unknown as DataTransfer;
 }
 
@@ -188,6 +197,7 @@ describe('App shell', () => {
   it('copies, pastes, cuts, and duplicates the selected item with editor shortcuts', async () => {
     const user = userEvent.setup();
     const rectangleItem = createRectangleItem({ x: 40, y: 60 });
+    const clipboardData = makeClipboardData();
     useEditorStore.setState({
       document: {
         ...createDefaultProjectDocument(),
@@ -197,9 +207,13 @@ describe('App shell', () => {
     });
     render(<App />);
 
-    await user.keyboard('{Control>}c{/Control}');
+    fireEvent.copy(document.body, {
+      clipboardData,
+    });
+    expect(clipboardData.getData(APP_CLIPBOARD_MIME_TYPE)).not.toBe('');
+
     fireEvent.paste(document.body, {
-      clipboardData: makeClipboardData(),
+      clipboardData,
     });
 
     let items = useEditorStore.getState().document.items;
@@ -212,11 +226,13 @@ describe('App shell', () => {
     expect(items).toHaveLength(3);
 
     const cutItem = items[2];
-    await user.keyboard('{Control>}x{/Control}');
+    fireEvent.cut(document.body, {
+      clipboardData,
+    });
     expect(useEditorStore.getState().document.items).toHaveLength(2);
 
     fireEvent.paste(document.body, {
-      clipboardData: makeClipboardData(),
+      clipboardData,
     });
     items = useEditorStore.getState().document.items;
     expect(items).toHaveLength(3);
@@ -259,10 +275,11 @@ describe('App shell', () => {
     );
   });
 
-  it('uses the current clipboard image instead of a stale internally copied image item', async () => {
-    const user = userEvent.setup();
+  it('prefers the app clipboard payload over a stale system image when pasting app-copied content', async () => {
     const firstImageFile = new File(['image-a'], 'first-image.png', { type: 'image/png' });
     const secondImageFile = new File(['image-b'], 'second-image.png', { type: 'image/png' });
+    const copiedItem = createRectangleItem({ x: 40, y: 60 });
+    const clipboardData = makeClipboardData();
 
     mockImportImageFile
       .mockResolvedValueOnce({
@@ -280,6 +297,14 @@ describe('App shell', () => {
         sourceName: 'second-image.png',
       });
 
+    useEditorStore.setState({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [copiedItem],
+      },
+      selectedItemIds: [copiedItem.id],
+    });
+
     render(<App />);
 
     fireEvent.paste(document.body, {
@@ -289,24 +314,37 @@ describe('App shell', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().document.items).toHaveLength(1);
+      expect(useEditorStore.getState().document.items).toHaveLength(2);
     });
 
-    await user.keyboard('{Control>}c{/Control}');
+    fireEvent.copy(document.body, {
+      clipboardData,
+    });
 
     fireEvent.paste(document.body, {
       clipboardData: makeClipboardData({
+        initialData: {
+          [APP_CLIPBOARD_MIME_TYPE]: clipboardData.getData(APP_CLIPBOARD_MIME_TYPE),
+        },
         items: [makeClipboardItem(secondImageFile)],
       }),
     });
 
-    await waitFor(() => {
-      expect(mockImportImageFile).toHaveBeenNthCalledWith(2, secondImageFile);
-    });
-
     const items = useEditorStore.getState().document.items;
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
     expect(items[0]).toEqual(
+      expect.objectContaining({
+        kind: 'rectangle',
+        id: copiedItem.id,
+      }),
+    );
+    expect(items[1]).toEqual(
+      expect.objectContaining({
+        kind: 'image',
+        name: 'first-image.png',
+      }),
+    );
+    expect(items[2]).toEqual(
       expect.objectContaining({
         kind: 'image',
         name: 'first-image.png',
@@ -314,14 +352,7 @@ describe('App shell', () => {
         originalHeight: 320,
       }),
     );
-    expect(items[1]).toEqual(
-      expect.objectContaining({
-        kind: 'image',
-        name: 'second-image.png',
-        originalWidth: 800,
-        originalHeight: 400,
-      }),
-    );
+    expect(mockImportImageFile).toHaveBeenCalledTimes(1);
   });
 
 

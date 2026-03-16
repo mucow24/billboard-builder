@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { fileDtoToDocument, documentToFileDto } from './documentCodec';
 import type { ProjectFileV1 } from './documentFileDto';
-import type { ProjectDocumentV1 } from './documentTypes';
+import type { CanvasItem, ProjectDocumentV1 } from './documentTypes';
 
 const CanvasShadowSchema = z.object({
   color: z.string(),
@@ -107,6 +107,10 @@ const ProjectFileSchema = z.object({
 export function parseProjectDocument(input: unknown): ProjectDocumentV1 {
   const parsedFile = ProjectFileSchema.parse(input) as ProjectFileV1;
   return fileDtoToDocument(parsedFile);
+}
+
+export function parseCanvasItems(input: unknown): CanvasItem[] {
+  return z.array(CanvasItemSchema).parse(input) as CanvasItem[];
 }
 
 export function serializeProjectDocument(document: ProjectDocumentV1): string {

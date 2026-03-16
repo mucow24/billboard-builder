@@ -10,7 +10,6 @@ import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
 import { selectCanRedo, selectCanUndo, selectSelectedItem } from '../editor/core/selectors';
 import { createImageItem } from '../editor/document/documentDefaults';
-import type { CanvasItem } from '../editor/document/documentTypes';
 import { useEditorStore } from '../editor/state/store';
 
 function getPointerCenteredPosition(x: number, y: number) {
@@ -26,7 +25,6 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [clipboardItem, setClipboardItem] = useState<CanvasItem | null>(null);
 
   const {
     activeTool,
@@ -78,7 +76,6 @@ export function useEditorController() {
   useCanvasPersistence({ document, persistenceReady });
 
   useEditorShortcuts({
-    clipboardItem,
     deleteSelectedItems,
     dispatch,
     onPasteImageFile: handleImageFile,
@@ -86,7 +83,6 @@ export function useEditorController() {
     reorderSelectedItem,
     selectedItem: selectedItemOrNull,
     setActiveTool,
-    setClipboardItem,
     undo,
   });
 
