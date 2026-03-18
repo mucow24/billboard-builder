@@ -41,9 +41,7 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
     node.getLayer()?.batchDraw();
 
     return () => {
-      if (node === imageRef.current) {
-        node.clearCache();
-      }
+      node.clearCache();
     };
   }, [adjustments, image, renderBox.width, renderBox.height]);
 

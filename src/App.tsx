@@ -30,7 +30,6 @@ export default function App() {
       handleSave,
       redo,
       reorderSelectedItem,
-      selectAllItems,
       selectSingleItem,
       setActiveTool,
       setCanvasSize,

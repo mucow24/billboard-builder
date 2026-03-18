@@ -7,6 +7,7 @@ import {
 } from './clipboard';
 import {
   DUPLICATE_ITEM_OFFSET,
+  createLineItem,
   createRectangleItem,
 } from '../editor/document/documentDefaults';
 import { useEditorShortcuts } from './useEditorShortcuts';
@@ -55,19 +56,28 @@ function dispatchCut(target: HTMLElement, clipboardData?: DataTransfer) {
   return fireEvent(target, event);
 }
 
+function dispatchKeyDown(target: HTMLElement, options: KeyboardEventInit) {
+  const event = createEvent.keyDown(target, options);
+  return fireEvent(target, event);
+}
+
 function createShortcutHarness() {
   const dispatch = vi.fn();
   const onPasteImageFile = vi.fn();
+  const redo = vi.fn();
+  const reorderSelectedItem = vi.fn();
+  const setActiveTool = vi.fn();
+  const undo = vi.fn();
 
   const args: Parameters<typeof useEditorShortcuts>[0] = {
     deleteSelectedItems: vi.fn(),
     dispatch,
     onPasteImageFile,
-    redo: vi.fn(),
-    reorderSelectedItem: vi.fn(),
+    redo,
+    reorderSelectedItem,
     selectedItem: null,
-    setActiveTool: vi.fn(),
-    undo: vi.fn(),
+    setActiveTool,
+    undo,
   };
 
   return {
@@ -75,6 +85,10 @@ function createShortcutHarness() {
     deleteSelectedItems: args.deleteSelectedItems,
     dispatch,
     onPasteImageFile,
+    redo,
+    reorderSelectedItem,
+    setActiveTool,
+    undo,
   };
 }
 
@@ -285,5 +299,105 @@ describe('useEditorShortcuts', () => {
     expect(wasUnhandled).toBe(true);
     expect(harness.dispatch).not.toHaveBeenCalled();
     expect(harness.onPasteImageFile).not.toHaveBeenCalled();
+  });
+
+  it('handles keyboard shortcuts for history, selection, reordering, tools, and escape', () => {
+    const harness = createShortcutHarness();
+    harness.args.selectAllItems = vi.fn();
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchKeyDown(document.body, { key: 'z', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 'z', ctrlKey: true, shiftKey: true });
+    dispatchKeyDown(document.body, { key: 'y', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 'a', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 'ArrowUp', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 'ArrowDown', ctrlKey: true, shiftKey: true });
+    dispatchKeyDown(document.body, { key: 't' });
+    dispatchKeyDown(document.body, { key: 'Escape' });
+
+    expect(harness.undo).toHaveBeenCalledOnce();
+    expect(harness.redo).toHaveBeenCalledTimes(2);
+    expect(harness.args.selectAllItems).toHaveBeenCalledOnce();
+    expect(harness.reorderSelectedItem).toHaveBeenNthCalledWith(1, 'forward');
+    expect(harness.reorderSelectedItem).toHaveBeenNthCalledWith(2, 'back');
+    expect(harness.setActiveTool).toHaveBeenNthCalledWith(1, 'text');
+    expect(harness.dispatch).toHaveBeenLastCalledWith({ type: 'clear_selection' });
+    expect(harness.setActiveTool).toHaveBeenLastCalledWith('select');
+  });
+
+  it('nudges selected items through the dispatch fallback when no store helper is provided', () => {
+    const harness = createShortcutHarness();
+    const line = createLineItem({
+      id: 'line',
+      startX: 10,
+      startY: 20,
+      endX: 30,
+      endY: 40,
+    });
+    const rectangle = createRectangleItem({ id: 'rect', x: 50, y: 60 });
+    harness.args.selectedItems = [line, rectangle];
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchKeyDown(document.body, { key: 'ArrowRight' });
+    dispatchKeyDown(document.body, { key: 'ArrowUp', shiftKey: true });
+
+    expect(harness.dispatch).toHaveBeenNthCalledWith(1, {
+      type: 'update_item',
+      itemId: 'line',
+      changes: {
+        startX: 11,
+        startY: 20,
+        endX: 31,
+        endY: 40,
+      },
+    });
+    expect(harness.dispatch).toHaveBeenNthCalledWith(2, {
+      type: 'update_item',
+      itemId: 'rect',
+      changes: {
+        x: 51,
+        y: 60,
+      },
+    });
+    expect(harness.dispatch).toHaveBeenNthCalledWith(3, {
+      type: 'update_item',
+      itemId: 'line',
+      changes: {
+        startX: 10,
+        startY: 15,
+        endX: 30,
+        endY: 35,
+      },
+    });
+    expect(harness.dispatch).toHaveBeenNthCalledWith(4, {
+      type: 'update_item',
+      itemId: 'rect',
+      changes: {
+        x: 50,
+        y: 55,
+      },
+    });
+  });
+
+  it('ignores keyboard shortcuts from editable targets', () => {
+    const harness = createShortcutHarness();
+    harness.args.selectAllItems = vi.fn();
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    dispatchKeyDown(input, { key: 'a', ctrlKey: true });
+    dispatchKeyDown(input, { key: 'Delete' });
+    dispatchKeyDown(input, { key: 'Escape' });
+
+    expect(harness.args.selectAllItems).not.toHaveBeenCalled();
+    expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
+    expect(harness.setActiveTool).not.toHaveBeenCalled();
+
+    input.remove();
   });
 });

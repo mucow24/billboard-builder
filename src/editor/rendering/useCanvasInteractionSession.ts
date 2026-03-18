@@ -18,8 +18,9 @@ import {
   buildGroupDragPreviews,
   buildGroupResizePreviews,
   buildGroupRotatePreviews,
+  getGroupResizeFrame,
+  getSelectionFrameForRotation,
   getSelectionRenderBounds,
-  getRenderBox,
   itemIntersectsSelectionRect,
   type RenderBox,
 } from './transformGeometry';
@@ -100,11 +101,13 @@ interface GroupSessionBase extends InteractionSessionBase {
 
 interface GroupDragSession extends GroupSessionBase {
   kind: 'group-drag';
+  currentPointer: Point;
 }
 
 interface GroupResizeSession extends GroupSessionBase {
   kind: 'group-resize';
   handle: ResizeHandle;
+  currentPointer: Point;
 }
 
 interface GroupRotateSession extends GroupSessionBase {
@@ -126,10 +129,6 @@ function rotateGroupPointerDelta(bounds: RenderBox, startPointer: Point, current
     deltaDegrees = Math.round(deltaDegrees / 15) * 15;
   }
   return deltaDegrees;
-}
-
-function translateBounds(bounds: RenderBox, dx: number, dy: number): RenderBox {
-  return { ...bounds, x: bounds.x + dx, y: bounds.y + dy };
 }
 
 export type InteractionSession =
@@ -249,7 +248,10 @@ export function useCanvasInteractionSession({
     }
     return renderedGroupBounds ? { bounds: renderedGroupBounds, rotation: 0 } : null;
   }, [renderedGroupBounds, renderedSelectedItems.length, selectionFrame]);
-  const activeSelectionFrame = renderedSelectionFrame ?? (groupBounds ? { bounds: groupBounds, rotation: 0 } : null);
+  const activeSelectionFrame = useMemo(
+    () => renderedSelectionFrame ?? (groupBounds ? { bounds: groupBounds, rotation: 0 } : null),
+    [groupBounds, renderedSelectionFrame]
+  );
   const selectedItemId = selectedItemIds[0];
   const selectedDocumentItem = orderedItems.find((item) => item.id === selectedItemId) ?? null;
   const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId) ?? null;
@@ -274,13 +276,16 @@ export function useCanvasInteractionSession({
       setSelectionFrame(null);
       return;
     }
+    if (session?.kind === 'group-drag' || session?.kind === 'group-resize' || session?.kind === 'group-rotate') {
+      return;
+    }
     setSelectionFrame((current) => {
-      if (current && currentSelectionSetSignature(selectedItems.map((item) => item.id)) === selectionSetSignature) {
-        return current;
-      }
-      return groupBounds ? { bounds: groupBounds, rotation: 0 } : null;
+      const rotation = current && currentSelectionSetSignature(selectedItems.map((item) => item.id)) === selectionSetSignature
+        ? current.rotation
+        : 0;
+      return getSelectionFrameForRotation(selectedItems, rotation) ?? (groupBounds ? { bounds: groupBounds, rotation } : null);
     });
-  }, [groupBounds, selectedItems, selectionSetSignature]);
+  }, [groupBounds, selectedItems, selectionSetSignature, session?.kind]);
 
   const getCurrentPointer = useCallback((event: MouseEvent) => {
     if (!stageRef.current) {
@@ -332,9 +337,27 @@ export function useCanvasInteractionSession({
       case 'marquee':
         return { ...current, currentPointer: pointer };
       case 'group-drag':
-        return { ...current, previewItems: buildGroupDragPreviews(current.originalItems, pointer.x - current.pointerStart.x, pointer.y - current.pointerStart.y) };
+        return {
+          ...current,
+          currentPointer: pointer,
+          previewItems: buildGroupDragPreviews(
+            current.originalItems,
+            pointer.x - current.pointerStart.x,
+            pointer.y - current.pointerStart.y
+          ),
+        };
       case 'group-resize':
-        return { ...current, previewItems: buildGroupResizePreviews(current.originalItems, current.bounds, current.handle, pointer) };
+        return {
+          ...current,
+          currentPointer: pointer,
+          previewItems: buildGroupResizePreviews(
+            current.originalItems,
+            current.bounds,
+            current.handle,
+            pointer,
+            current.frameRotation
+          ),
+        };
       case 'group-rotate':
         return { ...current, currentPointer: pointer, previewItems: buildGroupRotatePreviews(current.originalItems, current.bounds, current.pointerStart, pointer, Boolean(currentWithModifiers.shiftConstrain)) };
     }
@@ -369,14 +392,30 @@ export function useCanvasInteractionSession({
     if ('previewItems' in resolved) {
       const updates = resolved.previewItems.map((item) => ({ itemId: item.id, changes: getCommitChanges(item) }));
       if (resolved.kind === 'group-drag') {
-        const dx = pointer.x - resolved.pointerStart.x;
-        const dy = pointer.y - resolved.pointerStart.y;
-        setSelectionFrame({ bounds: translateBounds(resolved.bounds, dx, dy), rotation: resolved.frameRotation });
+        setSelectionFrame({
+          bounds: {
+            x: resolved.bounds.x + (resolved.currentPointer.x - resolved.pointerStart.x),
+            y: resolved.bounds.y + (resolved.currentPointer.y - resolved.pointerStart.y),
+            width: resolved.bounds.width,
+            height: resolved.bounds.height,
+          },
+          rotation: resolved.frameRotation,
+        });
       } else if (resolved.kind === 'group-rotate') {
-        const deltaRotation = rotateGroupPointerDelta(resolved.bounds, resolved.pointerStart, resolved.currentPointer, false);
-        setSelectionFrame({ bounds: resolved.bounds, rotation: resolved.frameRotation + deltaRotation });
+        const deltaRotation = rotateGroupPointerDelta(
+          resolved.bounds,
+          resolved.pointerStart,
+          resolved.currentPointer,
+          false
+        );
+        setSelectionFrame(
+          {
+            bounds: resolved.bounds,
+            rotation: resolved.frameRotation + deltaRotation,
+          }
+        );
       } else if (resolved.kind === 'group-resize') {
-        setSelectionFrame({ bounds: getSelectionRenderBounds(resolved.previewItems) ?? resolved.bounds, rotation: resolved.frameRotation });
+        setSelectionFrame(getGroupResizeFrame(resolved.bounds, resolved.handle, resolved.currentPointer, resolved.frameRotation));
       }
       if (onUpdateItems) {
         onUpdateItems(updates);
@@ -401,9 +440,6 @@ export function useCanvasInteractionSession({
   }, [finishSession, onGuidesChange, updateSession]);
 
   useEffect(() => {
-    if (!session) {
-      return;
-    }
     function handleMouseMove(event: MouseEvent) {
       let current = sessionRef.current;
       const pointer = getCurrentPointer(event);
@@ -435,7 +471,7 @@ export function useCanvasInteractionSession({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [commitActiveSession, getCurrentPointer, onGuidesChange, resolveSession, session, updateSession]);
+  }, [commitActiveSession, getCurrentPointer, onGuidesChange, resolveSession, updateSession]);
 
   const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
     updateSession({ kind: 'create', tool, pointerStart: pointer, previewItem: null, guides: [], snapDisabled: false });
@@ -447,7 +483,17 @@ export function useCanvasInteractionSession({
 
   const beginGroupDrag = useCallback((pointer: Point) => {
     if (!activeSelectionFrame || selectedItems.length <= 1) return;
-    updateSession({ kind: 'group-drag', itemIds: selectedItems.map((item) => item.id), originalItems: selectedItems, previewItems: selectedItems, bounds: activeSelectionFrame.bounds, frameRotation: activeSelectionFrame.rotation, pointerStart: pointer, guides: [] });
+    updateSession({
+      kind: 'group-drag',
+      itemIds: selectedItems.map((item) => item.id),
+      originalItems: selectedItems,
+      previewItems: selectedItems,
+      bounds: activeSelectionFrame.bounds,
+      frameRotation: activeSelectionFrame.rotation,
+      pointerStart: pointer,
+      currentPointer: pointer,
+      guides: [],
+    });
   }, [activeSelectionFrame, selectedItems, updateSession]);
 
   const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
@@ -457,7 +503,18 @@ export function useCanvasInteractionSession({
 
   const beginGroupResize = useCallback((handle: ResizeHandle, pointer: Point) => {
     if (!activeSelectionFrame || selectedItems.length <= 1) return;
-    updateSession({ kind: 'group-resize', itemIds: selectedItems.map((item) => item.id), originalItems: selectedItems, previewItems: selectedItems, bounds: activeSelectionFrame.bounds, frameRotation: activeSelectionFrame.rotation, pointerStart: pointer, handle, guides: [] });
+    updateSession({
+      kind: 'group-resize',
+      itemIds: selectedItems.map((item) => item.id),
+      originalItems: selectedItems,
+      previewItems: selectedItems,
+      bounds: activeSelectionFrame.bounds,
+      frameRotation: activeSelectionFrame.rotation,
+      pointerStart: pointer,
+      currentPointer: pointer,
+      handle,
+      guides: [],
+    });
   }, [activeSelectionFrame, selectedItems, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point) => {

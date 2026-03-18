@@ -117,7 +117,8 @@ describe('document schema', () => {
 
   it('defaults missing text padding when loading older saved files', () => {
     const legacyTextItem = createTextItem();
-    const { padding: _padding, ...legacyPayload } = legacyTextItem;
+    const { padding: ignoredPadding, ...legacyPayload } = legacyTextItem;
+    void ignoredPadding;
 
     const parsed = parseProjectDocument({
       version: 1,

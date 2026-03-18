@@ -107,6 +107,14 @@ function makeClipboardData({
   } as unknown as DataTransfer;
 }
 
+async function renderApp() {
+  render(<App />);
+
+  await waitFor(() => {
+    expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+  });
+}
+
 describe('App shell', () => {
   beforeEach(() => {
     mockCanvasPersistenceService.load.mockResolvedValue(null);
@@ -120,8 +128,8 @@ describe('App shell', () => {
     vi.useRealTimers();
   });
 
-  it('renders the top toolbar controls', () => {
-    render(<App />);
+  it('renders the top toolbar controls', async () => {
+    await renderApp();
 
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
@@ -443,8 +451,8 @@ describe('App shell', () => {
     expect(useEditorStore.getState().document.items[0].y).toBe(65);
   });
 
-  it('updates canvas size controls from the top toolbar', () => {
-    render(<App />);
+  it('updates canvas size controls from the top toolbar', async () => {
+    await renderApp();
 
     fireEvent.change(screen.getByLabelText('Canvas width'), {
       target: { value: '900' },
@@ -478,8 +486,8 @@ describe('App shell', () => {
     });
   });
 
-  it('ignores empty image and font upload events', () => {
-    render(<App />);
+  it('ignores empty image and font upload events', async () => {
+    await renderApp();
 
     fireEvent.change(screen.getByTestId('image-upload-input'), {
       target: { files: [] },

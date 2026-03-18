@@ -4,6 +4,7 @@ import type Konva from 'konva';
 
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
 import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
+import { getSelectionFrameForRotation } from './transformGeometry';
 import {
   createDefaultProjectDocument,
   createLineItem,
@@ -14,6 +15,48 @@ import type {
   CanvasTool,
   ProjectDocumentV1,
 } from '../document/documentTypes';
+
+function rotatePoint(
+  point: { x: number; y: number },
+  origin: { x: number; y: number },
+  rotation: number
+) {
+  const radians = (rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return {
+    x: origin.x + (point.x - origin.x) * cos - (point.y - origin.y) * sin,
+    y: origin.y + (point.x - origin.x) * sin + (point.y - origin.y) * cos,
+  };
+}
+
+function mapPointBetweenFrames(
+  point: { x: number; y: number },
+  fromFrame: { bounds: { x: number; y: number; width: number; height: number }; rotation: number },
+  toFrame: { bounds: { x: number; y: number; width: number; height: number }; rotation: number }
+) {
+  const fromCenter = {
+    x: fromFrame.bounds.x + fromFrame.bounds.width / 2,
+    y: fromFrame.bounds.y + fromFrame.bounds.height / 2,
+  };
+  const toCenter = {
+    x: toFrame.bounds.x + toFrame.bounds.width / 2,
+    y: toFrame.bounds.y + toFrame.bounds.height / 2,
+  };
+  const local = rotatePoint(point, fromCenter, -fromFrame.rotation);
+  const normalized = {
+    x: (local.x - fromFrame.bounds.x) / Math.max(fromFrame.bounds.width, 1),
+    y: (local.y - fromFrame.bounds.y) / Math.max(fromFrame.bounds.height, 1),
+  };
+  return rotatePoint(
+    {
+      x: toFrame.bounds.x + normalized.x * toFrame.bounds.width,
+      y: toFrame.bounds.y + normalized.y * toFrame.bounds.height,
+    },
+    toCenter,
+    toFrame.rotation
+  );
+}
 
 function makeStageRef() {
   let pointer: { x: number; y: number } | null = null;
@@ -67,6 +110,8 @@ function createHookParamsBase() {
     selectedItemIds: [] as string[],
     onGuidesChange: vi.fn(),
     onSelectItem: vi.fn(),
+    onToggleSelectItem: undefined as undefined | ReturnType<typeof vi.fn>,
+    onToggleSelectItems: undefined as undefined | ReturnType<typeof vi.fn>,
     onUpdateItem: vi.fn(),
     onUpdateItems: undefined as undefined | ReturnType<typeof vi.fn>,
     onAddItem: vi.fn(),
@@ -313,6 +358,250 @@ describe('useCanvasInteractionSession', () => {
     }
   });
 
+  it('resizes a rotated group using the rotated frame axes', () => {
+    const first = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+      onUpdateItems: vi.fn(),
+    });
+    const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), {
+      initialProps: params,
+    });
+    const bounds = result.current.renderedGroupBounds!;
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+
+    act(() => {
+      result.current.beginGroupRotate({ x: center.x, y: center.y - 100 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: center.x + 100, y: center.y }, 'shape'));
+    });
+
+    const rotationUpdates = params.onUpdateItems!.mock.calls.at(-1)?.[0] as Array<{
+      itemId: string;
+      changes: Partial<CanvasItem>;
+    }>;
+    const rotatedItems = [first, second].map((item) => ({
+      ...item,
+      ...(rotationUpdates.find((entry) => entry.itemId === item.id)?.changes ?? {}),
+    } as CanvasItem));
+
+    rerender({ ...params, document: createDocument(rotatedItems) });
+    const rotatedFrame = result.current.renderedSelectionFrame;
+    if (!rotatedFrame) {
+      throw new Error('Expected a committed rotated selection frame.');
+    }
+
+    act(() => {
+      result.current.beginGroupResize('middle-right', {
+        x: center.x,
+        y: center.y + bounds.width / 2,
+      });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: center.x,
+          clientY: center.y + bounds.width / 2 + 80,
+        })
+      );
+    });
+
+    const session = result.current.session;
+    expect(session?.kind).toBe('group-resize');
+    if (session?.kind !== 'group-resize') {
+      throw new Error('Expected a group-resize session.');
+    }
+
+    const resizedFrame = getSelectionFrameForRotation(
+      session.previewItems,
+      rotatedFrame.rotation,
+      {
+        x: rotatedFrame.bounds.x + rotatedFrame.bounds.width / 2,
+        y: rotatedFrame.bounds.y + rotatedFrame.bounds.height / 2,
+      }
+    );
+    if (!resizedFrame) {
+      throw new Error('Expected a resized selection frame.');
+    }
+    session.previewItems.forEach((item, index) => {
+      const expected = mapPointBetweenFrames(
+        { x: rotatedItems[index].x, y: rotatedItems[index].y },
+        rotatedFrame,
+        resizedFrame
+      );
+      expect(item.x).toBeCloseTo(expected.x, 5);
+      expect(item.y).toBeCloseTo(expected.y, 5);
+    });
+  });
+
+  it('keeps rotated group preview frames aligned across all resize handles', () => {
+    const handles = [
+      'top-left',
+      'top-center',
+      'top-right',
+      'middle-left',
+      'middle-right',
+      'bottom-left',
+      'bottom-center',
+      'bottom-right',
+    ] as const;
+    const first = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
+
+    for (const handle of handles) {
+      const params = createHookParams({
+        document: createDocument([first, second]),
+        selectedItemIds: [first.id, second.id],
+        onUpdateItems: vi.fn(),
+      });
+      const { result, rerender, unmount } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), {
+        initialProps: params,
+      });
+      const bounds = result.current.renderedGroupBounds!;
+      const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+
+      act(() => {
+        result.current.beginGroupRotate({ x: center.x, y: center.y - 100 });
+      });
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent({ x: center.x + 100, y: center.y }, 'shape'));
+      });
+
+      const rotationUpdates = params.onUpdateItems!.mock.calls.at(-1)?.[0] as Array<{
+        itemId: string;
+        changes: Partial<CanvasItem>;
+      }>;
+      const rotatedItems = [first, second].map((item) => ({
+        ...item,
+        ...(rotationUpdates.find((entry) => entry.itemId === item.id)?.changes ?? {}),
+      } as CanvasItem));
+
+      rerender({ ...params, document: createDocument(rotatedItems) });
+      const rotatedFrame = result.current.renderedSelectionFrame;
+      if (!rotatedFrame) {
+        throw new Error(`Expected a committed rotated selection frame for ${handle}.`);
+      }
+
+      const rotatedCenter = {
+        x: rotatedFrame.bounds.x + rotatedFrame.bounds.width / 2,
+        y: rotatedFrame.bounds.y + rotatedFrame.bounds.height / 2,
+      };
+      const handleStart = rotatePoint(
+        {
+          x: rotatedCenter.x + (handle.includes('left') ? -rotatedFrame.bounds.width / 2 : handle.includes('right') ? rotatedFrame.bounds.width / 2 : 0),
+          y: rotatedCenter.y + (handle.includes('top') ? -rotatedFrame.bounds.height / 2 : handle.includes('bottom') ? rotatedFrame.bounds.height / 2 : 0),
+        },
+        rotatedCenter,
+        rotatedFrame.rotation
+      );
+      const resizeTarget = rotatePoint(
+        {
+          x: handleStart.x + (handle.includes('left') ? -40 : handle.includes('right') ? 40 : 0),
+          y: handleStart.y + (handle.includes('top') ? -30 : handle.includes('bottom') ? 30 : 0),
+        },
+        handleStart,
+        rotatedFrame.rotation
+      );
+
+      act(() => {
+        result.current.beginGroupResize(handle, handleStart);
+      });
+      act(() => {
+        window.dispatchEvent(
+          new MouseEvent('mousemove', {
+            clientX: resizeTarget.x,
+            clientY: resizeTarget.y,
+          })
+        );
+      });
+
+      const session = result.current.session;
+      expect(session?.kind, `Expected a group-resize session for ${handle}.`).toBe('group-resize');
+      if (session?.kind !== 'group-resize') {
+        unmount();
+        continue;
+      }
+
+      const frame = getSelectionFrameForRotation(
+        session.previewItems,
+        rotatedFrame.rotation,
+        {
+          x: rotatedFrame.bounds.x + rotatedFrame.bounds.width / 2,
+          y: rotatedFrame.bounds.y + rotatedFrame.bounds.height / 2,
+        }
+      );
+      expect(frame, `Expected a preview frame for ${handle}.`).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it('preserves the logical rotated group frame after a resize commit', () => {
+    const first = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+      onUpdateItems: vi.fn(),
+    });
+    const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), {
+      initialProps: params,
+    });
+    const bounds = result.current.renderedGroupBounds!;
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+
+    act(() => {
+      result.current.beginGroupRotate({ x: center.x, y: center.y - 100 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: center.x + 100, y: center.y }, 'shape'));
+    });
+
+    const rotationUpdates = params.onUpdateItems!.mock.calls.at(-1)?.[0] as Array<{
+      itemId: string;
+      changes: Partial<CanvasItem>;
+    }>;
+    const rotatedItems = [first, second].map((item) => ({
+      ...item,
+      ...(rotationUpdates.find((entry) => entry.itemId === item.id)?.changes ?? {}),
+    } as CanvasItem));
+
+    rerender({ ...params, document: createDocument(rotatedItems) });
+
+    act(() => {
+      result.current.beginGroupResize('middle-right', {
+        x: center.x,
+        y: center.y + bounds.width / 2,
+      });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(
+        makeStageEvent({ x: center.x, y: center.y + bounds.width / 2 + 80 }, 'shape')
+      );
+    });
+
+    const resizeUpdates = params.onUpdateItems!.mock.calls.at(-1)?.[0] as Array<{
+      itemId: string;
+      changes: Partial<CanvasItem>;
+    }>;
+    const resizedItems = rotatedItems.map((item) => ({
+      ...item,
+      ...(resizeUpdates.find((entry) => entry.itemId === item.id)?.changes ?? {}),
+    } as CanvasItem));
+
+    rerender({ ...params, document: createDocument(resizedItems) });
+
+    expect(result.current.renderedSelectionFrame).toEqual(
+      getSelectionFrameForRotation(
+        resizedItems,
+        90,
+        center
+      )
+    );
+  });
+
 
   it('commits only the dragged line endpoint', () => {
     const item = createLineItem({
@@ -420,5 +709,189 @@ describe('useCanvasInteractionSession', () => {
 
     expect(result.current.session).toBeNull();
     expect(initialParams.onGuidesChange).toHaveBeenCalledWith([]);
+  });
+
+  it('toggles marquee hits when shift-selecting across multiple items', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      onToggleSelectItems: vi.fn(),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleStageMouseDown({
+        ...makeStageEvent({ x: 90, y: 90 }),
+        evt: { shiftKey: true },
+      } as unknown as Konva.KonvaEventObject<MouseEvent>);
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 320,
+          clientY: 180,
+        })
+      );
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 320,
+          clientY: 180,
+        })
+      );
+    });
+
+    expect(params.onToggleSelectItems).toHaveBeenCalledWith([first.id, second.id]);
+  });
+
+  it('clears a pending marquee without committing when the pointer never moves', () => {
+    const params = createHookParams();
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleStageMouseDown(makeStageEvent({ x: 10, y: 10 }));
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 10,
+          clientY: 10,
+        })
+      );
+    });
+
+    expect(result.current.session).toBeNull();
+    expect(params.onGuidesChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('locks drag motion to a dominant axis while shift is held', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 120,
+      height: 80,
+    });
+    const params = createHookParams({
+      document: createDocument([item], [item.id]),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginDrag(item, { x: 220, y: 140 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 320,
+          clientY: 200,
+          shiftKey: true,
+        })
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('drag');
+    if (result.current.session?.kind !== 'drag') {
+      throw new Error('Expected drag session.');
+    }
+    expect(result.current.session.axisLock).toBe('x');
+    expect(result.current.session.previewItem).toMatchObject({
+      x: 300,
+      y: 120,
+    });
+  });
+
+  it('disables snapping while ctrl-dragging', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const sibling = createRectangleItem({
+      x: 480,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const params = createHookParams({
+      document: createDocument([item, sibling], [item.id]),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginDrag(item, { x: 300, y: 180 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 584,
+          clientY: 180,
+          ctrlKey: true,
+        })
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('drag');
+    if (result.current.session?.kind !== 'drag') {
+      throw new Error('Expected drag session.');
+    }
+    expect(result.current.session.previewItem).toMatchObject({
+      x: 484,
+    });
+    expect(result.current.session.guides).toEqual([]);
+  });
+
+  it('toggles selection instead of dragging when shift-clicking an item', () => {
+    const item = createRectangleItem({ id: 'toggle-me' });
+    const params = createHookParams({
+      document: createDocument([item]),
+      onToggleSelectItem: vi.fn(),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(item, { x: 10, y: 20 }, true);
+    });
+
+    expect(params.onToggleSelectItem).toHaveBeenCalledWith(item.id);
+    expect(result.current.session).toBeNull();
+  });
+
+  it('starts a group drag when clicking an already-selected item in a multi-selection', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(first, { x: 120, y: 120 }, false);
+    });
+
+    expect(result.current.session?.kind).toBe('group-drag');
+  });
+
+  it('ignores non-canvas stage mouse downs and clears selection for pan tool clicks', () => {
+    const panParams = createHookParams({
+      activeTool: 'pan',
+    });
+    const nonCanvasParams = createHookParams();
+
+    const { result: panResult } = renderHook(() => useCanvasInteractionSession(panParams));
+    const { result: nonCanvasResult } = renderHook(() => useCanvasInteractionSession(nonCanvasParams));
+
+    act(() => {
+      panResult.current.handleStageMouseDown(makeStageEvent({ x: 50, y: 60 }));
+    });
+    act(() => {
+      nonCanvasResult.current.handleStageMouseDown(makeStageEvent({ x: 50, y: 60 }, 'shape'));
+    });
+
+    expect(panParams.onSelectItem).toHaveBeenCalledWith(undefined);
+    expect(nonCanvasParams.onSelectItem).not.toHaveBeenCalled();
   });
 });

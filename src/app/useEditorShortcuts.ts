@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import {
   APP_CLIPBOARD_MIME_TYPE,
@@ -52,7 +52,10 @@ export function useEditorShortcuts({
   undo,
   reorderSelectedItem,
 }: UseEditorShortcutsArgs) {
-  const resolvedSelectedItems = selectedItems ?? (selectedItem ? [selectedItem] : []);
+  const resolvedSelectedItems = useMemo(
+    () => selectedItems ?? (selectedItem ? [selectedItem] : []),
+    [selectedItem, selectedItems]
+  );
   const pasteStateRef = useRef<{ payload: string; count: number } | null>(null);
 
   useEffect(() => {

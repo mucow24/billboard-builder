@@ -3,7 +3,6 @@ import {
   Circle,
   Ellipse,
   Group,
-  Image as KonvaImage,
   Layer,
   Line,
   Rect,
@@ -18,11 +17,12 @@ import {
   getSelectionOutlinePoints,
   getShapeHandlePoints,
   getShapeHandleRects,
+  localToStage,
   RESIZE_HANDLE_NAMES,
   type Point,
   type ResizeHandle,
 } from './interactionGeometry';
-import { getRenderBox } from './transformGeometry';
+import { getGroupResizeFrame, getRenderBox, getSelectionFrameForRotation } from './transformGeometry';
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
 import { ImageItemNode } from './ImageItemNode';
 import { useImageElement } from './useImageElement';
@@ -51,6 +51,14 @@ interface CanvasStageProps {
 }
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
+
+declare global {
+  interface Window {
+    __BB_TEST__?: {
+      captureRenderSnapshot?: () => unknown;
+    };
+  }
+}
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
@@ -87,6 +95,75 @@ function toCanvasPointer(pointer: Point, zoom: number, pan: Point): Point {
   };
 }
 
+function toViewportPoint(point: Point, zoom: number, pan: Point): Point {
+  return {
+    x: pan.x + point.x * zoom,
+    y: pan.y + point.y * zoom,
+  };
+}
+
+function toViewportRect(
+  rect: { x: number; y: number; width: number; height: number },
+  zoom: number,
+  pan: Point
+) {
+  return {
+    left: pan.x + rect.x * zoom,
+    top: pan.y + rect.y * zoom,
+    width: rect.width * zoom,
+    height: rect.height * zoom,
+  };
+}
+
+function toOverlayStyle(rect: { left: number; top: number; width: number; height: number }) {
+  return {
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${Math.max(1, rect.width)}px`,
+    height: `${Math.max(1, rect.height)}px`,
+  };
+}
+
+function parseRotationDegrees(transform: string | null): number {
+  if (!transform) {
+    return 0;
+  }
+  const match = /rotate\((-?\d+(?:\.\d+)?)deg\)/.exec(transform);
+  return match ? Number(match[1]) : 0;
+}
+
+function readViewportHookRect(node: HTMLElement | null) {
+  if (!node) {
+    return null;
+  }
+  const width = Number.parseFloat(node.style.width || '0');
+  const height = Number.parseFloat(node.style.height || '0');
+  const left = Number.parseFloat(node.style.left || '0');
+  const top = Number.parseFloat(node.style.top || '0');
+  return {
+    left,
+    top,
+    width,
+    height,
+    center: {
+      x: left + width / 2,
+      y: top + height / 2,
+    },
+    rotation: parseRotationDegrees(node.style.transform || null),
+  };
+}
+
+function readViewportHookPoint(node: HTMLElement | null) {
+  if (!node) {
+    return null;
+  }
+  const bounds = node.getBoundingClientRect();
+  return {
+    x: bounds.left + bounds.width / 2,
+    y: bounds.top + bounds.height / 2,
+  };
+}
+
 function buildCheckerboardTiles(width: number, height: number, cellSize = 20) {
   const tiles: Array<{ x: number; y: number }> = [];
   const columns = Math.ceil(width / cellSize);
@@ -118,7 +195,6 @@ function ShapeItemView({
   activeTool,
   isSelected,
   item,
-  onBeginDrag,
   onBeginResize,
   onBeginRotate,
   onItemPointerDown,
@@ -131,7 +207,6 @@ function ShapeItemView({
   activeTool: CanvasTool;
   isSelected: boolean;
   item: ShapeItem;
-  onBeginDrag: (item: ShapeItem, pointer: Point) => void;
   onBeginResize: (item: ShapeItem, handle: ResizeHandle, pointer: Point) => void;
   onBeginRotate: (item: ShapeItem, pointer: Point) => void;
   onItemPointerDown: (item: ShapeItem, pointer: Point, shiftKey: boolean) => void;
@@ -152,6 +227,12 @@ function ShapeItemView({
       {renderContent ? (
       <Group
         ref={shapeRef}
+        id={`render-item-${item.id}`}
+        name={`render-item render-item-${item.kind}`}
+        itemId={item.id}
+        itemKind={item.kind}
+        renderWidth={renderBox.width}
+        renderHeight={renderBox.height}
         x={renderBox.x}
         y={renderBox.y}
         rotation={item.rotation}
@@ -351,7 +432,6 @@ function LineItemView({
   activeTool,
   isSelected,
   item,
-  onBeginDrag,
   onBeginLineHandle,
   onItemPointerDown,
   renderContent = true,
@@ -363,7 +443,6 @@ function LineItemView({
   activeTool: CanvasTool;
   isSelected: boolean;
   item: LineCanvasItem;
-  onBeginDrag: (item: LineCanvasItem, pointer: Point) => void;
   onBeginLineHandle: (item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => void;
   onItemPointerDown: (item: LineCanvasItem, pointer: Point, shiftKey: boolean) => void;
   renderContent?: boolean;
@@ -380,6 +459,10 @@ function LineItemView({
       {renderContent ? (
       <Line
         ref={shapeRef}
+        id={`render-item-${item.id}`}
+        name="render-item render-item-line"
+        itemId={item.id}
+        itemKind={item.kind}
         shadowColor={item.shadow.color}
         shadowBlur={item.shadow.blur}
         shadowOffsetX={item.shadow.offsetX}
@@ -481,6 +564,7 @@ export function CanvasStage({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isShiftPanActive, setIsShiftPanActive] = useState(false);
   const [isAltZoomActive, setIsAltZoomActive] = useState(false);
+  const [lastTestHookEvent, setLastTestHookEvent] = useState<string | null>(null);
   const panDragRef = useRef<{ startPointer: Point; startPan: Point } | null>(null);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
@@ -639,7 +723,6 @@ export function CanvasStage({
   );
 
   const {
-    beginDrag,
     beginGroupDrag,
     beginGroupResize,
     beginGroupRotate,
@@ -677,12 +760,36 @@ export function CanvasStage({
   });
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
   const groupRotateSession = session?.kind === 'group-rotate' ? session : null;
+  const groupDragSession = session?.kind === 'group-drag' ? session : null;
+  const groupResizeSession = session?.kind === 'group-resize' ? session : null;
   const baseGroupFrame = renderedSelectionFrame ?? (renderedGroupBounds ? { bounds: renderedGroupBounds, rotation: 0 } : null);
   const groupOverlayFrame = groupRotateSession
-    ? {
-        bounds: groupRotateSession.bounds,
-        rotation: groupRotateSession.frameRotation + (((Math.atan2(groupRotateSession.currentPointer.y - (groupRotateSession.bounds.y + groupRotateSession.bounds.height / 2), groupRotateSession.currentPointer.x - (groupRotateSession.bounds.x + groupRotateSession.bounds.width / 2)) - Math.atan2(groupRotateSession.pointerStart.y - (groupRotateSession.bounds.y + groupRotateSession.bounds.height / 2), groupRotateSession.pointerStart.x - (groupRotateSession.bounds.x + groupRotateSession.bounds.width / 2))) * 180) / Math.PI),
-      }
+    ? getSelectionFrameForRotation(
+        groupRotateSession.previewItems,
+        groupRotateSession.frameRotation +
+          (((Math.atan2(
+            groupRotateSession.currentPointer.y - (groupRotateSession.bounds.y + groupRotateSession.bounds.height / 2),
+            groupRotateSession.currentPointer.x - (groupRotateSession.bounds.x + groupRotateSession.bounds.width / 2)
+          ) -
+            Math.atan2(
+              groupRotateSession.pointerStart.y - (groupRotateSession.bounds.y + groupRotateSession.bounds.height / 2),
+              groupRotateSession.pointerStart.x - (groupRotateSession.bounds.x + groupRotateSession.bounds.width / 2)
+            )) *
+            180) /
+            Math.PI)
+      )
+    : groupDragSession
+      ? getSelectionFrameForRotation(
+          groupDragSession.previewItems,
+          groupDragSession.frameRotation
+        )
+    : groupResizeSession
+      ? getGroupResizeFrame(
+          groupResizeSession.bounds,
+          groupResizeSession.handle,
+          groupResizeSession.currentPointer,
+          groupResizeSession.frameRotation
+        )
     : baseGroupFrame;
 
   function zoomAround(point: Point, nextZoom: number) {
@@ -712,6 +819,72 @@ export function CanvasStage({
           ? 'default'
           : 'crosshair';
 
+  const selectedShapeHandleRects =
+    renderedSelectedItems.length <= 1 &&
+    selectedRenderedItem &&
+    selectedRenderedItem.kind !== 'line'
+      ? getShapeHandleRects(selectedRenderedItem)
+      : null;
+  const selectedLineHandleRects =
+    renderedSelectedItems.length <= 1 &&
+    selectedRenderedItem?.kind === 'line'
+      ? getLineHandleRects(selectedRenderedItem)
+      : null;
+  const marqueeViewportRect =
+    session?.kind === 'marquee'
+      ? toViewportRect(
+          {
+            x: Math.min(session.pointerStart.x, session.currentPointer.x),
+            y: Math.min(session.pointerStart.y, session.currentPointer.y),
+            width: Math.max(1, Math.abs(session.currentPointer.x - session.pointerStart.x)),
+            height: Math.max(1, Math.abs(session.currentPointer.y - session.pointerStart.y)),
+          },
+          zoom,
+          pan
+        )
+      : null;
+  const groupOverlayViewportRect = groupOverlayFrame
+    ? toViewportRect(groupOverlayFrame.bounds, zoom, pan)
+    : null;
+  const showGroupInteractionHooks = renderedSelectedItems.length > 1;
+  const selectedItemViewportRect =
+    renderedSelectedItems.length <= 1 && selectedRenderedItem
+      ? toViewportRect(getRenderBox(selectedRenderedItem), zoom, pan)
+      : null;
+  const groupHandleViewportPoints = groupOverlayFrame
+    ? Object.fromEntries(
+        RESIZE_HANDLE_NAMES.map((handle) => {
+          const width = groupOverlayFrame.bounds.width;
+          const height = groupOverlayFrame.bounds.height;
+          const localPoint = {
+            x: handle.includes('left') ? -width / 2 : handle.includes('right') ? width / 2 : 0,
+            y: handle.includes('top') ? -height / 2 : handle.includes('bottom') ? height / 2 : 0,
+          };
+          const center = {
+            x: groupOverlayFrame.bounds.x + width / 2,
+            y: groupOverlayFrame.bounds.y + height / 2,
+          };
+          return [
+            handle,
+            toViewportPoint(localToStage(localPoint, center, groupOverlayFrame.rotation), zoom, pan),
+          ] as const;
+        })
+      )
+    : null;
+  const groupRotaterViewportPoint = groupOverlayFrame
+    ? toViewportPoint(
+        localToStage(
+          { x: 0, y: -(groupOverlayFrame.bounds.height / 2) - 50 },
+          {
+            x: groupOverlayFrame.bounds.x + groupOverlayFrame.bounds.width / 2,
+            y: groupOverlayFrame.bounds.y + groupOverlayFrame.bounds.height / 2,
+          },
+          groupOverlayFrame.rotation
+        ),
+        zoom,
+        pan
+      )
+    : null;
   const debugInfo = {
     stageSize: viewportSize,
     canvasSize: {
@@ -723,11 +896,18 @@ export function CanvasStage({
     sessionHandle:
       session?.kind === 'resize' ||
       session?.kind === 'rotate' ||
-      session?.kind === 'line-handle'
+      session?.kind === 'line-handle' ||
+      session?.kind === 'group-resize' ||
+      session?.kind === 'group-rotate'
         ? session.handle
         : null,
     activeAnchor:
-      session?.kind === 'resize' || session?.kind === 'rotate' ? session.handle : null,
+      session?.kind === 'resize' ||
+      session?.kind === 'rotate' ||
+      session?.kind === 'group-resize' ||
+      session?.kind === 'group-rotate'
+        ? session.handle
+        : null,
     documentItem: selectedDocumentItem
       ? {
           ...getRenderBox(selectedDocumentItem),
@@ -761,10 +941,167 @@ export function CanvasStage({
     handles: nodeClientRect ? buildHandleDebug(nodeClientRect) : null,
     lineHandleRects:
       selectedRenderedItem?.kind === 'line' ? getLineHandleRects(selectedRenderedItem) : null,
+    selectedItemViewportRect,
+    marqueeViewportRect,
+    groupOverlayViewportRect,
+    groupHandleViewportPoints,
+    groupRotaterViewportPoint,
+    selectedItems: renderedSelectedItems.map((item) => item.kind === 'line'
+      ? {
+          ...getRenderBox(item),
+          kind: item.kind,
+          id: item.id,
+          rotation: 0,
+          startX: item.startX,
+          startY: item.startY,
+          endX: item.endX,
+          endY: item.endY,
+        }
+      : {
+          ...getRenderBox(item),
+          kind: item.kind,
+          id: item.id,
+          rotation: item.rotation,
+        }),
+    groupFrame: groupOverlayFrame
+      ? {
+          ...groupOverlayFrame.bounds,
+          rotation: groupOverlayFrame.rotation,
+        }
+      : null,
+    lastTestHookEvent,
   };
 
+  useEffect(() => {
+    function captureRenderSnapshot() {
+      const stage = stageRef.current;
+      const root = viewportRef.current;
+      if (!stage || !root) {
+        return null;
+      }
+
+      const selectedItems = renderedItems
+        .filter((item) => selectedItemIds.includes(item.id))
+        .map((item) => {
+          const node = stage.findOne(`#render-item-${item.id}`);
+          if (!node) {
+            return null;
+          }
+
+          if (item.kind === 'line') {
+            const points = (node as Konva.Line).points();
+            return {
+              id: item.id,
+              kind: item.kind,
+              outlinePoints: [
+                { x: points[0], y: points[1] },
+                { x: points[2], y: points[3] },
+              ],
+              geometry: {
+                x: Math.min(points[0], points[2]),
+                y: Math.min(points[1], points[3]),
+                width: Math.max(1, Math.abs(points[2] - points[0])),
+                height: Math.max(1, Math.abs(points[3] - points[1])),
+                rotation: 0,
+              },
+            };
+          }
+
+          const renderWidth = Number(node.getAttr('renderWidth') ?? 0);
+          const renderHeight = Number(node.getAttr('renderHeight') ?? 0);
+          const origin = {
+            x: node.x(),
+            y: node.y(),
+          };
+          const rotation = node.rotation();
+          const outlinePoints = [
+            localToStage({ x: 0, y: 0 }, origin, rotation),
+            localToStage({ x: renderWidth, y: 0 }, origin, rotation),
+            localToStage({ x: renderWidth, y: renderHeight }, origin, rotation),
+            localToStage({ x: 0, y: renderHeight }, origin, rotation),
+          ];
+          return {
+            id: item.id,
+            kind: item.kind,
+            outlinePoints,
+            geometry: {
+              x: origin.x,
+              y: origin.y,
+              width: renderWidth,
+              height: renderHeight,
+              rotation,
+            },
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+      const overlay = readViewportHookRect(root.querySelector<HTMLElement>('[data-testid="canvas-group-overlay"]'));
+      const handles = Object.fromEntries(
+        RESIZE_HANDLE_NAMES.flatMap((handle) => {
+          const point = readViewportHookPoint(
+            root.querySelector<HTMLElement>(`[data-testid="canvas-group-handle-${handle}"]`)
+          );
+          return point ? [[handle, point] as const] : [];
+        })
+      );
+      const rotater = readViewportHookPoint(root.querySelector<HTMLElement>('[data-testid="canvas-group-rotater"]'));
+
+      const canvasOverlay = overlay
+        ? {
+            x: (overlay.left - pan.x) / zoom,
+            y: (overlay.top - pan.y) / zoom,
+            width: overlay.width / zoom,
+            height: overlay.height / zoom,
+            center: {
+              x: (overlay.center.x - pan.x) / zoom,
+              y: (overlay.center.y - pan.y) / zoom,
+            },
+            rotation: overlay.rotation,
+            viewportRect: overlay,
+          }
+        : null;
+
+      return {
+        sessionKind: session?.kind ?? null,
+        sessionHandle:
+          session?.kind === 'resize' ||
+          session?.kind === 'rotate' ||
+          session?.kind === 'line-handle' ||
+          session?.kind === 'group-resize' ||
+          session?.kind === 'group-rotate'
+            ? session.handle
+            : null,
+        viewport: {
+          zoom,
+          panX: pan.x,
+          panY: pan.y,
+        },
+        selectedItemIds: [...selectedItemIds],
+        selectedItems,
+        groupOverlay: canvasOverlay,
+        groupHandles: handles,
+        groupRotater: rotater,
+      };
+    }
+
+    window.__BB_TEST__ = {
+      ...window.__BB_TEST__,
+      captureRenderSnapshot,
+    };
+
+    return () => {
+      if (!window.__BB_TEST__) {
+        return;
+      }
+      delete window.__BB_TEST__.captureRenderSnapshot;
+      if (Object.keys(window.__BB_TEST__).length === 0) {
+        delete window.__BB_TEST__;
+      }
+    };
+  }, [pan.x, pan.y, renderedItems, selectedItemIds, session, stageRef, zoom]);
+
   return (
-    <div className="canvas-stage-screen" ref={viewportRef}>
+    <div className="canvas-stage-screen" ref={viewportRef} data-testid="canvas-stage-root">
       <div className="canvas-hud">
         <div className="canvas-hud-pill" data-testid="canvas-size">
           {document.canvas.width} x {document.canvas.height}
@@ -946,7 +1283,6 @@ export function CanvasStage({
                     activeTool={activeTool}
                     isSelected={item.id === selectedItemId}
                     item={item}
-                    onBeginDrag={beginDrag}
                     onBeginLineHandle={beginLineHandle}
                     onItemPointerDown={handleItemPointerDown}
                     renderSelection={false}
@@ -959,7 +1295,6 @@ export function CanvasStage({
                     activeTool={activeTool}
                     isSelected={item.id === selectedItemId}
                     item={item}
-                    onBeginDrag={beginDrag}
                     onBeginResize={beginResize}
                     onBeginRotate={beginRotate}
                     onItemPointerDown={handleItemPointerDown}
@@ -1031,7 +1366,6 @@ export function CanvasStage({
                         activeTool={activeTool}
                         isSelected
                         item={selectedRenderedItem}
-                        onBeginDrag={beginDrag}
                         onBeginLineHandle={beginLineHandle}
                         onItemPointerDown={handleItemPointerDown}
                         renderContent={false}
@@ -1045,7 +1379,6 @@ export function CanvasStage({
                         activeTool={activeTool}
                         isSelected
                         item={selectedRenderedItem}
-                        onBeginDrag={beginDrag}
                         onBeginResize={beginResize}
                         onBeginRotate={beginRotate}
                         onItemPointerDown={handleItemPointerDown}
@@ -1137,7 +1470,6 @@ export function CanvasStage({
                   activeTool={activeTool}
                   isSelected={selectedRenderedItem.id === selectedItemId}
                   item={selectedRenderedItem}
-                  onBeginDrag={beginDrag}
                   onBeginLineHandle={beginLineHandle}
                   onItemPointerDown={handleItemPointerDown}
                   renderContent={false}
@@ -1150,7 +1482,6 @@ export function CanvasStage({
                   activeTool={activeTool}
                   isSelected={selectedRenderedItem.id === selectedItemId}
                   item={selectedRenderedItem}
-                  onBeginDrag={beginDrag}
                   onBeginResize={beginResize}
                   onBeginRotate={beginRotate}
                   onItemPointerDown={handleItemPointerDown}
@@ -1167,6 +1498,214 @@ export function CanvasStage({
       <div className="canvas-debug" aria-hidden="true">
         <pre data-testid="stage-debug">{JSON.stringify(debugInfo)}</pre>
         <pre data-testid="selected-item-debug">{JSON.stringify(debugInfo)}</pre>
+      </div>
+      <div
+        aria-hidden="true"
+        data-testid="canvas-test-previews"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 4,
+        }}
+      >
+        {marqueeViewportRect ? (
+          <div
+            data-testid="canvas-marquee-preview"
+            style={{
+              position: 'absolute',
+              opacity: 0,
+              ...toOverlayStyle(marqueeViewportRect),
+            }}
+          />
+        ) : null}
+        {session?.kind === 'create' && session.tool === 'text' && session.previewItem && session.previewItem.kind === 'text' ? (
+          <div
+            data-testid="canvas-text-create-preview"
+            style={{
+              position: 'absolute',
+              opacity: 0,
+              ...toOverlayStyle(
+                toViewportRect(
+                  {
+                    x: session.previewItem.x,
+                    y: session.previewItem.y,
+                    width: session.previewItem.width,
+                    height: session.previewItem.height,
+                  },
+                  zoom,
+                  pan
+                )
+              ),
+            }}
+          />
+        ) : null}
+      </div>
+      <div
+        aria-hidden="true"
+        data-testid="canvas-test-hooks"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 5,
+        }}
+      >
+        {selectedItemViewportRect && selectedRenderedItem ? (
+          <div
+            data-testid="canvas-selected-item-overlay"
+            onMouseDown={(event) => {
+              if (event.button === 1) {
+                return;
+              }
+              setLastTestHookEvent('selected-item-overlay');
+              const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+              if (!pointer) {
+                return;
+              }
+              handleItemPointerDown(selectedRenderedItem, toCanvasPointer(pointer, zoom, pan), false);
+            }}
+            style={{
+              position: 'absolute',
+              pointerEvents: 'auto',
+              background: 'rgba(0, 0, 0, 0.001)',
+              transform: `rotate(${selectedRenderedItem.rotation}deg)`,
+              transformOrigin: 'center',
+              ...toOverlayStyle(selectedItemViewportRect),
+            }}
+          />
+        ) : null}
+        {selectedShapeHandleRects
+          ? Object.entries(selectedShapeHandleRects).map(([handle, rect]) => (
+              <div
+                key={`shape-handle-${handle}`}
+                data-testid={`canvas-shape-handle-${handle}`}
+                onMouseDown={(event) => {
+                  if (!selectedRenderedItem || selectedRenderedItem.kind === 'line' || event.button === 1) {
+                    return;
+                  }
+                  setLastTestHookEvent(`shape-handle-${handle}`);
+                  const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                  if (!pointer) {
+                    return;
+                  }
+                  if (handle === 'rotater') {
+                    beginRotate(selectedRenderedItem, toCanvasPointer(pointer, zoom, pan));
+                    return;
+                  }
+                  beginResize(selectedRenderedItem, handle as ResizeHandle, toCanvasPointer(pointer, zoom, pan));
+                }}
+                style={{
+                  position: 'absolute',
+                  pointerEvents: 'auto',
+                  background: 'rgba(0, 0, 0, 0.001)',
+                  ...toOverlayStyle(toViewportRect(rect, zoom, pan)),
+                }}
+              />
+            ))
+          : null}
+        {selectedLineHandleRects
+          ? Object.entries(selectedLineHandleRects).map(([handle, rect]) => (
+              <div
+                key={`line-handle-${handle}`}
+                data-testid={`canvas-line-handle-${handle}`}
+                onMouseDown={(event) => {
+                  if (!selectedRenderedItem || selectedRenderedItem.kind !== 'line' || event.button === 1) {
+                    return;
+                  }
+                  setLastTestHookEvent(`line-handle-${handle}`);
+                  const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                  if (!pointer) {
+                    return;
+                  }
+                  beginLineHandle(selectedRenderedItem, handle as 'start' | 'end', toCanvasPointer(pointer, zoom, pan));
+                }}
+                style={{
+                  position: 'absolute',
+                  pointerEvents: 'auto',
+                  background: 'rgba(0, 0, 0, 0.001)',
+                  ...toOverlayStyle(toViewportRect(rect, zoom, pan)),
+                }}
+              />
+            ))
+          : null}
+        {showGroupInteractionHooks && groupOverlayViewportRect ? (
+          <div
+            data-testid="canvas-group-overlay"
+            onMouseDown={(event) => {
+              if (event.button === 1) {
+                return;
+              }
+              setLastTestHookEvent('group-overlay');
+              const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+              if (!pointer) {
+                return;
+              }
+              beginGroupDrag(toCanvasPointer(pointer, zoom, pan));
+            }}
+            style={{
+              position: 'absolute',
+              pointerEvents: 'auto',
+              background: 'rgba(0, 0, 0, 0.001)',
+              transform: `rotate(${groupOverlayFrame?.rotation ?? 0}deg)`,
+              transformOrigin: 'center',
+              ...toOverlayStyle(groupOverlayViewportRect),
+            }}
+          />
+        ) : null}
+        {showGroupInteractionHooks && groupHandleViewportPoints
+          ? Object.entries(groupHandleViewportPoints).map(([handle, point]) => (
+              <div
+                key={`group-handle-${handle}`}
+                data-testid={`canvas-group-handle-${handle}`}
+                onMouseDown={(event) => {
+                  if (event.button === 1) {
+                    return;
+                  }
+                  setLastTestHookEvent(`group-handle-${handle}`);
+                  const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                  if (!pointer) {
+                    return;
+                  }
+                  beginGroupResize(handle as ResizeHandle, toCanvasPointer(pointer, zoom, pan));
+                }}
+                style={{
+                  position: 'absolute',
+                  pointerEvents: 'auto',
+                  background: 'rgba(0, 0, 0, 0.001)',
+                  left: `${point.x - 8}px`,
+                  top: `${point.y - 8}px`,
+                  width: '16px',
+                  height: '16px',
+                }}
+              />
+            ))
+          : null}
+        {showGroupInteractionHooks && groupRotaterViewportPoint ? (
+          <div
+            data-testid="canvas-group-rotater"
+            onMouseDown={(event) => {
+              if (event.button === 1) {
+                return;
+              }
+              setLastTestHookEvent('group-rotater');
+              const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+              if (!pointer) {
+                return;
+              }
+              beginGroupRotate(toCanvasPointer(pointer, zoom, pan));
+            }}
+            style={{
+              position: 'absolute',
+              pointerEvents: 'auto',
+              background: 'rgba(0, 0, 0, 0.001)',
+              left: `${groupRotaterViewportPoint.x - 8}px`,
+              top: `${groupRotaterViewportPoint.y - 8}px`,
+              width: '16px',
+              height: '16px',
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

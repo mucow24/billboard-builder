@@ -356,7 +356,7 @@ export function PropertiesPanel({
   useEffect(() => {
     const key = selectedItem || isMultiSelection ? 'properties' : activeTab;
     setActiveTab((current) => (current === 'layers' ? current : key));
-  }, [activeTab, selectedItem]);
+  }, [activeTab, isMultiSelection, selectedItem]);
 
   useEffect(() => {
     const target = activeTab === 'layers' ? layersScrollRef.current : propertiesScrollRef.current;

@@ -1,25 +1,41 @@
 Huge:
+P0:
+P1:
+P2:
+P3:
 REQUEST: Integrate generators
 
 Big ones:
-REQUEST: Multi-select / copy / paste / manipulate
-REQUEST: Templates
+P0:
+P1:
 REQUEST: Rich text fields
+P2:
+REQUEST: Templates
+P3:
 
 Medium:
+P0:
+P1:
+REQUEST: Crop images
+P2:
+REDESIGN: Densification of properties panel.
+REDESIGN: Densification of layers panel.
 REQUEST: Make content off-canvas be visible "under" the background, with blurring and translucency.
 REQUEST: Drag and drop layers with autoscroll, insertion line, animations, etc.
-REQUEST: Crop images
-REQUEST: Grouping
 
 Small:
+P0:
+BUG: Middle-drag doesn't work on the selection box
+BUG: Multi-selections don't snap to guides
+P1:
+REQUEST: Grouping
+P2:
 
-UI:
-Densification of properties panel.
-Densification of layers panel.
+
 Make layer panel entries span the whole width, always show the delete button
 
 IN PROGRESS:
+REQUEST: Multi-select / copy / paste / manipulate
 
 DONE:
 REQUEST: Image opacity slider
@@ -30,4 +46,5 @@ REQUEST: Brightness / Contrast / Hue adjustment for images.
 BUG: Manipulators grow/shrink with the canvas zoom; should be constant size.
 REQUEST: Default corner radius to 0, text color to white
 BUG: weird canvas edge
+HYGIENE: Full browser suite
 REQUEST: Blinding white flash

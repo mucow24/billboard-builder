@@ -1,5 +1,5 @@
-// This file intentionally mocks Konva and the interaction session; it only covers viewport chrome wiring.
-import { render, screen } from '@testing-library/react';
+// This file intentionally mocks Konva and the interaction session; it covers stage wiring without a real canvas.
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React, { createRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ const { mockInteractionSession } = vi.hoisted(() => ({
     nodeClientRect: null,
     registerShapeRef: vi.fn(),
     renderedGroupBounds: null,
+    renderedSelectionFrame: null,
     renderedItems: [],
     renderedSelectedItems: [],
     selectedDocumentItem: null,
@@ -40,24 +41,79 @@ vi.mock('konva', () => ({
 }));
 
 import { CanvasStage } from './CanvasStage';
-import { createDefaultProjectDocument, createRectangleItem } from '../document/documentDefaults';
+import {
+  createDefaultProjectDocument,
+  createLineItem,
+  createRectangleItem,
+  createTextItem,
+} from '../document/documentDefaults';
 import type Konva from 'konva';
+import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
+import { getGroupResizeFrame, getSelectionFrameForRotation } from './transformGeometry';
 
 vi.mock('react-konva', () => {
   type MockKonvaProps = React.PropsWithChildren<Record<string, unknown>>;
+  function buildKonvaEvent(
+    event: MouseEvent | WheelEvent,
+    nodeRef: HTMLDivElement | null,
+  ) {
+    const stage = {
+      getPointerPosition: () => ({
+        x: event.clientX || 640,
+        y: event.clientY || 360,
+      }),
+    };
+
+    return {
+      cancelBubble: false,
+      evt: event,
+      target: Object.assign(nodeRef ?? event.target ?? {}, {
+        getStage: () => stage,
+      }),
+    };
+  }
+
   const make = (name: string) =>
     React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) => {
-      const dataProps = Object.fromEntries(
-        Object.entries(props).flatMap(([key, value]) => {
-          if (value === undefined || typeof value === 'function') {
+      let nodeRef: HTMLDivElement | null = null;
+      const entries = Object.entries(props).flatMap<[string, unknown]>(([key, value]) => {
+          if (value === undefined) {
             return [];
           }
+          if (typeof value === 'function') {
+            if (/^on(MouseDown|MouseUp|MouseMove|MouseLeave|Wheel)$/.test(key)) {
+              return [[
+                key,
+                (event: MouseEvent | WheelEvent) => {
+                  value(buildKonvaEvent(event, nodeRef));
+                },
+              ]];
+            }
+            return /^(onClick|onWheel)/.test(key) ? [[key, value]] : [];
+          }
           return [[`data-prop-${key.toLowerCase()}`, typeof value === 'object' ? JSON.stringify(value) : String(value)]];
-        }),
-      );
+        });
+      const domProps = Object.fromEntries(entries);
+      const setRef = (node: HTMLDivElement | null) => {
+        nodeRef = node;
+        if (node) {
+          Object.assign(node, {
+            getStage: () => ({
+              getPointerPosition: () => ({ x: 640, y: 360 }),
+            }),
+            hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
+            name: () => String(props.name ?? ''),
+          });
+        }
+        if (typeof ref === 'function') {
+          ref(node);
+        } else if (ref) {
+          ref.current = node;
+        }
+      };
       return React.createElement(
         'div',
-        { ref, 'data-konva-node': name, ...dataProps },
+        { ref: setRef, 'data-konva-node': name, ...domProps },
         children as React.ReactNode,
       );
     });
@@ -99,6 +155,7 @@ describe('CanvasStage viewport controls', () => {
       nodeClientRect: null,
       registerShapeRef: vi.fn(),
       renderedGroupBounds: null,
+      renderedSelectionFrame: null,
       renderedItems: [],
       renderedSelectedItems: [],
       selectedDocumentItem: null,
@@ -258,5 +315,583 @@ describe('CanvasStage viewport controls', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fit canvas to viewport' }));
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 63%');
+  });
+
+  it('forwards group overlay drag and resize handles to the interaction session', () => {
+    const document = createDefaultProjectDocument();
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+    document.items = [first, second];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [first, second],
+      renderedSelectedItems: [first, second],
+      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
+      selectedItemId: first.id,
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[first.id, second.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const groupOutline = container.querySelector(
+      '[data-konva-node="Rect"][data-prop-dash="[8,4]"]'
+    ) as HTMLElement | null;
+    const rightHandle = container.querySelector(
+      '[data-konva-node="Circle"][data-prop-x="90"][data-prop-y="0"]'
+    ) as HTMLElement | null;
+
+    expect(groupOutline).not.toBeNull();
+    expect(rightHandle).not.toBeNull();
+
+    fireEvent.mouseDown(groupOutline!, { button: 0 });
+    fireEvent.mouseDown(rightHandle!, { button: 0 });
+
+    expect(mockInteractionSession.beginGroupDrag).toHaveBeenCalledOnce();
+    expect(mockInteractionSession.beginGroupResize).toHaveBeenCalledWith(
+      'middle-right',
+      expect.any(Object),
+    );
+  });
+
+  it('uses preview group bounds during rotated drag and resize sessions', () => {
+    const document = createDefaultProjectDocument();
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+    const draggedFirst = createRectangleItem({ id: 'first', x: 60, y: 70, width: 80, height: 40 });
+    const draggedSecond = createRectangleItem({ id: 'second', x: 180, y: 100, width: 60, height: 50 });
+    const resizedFirst = createRectangleItem({ id: 'first', x: 30, y: 20, width: 110, height: 80 });
+    const resizedSecond = createRectangleItem({ id: 'second', x: 170, y: 70, width: 90, height: 90 });
+    document.items = [first, second];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [draggedFirst, draggedSecond],
+      renderedSelectedItems: [draggedFirst, draggedSecond],
+      renderedGroupBounds: { x: 60, y: 70, width: 180, height: 80 },
+      renderedSelectionFrame: { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 30 },
+      session: {
+        kind: 'group-drag',
+        itemIds: ['first', 'second'],
+        originalItems: [first, second],
+        previewItems: [draggedFirst, draggedSecond],
+        bounds: { x: 20, y: 30, width: 180, height: 80 },
+        frameRotation: 30,
+        pointerStart: { x: 110, y: 70 },
+        currentPointer: { x: 150, y: 110 },
+        guides: [],
+      },
+    });
+
+    const { rerender } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={['first', 'second']}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    let debugInfo = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(debugInfo.sessionKind).toBe('group-drag');
+    const draggedFrame = getSelectionFrameForRotation([draggedFirst, draggedSecond], 30);
+    expect(debugInfo.groupFrame.x).toBeCloseTo(draggedFrame?.bounds.x ?? 0, 10);
+    expect(debugInfo.groupFrame.y).toBeCloseTo(draggedFrame?.bounds.y ?? 0, 10);
+    expect(debugInfo.groupFrame.width).toBeCloseTo(draggedFrame?.bounds.width ?? 0, 10);
+    expect(debugInfo.groupFrame.height).toBeCloseTo(draggedFrame?.bounds.height ?? 0, 10);
+    expect(debugInfo.groupFrame.rotation).toBeCloseTo(30, 10);
+    expect(debugInfo.selectedItems).toEqual([
+      expect.objectContaining({
+        id: 'first',
+        x: draggedFirst.x,
+        y: draggedFirst.y,
+        width: draggedFirst.width,
+        height: draggedFirst.height,
+        rotation: draggedFirst.rotation,
+      }),
+      expect.objectContaining({
+        id: 'second',
+        x: draggedSecond.x,
+        y: draggedSecond.y,
+        width: draggedSecond.width,
+        height: draggedSecond.height,
+        rotation: draggedSecond.rotation,
+      }),
+    ]);
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [resizedFirst, resizedSecond],
+      renderedSelectedItems: [resizedFirst, resizedSecond],
+      renderedGroupBounds: { x: 30, y: 20, width: 230, height: 140 },
+      session: {
+        kind: 'group-resize',
+        itemIds: ['first', 'second'],
+        originalItems: [first, second],
+        previewItems: [resizedFirst, resizedSecond],
+        bounds: { x: 20, y: 30, width: 180, height: 80 },
+        frameRotation: 30,
+        pointerStart: { x: 200, y: 110 },
+        currentPointer: { x: 240, y: 170 },
+        handle: 'bottom-right',
+        guides: [],
+      },
+    });
+
+    rerender(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={['first', 'second']}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    debugInfo = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(debugInfo.sessionKind).toBe('group-resize');
+    const resizedFrame = getGroupResizeFrame(
+      { x: 20, y: 30, width: 180, height: 80 },
+      'bottom-right',
+      { x: 240, y: 170 },
+      30,
+    );
+    expect(debugInfo.groupFrame.x).toBeCloseTo(resizedFrame?.bounds.x ?? 0, 10);
+    expect(debugInfo.groupFrame.y).toBeCloseTo(resizedFrame?.bounds.y ?? 0, 10);
+    expect(debugInfo.groupFrame.width).toBeCloseTo(resizedFrame?.bounds.width ?? 0, 10);
+    expect(debugInfo.groupFrame.height).toBeCloseTo(resizedFrame?.bounds.height ?? 0, 10);
+    expect(debugInfo.groupFrame.rotation).toBeCloseTo(30, 10);
+    expect(debugInfo.selectedItems).toEqual([
+      expect.objectContaining({
+        id: 'first',
+        x: resizedFirst.x,
+        y: resizedFirst.y,
+        width: resizedFirst.width,
+        height: resizedFirst.height,
+        rotation: resizedFirst.rotation,
+      }),
+      expect.objectContaining({
+        id: 'second',
+        x: resizedSecond.x,
+        y: resizedSecond.y,
+        width: resizedSecond.width,
+        height: resizedSecond.height,
+        rotation: resizedSecond.rotation,
+      }),
+    ]);
+  });
+
+  it('derives rotated group debug frames from preview items for drag, resize, and rotate sessions', () => {
+    const document = createDefaultProjectDocument();
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+    const previewDragItems = [
+      createRectangleItem({ id: 'first', x: 60, y: 70, width: 80, height: 40, rotation: 30 }),
+      createRectangleItem({ id: 'second', x: 180, y: 100, width: 60, height: 50, rotation: 30 }),
+    ];
+    const previewResizeItems = [
+      createRectangleItem({ id: 'first', x: 40, y: 35, width: 120, height: 70, rotation: 30 }),
+      createRectangleItem({ id: 'second', x: 190, y: 95, width: 90, height: 85, rotation: 30 }),
+    ];
+    document.items = [first, second];
+
+    const cases = [
+      {
+        kind: 'group-drag',
+        previewItems: previewDragItems,
+        session: {
+          kind: 'group-drag' as const,
+          itemIds: ['first', 'second'],
+          originalItems: [first, second],
+          previewItems: previewDragItems,
+          bounds: { x: 20, y: 30, width: 180, height: 80 },
+          frameRotation: 30,
+          pointerStart: { x: 110, y: 70 },
+          currentPointer: { x: 150, y: 110 },
+          guides: [],
+        },
+      },
+      {
+        kind: 'group-resize',
+        previewItems: previewResizeItems,
+        session: {
+          kind: 'group-resize' as const,
+          itemIds: ['first', 'second'],
+          originalItems: [first, second],
+          previewItems: previewResizeItems,
+          bounds: { x: 20, y: 30, width: 180, height: 80 },
+          frameRotation: 30,
+          pointerStart: { x: 200, y: 110 },
+          currentPointer: { x: 240, y: 170 },
+          handle: 'bottom-right' as const,
+          guides: [],
+        },
+      },
+    ];
+
+    const { rerender } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={['first', 'second']}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    for (const testCase of cases) {
+      Object.assign(mockInteractionSession, {
+        renderedItems: testCase.previewItems,
+        renderedSelectedItems: testCase.previewItems,
+        renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
+        renderedSelectionFrame: { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 30 },
+        session: testCase.session,
+      });
+
+      rerender(
+        <CanvasStage
+          activeTool="select"
+          document={document}
+          selectedItemIds={['first', 'second']}
+          guides={[]}
+          onGuidesChange={vi.fn()}
+          onSelectItem={vi.fn()}
+          onUpdateItem={vi.fn()}
+          onUpdateItems={vi.fn()}
+          onAddItem={vi.fn()}
+          onSetActiveTool={vi.fn()}
+          stageRef={createRef<Konva.Stage>()}
+        />,
+      );
+
+      const debugInfo = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+      expect(debugInfo.sessionKind).toBe(testCase.kind);
+      const previewFrame = testCase.kind === 'group-resize'
+        ? getGroupResizeFrame(
+            { x: 20, y: 30, width: 180, height: 80 },
+            'bottom-right',
+            { x: 240, y: 170 },
+            30,
+          )
+        : getSelectionFrameForRotation(testCase.previewItems, 30);
+      expect(debugInfo.groupFrame.x).toBeCloseTo(previewFrame?.bounds.x ?? 0, 10);
+      expect(debugInfo.groupFrame.y).toBeCloseTo(previewFrame?.bounds.y ?? 0, 10);
+      expect(debugInfo.groupFrame.width).toBeCloseTo(previewFrame?.bounds.width ?? 0, 10);
+      expect(debugInfo.groupFrame.height).toBeCloseTo(previewFrame?.bounds.height ?? 0, 10);
+      expect(debugInfo.groupFrame.rotation).toBeCloseTo(30, 10);
+    }
+  });
+
+  it('forwards selected line handle drags to the interaction session', () => {
+    const document = createDefaultProjectDocument();
+    const line = createLineItem({
+      id: 'line',
+      startX: 160,
+      startY: 160,
+      endX: 360,
+      endY: 220,
+    });
+    document.items = [line];
+    const startHandle = getLineHandleRects(line).start;
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [line],
+      renderedSelectedItems: [line],
+      selectedDocumentItem: line,
+      selectedRenderedItem: line,
+      selectedItemId: line.id,
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[line.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const startHandleNode = container.querySelector(
+      `[data-konva-node="Circle"][data-prop-x="${startHandle.x + startHandle.width / 2}"][data-prop-y="${startHandle.y + startHandle.height / 2}"]`
+    ) as HTMLElement | null;
+
+    expect(startHandleNode).not.toBeNull();
+
+    fireEvent.mouseDown(startHandleNode!, { button: 0 });
+
+    expect(mockInteractionSession.beginLineHandle).toHaveBeenCalledWith(
+      line,
+      'start',
+      expect.any(Object),
+    );
+  });
+
+  it('forwards single-shape drag, resize, and rotate handles to the interaction session', () => {
+    const document = createDefaultProjectDocument();
+    const rectangle = createRectangleItem({
+      id: 'shape',
+      x: 120,
+      y: 80,
+      width: 160,
+      height: 100,
+    });
+    document.items = [rectangle];
+    const handlePoints = getShapeHandlePoints(rectangle);
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [rectangle],
+      renderedSelectedItems: [rectangle],
+      selectedDocumentItem: rectangle,
+      selectedRenderedItem: rectangle,
+      selectedItemId: rectangle.id,
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[rectangle.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const shapeGroups = container.querySelectorAll(
+      `[data-konva-node="Group"][data-prop-x="${rectangle.x}"][data-prop-y="${rectangle.y}"]`
+    );
+    const rotaterHandle = container.querySelector(
+      `[data-konva-node="Circle"][data-prop-x="${handlePoints.rotater.x}"][data-prop-y="${handlePoints.rotater.y}"]`
+    ) as HTMLElement | null;
+    const rightResizeHandle = container.querySelector(
+      `[data-konva-node="Circle"][data-prop-x="${handlePoints['middle-right'].x}"][data-prop-y="${handlePoints['middle-right'].y}"]`
+    ) as HTMLElement | null;
+
+    expect(shapeGroups.length).toBeGreaterThan(0);
+    expect(rotaterHandle).not.toBeNull();
+    expect(rightResizeHandle).not.toBeNull();
+
+    fireEvent.mouseDown(shapeGroups[0]!, { button: 0, shiftKey: true, clientX: 300, clientY: 240 });
+    fireEvent.mouseDown(rightResizeHandle!, { button: 0, clientX: 300, clientY: 240 });
+    fireEvent.mouseDown(rotaterHandle!, { button: 0, clientX: 300, clientY: 240 });
+
+    expect(mockInteractionSession.handleItemPointerDown).toHaveBeenCalledWith(
+      rectangle,
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      true,
+    );
+    expect(mockInteractionSession.beginResize).toHaveBeenCalledWith(
+      rectangle,
+      'middle-right',
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+    expect(mockInteractionSession.beginRotate).toHaveBeenCalledWith(
+      rectangle,
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+  });
+
+  it('renders marquee and text-create previews plus active guide lines', () => {
+    const document = createDefaultProjectDocument();
+    const previewItem = createTextItem({
+      x: 80,
+      y: 70,
+      width: 180,
+      height: 60,
+      text: 'Preview',
+      fontFamily: 'Arial',
+      fontSize: 32,
+      lineHeight: 1.2,
+      letterSpacing: 0,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      fill: '#ffffff',
+    });
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [],
+      renderedSelectedItems: [],
+      session: {
+        kind: 'marquee',
+        pointerStart: { x: 50, y: 40 },
+        currentPointer: { x: 180, y: 140 },
+        toggleMode: false,
+        guides: [],
+      },
+    });
+
+    const { container, rerender } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[]}
+        guides={[
+          { orientation: 'vertical', position: 120 },
+          { orientation: 'horizontal', position: 90 },
+        ]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    expect(
+      container.querySelector('[data-konva-node="Rect"][data-prop-stroke="#7dd3fc"][data-prop-dash="[6,4]"]')
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        `[data-konva-node="Line"][data-prop-points="[120,0,120,${document.canvas.height}]"]`
+      )
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        `[data-konva-node="Line"][data-prop-points="[0,90,${document.canvas.width},90]"]`
+      )
+    ).not.toBeNull();
+
+    Object.assign(mockInteractionSession, {
+      session: {
+        kind: 'create',
+        tool: 'text',
+        pointerStart: { x: 80, y: 70 },
+        previewItem,
+        guides: [],
+        snapDisabled: false,
+      },
+    });
+
+    rerender(
+      <CanvasStage
+        activeTool="text"
+        document={document}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    expect(
+      container.querySelector('[data-konva-node="Rect"][data-prop-x="80"][data-prop-y="70"][data-prop-width="180"][data-prop-height="60"][data-prop-dash="[6,4]"]')
+    ).not.toBeNull();
+  });
+
+  it('wires stage wheel, zoom-tool clicks, pan gestures, and mouse-up forwarding', () => {
+    const handleStageMouseDown = vi.fn();
+    const handleStageMouseUp = vi.fn();
+    Object.assign(mockInteractionSession, {
+      handleStageMouseDown,
+      handleStageMouseUp,
+    });
+
+    const { container, rerender } = render(
+      <CanvasStage
+        activeTool="select"
+        document={createDefaultProjectDocument()}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const stage = container.querySelector('[data-konva-node="Stage"]') as HTMLElement | null;
+    const readCursor = () => JSON.parse(stage?.getAttribute('data-prop-style') ?? '{}').cursor;
+    expect(stage).not.toBeNull();
+    expect(readCursor()).toBe('default');
+
+    fireEvent.wheel(stage!, { deltaY: -100, clientX: 640, clientY: 360 });
+    expect(screen.getByTestId('viewport-zoom')).not.toHaveTextContent('Zoom: 63%');
+
+    fireEvent.mouseDown(stage!, { button: 0, clientX: 640, clientY: 360 });
+    fireEvent.mouseUp(stage!, { button: 0, clientX: 640, clientY: 360 });
+
+    expect(handleStageMouseDown).toHaveBeenCalledOnce();
+    expect(handleStageMouseUp).toHaveBeenCalledOnce();
+
+    fireEvent.keyDown(window, { key: 'Shift' });
+    expect(readCursor()).toBe('grab');
+
+    fireEvent.mouseDown(stage!, { button: 0, shiftKey: true, clientX: 640, clientY: 360 });
+    expect(document.body.style.cursor).toBe('grabbing');
+
+    fireEvent.mouseMove(stage!, { clientX: 700, clientY: 420 });
+    expect(readCursor()).toBe('grabbing');
+    fireEvent.mouseUp(stage!, { button: 0, clientX: 700, clientY: 420 });
+    expect(document.body.style.cursor).toBe('');
+    expect(handleStageMouseUp).toHaveBeenCalledOnce();
+
+    fireEvent.keyUp(window, { key: 'Shift' });
+
+    rerender(
+      <CanvasStage
+        activeTool="zoom"
+        document={createDefaultProjectDocument()}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    expect(readCursor()).toBe('zoom-in');
+    fireEvent.keyDown(window, { key: 'Alt' });
+    expect(readCursor()).toBe('zoom-out');
+    fireEvent.mouseDown(stage!, { button: 0, altKey: true, clientX: 640, clientY: 360 });
+    expect(handleStageMouseDown).toHaveBeenCalledOnce();
+    fireEvent.keyUp(window, { key: 'Alt' });
   });
 });

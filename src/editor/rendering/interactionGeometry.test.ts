@@ -3,12 +3,18 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCreatedItem,
   getCreatePreview,
+  getLineHandleRects,
+  getSelectionOutlinePoints,
+  getShapeHandleRects,
   getShapeHandlePoints,
+  isCreateTool,
+  localToStage,
   rotateVector,
   solveDragSession,
   solveLineHandleSession,
   solveResizeSession,
   solveRotateSession,
+  stageToLocal,
 } from './interactionGeometry';
 import {
   createImageItem,
@@ -243,5 +249,133 @@ describe('interaction geometry', () => {
     expect(result.guides).toEqual(
       expect.arrayContaining([{ orientation: 'vertical', position: 480 }])
     );
+  });
+
+  it('converts between stage and local coordinates for rotated items', () => {
+    const origin = { x: 120, y: 80 };
+    const local = { x: 40, y: -20 };
+    const stagePoint = localToStage(local, origin, 90);
+
+    expect(stagePoint).toEqual({ x: 140, y: 120 });
+    const roundTripped = stageToLocal(stagePoint, origin, 90);
+
+    expect(roundTripped.x).toBeCloseTo(local.x, 5);
+    expect(roundTripped.y).toBeCloseTo(local.y, 5);
+  });
+
+  it('builds handle rects and outlines for rotated shapes and line endpoints', () => {
+    const rectangle = createRectangleItem({
+      x: 100,
+      y: 120,
+      width: 80,
+      height: 40,
+      rotation: 90,
+    });
+    const line = createLineItem({
+      startX: 20,
+      startY: 30,
+      endX: 120,
+      endY: 90,
+    });
+
+    const rects = getShapeHandleRects(rectangle);
+    const outline = getSelectionOutlinePoints(rectangle);
+    const lineRects = getLineHandleRects(line);
+
+    expect(rects['top-left']).toMatchObject({ width: 16, height: 16 });
+    expect(outline).toHaveLength(8);
+    expect(lineRects.start).toMatchObject({ x: 12, y: 22, width: 16, height: 16 });
+    expect(lineRects.end).toMatchObject({ x: 112, y: 82, width: 16, height: 16 });
+  });
+
+  it('disables resize snapping for rotated items even when siblings are close', () => {
+    const sibling = createRectangleItem({
+      x: 320,
+      y: 188,
+      width: 200,
+      height: 120,
+    });
+    const item = createRectangleItem({
+      x: 600,
+      y: 184,
+      width: 200,
+      height: 120,
+      rotation: 15,
+    });
+    const handle = getShapeHandlePoints(item)['top-center'];
+
+    const result = solveResizeSession(
+      item,
+      'top-center',
+      { x: handle.x, y: 190 },
+      { x: 0, y: 0 },
+      [sibling],
+      { x: 0, y: 0, width: 1200, height: 600 }
+    );
+
+    expect(result.guides).toEqual([]);
+  });
+
+  it('snaps rotate sessions to 22.5-degree increments when absolute snapping is enabled', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+      rotation: 8,
+    });
+    const center = {
+      x: item.x + item.width / 2,
+      y: item.y + item.height / 2,
+    };
+
+    const result = solveRotateSession(
+      item,
+      { x: center.x, y: center.y - 100 },
+      { x: center.x + 100, y: center.y - 20 },
+      true
+    );
+
+    expect(result.item.rotation % 22.5).toBeCloseTo(0, 5);
+  });
+
+  it('snaps line handle drags to the anchor axes when close enough', () => {
+    const item = createLineItem({
+      startX: 100,
+      startY: 120,
+      endX: 240,
+      endY: 260,
+    });
+
+    const result = solveLineHandleSession(
+      item,
+      'end',
+      { x: 104, y: 126 },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      false
+    );
+
+    expect(result.item).toMatchObject({
+      endX: 100,
+      endY: 120,
+    });
+    expect(result.guides).toEqual(
+      expect.arrayContaining([
+        { orientation: 'vertical', position: 100 },
+        { orientation: 'horizontal', position: 120 },
+      ])
+    );
+  });
+
+  it('identifies the supported creation tools explicitly', () => {
+    expect(isCreateTool('text')).toBe(true);
+    expect(isCreateTool('rectangle')).toBe(true);
+    expect(isCreateTool('ellipse')).toBe(true);
+    expect(isCreateTool('line')).toBe(true);
+    expect(isCreateTool('select')).toBe(false);
+    expect(isCreateTool('pan')).toBe(false);
+    expect(isCreateTool('zoom')).toBe(false);
   });
 });

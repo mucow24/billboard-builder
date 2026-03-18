@@ -3,28 +3,39 @@ import { describe, expect, it, vi } from 'vitest';
 import { downloadStageAsPng } from './exportPng';
 
 describe('downloadStageAsPng', () => {
+  it('falls back to exporting the full stage when no export root is present', () => {
+    const originalCreateElement = document.createElement.bind(document);
+    const anchor = originalCreateElement('a');
+    const anchorClick = vi.spyOn(anchor, 'click').mockImplementation(() => {});
+    const createElementSpy = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((tagName: string) => (tagName === 'a' ? anchor : originalCreateElement(tagName)));
+
+    const stage = {
+      findOne: vi.fn(() => null),
+      toDataURL: vi.fn(() => 'data:image/png;base64,fallback'),
+    };
+
+    downloadStageAsPng(stage as never, 3, 'fallback.png');
+
+    expect(stage.toDataURL).toHaveBeenCalledWith({
+      pixelRatio: 3,
+      mimeType: 'image/png',
+    });
+    expect(anchor.href).toBe('data:image/png;base64,fallback');
+    expect(anchor.download).toBe('fallback.png');
+    expect(anchorClick).toHaveBeenCalledOnce();
+
+    createElementSpy.mockRestore();
+  });
+
   it('hides export-excluded nodes during export and restores them afterward', () => {
-    const anchorClick = vi.fn();
-    const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
-      if (tagName === 'a') {
-        return {
-          click: anchorClick,
-          set href(value: string) {
-            this._href = value;
-          },
-          get href() {
-            return this._href;
-          },
-          set download(value: string) {
-            this._download = value;
-          },
-          get download() {
-            return this._download;
-          },
-        } as unknown as HTMLAnchorElement;
-      }
-      return document.createElement(tagName);
-    }) as typeof document.createElement);
+    const originalCreateElement = document.createElement.bind(document);
+    const anchor = originalCreateElement('a');
+    const anchorClick = vi.spyOn(anchor, 'click').mockImplementation(() => {});
+    const createElementSpy = vi
+      .spyOn(document, 'createElement')
+      .mockImplementation((tagName: string) => (tagName === 'a' ? anchor : originalCreateElement(tagName)));
 
     const excludedNode = {
       visible: vi.fn((value?: boolean) => (value === undefined ? true : undefined)),
@@ -67,7 +78,9 @@ describe('downloadStageAsPng', () => {
     expect(excludedNode.listening).toHaveBeenLastCalledWith(true);
     expect(exportRoot.position).toHaveBeenLastCalledWith({ x: 120, y: 240 });
     expect(exportRoot.scale).toHaveBeenLastCalledWith({ x: 0.75, y: 0.75 });
-    expect(anchorClick).toHaveBeenCalledTimes(1);
+    expect(anchor.href).toBe('data:image/png;base64,abc123');
+    expect(anchor.download).toBe('bb-export.png');
+    expect(anchorClick).toHaveBeenCalledOnce();
 
     createElementSpy.mockRestore();
   });
