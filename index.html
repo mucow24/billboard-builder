@@ -7,8 +7,161 @@
       content="width=device-width, initial-scale=1.0"
     />
     <title>Billboard Builder</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --boot-bg: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.18), transparent 24%),
+          radial-gradient(circle at 80% 18%, rgba(239, 68, 68, 0.14), transparent 22%),
+          radial-gradient(circle at 68% 74%, rgba(34, 197, 94, 0.12), transparent 26%),
+          linear-gradient(180deg, #0b1020 0%, #0f172a 45%, #111827 100%);
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #0b1020;
+      }
+
+      body {
+        background-image: var(--boot-bg);
+        color: rgba(241, 245, 249, 0.95);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #root,
+      #boot-shell {
+        min-height: 100vh;
+      }
+
+      #boot-shell {
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      #boot-shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.03),
+          transparent 35%,
+          transparent 65%,
+          rgba(255, 255, 255, 0.02)
+        );
+        pointer-events: none;
+      }
+
+      .boot-spinner-wrap {
+        position: relative;
+        width: 7rem;
+        height: 7rem;
+        display: grid;
+        place-items: center;
+      }
+
+      .boot-spinner-wrap::before {
+        content: "";
+        position: absolute;
+        width: 9rem;
+        height: 9rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.1);
+        filter: blur(48px);
+        pointer-events: none;
+      }
+
+      .boot-spinner,
+      .boot-spinner::before,
+      .boot-spinner::after {
+        position: absolute;
+        border-radius: 9999px;
+      }
+
+      .boot-spinner {
+        inset: 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.06);
+        box-shadow: 0 24px 60px rgba(2, 6, 23, 0.5);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+      }
+
+      .boot-spinner::before {
+        content: "";
+        inset: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+      }
+
+      .boot-spinner::after {
+        content: "";
+        inset: 5px;
+        background: conic-gradient(
+          from 0deg,
+          rgba(255, 255, 255, 0.02) 0deg,
+          rgba(255, 255, 255, 0.05) 220deg,
+          rgba(255, 255, 255, 0.85) 300deg,
+          rgba(255, 255, 255, 0.22) 334deg,
+          rgba(255, 255, 255, 0.02) 360deg
+        );
+        mask: radial-gradient(farthest-side, transparent calc(100% - 14px), #000 calc(100% - 13px));
+        -webkit-mask: radial-gradient(
+          farthest-side,
+          transparent calc(100% - 14px),
+          #000 calc(100% - 13px)
+        );
+        animation: boot-spin 0.95s linear infinite;
+      }
+
+      .boot-spinner-core {
+        position: absolute;
+        inset: 18px;
+        border-radius: 9999px;
+        background: radial-gradient(
+          circle at 30% 28%,
+          rgba(255, 255, 255, 0.18),
+          rgba(255, 255, 255, 0.06) 34%,
+          rgba(255, 255, 255, 0.02) 58%,
+          rgba(255, 255, 255, 0.01) 100%
+        );
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+      }
+
+      .boot-spinner-glint {
+        position: absolute;
+        left: 24%;
+        top: 18%;
+        width: 2.75rem;
+        height: 1.75rem;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.14);
+        filter: blur(18px);
+        pointer-events: none;
+      }
+
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-shell" aria-hidden="true">
+      <div class="boot-spinner-wrap">
+        <div class="boot-spinner"></div>
+        <div class="boot-spinner-core"></div>
+        <div class="boot-spinner-glint"></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

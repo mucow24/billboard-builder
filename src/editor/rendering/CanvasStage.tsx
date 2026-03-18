@@ -24,6 +24,7 @@ import {
 } from './interactionGeometry';
 import { getRenderBox } from './transformGeometry';
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
+import { ImageItemNode } from './ImageItemNode';
 import { useImageElement } from './useImageElement';
 import type {
   CanvasItem,
@@ -40,7 +41,10 @@ interface CanvasStageProps {
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
   onSelectItem: (itemId?: string) => void;
+  onToggleSelectItem?: (itemId: string) => void;
+  onToggleSelectItems?: (itemIds: string[]) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
+  onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
   onSetActiveTool: (tool: CanvasTool) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -108,6 +112,7 @@ const SHADOW_MIN_ALPHA_STROKE = 'rgba(0,0,0,0.001)';
 const SELECTION_STROKE = '#7dd3fc';
 const HANDLE_FILL = 'rgba(224, 242, 254, 0.95)';
 const HANDLE_STROKE = '#0f172a';
+const CANVAS_SURFACE_FILL = '#0b1220';
 
 function ShapeItemView({
   activeTool,
@@ -116,9 +121,10 @@ function ShapeItemView({
   onBeginDrag,
   onBeginResize,
   onBeginRotate,
-  onSelectItem,
+  onItemPointerDown,
   renderContent = true,
   renderSelection = true,
+  renderHandles = true,
   shapeRef,
   toCanvasPointer,
 }: {
@@ -128,9 +134,10 @@ function ShapeItemView({
   onBeginDrag: (item: ShapeItem, pointer: Point) => void;
   onBeginResize: (item: ShapeItem, handle: ResizeHandle, pointer: Point) => void;
   onBeginRotate: (item: ShapeItem, pointer: Point) => void;
-  onSelectItem: (itemId?: string) => void;
+  onItemPointerDown: (item: ShapeItem, pointer: Point, shiftKey: boolean) => void;
   renderContent?: boolean;
   renderSelection?: boolean;
+  renderHandles?: boolean;
   shapeRef: (node: Konva.Node | null) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }) {
@@ -160,12 +167,11 @@ function ShapeItemView({
             return;
           }
           event.cancelBubble = true;
-          onSelectItem(item.id);
-          onBeginDrag(item, toCanvasPointer(pointer));
+          onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
         }}
         onTap={() => {
           if (interactionEnabled) {
-            onSelectItem(item.id);
+            onItemPointerDown(item, { x: item.x, y: item.y }, false);
           }
         }}
       >
@@ -185,8 +191,8 @@ function ShapeItemView({
             shadowOffsetX={item.shadow.offsetX}
             shadowOffsetY={item.shadow.offsetY}
             shadowOpacity={item.shadow.opacity}
-            x={0}
-            y={0}
+            x={item.padding.left}
+            y={item.padding.top}
             fill={item.fill}
             fontFamily={item.fontFamily}
             fontSize={item.fontSize}
@@ -196,8 +202,8 @@ function ShapeItemView({
             lineHeight={item.lineHeight}
             letterSpacing={item.letterSpacing}
             text={item.text}
-            width={renderBox.width}
-            height={renderBox.height}
+            width={Math.max(1, renderBox.width - item.padding.left - item.padding.right)}
+            height={Math.max(1, renderBox.height - item.padding.top - item.padding.bottom)}
             perfectDrawEnabled={false}
             listening={false}
           />
@@ -238,19 +244,7 @@ function ShapeItemView({
           />
         ) : null}
         {item.kind === 'image' ? (
-          <KonvaImage
-            shadowColor={item.shadow.color}
-            shadowBlur={item.shadow.blur}
-            shadowOffsetX={item.shadow.offsetX}
-            shadowOffsetY={item.shadow.offsetY}
-            shadowOpacity={item.shadow.opacity}
-            x={0}
-            y={0}
-            image={imageElement ?? undefined}
-            width={renderBox.width}
-            height={renderBox.height}
-            listening={false}
-          />
+          <ImageItemNode item={item} image={imageElement} renderBox={renderBox} />
         ) : null}
       </Group>
       ) : null}
@@ -269,8 +263,7 @@ function ShapeItemView({
                 return;
               }
               event.cancelBubble = true;
-              onSelectItem(item.id);
-              onBeginDrag(item, toCanvasPointer(pointer));
+              onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
             }}
           >
             <Rect
@@ -289,30 +282,53 @@ function ShapeItemView({
             dash={[8, 4]}
             listening={false}
           />
-          <Line
-            points={[
-              handlePoints['top-center'].x,
-              handlePoints['top-center'].y,
-              handlePoints.rotater.x,
-              handlePoints.rotater.y,
-            ]}
-            stroke={SELECTION_STROKE}
-            strokeWidth={2}
-            listening={false}
-          />
-          {RESIZE_HANDLE_NAMES.map((handle) => {
-            const point = handlePoints[handle];
-            return (
+          {renderHandles ? (
+            <>
+              <Line
+                points={[
+                  handlePoints['top-center'].x,
+                  handlePoints['top-center'].y,
+                  handlePoints.rotater.x,
+                  handlePoints.rotater.y,
+                ]}
+                stroke={SELECTION_STROKE}
+                strokeWidth={2}
+                listening={false}
+              />
+              {RESIZE_HANDLE_NAMES.map((handle) => {
+                const point = handlePoints[handle];
+                return (
+                  <Circle
+                    key={`${item.id}-${handle}`}
+                    x={point.x}
+                    y={point.y}
+                    radius={8}
+                    fill={HANDLE_FILL}
+                    stroke={HANDLE_STROKE}
+                    strokeWidth={2}
+                    onMouseDown={(event) => {
+                      if (item.locked || event.evt.button === 1) {
+                        return;
+                      }
+                      const pointer = event.target.getStage()?.getPointerPosition();
+                      if (!pointer) {
+                        return;
+                      }
+                      event.cancelBubble = true;
+                      onBeginResize(item, handle, toCanvasPointer(pointer));
+                    }}
+                  />
+                );
+              })}
               <Circle
-                key={`${item.id}-${handle}`}
-                x={point.x}
-                y={point.y}
+                x={handlePoints.rotater.x}
+                y={handlePoints.rotater.y}
                 radius={8}
                 fill={HANDLE_FILL}
                 stroke={HANDLE_STROKE}
                 strokeWidth={2}
                 onMouseDown={(event) => {
-                  if (item.locked || event.evt.button === 1) {
+                  if (item.locked) {
                     return;
                   }
                   const pointer = event.target.getStage()?.getPointerPosition();
@@ -320,30 +336,11 @@ function ShapeItemView({
                     return;
                   }
                   event.cancelBubble = true;
-                  onBeginResize(item, handle, toCanvasPointer(pointer));
+                  onBeginRotate(item, toCanvasPointer(pointer));
                 }}
               />
-            );
-          })}
-          <Circle
-            x={handlePoints.rotater.x}
-            y={handlePoints.rotater.y}
-            radius={8}
-            fill={HANDLE_FILL}
-            stroke={HANDLE_STROKE}
-            strokeWidth={2}
-            onMouseDown={(event) => {
-              if (item.locked) {
-                return;
-              }
-              const pointer = event.target.getStage()?.getPointerPosition();
-              if (!pointer) {
-                return;
-              }
-              event.cancelBubble = true;
-              onBeginRotate(item, toCanvasPointer(pointer));
-            }}
-          />
+            </>
+          ) : null}
         </>
       ) : null}
     </>
@@ -356,9 +353,10 @@ function LineItemView({
   item,
   onBeginDrag,
   onBeginLineHandle,
-  onSelectItem,
+  onItemPointerDown,
   renderContent = true,
   renderSelection = true,
+  renderHandles = true,
   shapeRef,
   toCanvasPointer,
 }: {
@@ -367,9 +365,10 @@ function LineItemView({
   item: LineCanvasItem;
   onBeginDrag: (item: LineCanvasItem, pointer: Point) => void;
   onBeginLineHandle: (item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => void;
-  onSelectItem: (itemId?: string) => void;
+  onItemPointerDown: (item: LineCanvasItem, pointer: Point, shiftKey: boolean) => void;
   renderContent?: boolean;
   renderSelection?: boolean;
+  renderHandles?: boolean;
   shapeRef: (node: Konva.Node | null) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }) {
@@ -402,12 +401,11 @@ function LineItemView({
             return;
           }
           event.cancelBubble = true;
-          onSelectItem(item.id);
-          onBeginDrag(item, toCanvasPointer(pointer));
+          onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
         }}
         onTap={() => {
           if (interactionEnabled) {
-            onSelectItem(item.id);
+            onItemPointerDown(item, { x: item.x, y: item.y }, false);
           }
         }}
       />
@@ -428,11 +426,10 @@ function LineItemView({
                 return;
               }
               event.cancelBubble = true;
-              onSelectItem(item.id);
-              onBeginDrag(item, toCanvasPointer(pointer));
+              onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
             }}
           />
-          {(['start', 'end'] as const).map((handle) => {
+          {renderHandles ? (['start', 'end'] as const).map((handle) => {
             const rect = lineHandleRects[handle];
             return (
               <Circle
@@ -456,7 +453,7 @@ function LineItemView({
                 }}
               />
             );
-          })}
+          }) : null}
         </>
       ) : null}
     </>
@@ -470,7 +467,10 @@ export function CanvasStage({
   guides,
   onGuidesChange,
   onSelectItem,
+  onToggleSelectItem,
+  onToggleSelectItems,
   onUpdateItem,
+  onUpdateItems,
   onAddItem,
   onSetActiveTool,
   stageRef,
@@ -640,14 +640,21 @@ export function CanvasStage({
 
   const {
     beginDrag,
+    beginGroupDrag,
+    beginGroupResize,
+    beginGroupRotate,
     beginLineHandle,
     beginResize,
     beginRotate,
+    handleItemPointerDown,
     handleStageMouseDown,
     handleStageMouseUp,
     nodeClientRect,
     registerShapeRef,
+    renderedGroupBounds,
+    renderedSelectionFrame,
     renderedItems,
+    renderedSelectedItems = [],
     selectedDocumentItem,
     selectedNode,
     selectedRenderedItem,
@@ -659,13 +666,24 @@ export function CanvasStage({
     selectedItemIds,
     onGuidesChange,
     onSelectItem,
+    onToggleSelectItem,
+    onToggleSelectItems,
     onUpdateItem,
+    onUpdateItems,
     onAddItem,
     onSetActiveTool,
     stageRef,
     viewport,
   });
-  const previewItem = session?.previewItem ?? null;
+  const previewItem = session && 'previewItem' in session ? session.previewItem : null;
+  const groupRotateSession = session?.kind === 'group-rotate' ? session : null;
+  const baseGroupFrame = renderedSelectionFrame ?? (renderedGroupBounds ? { bounds: renderedGroupBounds, rotation: 0 } : null);
+  const groupOverlayFrame = groupRotateSession
+    ? {
+        bounds: groupRotateSession.bounds,
+        rotation: groupRotateSession.frameRotation + (((Math.atan2(groupRotateSession.currentPointer.y - (groupRotateSession.bounds.y + groupRotateSession.bounds.height / 2), groupRotateSession.currentPointer.x - (groupRotateSession.bounds.x + groupRotateSession.bounds.width / 2)) - Math.atan2(groupRotateSession.pointerStart.y - (groupRotateSession.bounds.y + groupRotateSession.bounds.height / 2), groupRotateSession.pointerStart.x - (groupRotateSession.bounds.x + groupRotateSession.bounds.width / 2))) * 180) / Math.PI),
+      }
+    : baseGroupFrame;
 
   function zoomAround(point: Point, nextZoom: number) {
     const clampedZoom = clampZoom(nextZoom);
@@ -872,12 +890,17 @@ export function CanvasStage({
           >
             <Rect
               name="export-exclude"
-              x={-14}
-              y={-14}
-              width={document.canvas.width + 28}
-              height={document.canvas.height + 28}
-              cornerRadius={26}
-              fill="rgba(8, 14, 24, 0.9)"
+              x={-2}
+              y={-2}
+              width={document.canvas.width + 4}
+              height={document.canvas.height + 4}
+              cornerRadius={0}
+              fill="rgba(0,0,0,0)"
+              stroke="rgba(128, 176, 255, 0.18)"
+              strokeWidth={1}
+              shadowColor="rgba(110, 160, 255, 0.14)"
+              shadowBlur={18}
+              shadowOpacity={1}
               listening={false}
             />
             <Rect
@@ -886,12 +909,10 @@ export function CanvasStage({
               y={0}
               width={document.canvas.width}
               height={document.canvas.height}
-              cornerRadius={18}
-              fill="#0b1220"
-              shadowColor="rgba(15, 23, 42, 0.38)"
-              shadowBlur={36}
-              shadowOffsetY={20}
-              shadowOpacity={1}
+              cornerRadius={0}
+              fill={CANVAS_SURFACE_FILL}
+              stroke="rgba(0, 0, 0, 0.14)"
+              strokeWidth={1}
               listening={false}
             />
             <Group name="export-content" clipX={0} clipY={0} clipWidth={document.canvas.width} clipHeight={document.canvas.height}>
@@ -927,7 +948,7 @@ export function CanvasStage({
                     item={item}
                     onBeginDrag={beginDrag}
                     onBeginLineHandle={beginLineHandle}
-                    onSelectItem={onSelectItem}
+                    onItemPointerDown={handleItemPointerDown}
                     renderSelection={false}
                     shapeRef={(node) => registerShapeRef(item.id, node)}
                     toCanvasPointer={(pointer) => toCanvasPointer(pointer, zoom, pan)}
@@ -941,13 +962,28 @@ export function CanvasStage({
                     onBeginDrag={beginDrag}
                     onBeginResize={beginResize}
                     onBeginRotate={beginRotate}
-                    onSelectItem={onSelectItem}
+                    onItemPointerDown={handleItemPointerDown}
                     renderSelection={false}
                     shapeRef={(node) => registerShapeRef(item.id, node)}
                     toCanvasPointer={(pointer) => toCanvasPointer(pointer, zoom, pan)}
                   />
                 ),
               )}
+              {session?.kind === 'marquee' ? (
+                <Group name="marquee-preview export-exclude">
+                  <Rect
+                    x={Math.min(session.pointerStart.x, session.currentPointer.x)}
+                    y={Math.min(session.pointerStart.y, session.currentPointer.y)}
+                    width={Math.max(1, Math.abs(session.currentPointer.x - session.pointerStart.x))}
+                    height={Math.max(1, Math.abs(session.currentPointer.y - session.pointerStart.y))}
+                    stroke={SELECTION_STROKE}
+                    strokeWidth={1.5}
+                    dash={[6, 4]}
+                    fill="rgba(56, 189, 248, 0.08)"
+                    listening={false}
+                  />
+                </Group>
+              ) : null}
               {session?.kind === 'create' && session.tool === 'text' && session.previewItem && session.previewItem.kind === 'text' ? (
                 <Group name="text-create-preview export-exclude">
                   <Rect
@@ -986,7 +1022,115 @@ export function CanvasStage({
               </Group>
             </Group>
             <Group name="selection-overlay export-exclude">
-              {selectedRenderedItem ? (
+              {renderedSelectedItems.length > 1 ? (
+                <>
+                  {renderedSelectedItems.map((selectedRenderedItem) =>
+                    selectedRenderedItem.kind === 'line' ? (
+                      <LineItemView
+                        key={`${selectedRenderedItem.id}-selection-outline`}
+                        activeTool={activeTool}
+                        isSelected
+                        item={selectedRenderedItem}
+                        onBeginDrag={beginDrag}
+                        onBeginLineHandle={beginLineHandle}
+                        onItemPointerDown={handleItemPointerDown}
+                        renderContent={false}
+                        renderHandles={false}
+                        shapeRef={() => {}}
+                        toCanvasPointer={(pointer) => toCanvasPointer(pointer, zoom, pan)}
+                      />
+                    ) : (
+                      <ShapeItemView
+                        key={`${selectedRenderedItem.id}-selection-outline`}
+                        activeTool={activeTool}
+                        isSelected
+                        item={selectedRenderedItem}
+                        onBeginDrag={beginDrag}
+                        onBeginResize={beginResize}
+                        onBeginRotate={beginRotate}
+                        onItemPointerDown={handleItemPointerDown}
+                        renderContent={false}
+                        renderHandles={false}
+                        shapeRef={() => {}}
+                        toCanvasPointer={(pointer) => toCanvasPointer(pointer, zoom, pan)}
+                      />
+                    ),
+                  )}
+                  {groupOverlayFrame ? (
+                    <Group
+                      x={groupOverlayFrame.bounds.x + groupOverlayFrame.bounds.width / 2}
+                      y={groupOverlayFrame.bounds.y + groupOverlayFrame.bounds.height / 2}
+                      rotation={groupOverlayFrame.rotation}
+                    >
+                      <Rect
+                        x={-groupOverlayFrame.bounds.width / 2}
+                        y={-groupOverlayFrame.bounds.height / 2}
+                        width={groupOverlayFrame.bounds.width}
+                        height={groupOverlayFrame.bounds.height}
+                        stroke={SELECTION_STROKE}
+                        strokeWidth={2}
+                        dash={[8, 4]}
+                        fill={SHADOW_MIN_ALPHA_STROKE}
+                        onMouseDown={(event) => {
+                          const pointer = event.target.getStage()?.getPointerPosition();
+                          if (!pointer || event.evt.button === 1) {
+                            return;
+                          }
+                          event.cancelBubble = true;
+                          beginGroupDrag(toCanvasPointer(pointer, zoom, pan));
+                        }}
+                      />
+                      <Line
+                        points={[0, -groupOverlayFrame.bounds.height / 2, 0, -(groupOverlayFrame.bounds.height / 2) - 50]}
+                        stroke={SELECTION_STROKE}
+                        strokeWidth={2}
+                        listening={false}
+                      />
+                      {RESIZE_HANDLE_NAMES.map((handle) => {
+                        const width = groupOverlayFrame.bounds.width;
+                        const height = groupOverlayFrame.bounds.height;
+                        const x = handle.includes('left') ? -width / 2 : handle.includes('right') ? width / 2 : 0;
+                        const y = handle.includes('top') ? -height / 2 : handle.includes('bottom') ? height / 2 : 0;
+                        return (
+                          <Circle
+                            key={`group-${handle}`}
+                            x={x}
+                            y={y}
+                            radius={8}
+                            fill={HANDLE_FILL}
+                            stroke={HANDLE_STROKE}
+                            strokeWidth={2}
+                            onMouseDown={(event) => {
+                              const pointer = event.target.getStage()?.getPointerPosition();
+                              if (!pointer || event.evt.button === 1) {
+                                return;
+                              }
+                              event.cancelBubble = true;
+                              beginGroupResize(handle, toCanvasPointer(pointer, zoom, pan));
+                            }}
+                          />
+                        );
+                      })}
+                      <Circle
+                        x={0}
+                        y={-(groupOverlayFrame.bounds.height / 2) - 50}
+                        radius={8}
+                        fill={HANDLE_FILL}
+                        stroke={HANDLE_STROKE}
+                        strokeWidth={2}
+                        onMouseDown={(event) => {
+                          const pointer = event.target.getStage()?.getPointerPosition();
+                          if (!pointer || event.evt.button === 1) {
+                            return;
+                          }
+                          event.cancelBubble = true;
+                          beginGroupRotate(toCanvasPointer(pointer, zoom, pan));
+                        }}
+                      />
+                    </Group>
+                  ) : null}
+                </>
+              ) : selectedRenderedItem ? (
                 selectedRenderedItem.kind === 'line' ? (
                 <LineItemView
                   key={`${selectedRenderedItem.id}-selection`}
@@ -995,7 +1139,7 @@ export function CanvasStage({
                   item={selectedRenderedItem}
                   onBeginDrag={beginDrag}
                   onBeginLineHandle={beginLineHandle}
-                  onSelectItem={onSelectItem}
+                  onItemPointerDown={handleItemPointerDown}
                   renderContent={false}
                   shapeRef={() => {}}
                   toCanvasPointer={(pointer) => toCanvasPointer(pointer, zoom, pan)}
@@ -1009,7 +1153,7 @@ export function CanvasStage({
                   onBeginDrag={beginDrag}
                   onBeginResize={beginResize}
                   onBeginRotate={beginRotate}
-                  onSelectItem={onSelectItem}
+                  onItemPointerDown={handleItemPointerDown}
                   renderContent={false}
                   shapeRef={() => {}}
                   toCanvasPointer={(pointer) => toCanvasPointer(pointer, zoom, pan)}

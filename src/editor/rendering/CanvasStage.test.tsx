@@ -4,16 +4,63 @@ import userEvent from '@testing-library/user-event';
 import React, { createRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { mockInteractionSession } = vi.hoisted(() => ({
+  mockInteractionSession: {
+    beginDrag: vi.fn(),
+    beginGroupDrag: vi.fn(),
+    beginGroupResize: vi.fn(),
+    beginGroupRotate: vi.fn(),
+    beginLineHandle: vi.fn(),
+    beginResize: vi.fn(),
+    beginRotate: vi.fn(),
+    handleItemPointerDown: vi.fn(),
+    handleStageMouseDown: vi.fn(),
+    handleStageMouseUp: vi.fn(),
+    nodeClientRect: null,
+    registerShapeRef: vi.fn(),
+    renderedGroupBounds: null,
+    renderedItems: [],
+    renderedSelectedItems: [],
+    selectedDocumentItem: null,
+    selectedNode: null,
+    selectedRenderedItem: null,
+    selectedItemId: undefined,
+    session: null,
+  },
+}));
+
+vi.mock('konva', () => ({
+  default: {
+    Filters: {
+      Brighten: Symbol('Brighten'),
+      Contrast: Symbol('Contrast'),
+      RGBA: Symbol('RGBA'),
+    },
+  },
+}));
+
 import { CanvasStage } from './CanvasStage';
-import { createDefaultProjectDocument } from '../document/documentDefaults';
+import { createDefaultProjectDocument, createRectangleItem } from '../document/documentDefaults';
 import type Konva from 'konva';
 
 vi.mock('react-konva', () => {
   type MockKonvaProps = React.PropsWithChildren<Record<string, unknown>>;
   const make = (name: string) =>
-    React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) =>
-      React.createElement('div', { ref, 'data-konva-node': name, ...props }, children as React.ReactNode),
-    );
+    React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) => {
+      const dataProps = Object.fromEntries(
+        Object.entries(props).flatMap(([key, value]) => {
+          if (value === undefined || typeof value === 'function') {
+            return [];
+          }
+          return [[`data-prop-${key.toLowerCase()}`, typeof value === 'object' ? JSON.stringify(value) : String(value)]];
+        }),
+      );
+      return React.createElement(
+        'div',
+        { ref, 'data-konva-node': name, ...dataProps },
+        children as React.ReactNode,
+      );
+    });
 
   return {
     Stage: make('Stage'),
@@ -29,22 +76,7 @@ vi.mock('react-konva', () => {
 });
 
 vi.mock('./useCanvasInteractionSession', () => ({
-  useCanvasInteractionSession: () => ({
-    beginDrag: vi.fn(),
-    beginLineHandle: vi.fn(),
-    beginResize: vi.fn(),
-    beginRotate: vi.fn(),
-    handleStageMouseDown: vi.fn(),
-    handleStageMouseUp: vi.fn(),
-    nodeClientRect: null,
-    registerShapeRef: vi.fn(),
-    renderedItems: [],
-    selectedDocumentItem: null,
-    selectedNode: null,
-    selectedRenderedItem: null,
-    selectedItemId: undefined,
-    session: null,
-  }),
+  useCanvasInteractionSession: () => mockInteractionSession,
 }));
 
 vi.mock('./useImageElement', () => ({
@@ -53,6 +85,28 @@ vi.mock('./useImageElement', () => ({
 
 describe('CanvasStage viewport controls', () => {
   beforeEach(() => {
+    Object.assign(mockInteractionSession, {
+      beginDrag: vi.fn(),
+      beginGroupDrag: vi.fn(),
+      beginGroupResize: vi.fn(),
+      beginGroupRotate: vi.fn(),
+      beginLineHandle: vi.fn(),
+      beginResize: vi.fn(),
+      beginRotate: vi.fn(),
+      handleItemPointerDown: vi.fn(),
+      handleStageMouseDown: vi.fn(),
+      handleStageMouseUp: vi.fn(),
+      nodeClientRect: null,
+      registerShapeRef: vi.fn(),
+      renderedGroupBounds: null,
+      renderedItems: [],
+      renderedSelectedItems: [],
+      selectedDocumentItem: null,
+      selectedNode: null,
+      selectedRenderedItem: null,
+      selectedItemId: undefined,
+      session: null,
+    });
     class TestResizeObserver {
       private callback: ResizeObserverCallback;
 
@@ -90,6 +144,86 @@ describe('CanvasStage viewport controls', () => {
     }
 
     vi.stubGlobal('ResizeObserver', TestResizeObserver);
+  });
+
+
+
+  it('renders a square canvas edge with a subtle glow treatment', () => {
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={createDefaultProjectDocument()}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const glowRect = container.querySelector('[data-konva-node="Rect"][data-prop-name="export-exclude"]');
+    expect(glowRect).not.toBeNull();
+    expect(glowRect).toHaveAttribute('data-prop-cornerradius', '0');
+    expect(glowRect).toHaveAttribute('data-prop-stroke', 'rgba(128, 176, 255, 0.18)');
+    expect(glowRect).toHaveAttribute('data-prop-shadowcolor', 'rgba(110, 160, 255, 0.14)');
+
+    const canvasRect = container.querySelector(
+      '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
+    );
+    expect(canvasRect).not.toBeNull();
+    expect(canvasRect).toHaveAttribute('data-prop-cornerradius', '0');
+    expect(canvasRect).toHaveAttribute('data-prop-fill', '#0b1220');
+    expect(canvasRect).toHaveAttribute('data-prop-stroke', 'rgba(0, 0, 0, 0.14)');
+  });
+
+
+  it('renders subtle outlines for each item in a multi-selection and rotates the shared overlay during group rotation', () => {
+    const document = createDefaultProjectDocument();
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40, rotation: 0 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50, rotation: 0 });
+    document.items = [first, second];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [first, second],
+      renderedSelectedItems: [first, second],
+      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
+      session: {
+        kind: 'group-rotate',
+        itemIds: ['first', 'second'],
+        originalItems: [first, second],
+        previewItems: [first, second],
+        bounds: { x: 20, y: 30, width: 180, height: 80 },
+        pointerStart: { x: 110, y: -20 },
+        currentPointer: { x: 150, y: 20 },
+        handle: 'rotater',
+        guides: [],
+      },
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={['first', 'second']}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const dashedLines = container.querySelectorAll('[data-konva-node="Line"][data-prop-dash="[8,4]"]');
+    expect(dashedLines.length).toBeGreaterThanOrEqual(2);
+
+    const rotatedGroups = Array.from(container.querySelectorAll('[data-konva-node="Group"][data-prop-rotation]'));
+    expect(rotatedGroups.some((node) => node.getAttribute('data-prop-rotation') !== '0')).toBe(true);
   });
 
   it('renders zoom controls and updates the readout', async () => {

@@ -43,7 +43,9 @@ describe('document defaults', () => {
     expect(textItem.letterSpacing).toBe(0);
     expect(textItem.verticalAlign).toBe('top');
     expect(textItem.fontWeight).toBe('normal');
-    expect(rectangleItem.cornerRadius).toBeGreaterThan(0);
+    expect(textItem.fill).toBe('#ffffff');
+    expect(textItem.padding).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+    expect(rectangleItem.cornerRadius).toBe(0);
     expect(ellipseItem.kind).toBe('ellipse');
     expect(lineItem.strokeWidth).toBeGreaterThan(0);
     expect(lineItem.endX).toBeGreaterThan(lineItem.startX);
@@ -60,6 +62,12 @@ describe('document defaults', () => {
     expect(imageItem.width).toBe(400);
     expect(imageItem.height).toBe(200);
     expect(imageItem.preserveAspectRatio).toBe(true);
+    expect(imageItem.adjustments).toEqual({
+      brightness: 100,
+      contrast: 50,
+      tintColor: '#ffffff',
+      tintStrength: 0,
+    });
   });
 
   it('sorts and normalizes z-indices deterministically', () => {

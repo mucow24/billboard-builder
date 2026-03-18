@@ -5,6 +5,7 @@ import { familySupportsVariant } from '../fonts';
 import type {
   CanvasItem,
   DocumentFontReference,
+  ImageAdjustments,
   ReorderMode,
   TextAlign,
   TextVerticalAlign,
@@ -20,6 +21,7 @@ interface PropertiesPanelProps {
   items: CanvasItem[];
   missingFontFamilies: string[];
   selectedItem?: CanvasItem;
+  selectedItems?: CanvasItem[];
   onBackgroundChange: (background: string) => void;
   onItemChange: (changes: Partial<CanvasItem>) => void;
   onDeleteItem: (itemId: string) => void;
@@ -45,6 +47,13 @@ function clampNumberInputValue(value: number, min?: number, max?: number): numbe
   return nextValue;
 }
 
+function applyDetent(value: number, detentValue?: number, detentThreshold = 0): number {
+  if (detentValue === undefined || detentThreshold <= 0) {
+    return value;
+  }
+  return Math.abs(value - detentValue) <= detentThreshold ? detentValue : value;
+}
+
 function NumberInput({
   label,
   value,
@@ -52,6 +61,9 @@ function NumberInput({
   max,
   step = 1,
   digits = 1,
+  slider = false,
+  sliderDetentValue,
+  sliderDetentThreshold,
   onChange,
 }: {
   label: string;
@@ -60,21 +72,64 @@ function NumberInput({
   max?: number;
   step?: number;
   digits?: number;
+  slider?: boolean;
+  sliderDetentValue?: number;
+  sliderDetentThreshold?: number;
   onChange: (value: number) => void;
 }) {
+  const displayedValue = formatDisplayedNumber(value, digits);
+  const inputId = useId();
+  const sliderId = useId();
+
+  const commitValue = (nextValue: number) => {
+    onChange(clampNumberInputValue(nextValue, min, max));
+  };
+
+  if (slider) {
+    return (
+      <div className="number-input-field number-input-field-with-slider">
+        <span>{label}</span>
+        <div className="number-input-slider-row">
+          <input
+            id={sliderId}
+            aria-label={label}
+            type="range"
+            min={min}
+            max={max}
+            step={step}
+            value={displayedValue}
+            onChange={(event) => {
+              const sliderValue = clampNumberInputValue(Number(event.target.value), min, max);
+              commitValue(applyDetent(sliderValue, sliderDetentValue, sliderDetentThreshold));
+            }}
+          />
+          <input
+            id={inputId}
+            aria-label={`${label} value`}
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={displayedValue}
+            onChange={(event) => commitValue(Number(event.target.value))}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <label className="number-input-field">
+    <label className="number-input-field" htmlFor={inputId}>
       <span>{label}</span>
       <input
+        id={inputId}
         aria-label={label}
         type="number"
         min={min}
         max={max}
         step={step}
-        value={formatDisplayedNumber(value, digits)}
-        onChange={(event) =>
-          onChange(clampNumberInputValue(Number(event.target.value), min, max))
-        }
+        value={displayedValue}
+        onChange={(event) => commitValue(Number(event.target.value))}
       />
     </label>
   );
@@ -207,6 +262,18 @@ function layerPreviewStyle(item: CanvasItem): React.CSSProperties {
   return {};
 }
 
+function updateImageAdjustments(
+  current: ImageAdjustments,
+  changes: Partial<ImageAdjustments>,
+): Partial<CanvasItem> {
+  return {
+    adjustments: {
+      ...current,
+      ...changes,
+    },
+  } as Partial<CanvasItem>;
+}
+
 function geometrySummary(item: CanvasItem): string {
   if (item.kind === 'line') {
     return `X1 ${formatDisplayedNumber(item.startX)} · Y1 ${formatDisplayedNumber(item.startY)} · X2 ${formatDisplayedNumber(item.endX)} · Y2 ${formatDisplayedNumber(item.endY)}`;
@@ -222,6 +289,7 @@ export function PropertiesPanel({
   items,
   missingFontFamilies,
   selectedItem,
+  selectedItems = selectedItem ? [selectedItem] : [],
   onBackgroundChange,
   onItemChange,
   onDeleteItem,
@@ -253,6 +321,9 @@ export function PropertiesPanel({
   );
 
   const selectedTextItem = selectedItem?.kind === 'text' ? selectedItem : undefined;
+  const isMultiSelection = selectedItems.length > 1;
+  const allSelectedOpacityEqual = selectedItems.every((item) => item.opacity === selectedItems[0]?.opacity);
+  const multiOpacityValue = selectedItems[0]?.opacity ?? 1;
   const selectedFontIsSystem = selectedTextItem
     ? WEB_SAFE_FONTS.includes(selectedTextItem.fontFamily as (typeof WEB_SAFE_FONTS)[number])
     : false;
@@ -283,7 +354,7 @@ export function PropertiesPanel({
     : false;
 
   useEffect(() => {
-    const key = selectedItem ? 'properties' : activeTab;
+    const key = selectedItem || isMultiSelection ? 'properties' : activeTab;
     setActiveTab((current) => (current === 'layers' ? current : key));
   }, [activeTab, selectedItem]);
 
@@ -343,7 +414,7 @@ export function PropertiesPanel({
                   return (
                     <div
                       key={item.id}
-                      className={item.id === selectedItem?.id ? 'layer-row active' : 'layer-row'}
+                      className={selectedItems.some((selected) => selected.id === item.id) ? 'layer-row active' : 'layer-row'}
                     >
                       <button
                         aria-label={layerPrimaryLabel(item)}
@@ -400,7 +471,23 @@ export function PropertiesPanel({
           </div>
         ) : (
           <div ref={propertiesScrollRef} className="rail-tab-body rail-tab-body-properties">
-            {selectedItem ? (
+            {isMultiSelection ? (
+              <>
+                <div className="panel-heading-row compact-heading-row compact-item-header slim-item-header">
+                  <span className="slim-item-header-glyph" aria-hidden="true">◎</span>
+                  <div className="panel-heading-stack compact slim-item-heading-stack">
+                    <h2>{selectedItems.length} items selected</h2>
+                    <span className="slim-item-subtitle">Multi-selection</span>
+                  </div>
+                </div>
+                <SectionBlock title="Selection">
+                  <div className="field-grid dense-grid two-up-grid">
+                    <NumberInput label="Opacity" min={0} max={1} step={0.1} digits={1} value={multiOpacityValue} onChange={(value) => onItemChange({ opacity: value })} />
+                    {!allSelectedOpacityEqual ? <span className="slim-item-subtitle">Mixed</span> : null}
+                  </div>
+                </SectionBlock>
+              </>
+            ) : selectedItem ? (
               <>
                 <div className="panel-heading-row compact-heading-row compact-item-header slim-item-header">
                   <span className="slim-item-header-glyph" aria-hidden="true">
@@ -485,19 +572,36 @@ export function PropertiesPanel({
                 ) : null}
 
                 {selectedItem.kind === 'image' ? (
-                  <SectionBlock title="Image">
-                    <label className="checkbox-row compact-checkbox-row">
-                      <input aria-label="Preserve aspect ratio" type="checkbox" checked={selectedItem.preserveAspectRatio} onChange={(event) => onItemChange({ preserveAspectRatio: event.target.checked })} />
-                      Preserve aspect ratio
-                    </label>
-                  </SectionBlock>
+                  <>
+                    <SectionBlock title="Image">
+                      <div className="field-grid dense-grid two-up-grid">
+                        <NumberInput label="Opacity" min={0} max={1} step={0.1} digits={1} value={selectedItem.opacity} onChange={(value) => onItemChange({ opacity: value })} />
+                      </div>
+                      <label className="checkbox-row compact-checkbox-row">
+                        <input aria-label="Preserve aspect ratio" type="checkbox" checked={selectedItem.preserveAspectRatio} onChange={(event) => onItemChange({ preserveAspectRatio: event.target.checked })} />
+                        Preserve aspect ratio
+                      </label>
+                    </SectionBlock>
+                    <SectionBlock title="Color">
+                      <div className="field-grid dense-grid two-up-grid">
+                        <NumberInput label="Brightness" min={0} max={200} digits={0} slider sliderDetentValue={100} sliderDetentThreshold={3} value={selectedItem.adjustments.brightness} onChange={(value) => onItemChange(updateImageAdjustments(selectedItem.adjustments, { brightness: value }))} />
+                        <NumberInput label="Contrast" min={0} max={100} digits={0} slider sliderDetentValue={50} sliderDetentThreshold={2} value={selectedItem.adjustments.contrast} onChange={(value) => onItemChange(updateImageAdjustments(selectedItem.adjustments, { contrast: value }))} />
+                        <NumberInput label="Tint strength" min={0} max={100} digits={0} slider value={selectedItem.adjustments.tintStrength} onChange={(value) => onItemChange(updateImageAdjustments(selectedItem.adjustments, { tintStrength: value }))} />
+                      </div>
+                      <ColorPickerControl
+                        label="Tint color"
+                        value={selectedItem.adjustments.tintColor}
+                        onChange={(value) => onItemChange(updateImageAdjustments(selectedItem.adjustments, { tintColor: value }))}
+                      />
+                    </SectionBlock>
+                  </>
                 ) : null}
 
                 {(selectedItem.kind === 'rectangle' || selectedItem.kind === 'ellipse' || selectedItem.kind === 'line' || selectedItem.kind === 'text') ? (
                   <SectionBlock title="Main">
                     <div className="field-grid dense-grid two-up-grid">
                       {'stroke' in selectedItem ? (
-                        <NumberInput label="Stroke width" min={1} digits={1} value={selectedItem.strokeWidth} onChange={(value) => onItemChange({ strokeWidth: value })} />
+                        <NumberInput label="Stroke width" min={selectedItem.kind === 'line' ? 1 : 0} digits={1} value={selectedItem.strokeWidth} onChange={(value) => onItemChange({ strokeWidth: value })} />
                       ) : null}
                       {selectedItem.kind === 'rectangle' ? (
                         <NumberInput label="Corner radius" min={0} digits={1} value={selectedItem.cornerRadius} onChange={(value) => onItemChange({ cornerRadius: value })} />
@@ -526,11 +630,14 @@ export function PropertiesPanel({
                       <NumberInput label="Y" value={selectedItem.y} step={0.1} digits={1} onChange={(value) => onItemChange({ y: value })} />
                       <NumberInput label="Width" min={1} digits={1} value={selectedItem.width} onChange={(value) => onItemChange({ width: value })} />
                       <NumberInput label="Height" min={1} digits={1} value={selectedItem.height} onChange={(value) => onItemChange({ height: value })} />
-                      {(selectedItem.kind === 'text' || selectedItem.kind === 'image') ? (
+                      {selectedItem.kind === 'text' ? (
                         <>
                           <NumberInput label="Opacity" min={0} max={1} step={0.1} digits={1} value={selectedItem.opacity} onChange={(value) => onItemChange({ opacity: value })} />
                           <NumberInput label="Rotation" digits={0} value={selectedItem.rotation} onChange={(value) => onItemChange({ rotation: value })} />
                         </>
+                      ) : null}
+                      {selectedItem.kind === 'image' ? (
+                        <NumberInput label="Rotation" digits={0} value={selectedItem.rotation} onChange={(value) => onItemChange({ rotation: value })} />
                       ) : null}
                     </div>
                   )}
@@ -541,6 +648,10 @@ export function PropertiesPanel({
                     <div className="field-grid dense-grid two-up-grid">
                       <NumberInput label="Line height" min={0.5} step={0.1} value={selectedItem.lineHeight} digits={1} onChange={(value) => onItemChange({ lineHeight: value })} />
                       <NumberInput label="Character spacing" step={0.5} value={selectedItem.letterSpacing} digits={1} onChange={(value) => onItemChange({ letterSpacing: value })} />
+                      <NumberInput label="Padding top" digits={1} value={selectedItem.padding.top} onChange={(value) => onItemChange({ padding: { ...selectedItem.padding, top: value } })} />
+                      <NumberInput label="Padding right" digits={1} value={selectedItem.padding.right} onChange={(value) => onItemChange({ padding: { ...selectedItem.padding, right: value } })} />
+                      <NumberInput label="Padding bottom" digits={1} value={selectedItem.padding.bottom} onChange={(value) => onItemChange({ padding: { ...selectedItem.padding, bottom: value } })} />
+                      <NumberInput label="Padding left" digits={1} value={selectedItem.padding.left} onChange={(value) => onItemChange({ padding: { ...selectedItem.padding, left: value } })} />
                     </div>
                   </SectionBlock>
                 ) : null}

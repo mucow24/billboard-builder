@@ -8,7 +8,7 @@ import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
-import { selectCanRedo, selectCanUndo, selectSelectedItem } from '../editor/core/selectors';
+import { selectCanRedo, selectCanUndo, selectSelectedItem, selectSelectedItems } from '../editor/core/selectors';
 import { createImageItem } from '../editor/document/documentDefaults';
 import { useEditorStore } from '../editor/state/store';
 
@@ -28,6 +28,7 @@ export function useEditorController() {
 
   const {
     activeTool,
+    applyTransaction,
     availableFonts,
     document,
     historyFuture,
@@ -39,26 +40,34 @@ export function useEditorController() {
     deleteItem,
     deleteSelectedItems,
     dispatch,
+    duplicateSelectedItems,
     loadDocument,
+    nudgeSelectedItems,
     redo,
     registerAvailableFont,
     reorderSelectedItem,
     resetDocument,
+    selectAllItems,
     selectSingleItem,
     setActiveTool,
     setCanvasSize,
     setMissingFontFamilies,
+    toggleSelectedItem,
+    toggleSelectedItems,
     undo,
     updateSelectedItem,
+    updateSelectedItems,
   } = useEditorStore();
 
-  const selectedItem = selectSelectedItem(document, {
+  const selectionState = {
     activeTool,
     availableFonts,
     missingFontFamilies,
     exportScale,
     selectedItemIds,
-  });
+  };
+  const selectedItem = selectSelectedItem(document, selectionState);
+  const selectedItems = selectSelectedItems(document, selectionState);
   const selectedItemOrNull = selectedItem ?? null;
   const canUndo = selectCanUndo({ past: historyPast, future: historyFuture });
   const canRedo = selectCanRedo({ past: historyPast, future: historyFuture });
@@ -76,12 +85,15 @@ export function useEditorController() {
   useCanvasPersistence({ document, persistenceReady });
 
   useEditorShortcuts({
+    applyTransaction,
     deleteSelectedItems,
-    dispatch,
+    duplicateSelectedItems,
+    nudgeSelectedItems,
     onPasteImageFile: handleImageFile,
     redo,
     reorderSelectedItem,
-    selectedItem: selectedItemOrNull,
+    selectAllItems,
+    selectedItems,
     setActiveTool,
     undo,
   });
@@ -164,22 +176,29 @@ export function useEditorController() {
 
   return {
     actions: {
+      applyTransaction,
       deleteItem,
       deleteSelectedItems,
       dispatch,
+      duplicateSelectedItems,
       handleExport,
       handleFontUpload,
       handleImageUpload,
       handleNewProject,
       handleOpenProject,
       handleSave,
+      nudgeSelectedItems,
       redo,
       reorderSelectedItem,
+      selectAllItems,
       selectSingleItem,
       setActiveTool,
       setCanvasSize,
+      toggleSelectedItem,
+      toggleSelectedItems,
       undo,
       updateSelectedItem,
+      updateSelectedItems,
     },
     state: {
       activeTool,
@@ -191,6 +210,7 @@ export function useEditorController() {
       missingFontFamilies,
       selectedItem: selectedItemOrNull,
       selectedItemIds,
+      selectedItems,
     },
   };
 }

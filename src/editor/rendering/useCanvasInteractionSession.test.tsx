@@ -58,22 +58,27 @@ function createDocument(items: CanvasItem[] = [], selectedItemIds: string[] = []
   } satisfies ProjectDocumentV1;
 }
 
-function createHookParams(overrides?: {
-  activeTool?: CanvasTool;
-  document?: ProjectDocumentV1;
-}) {
+function createHookParamsBase() {
   const stageRef = makeStageRef();
 
   return {
-    activeTool: overrides?.activeTool ?? 'select',
-    document: overrides?.document ?? createDefaultProjectDocument(),
-    selectedItemIds: [],
+    activeTool: 'select' as CanvasTool,
+    document: createDefaultProjectDocument(),
+    selectedItemIds: [] as string[],
     onGuidesChange: vi.fn(),
     onSelectItem: vi.fn(),
     onUpdateItem: vi.fn(),
+    onUpdateItems: undefined as undefined | ReturnType<typeof vi.fn>,
     onAddItem: vi.fn(),
     onSetActiveTool: vi.fn(),
     stageRef: stageRef.ref,
+  };
+}
+
+function createHookParams(overrides?: Partial<ReturnType<typeof createHookParamsBase>>) {
+  return {
+    ...createHookParamsBase(),
+    ...overrides,
   };
 }
 
@@ -93,7 +98,7 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(result.current.session?.kind).toBe('create');
-    expect(result.current.session?.previewItem).toBeNull();
+    expect(result.current.session && 'previewItem' in result.current.session ? result.current.session.previewItem : null).toBeNull();
   });
 
 
@@ -239,6 +244,76 @@ describe('useCanvasInteractionSession', () => {
     expect(changes.rotation).toBeCloseTo(90, 0);
   });
 
+  it('preserves the rotated group selection frame after commit', () => {
+    const first = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+      onUpdateItems: vi.fn(),
+    });
+    const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), { initialProps: params });
+    const bounds = result.current.renderedGroupBounds!;
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+
+    act(() => {
+      result.current.beginGroupRotate({ x: center.x, y: center.y - 100 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: center.x + 100, y: center.y }, 'shape'));
+    });
+
+    const updates = params.onUpdateItems!.mock.calls.at(-1)?.[0] as Array<{ itemId: string; changes: Partial<CanvasItem> }>;
+    const rotatedItems = [first, second].map((item) => ({
+      ...item,
+      ...(updates.find((entry) => entry.itemId === item.id)?.changes ?? {}),
+    } as CanvasItem));
+
+    rerender({ ...params, document: createDocument(rotatedItems) });
+
+    expect(result.current.renderedSelectionFrame?.rotation).toBeCloseTo(90, 0);
+  });
+
+  it('starts a second group rotation from the committed rotated frame', () => {
+    const first = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+      onUpdateItems: vi.fn(),
+    });
+    const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), { initialProps: params });
+    const bounds = result.current.renderedGroupBounds!;
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+
+    act(() => {
+      result.current.beginGroupRotate({ x: center.x, y: center.y - 100 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: center.x + 100, y: center.y }, 'shape'));
+    });
+
+    const firstUpdates = params.onUpdateItems!.mock.calls.at(-1)?.[0] as Array<{ itemId: string; changes: Partial<CanvasItem> }>;
+    const rotatedItems = [first, second].map((item) => ({
+      ...item,
+      ...(firstUpdates.find((entry) => entry.itemId === item.id)?.changes ?? {}),
+    } as CanvasItem));
+
+    rerender({ ...params, document: createDocument(rotatedItems) });
+
+    act(() => {
+      result.current.beginGroupRotate({ x: center.x + 100, y: center.y });
+    });
+
+    const session = result.current.session;
+    expect(session?.kind).toBe('group-rotate');
+    if (session?.kind === 'group-rotate') {
+      expect(session.frameRotation).toBeCloseTo(90, 0);
+      expect(session.bounds).toEqual(bounds);
+    }
+  });
+
+
   it('commits only the dragged line endpoint', () => {
     const item = createLineItem({
       startX: 160,
@@ -304,7 +379,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(result.current.session?.previewItem).toEqual(
+    expect(result.current.session && 'previewItem' in result.current.session ? result.current.session.previewItem : null).toEqual(
       expect.objectContaining({
         x: 480,
       })

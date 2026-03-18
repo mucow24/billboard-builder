@@ -14,6 +14,15 @@ import {
   type Point,
   type ResizeHandle,
 } from './interactionGeometry';
+import {
+  buildGroupDragPreviews,
+  buildGroupResizePreviews,
+  buildGroupRotatePreviews,
+  getSelectionRenderBounds,
+  getRenderBox,
+  itemIntersectsSelectionRect,
+  type RenderBox,
+} from './transformGeometry';
 import type {
   CanvasItem,
   CanvasTool,
@@ -23,10 +32,11 @@ import type {
 } from '../document/documentTypes';
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
+
 type SessionWithModifiers = InteractionSession & { shiftConstrain?: boolean };
 
 interface InteractionSessionBase {
-  kind: 'create' | 'drag' | 'resize' | 'rotate' | 'line-handle';
+  kind: 'create' | 'drag' | 'resize' | 'rotate' | 'line-handle' | 'marquee' | 'group-drag' | 'group-resize' | 'group-rotate';
   pointerStart: Point;
   guides: GuideLine[];
   snapDisabled?: boolean;
@@ -68,12 +78,70 @@ interface LineHandleSession extends ItemSession {
   pointerOffset: Point;
 }
 
+interface MarqueeSession extends InteractionSessionBase {
+  kind: 'marquee';
+  currentPointer: Point;
+  toggleMode: boolean;
+}
+
+export interface SelectionFrame {
+  bounds: RenderBox;
+  rotation: number;
+}
+
+interface GroupSessionBase extends InteractionSessionBase {
+  kind: 'group-drag' | 'group-resize' | 'group-rotate';
+  itemIds: string[];
+  originalItems: CanvasItem[];
+  previewItems: CanvasItem[];
+  bounds: RenderBox;
+  frameRotation: number;
+}
+
+interface GroupDragSession extends GroupSessionBase {
+  kind: 'group-drag';
+}
+
+interface GroupResizeSession extends GroupSessionBase {
+  kind: 'group-resize';
+  handle: ResizeHandle;
+}
+
+interface GroupRotateSession extends GroupSessionBase {
+  kind: 'group-rotate';
+  handle: 'rotater';
+  currentPointer: Point;
+}
+
+function currentSelectionSetSignature(itemIds: string[]): string {
+  return [...itemIds].sort().join('\u0000');
+}
+
+function rotateGroupPointerDelta(bounds: RenderBox, startPointer: Point, currentPointer: Point, snap = false): number {
+  const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+  const startAngle = Math.atan2(startPointer.y - center.y, startPointer.x - center.x);
+  const currentAngle = Math.atan2(currentPointer.y - center.y, currentPointer.x - center.x);
+  let deltaDegrees = ((currentAngle - startAngle) * 180) / Math.PI;
+  if (snap) {
+    deltaDegrees = Math.round(deltaDegrees / 15) * 15;
+  }
+  return deltaDegrees;
+}
+
+function translateBounds(bounds: RenderBox, dx: number, dy: number): RenderBox {
+  return { ...bounds, x: bounds.x + dx, y: bounds.y + dy };
+}
+
 export type InteractionSession =
   | CreateSession
   | DragSession
   | ResizeSession
   | RotateSession
-  | LineHandleSession;
+  | LineHandleSession
+  | MarqueeSession
+  | GroupDragSession
+  | GroupResizeSession
+  | GroupRotateSession;
 
 function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
   if (item.kind === 'line') {
@@ -102,6 +170,15 @@ function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
   };
 }
 
+function normalizeRectFromPoints(start: Point, current: Point): RenderBox {
+  return {
+    x: Math.min(start.x, current.x),
+    y: Math.min(start.y, current.y),
+    width: Math.max(1, Math.abs(current.x - start.x)),
+    height: Math.max(1, Math.abs(current.y - start.y)),
+  };
+}
+
 interface UseCanvasInteractionSessionParams {
   activeTool: CanvasTool;
   document: ProjectDocumentV1;
@@ -109,7 +186,10 @@ interface UseCanvasInteractionSessionParams {
   viewport?: { zoom: number; panX: number; panY: number };
   onGuidesChange: (guides: GuideLine[]) => void;
   onSelectItem: (itemId?: string) => void;
+  onToggleSelectItem?: (itemId: string) => void;
+  onToggleSelectItems?: (itemIds: string[]) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
+  onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
   onSetActiveTool: (tool: CanvasTool) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -122,43 +202,55 @@ export function useCanvasInteractionSession({
   viewport = { zoom: 1, panX: 0, panY: 0 },
   onGuidesChange,
   onSelectItem,
+  onToggleSelectItem,
+  onToggleSelectItems,
   onUpdateItem,
+  onUpdateItems,
   onAddItem,
   onSetActiveTool,
   stageRef,
 }: UseCanvasInteractionSessionParams) {
   const shapeRefs = useRef(new Map<string, Konva.Node>());
   const sessionRef = useRef<InteractionSession | null>(null);
+  const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
+  const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
 
-  // Rendering/interaction should not depend on core editor selectors.
-  // Selection semantics are intentionally simple here: the first id (if any)
-  // is considered the primary selection.
-  const selectedItemId = selectedItemIds[0];
-  const stageBounds = useMemo(
-    () => ({
-      x: 0,
-      y: 0,
-      width: document.canvas.width,
-      height: document.canvas.height,
-    }),
-    [document.canvas.height, document.canvas.width]
-  );
-  const orderedItems = useMemo(
-    () => document.items.slice().sort((left, right) => left.zIndex - right.zIndex),
-    [document.items]
-  );
+  const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const orderedItems = useMemo(() => document.items.slice().sort((left, right) => left.zIndex - right.zIndex), [document.items]);
+  const selectedItems = useMemo(() => orderedItems.filter((item) => selectedIdSet.has(item.id)), [orderedItems, selectedIdSet]);
+  const groupBounds = useMemo(() => getSelectionRenderBounds(selectedItems), [selectedItems]);
+  const stageBounds = useMemo(() => ({ x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }), [document.canvas.height, document.canvas.width]);
+
   const renderedItems = useMemo(() => {
-    const previewItem = session?.previewItem ?? null;
-    const baseItems = orderedItems.map((item) =>
-      previewItem && session && session.kind !== 'create' && item.id === session.itemId
-        ? previewItem
-        : item
-    );
-    return session?.kind === 'create' && previewItem
-      ? [...baseItems, previewItem]
-      : baseItems;
+    const previewItem = session && 'previewItem' in session ? session.previewItem : null;
+    const previewItems = session && 'previewItems' in session ? session.previewItems : null;
+    const previewMap = new Map(previewItems?.map((item) => [item.id, item] as const) ?? []);
+    const baseItems = orderedItems.map((item) => {
+      if (previewMap.has(item.id)) {
+        return previewMap.get(item.id)!;
+      }
+      if (previewItem && 'itemId' in (session ?? {}) && item.id === (session as DragSession | ResizeSession | RotateSession | LineHandleSession).itemId) {
+        return previewItem;
+      }
+      return item;
+    });
+    return session?.kind === 'create' && session.previewItem ? [...baseItems, session.previewItem] : baseItems;
   }, [orderedItems, session]);
+
+  const renderedSelectedItems = useMemo(() => renderedItems.filter((item) => selectedIdSet.has(item.id)), [renderedItems, selectedIdSet]);
+  const renderedGroupBounds = useMemo(() => getSelectionRenderBounds(renderedSelectedItems), [renderedSelectedItems]);
+  const renderedSelectionFrame = useMemo(() => {
+    if (renderedSelectedItems.length <= 1) {
+      return null;
+    }
+    if (selectionFrame) {
+      return selectionFrame;
+    }
+    return renderedGroupBounds ? { bounds: renderedGroupBounds, rotation: 0 } : null;
+  }, [renderedGroupBounds, renderedSelectedItems.length, selectionFrame]);
+  const activeSelectionFrame = renderedSelectionFrame ?? (groupBounds ? { bounds: groupBounds, rotation: 0 } : null);
+  const selectedItemId = selectedItemIds[0];
   const selectedDocumentItem = orderedItems.find((item) => item.id === selectedItemId) ?? null;
   const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId) ?? null;
 
@@ -167,6 +259,7 @@ export function useCanvasInteractionSession({
     setSession(nextSession);
   }, []);
 
+
   useEffect(() => {
     if ((activeTool === 'select' || activeTool === 'pan' || activeTool === 'zoom') && session?.kind === 'create') {
       updateSession(null);
@@ -174,280 +267,212 @@ export function useCanvasInteractionSession({
     }
   }, [activeTool, onGuidesChange, session, updateSession]);
 
-  const getCurrentPointer = useCallback(
-    (event: MouseEvent) => {
-      if (!stageRef.current) {
-        return null;
-      }
-      stageRef.current.setPointersPositions(event);
-      const pointer = stageRef.current.getPointerPosition();
-      if (!pointer) {
-        return null;
-      }
-      return {
-        x: (pointer.x - viewport.panX) / viewport.zoom,
-        y: (pointer.y - viewport.panY) / viewport.zoom,
-      };
-    },
-    [stageRef, viewport.panX, viewport.panY, viewport.zoom]
-  );
+  const selectionSetSignature = useMemo(() => currentSelectionSetSignature(selectedItemIds), [selectedItemIds]);
 
-  const resolveSession = useCallback(
-    (current: InteractionSession, pointer: Point): InteractionSession => {
-      const currentWithModifiers = current as SessionWithModifiers;
+  useEffect(() => {
+    if (selectedItems.length <= 1) {
+      setSelectionFrame(null);
+      return;
+    }
+    setSelectionFrame((current) => {
+      if (current && currentSelectionSetSignature(selectedItems.map((item) => item.id)) === selectionSetSignature) {
+        return current;
+      }
+      return groupBounds ? { bounds: groupBounds, rotation: 0 } : null;
+    });
+  }, [groupBounds, selectedItems, selectionSetSignature]);
 
-      switch (current.kind) {
-        case 'create':
-          return {
-            ...current,
-            previewItem: getCreatePreview(current.tool, current.pointerStart, pointer),
-          };
-        case 'drag': {
-          let resolvedPointer = pointer;
-          let axisLock = current.axisLock;
-          const deltaX = pointer.x - current.pointerStart.x;
-          const deltaY = pointer.y - current.pointerStart.y;
-          if ((current as DragSession).snapDisabled === undefined) {
-            // no-op
+  const getCurrentPointer = useCallback((event: MouseEvent) => {
+    if (!stageRef.current) {
+      return null;
+    }
+    stageRef.current.setPointersPositions(event);
+    const pointer = stageRef.current.getPointerPosition();
+    if (!pointer) {
+      return null;
+    }
+    return {
+      x: (pointer.x - viewport.panX) / viewport.zoom,
+      y: (pointer.y - viewport.panY) / viewport.zoom,
+    };
+  }, [stageRef, viewport.panX, viewport.panY, viewport.zoom]);
+
+  const resolveSession = useCallback((current: InteractionSession, pointer: Point): InteractionSession => {
+    const currentWithModifiers = current as SessionWithModifiers;
+    switch (current.kind) {
+      case 'create':
+        return { ...current, previewItem: getCreatePreview(current.tool, current.pointerStart, pointer) };
+      case 'drag': {
+        let resolvedPointer = pointer;
+        let axisLock = current.axisLock;
+        const deltaX = pointer.x - current.pointerStart.x;
+        const deltaY = pointer.y - current.pointerStart.y;
+        if (currentWithModifiers.shiftConstrain) {
+          if (!axisLock && Math.hypot(deltaX, deltaY) >= 6) {
+            axisLock = Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
           }
-          if ((current as DragSession) && (current as DragSession).kind === 'drag') {
-            if ((current as DragSession).axisLock) {
-              axisLock = (current as DragSession).axisLock;
-            }
-          }
-          if ((current as DragSession) && (current as DragSession).kind === 'drag' && currentWithModifiers.shiftConstrain) {
-            if (!axisLock && Math.hypot(deltaX, deltaY) >= 6) {
-              axisLock = Math.abs(deltaX) >= Math.abs(deltaY) ? 'x' : 'y';
-            }
-            if (axisLock === 'x') {
-              resolvedPointer = { ...pointer, y: current.pointerStart.y };
-            } else if (axisLock === 'y') {
-              resolvedPointer = { ...pointer, x: current.pointerStart.x };
-            }
-          }
-          const next = solveDragSession(
-            current.originalItem,
-            current.pointerStart,
-            resolvedPointer,
-            current.siblingItems,
-            stageBounds,
-            !current.snapDisabled
-          );
-          return {
-            ...current,
-            axisLock,
-            previewItem: next.item,
-            guides: next.guides,
-          };
+          if (axisLock === 'x') resolvedPointer = { ...pointer, y: current.pointerStart.y };
+          if (axisLock === 'y') resolvedPointer = { ...pointer, x: current.pointerStart.x };
         }
-        case 'resize': {
-          const next = solveResizeSession(
-            current.originalItem as ShapeItem,
-            current.handle,
-            pointer,
-            current.pointerOffset,
-            current.siblingItems,
-            stageBounds,
-            !current.snapDisabled
-          );
-          return {
-            ...current,
-            previewItem: next.item,
-            guides: next.guides,
-          };
-        }
-        case 'rotate': {
-          const next = solveRotateSession(
-            current.originalItem as ShapeItem,
-            current.pointerStart,
-            pointer,
-            Boolean(currentWithModifiers.shiftConstrain)
-          );
-          return {
-            ...current,
-            previewItem: next.item,
-            guides: [],
-          };
-        }
-        case 'line-handle': {
-          const next = solveLineHandleSession(
-            current.originalItem as LineCanvasItem,
-            current.handle,
-            pointer,
-            current.pointerOffset,
-            current.siblingItems,
-            stageBounds,
-            !current.snapDisabled
-          );
-          return {
-            ...current,
-            previewItem: next.item,
-            guides: next.guides,
-          };
-        }
+        const next = solveDragSession(current.originalItem, current.pointerStart, resolvedPointer, current.siblingItems, stageBounds, !current.snapDisabled);
+        return { ...current, axisLock, previewItem: next.item, guides: next.guides };
       }
-    },
-    [stageBounds]
-  );
-
-  const finishSession = useCallback(
-    (current: InteractionSession, pointer: Point) => {
-      const resolved = resolveSession(current, pointer);
-      onGuidesChange([]);
-
-      if (resolved.kind === 'create') {
-        const createdItem =
-          resolved.previewItem ??
-          buildCreatedItem(resolved.tool, resolved.pointerStart, pointer);
-        onAddItem(createdItem);
-        onSetActiveTool('select');
-        return;
+      case 'resize': {
+        const next = solveResizeSession(current.originalItem as ShapeItem, current.handle, pointer, current.pointerOffset, current.siblingItems, stageBounds, !current.snapDisabled);
+        return { ...current, previewItem: next.item, guides: next.guides };
       }
-
-      onUpdateItem(resolved.itemId, getCommitChanges(resolved.previewItem));
-    },
-    [onAddItem, onGuidesChange, onSetActiveTool, onUpdateItem, resolveSession]
-  );
-
-  const commitActiveSession = useCallback(
-    (pointer: Point | null) => {
-      const current = sessionRef.current;
-      const resolvedPointer = pointer ?? current?.pointerStart ?? null;
-      if (!current || !resolvedPointer) {
-        updateSession(null);
-        onGuidesChange([]);
-        return;
+      case 'rotate': {
+        const next = solveRotateSession(current.originalItem as ShapeItem, current.pointerStart, pointer, Boolean(currentWithModifiers.shiftConstrain));
+        return { ...current, previewItem: next.item, guides: [] };
       }
-      finishSession(current, resolvedPointer);
+      case 'line-handle': {
+        const next = solveLineHandleSession(current.originalItem as LineCanvasItem, current.handle, pointer, current.pointerOffset, current.siblingItems, stageBounds, !current.snapDisabled);
+        return { ...current, previewItem: next.item, guides: next.guides };
+      }
+      case 'marquee':
+        return { ...current, currentPointer: pointer };
+      case 'group-drag':
+        return { ...current, previewItems: buildGroupDragPreviews(current.originalItems, pointer.x - current.pointerStart.x, pointer.y - current.pointerStart.y) };
+      case 'group-resize':
+        return { ...current, previewItems: buildGroupResizePreviews(current.originalItems, current.bounds, current.handle, pointer) };
+      case 'group-rotate':
+        return { ...current, currentPointer: pointer, previewItems: buildGroupRotatePreviews(current.originalItems, current.bounds, current.pointerStart, pointer, Boolean(currentWithModifiers.shiftConstrain)) };
+    }
+  }, [stageBounds]);
+
+  const finishSession = useCallback((current: InteractionSession, pointer: Point) => {
+    const resolved = resolveSession(current, pointer);
+    onGuidesChange([]);
+
+    if (resolved.kind === 'create') {
+      const createdItem = resolved.previewItem ?? buildCreatedItem(resolved.tool, resolved.pointerStart, pointer);
+      onAddItem(createdItem);
+      onSetActiveTool('select');
+      return;
+    }
+    if (resolved.kind === 'marquee') {
+      const rect = normalizeRectFromPoints(resolved.pointerStart, resolved.currentPointer);
+      const hitIds = orderedItems.filter((item) => !item.hidden && itemIntersectsSelectionRect(item, rect)).map((item) => item.id);
+      if (resolved.toggleMode && onToggleSelectItems) {
+        onToggleSelectItems(hitIds);
+      } else if (hitIds.length > 0) {
+        onSelectItem(hitIds[0]);
+        if (hitIds.length > 1 && onToggleSelectItems) {
+          onSelectItem(undefined);
+          onToggleSelectItems(hitIds);
+        }
+      } else {
+        onSelectItem(undefined);
+      }
+      return;
+    }
+    if ('previewItems' in resolved) {
+      const updates = resolved.previewItems.map((item) => ({ itemId: item.id, changes: getCommitChanges(item) }));
+      if (resolved.kind === 'group-drag') {
+        const dx = pointer.x - resolved.pointerStart.x;
+        const dy = pointer.y - resolved.pointerStart.y;
+        setSelectionFrame({ bounds: translateBounds(resolved.bounds, dx, dy), rotation: resolved.frameRotation });
+      } else if (resolved.kind === 'group-rotate') {
+        const deltaRotation = rotateGroupPointerDelta(resolved.bounds, resolved.pointerStart, resolved.currentPointer, false);
+        setSelectionFrame({ bounds: resolved.bounds, rotation: resolved.frameRotation + deltaRotation });
+      } else if (resolved.kind === 'group-resize') {
+        setSelectionFrame({ bounds: getSelectionRenderBounds(resolved.previewItems) ?? resolved.bounds, rotation: resolved.frameRotation });
+      }
+      if (onUpdateItems) {
+        onUpdateItems(updates);
+      } else {
+        updates.forEach(({ itemId, changes }) => onUpdateItem(itemId, changes));
+      }
+      return;
+    }
+    onUpdateItem(resolved.itemId, getCommitChanges(resolved.previewItem));
+  }, [onAddItem, onGuidesChange, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, resolveSession]);
+
+  const commitActiveSession = useCallback((pointer: Point | null) => {
+    const current = sessionRef.current;
+    const resolvedPointer = pointer ?? current?.pointerStart ?? null;
+    if (!current || !resolvedPointer) {
       updateSession(null);
-    },
-    [finishSession, onGuidesChange, updateSession]
-  );
+      onGuidesChange([]);
+      return;
+    }
+    finishSession(current, resolvedPointer);
+    updateSession(null);
+  }, [finishSession, onGuidesChange, updateSession]);
 
   useEffect(() => {
     if (!session) {
       return;
     }
-
     function handleMouseMove(event: MouseEvent) {
-      const current = sessionRef.current;
+      let current = sessionRef.current;
       const pointer = getCurrentPointer(event);
-      if (!current || !pointer) {
+      if (!pointer) {
         return;
       }
-      const next = resolveSession({
-        ...current,
-        snapDisabled: current.kind === 'drag' || current.kind === 'line-handle' ? event.ctrlKey : current.snapDisabled,
-        shiftConstrain: event.shiftKey,
-      } as SessionWithModifiers, pointer);
+      if (!current && pendingMarqueeRef.current) {
+        current = { kind: 'marquee', pointerStart: pendingMarqueeRef.current.pointerStart, currentPointer: pointer, toggleMode: pendingMarqueeRef.current.toggleMode, guides: [] };
+      }
+      if (!current) {
+        return;
+      }
+      const next = resolveSession({ ...current, snapDisabled: current.kind === 'drag' || current.kind === 'line-handle' ? event.ctrlKey : current.snapDisabled, shiftConstrain: event.shiftKey } as SessionWithModifiers, pointer);
+      pendingMarqueeRef.current = null;
       onGuidesChange(next.guides);
       updateSession(next);
     }
-
     function handleMouseUp(event: MouseEvent) {
+      if (!sessionRef.current && pendingMarqueeRef.current) {
+        pendingMarqueeRef.current = null;
+        onGuidesChange([]);
+        return;
+      }
       commitActiveSession(getCurrentPointer(event));
     }
-
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp, true);
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
   }, [commitActiveSession, getCurrentPointer, onGuidesChange, resolveSession, session, updateSession]);
 
-  const beginCreate = useCallback(
-    (tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
-      updateSession({
-        kind: 'create',
-        tool,
-        pointerStart: pointer,
-        previewItem: null,
-        guides: [],
-        snapDisabled: false,
-      });
-    },
-    [updateSession]
-  );
+  const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
+    updateSession({ kind: 'create', tool, pointerStart: pointer, previewItem: null, guides: [], snapDisabled: false });
+  }, [updateSession]);
 
-  const beginDrag = useCallback(
-    (item: CanvasItem, pointer: Point) => {
-      updateSession({
-        kind: 'drag',
-        itemId: item.id,
-        originalItem: item,
-        previewItem: item,
-        siblingItems: orderedItems.filter((entry) => entry.id !== item.id),
-        pointerStart: pointer,
-        guides: [],
-        snapDisabled: false,
-        axisLock: undefined,
-      });
-    },
-    [orderedItems, updateSession]
-  );
+  const beginDrag = useCallback((item: CanvasItem, pointer: Point) => {
+    updateSession({ kind: 'drag', itemId: item.id, originalItem: item, previewItem: item, siblingItems: orderedItems.filter((entry) => entry.id !== item.id), pointerStart: pointer, guides: [], snapDisabled: false, axisLock: undefined });
+  }, [orderedItems, updateSession]);
 
-  const beginResize = useCallback(
-    (item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
-      const handlePoint = getShapeHandlePoints(item)[handle];
-      updateSession({
-        kind: 'resize',
-        itemId: item.id,
-        originalItem: item,
-        previewItem: item,
-        siblingItems: orderedItems.filter((entry) => entry.id !== item.id),
-        pointerStart: pointer,
-        pointerOffset: {
-          x: pointer.x - handlePoint.x,
-          y: pointer.y - handlePoint.y,
-        },
-        handle,
-        guides: [],
-        snapDisabled: false,
-      });
-    },
-    [orderedItems, updateSession]
-  );
+  const beginGroupDrag = useCallback((pointer: Point) => {
+    if (!activeSelectionFrame || selectedItems.length <= 1) return;
+    updateSession({ kind: 'group-drag', itemIds: selectedItems.map((item) => item.id), originalItems: selectedItems, previewItems: selectedItems, bounds: activeSelectionFrame.bounds, frameRotation: activeSelectionFrame.rotation, pointerStart: pointer, guides: [] });
+  }, [activeSelectionFrame, selectedItems, updateSession]);
 
-  const beginRotate = useCallback(
-    (item: ShapeItem, pointer: Point) => {
-      updateSession({
-        kind: 'rotate',
-        itemId: item.id,
-        originalItem: item,
-        previewItem: item,
-        siblingItems: orderedItems.filter((entry) => entry.id !== item.id),
-        pointerStart: pointer,
-        handle: 'rotater',
-        guides: [],
-        snapDisabled: false,
-      });
-    },
-    [orderedItems, updateSession]
-  );
+  const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
+    const handlePoint = getShapeHandlePoints(item)[handle];
+    updateSession({ kind: 'resize', itemId: item.id, originalItem: item, previewItem: item, siblingItems: orderedItems.filter((entry) => entry.id !== item.id), pointerStart: pointer, pointerOffset: { x: pointer.x - handlePoint.x, y: pointer.y - handlePoint.y }, handle, guides: [], snapDisabled: false });
+  }, [orderedItems, updateSession]);
 
-  const beginLineHandle = useCallback(
-    (item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => {
-      const rect = getLineHandleRects(item)[handle];
-      updateSession({
-        kind: 'line-handle',
-        itemId: item.id,
-        originalItem: item,
-        previewItem: item,
-        siblingItems: orderedItems.filter((entry) => entry.id !== item.id),
-        pointerStart: pointer,
-        pointerOffset: {
-          x: pointer.x - (rect.x + rect.width / 2),
-          y: pointer.y - (rect.y + rect.height / 2),
-        },
-        handle,
-        guides: [],
-        snapDisabled: false,
-      });
-    },
-    [orderedItems, updateSession]
-  );
+  const beginGroupResize = useCallback((handle: ResizeHandle, pointer: Point) => {
+    if (!activeSelectionFrame || selectedItems.length <= 1) return;
+    updateSession({ kind: 'group-resize', itemIds: selectedItems.map((item) => item.id), originalItems: selectedItems, previewItems: selectedItems, bounds: activeSelectionFrame.bounds, frameRotation: activeSelectionFrame.rotation, pointerStart: pointer, handle, guides: [] });
+  }, [activeSelectionFrame, selectedItems, updateSession]);
+
+  const beginRotate = useCallback((item: ShapeItem, pointer: Point) => {
+    updateSession({ kind: 'rotate', itemId: item.id, originalItem: item, previewItem: item, siblingItems: orderedItems.filter((entry) => entry.id !== item.id), pointerStart: pointer, handle: 'rotater', guides: [], snapDisabled: false });
+  }, [orderedItems, updateSession]);
+
+  const beginGroupRotate = useCallback((pointer: Point) => {
+    if (!activeSelectionFrame || selectedItems.length <= 1) return;
+    updateSession({ kind: 'group-rotate', itemIds: selectedItems.map((item) => item.id), originalItems: selectedItems, previewItems: selectedItems, bounds: activeSelectionFrame.bounds, frameRotation: activeSelectionFrame.rotation, pointerStart: pointer, currentPointer: pointer, handle: 'rotater', guides: [] });
+  }, [activeSelectionFrame, selectedItems, updateSession]);
+
+  const beginLineHandle = useCallback((item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => {
+    const rect = getLineHandleRects(item)[handle];
+    updateSession({ kind: 'line-handle', itemId: item.id, originalItem: item, previewItem: item, siblingItems: orderedItems.filter((entry) => entry.id !== item.id), pointerStart: pointer, pointerOffset: { x: pointer.x - (rect.x + rect.width / 2), y: pointer.y - (rect.y + rect.height / 2) }, handle, guides: [], snapDisabled: false });
+  }, [orderedItems, updateSession]);
 
   const registerShapeRef = useCallback((itemId: string, node: Konva.Node | null) => {
     if (!node) {
@@ -458,70 +483,71 @@ export function useCanvasInteractionSession({
   }, []);
 
   const selectedNode = selectedItemId ? shapeRefs.current.get(selectedItemId) ?? null : null;
-  const nodeClientRect =
-    selectedNode && stageRef.current
-      ? selectedNode.getClientRect({ relativeTo: stageRef.current })
-      : null;
+  const nodeClientRect = selectedNode && stageRef.current ? selectedNode.getClientRect({ relativeTo: stageRef.current }) : null;
 
-  const handleStageMouseDown = useCallback(
-    (event: Konva.KonvaEventObject<MouseEvent>) => {
-      const target = event.target;
-      const stage = event.target.getStage();
-      const rawPointer = stage?.getPointerPosition();
-      const pointer = rawPointer
-        ? {
-            x: (rawPointer.x - viewport.panX) / viewport.zoom,
-            y: (rawPointer.y - viewport.panY) / viewport.zoom,
-          }
-        : null;
-      const isCanvasSurface =
-        target === stage ||
-        target.hasName?.('canvas-surface') ||
-        target.hasName?.('canvas-background') ||
-        target.hasName?.('canvas-backdrop') ||
-        target.name() === 'canvas-surface' ||
-        target.name() === 'canvas-background' ||
-        target.name() === 'canvas-backdrop';
-      if (!pointer || !isCanvasSurface) {
+  const handleItemPointerDown = useCallback((item: CanvasItem, pointer: Point, shiftKey: boolean) => {
+    if (shiftKey && onToggleSelectItem) {
+      onToggleSelectItem(item.id);
+      return;
+    }
+    if (selectedIdSet.has(item.id)) {
+      if (selectedItems.length > 1) {
+        beginGroupDrag(pointer);
         return;
       }
-      if (isCreateTool(activeTool)) {
-        beginCreate(activeTool, pointer);
-        return;
-      }
+      beginDrag(item, pointer);
+      return;
+    }
+    onSelectItem(item.id);
+    beginDrag(item, pointer);
+  }, [beginDrag, beginGroupDrag, onSelectItem, onToggleSelectItem, selectedIdSet, selectedItems.length]);
+
+  const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
+    const target = event.target;
+    const stage = event.target.getStage();
+    const rawPointer = stage?.getPointerPosition();
+    const pointer = rawPointer ? { x: (rawPointer.x - viewport.panX) / viewport.zoom, y: (rawPointer.y - viewport.panY) / viewport.zoom } : null;
+    const isCanvasSurface = target === stage || target.hasName?.('canvas-surface') || target.hasName?.('canvas-background') || target.hasName?.('canvas-backdrop') || target.name() === 'canvas-surface' || target.name() === 'canvas-background' || target.name() === 'canvas-backdrop';
+    if (!pointer || !isCanvasSurface) return;
+    if (isCreateTool(activeTool)) {
+      beginCreate(activeTool, pointer);
+      return;
+    }
+    if (activeTool === 'select') {
       onGuidesChange([]);
       onSelectItem(undefined);
-    },
-    [activeTool, beginCreate, onGuidesChange, onSelectItem, viewport.panX, viewport.panY, viewport.zoom]
-  );
+      pendingMarqueeRef.current = { pointerStart: pointer, toggleMode: Boolean(event.evt?.shiftKey) };
+      updateSession(null);
+      return;
+    }
+    onGuidesChange([]);
+    onSelectItem(undefined);
+  }, [activeTool, beginCreate, onGuidesChange, onSelectItem, updateSession, viewport.panX, viewport.panY, viewport.zoom]);
 
-  const handleStageMouseUp = useCallback(
-    (event: Konva.KonvaEventObject<MouseEvent>) => {
-      if (!sessionRef.current) {
-        return;
-      }
-      const rawPointer = event.target.getStage()?.getPointerPosition() ?? null;
-      const pointer = rawPointer
-        ? {
-            x: (rawPointer.x - viewport.panX) / viewport.zoom,
-            y: (rawPointer.y - viewport.panY) / viewport.zoom,
-          }
-        : null;
-      commitActiveSession(pointer);
-    },
-    [commitActiveSession, viewport.panX, viewport.panY, viewport.zoom]
-  );
+  const handleStageMouseUp = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!sessionRef.current) return;
+    const rawPointer = event.target.getStage()?.getPointerPosition() ?? null;
+    const pointer = rawPointer ? { x: (rawPointer.x - viewport.panX) / viewport.zoom, y: (rawPointer.y - viewport.panY) / viewport.zoom } : null;
+    commitActiveSession(pointer);
+  }, [commitActiveSession, viewport.panX, viewport.panY, viewport.zoom]);
 
   return {
     beginDrag,
+    beginGroupDrag,
+    beginGroupResize,
+    beginGroupRotate,
     beginLineHandle,
     beginResize,
     beginRotate,
+    handleItemPointerDown,
     handleStageMouseDown,
     handleStageMouseUp,
     nodeClientRect,
     registerShapeRef,
     renderedItems,
+    renderedSelectedItems,
+    renderedGroupBounds,
+    renderedSelectionFrame,
     selectedDocumentItem,
     selectedNode,
     selectedRenderedItem,

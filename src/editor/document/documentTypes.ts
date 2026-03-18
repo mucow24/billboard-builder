@@ -43,6 +43,20 @@ export interface CanvasShadow {
   opacity: number;
 }
 
+export interface ImageAdjustments {
+  brightness: number;
+  contrast: number;
+  tintColor: string;
+  tintStrength: number;
+}
+
+export interface TextPadding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface BaseCanvasItem {
   id: string;
   kind: CanvasItemKind;
@@ -73,6 +87,7 @@ export interface TextCanvasItem extends BaseCanvasItem {
   verticalAlign: TextVerticalAlign;
   lineHeight: number;
   letterSpacing: number;
+  padding: TextPadding;
 }
 
 export interface ImageCanvasItem extends BaseCanvasItem {
@@ -82,6 +97,7 @@ export interface ImageCanvasItem extends BaseCanvasItem {
   originalWidth: number;
   originalHeight: number;
   preserveAspectRatio: boolean;
+  adjustments: ImageAdjustments;
 }
 
 export interface RectangleCanvasItem extends BaseCanvasItem {
@@ -137,6 +153,7 @@ export type EditorCommand =
   | { type: 'set_canvas_size'; canvas: CanvasSize }
   | { type: 'set_background'; background: string }
   | { type: 'reorder_item'; itemId: string; mode: ReorderMode }
+  | { type: 'reorder_items'; itemIds: string[]; mode: ReorderMode }
   | { type: 'register_font'; font: DocumentFontReference }
   | { type: 'load_document'; document: ProjectDocumentV1 };
 

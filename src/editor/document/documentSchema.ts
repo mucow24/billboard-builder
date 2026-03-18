@@ -12,6 +12,20 @@ const CanvasShadowSchema = z.object({
   opacity: z.number().min(0).max(1),
 });
 
+const ImageAdjustmentsSchema = z.object({
+  brightness: z.number().min(0).max(200),
+  contrast: z.number().min(0).max(100),
+  tintColor: z.string(),
+  tintStrength: z.number().min(0).max(100),
+});
+
+const TextPaddingSchema = z.object({
+  top: z.number(),
+  right: z.number(),
+  bottom: z.number(),
+  left: z.number(),
+});
+
 const BaseCanvasItemSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line']),
@@ -42,6 +56,7 @@ const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
   lineHeight: z.number().positive(),
   letterSpacing: z.number().optional(),
+  padding: TextPaddingSchema.optional(),
 });
 
 const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({
@@ -51,6 +66,7 @@ const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({
   originalWidth: z.number().positive(),
   originalHeight: z.number().positive(),
   preserveAspectRatio: z.boolean(),
+  adjustments: ImageAdjustmentsSchema.optional(),
 });
 
 const RectangleCanvasItemSchema = BaseCanvasItemSchema.extend({

@@ -1,0 +1,33 @@
+Huge:
+REQUEST: Integrate generators
+
+Big ones:
+REQUEST: Multi-select / copy / paste / manipulate
+REQUEST: Templates
+REQUEST: Rich text fields
+
+Medium:
+REQUEST: Make content off-canvas be visible "under" the background, with blurring and translucency.
+REQUEST: Drag and drop layers with autoscroll, insertion line, animations, etc.
+REQUEST: Crop images
+REQUEST: Grouping
+
+Small:
+
+UI:
+Densification of properties panel.
+Densification of layers panel.
+Make layer panel entries span the whole width, always show the delete button
+
+IN PROGRESS:
+
+DONE:
+REQUEST: Image opacity slider
+BUG: Shape color previews always show the stroke color, even if stroke width is 0.
+BUG: Shape color previews have a rendering glitch, a small rectangle inside the preview.
+REQUEST: Configurable textbox padding (under "advanced text")
+REQUEST: Brightness / Contrast / Hue adjustment for images.
+BUG: Manipulators grow/shrink with the canvas zoom; should be constant size.
+REQUEST: Default corner radius to 0, text color to white
+BUG: weird canvas edge
+REQUEST: Blinding white flash

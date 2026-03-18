@@ -30,11 +30,15 @@ export default function App() {
       handleSave,
       redo,
       reorderSelectedItem,
+      selectAllItems,
       selectSingleItem,
       setActiveTool,
       setCanvasSize,
+      toggleSelectedItem,
+      toggleSelectedItems,
       undo,
       updateSelectedItem,
+      updateSelectedItems,
     },
     state: {
       activeTool,
@@ -46,6 +50,7 @@ export default function App() {
       missingFontFamilies,
       selectedItem,
       selectedItemIds,
+      selectedItems,
     },
   } = useEditorController();
 
@@ -80,9 +85,12 @@ export default function App() {
           guides={guides}
           onGuidesChange={setGuides}
           onSelectItem={selectSingleItem}
+          onToggleSelectItem={toggleSelectedItem}
+          onToggleSelectItems={toggleSelectedItems}
           onUpdateItem={(itemId, changes) => {
             dispatch({ type: 'update_item', itemId, changes });
           }}
+          onUpdateItems={updateSelectedItems}
           onAddItem={(item) => dispatch({ type: 'add_item', item })}
           onSetActiveTool={setActiveTool}
           stageRef={stageRef}
@@ -133,9 +141,16 @@ export default function App() {
                 items={document.items}
                 missingFontFamilies={missingFontFamilies}
                 selectedItem={selectedItem ?? undefined}
+                selectedItems={selectedItems}
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onDeleteItem={deleteItem}
-                onItemChange={(changes: Partial<CanvasItem>) => updateSelectedItem(changes)}
+                onItemChange={(changes: Partial<CanvasItem>) => {
+                  if (selectedItems.length > 1) {
+                    updateSelectedItems(selectedItems.map((item) => ({ itemId: item.id, changes })));
+                    return;
+                  }
+                  updateSelectedItem(changes);
+                }}
                 onSelectItem={selectSingleItem}
                 onReorder={reorderSelectedItem}
               />

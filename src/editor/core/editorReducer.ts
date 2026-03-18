@@ -8,6 +8,8 @@ import {
   DEFAULT_ITEM_SHADOW,
   sortByZIndex,
 } from '../document/documentDefaults';
+import { normalizeImageAdjustments } from '../document/imageAdjustments';
+import { normalizeTextPadding } from '../document/textPadding';
 import type {
   CanvasItem,
   CanvasItemKind,
@@ -40,6 +42,7 @@ import {
   type SessionAction,
   type TransactionAction,
 } from './editorActions';
+import { reorderItemsBySelection } from './reorderItems';
 
 function clampFinite(
   value: number,
@@ -104,6 +107,7 @@ function normalizeItem(item: CanvasItem): CanvasItem {
         fontSize: clampFinite(item.fontSize, 1, 1),
         lineHeight: clampFinite(item.lineHeight, 1, 0.1),
         letterSpacing: clampFinite(item.letterSpacing ?? 0, 0),
+        padding: normalizeTextPadding(item.padding),
       };
       return normalizedTextItem;
     }
@@ -125,6 +129,7 @@ function normalizeItem(item: CanvasItem): CanvasItem {
         originalWidth: clampFinite(item.originalWidth, 1, 1),
         originalHeight: clampFinite(item.originalHeight, 1, 1),
         preserveAspectRatio: Boolean(item.preserveAspectRatio),
+        adjustments: normalizeImageAdjustments(item.adjustments),
       };
       return normalizedImageItem;
     }
@@ -321,6 +326,12 @@ export function applyDocumentCommand(
       nextDocument = {
         ...document,
         items: reorderItems(document.items, command.itemId, command.mode),
+      };
+      break;
+    case 'reorder_items':
+      nextDocument = {
+        ...document,
+        items: reorderItemsBySelection(document.items, command.itemIds, command.mode),
       };
       break;
     case 'register_font': {

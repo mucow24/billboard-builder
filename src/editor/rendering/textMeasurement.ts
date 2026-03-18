@@ -1,11 +1,16 @@
 import { getRenderableCanvasFontDeclaration } from '../fonts/fontStyles';
 import type { TextCanvasItem } from '../document/documentTypes';
 
+function getTextContentWidth(item: TextCanvasItem, width: number): number {
+  return Math.max(1, width - item.padding.left - item.padding.right);
+}
+
 export function measureWordWrappedTextHeight(
   item: TextCanvasItem,
   width: number
 ) {
-  const safeWidth = Math.max(1, width);
+  const safeWidth = getTextContentWidth(item, width);
+  const verticalPadding = item.padding.top + item.padding.bottom;
   const fallbackLineHeight = Math.ceil(item.fontSize * item.lineHeight);
   const paragraphs = item.text.split('\n');
   const isJsdom =
@@ -24,7 +29,7 @@ export function measureWordWrappedTextHeight(
       const length = Math.max(paragraph.length, 1);
       return total + Math.max(1, Math.ceil(length / estimatedCharsPerLine));
     }, 0);
-    return Math.max(item.height, estimatedLineCount * fallbackLineHeight);
+    return Math.max(item.height, verticalPadding + estimatedLineCount * fallbackLineHeight);
   }
 
   context.font = getRenderableCanvasFontDeclaration(item);
@@ -65,5 +70,5 @@ export function measureWordWrappedTextHeight(
     }
   }
 
-  return Math.max(1, Math.ceil(lineCount * item.fontSize * item.lineHeight));
+  return Math.max(1, Math.ceil(verticalPadding + lineCount * item.fontSize * item.lineHeight));
 }

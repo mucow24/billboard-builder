@@ -56,4 +56,103 @@ describe('text measurement', () => {
       value: originalNavigator,
     });
   });
+
+
+  it('measures wrapping against the inner content width after horizontal padding', () => {
+    const text = 'One two three four five six seven eight nine ten eleven twelve.';
+    const heightWithPadding = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 96,
+        text,
+        padding: { top: 0, right: 24, bottom: 0, left: 24 },
+      }),
+      120,
+    );
+    const heightWithoutPadding = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 96,
+        text,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      }),
+      120,
+    );
+
+    expect(heightWithPadding).toBeGreaterThan(heightWithoutPadding);
+  });
+
+  it('adds vertical padding to the measured text height', () => {
+    const text = 'alpha beta gamma delta epsilon zeta';
+    const baseHeight = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 24,
+        text,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      }),
+      120,
+    );
+    const paddedHeight = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 24,
+        text,
+        padding: { top: 12, right: 0, bottom: 18, left: 0 },
+      }),
+      120,
+    );
+
+    expect(paddedHeight).toBe(baseHeight + 30);
+  });
+
+
+  it('supports negative horizontal padding by widening the inner content width', () => {
+    const text = 'One two three four five six seven eight nine ten eleven twelve.';
+    const heightWithNegativePadding = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 96,
+        text,
+        padding: { top: 0, right: -24, bottom: 0, left: -24 },
+      }),
+      120,
+    );
+    const heightWithoutPadding = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 96,
+        text,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      }),
+      120,
+    );
+
+    expect(heightWithNegativePadding).toBeLessThan(heightWithoutPadding);
+  });
+
+  it('supports negative vertical padding by reducing the measured total height', () => {
+    const text = 'alpha beta gamma delta epsilon zeta';
+    const baseHeight = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 24,
+        text,
+        padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      }),
+      120,
+    );
+    const paddedHeight = measureWordWrappedTextHeight(
+      createTextItem({
+        width: 320,
+        height: 24,
+        text,
+        padding: { top: -12, right: 0, bottom: -18, left: 0 },
+      }),
+      120,
+    );
+
+    expect(paddedHeight).toBe(baseHeight - 30);
+  });
+
 });

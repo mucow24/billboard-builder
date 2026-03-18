@@ -1,4 +1,11 @@
-import { createDefaultProjectDocument, DEFAULT_ITEM_SHADOW, normalizeZIndices, sortByZIndex } from './documentDefaults';
+import {
+  createDefaultProjectDocument,
+  DEFAULT_ITEM_SHADOW,
+  normalizeZIndices,
+  sortByZIndex,
+} from './documentDefaults';
+import { normalizeImageAdjustments } from './imageAdjustments';
+import { normalizeTextPadding } from './textPadding';
 import type { CanvasItem, CanvasShadow, ProjectDocumentV1 } from './documentTypes';
 
 function normalizeShadow(shadow: Partial<CanvasShadow> | undefined): CanvasShadow {
@@ -9,6 +16,22 @@ function normalizeShadow(shadow: Partial<CanvasShadow> | undefined): CanvasShado
 }
 
 function normalizeItem(item: CanvasItem): CanvasItem {
+  if (item.kind === 'image') {
+    return {
+      ...item,
+      shadow: normalizeShadow(item.shadow),
+      adjustments: normalizeImageAdjustments(item.adjustments),
+    } as CanvasItem;
+  }
+
+  if (item.kind === 'text') {
+    return {
+      ...item,
+      shadow: normalizeShadow(item.shadow),
+      padding: normalizeTextPadding(item.padding),
+    } as CanvasItem;
+  }
+
   return {
     ...item,
     shadow: normalizeShadow(item.shadow),
@@ -16,7 +39,7 @@ function normalizeItem(item: CanvasItem): CanvasItem {
 }
 
 export function normalizeProjectDocument(
-  input: Partial<ProjectDocumentV1> | undefined
+  input: Partial<ProjectDocumentV1> | undefined,
 ): ProjectDocumentV1 {
   const baseDocument = createDefaultProjectDocument();
   const items = normalizeZIndices(sortByZIndex((input?.items ?? []).map(normalizeItem)));

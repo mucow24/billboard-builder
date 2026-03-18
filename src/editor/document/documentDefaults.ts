@@ -1,3 +1,6 @@
+import { DEFAULT_IMAGE_ADJUSTMENTS } from './imageAdjustments';
+import { DEFAULT_TEXT_PADDING } from './textPadding';
+
 import type {
   BaseCanvasItem,
   CanvasItem,
@@ -102,11 +105,12 @@ export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasIt
     fontSize: 42,
     fontStyle: 'normal',
     fontWeight: 'normal',
-    fill: '#111827',
+    fill: '#ffffff',
     align: 'left',
     verticalAlign: 'top',
     lineHeight: 1.1,
     letterSpacing: 0,
+    padding: { ...DEFAULT_TEXT_PADDING },
     ...position,
   };
 }
@@ -119,7 +123,7 @@ export function createRectangleItem(
     fill: '#f97316',
     stroke: '#c2410cff',
     strokeWidth: 0,
-    cornerRadius: 16,
+    cornerRadius: 0,
     ...position,
   };
 }
@@ -173,26 +177,27 @@ export function createImageItem(params: {
     originalWidth: params.originalWidth,
     originalHeight: params.originalHeight,
     preserveAspectRatio: true,
+    adjustments: { ...DEFAULT_IMAGE_ADJUSTMENTS },
   };
 }
 
-export function cloneCanvasItem(item: CanvasItem): CanvasItem {
+export function cloneCanvasItem(item: CanvasItem, offset = DUPLICATE_ITEM_OFFSET): CanvasItem {
   const nextId = crypto.randomUUID();
   const basePosition = {
-    x: item.x + DUPLICATE_ITEM_OFFSET,
-    y: item.y + DUPLICATE_ITEM_OFFSET,
+    x: item.x + offset,
+    y: item.y + offset,
   };
 
   if (item.kind === 'line') {
     return {
       ...item,
       id: nextId,
-      x: item.x + DUPLICATE_ITEM_OFFSET,
-      y: item.y + DUPLICATE_ITEM_OFFSET,
-      startX: item.startX + DUPLICATE_ITEM_OFFSET,
-      startY: item.startY + DUPLICATE_ITEM_OFFSET,
-      endX: item.endX + DUPLICATE_ITEM_OFFSET,
-      endY: item.endY + DUPLICATE_ITEM_OFFSET,
+      x: item.x + offset,
+      y: item.y + offset,
+      startX: item.startX + offset,
+      startY: item.startY + offset,
+      endX: item.endX + offset,
+      endY: item.endY + offset,
     };
   }
 

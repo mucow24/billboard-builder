@@ -220,6 +220,36 @@ describe('useEditorShortcuts', () => {
     });
   });
 
+
+  it('offsets repeated pastes cumulatively for the same clipboard payload', () => {
+    const copiedItem = createRectangleItem({ x: 10, y: 20 });
+    const harness = createShortcutHarness();
+    const clipboardData = makeClipboardData();
+
+    writeSelectionToClipboardData(clipboardData, [copiedItem]);
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchPaste(document.body, clipboardData);
+    dispatchPaste(document.body, clipboardData);
+
+    expect(harness.dispatch).toHaveBeenCalledTimes(2);
+    expect(harness.dispatch.mock.calls[0][0]).toMatchObject({
+      type: 'add_item',
+      item: expect.objectContaining({
+        x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
+        y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
+      }),
+    });
+    expect(harness.dispatch.mock.calls[1][0]).toMatchObject({
+      type: 'add_item',
+      item: expect.objectContaining({
+        x: copiedItem.x + DUPLICATE_ITEM_OFFSET * 2,
+        y: copiedItem.y + DUPLICATE_ITEM_OFFSET * 2,
+      }),
+    });
+  });
+
   it('ignores paste events from editable targets', () => {
     const imageFile = new File(['image'], 'clipboard.png', { type: 'image/png' });
     const harness = createShortcutHarness();

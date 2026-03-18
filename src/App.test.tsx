@@ -8,6 +8,7 @@ import { APP_CLIPBOARD_MIME_TYPE } from './app/clipboard';
 import {
   DUPLICATE_ITEM_OFFSET,
   createDefaultProjectDocument,
+  createImageItem,
   createRectangleItem,
 } from './editor/document/documentDefaults';
 import { useEditorStore } from './editor/state/store';
@@ -175,6 +176,72 @@ describe('App shell', () => {
 
     const latestSavedDocument = mockCanvasPersistenceService.save.mock.calls.at(-1)?.[0];
     expect(latestSavedDocument.items).toHaveLength(1);
+  });
+
+
+  it('persists image adjustments in the latest autosaved canvas snapshot', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+    imageItem.adjustments = {
+      brightness: 140,
+      contrast: 20,
+      tintColor: '#123456',
+      tintStrength: 60,
+    };
+
+    act(() => {
+      useEditorStore.getState().dispatch({ type: 'add_item', item: imageItem });
+    });
+
+    await waitFor(() => {
+      const latestSavedDocument = mockCanvasPersistenceService.save.mock.calls.at(-1)?.[0];
+      expect(latestSavedDocument.items[0]).toMatchObject({
+        kind: 'image',
+        adjustments: {
+          brightness: 140,
+          contrast: 20,
+          tintColor: '#123456',
+          tintStrength: 60,
+        },
+      });
+    });
+  });
+
+
+  it('applies multi-selection opacity changes to every selected item', async () => {
+    const first = createRectangleItem({ id: 'first', opacity: 0.2 });
+    const second = createRectangleItem({ id: 'second', opacity: 0.8, x: 200 });
+
+    useEditorStore.setState({
+      document: { ...createDefaultProjectDocument(), items: [first, second] },
+      activeTool: 'select',
+      availableFonts: [],
+      missingFontFamilies: [],
+      exportScale: 1,
+      selectedItemIds: [first.id, second.id],
+      historyPast: [],
+      historyFuture: [],
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText('Mixed')).toBeInTheDocument();
+    const opacityInput = await screen.findByLabelText('Opacity');
+    fireEvent.change(opacityInput, { target: { value: '0.5' } });
+
+    const updatedItems = useEditorStore.getState().document.items;
+    expect(updatedItems.find((item) => item.id === first.id)?.opacity).toBe(0.5);
+    expect(updatedItems.find((item) => item.id === second.id)?.opacity).toBe(0.5);
   });
 
   it('supports global tool hotkeys', async () => {

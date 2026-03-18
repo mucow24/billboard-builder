@@ -188,6 +188,76 @@ describe('PropertiesPanel', () => {
     });
   });
 
+
+  it('allows non-line stroke width controls to reach zero', () => {
+    const onItemChange = vi.fn();
+    const rectangleItem = createRectangleItem({
+      strokeWidth: 4,
+    });
+
+    render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[rectangleItem]}
+        missingFontFamilies={[]}
+        selectedItem={rectangleItem}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={onItemChange}
+        onSelectItem={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText('Stroke width'), {
+      target: { value: '0' },
+    });
+
+    expect(onItemChange).toHaveBeenCalledWith({ strokeWidth: 0 });
+  });
+
+  it('shows image opacity in the Image section instead of Geometry', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+      originalWidth: 20,
+      originalHeight: 10,
+    });
+    imageItem.opacity = 0.4;
+
+    render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[imageItem]}
+        missingFontFamilies={[]}
+        selectedItem={imageItem}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={onItemChange}
+        onSelectItem={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    const imageSection = screen.getByRole('button', { name: 'Image' }).closest('section');
+    expect(imageSection).not.toBeNull();
+    fireEvent.change(within(imageSection!).getByLabelText('Opacity'), {
+      target: { value: '2' },
+    });
+    expect(onItemChange).toHaveBeenCalledWith({ opacity: 1 });
+
+    await user.click(screen.getByRole('button', { name: /Geometry/i }));
+    const geometrySection = screen.getByRole('button', { name: /Geometry/i }).closest('section');
+    expect(geometrySection).not.toBeNull();
+    expect(within(geometrySection!).queryByLabelText('Opacity')).not.toBeInTheDocument();
+  });
+
   it('renders line and image specific controls', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
@@ -239,7 +309,60 @@ describe('PropertiesPanel', () => {
     );
 
     await user.click(screen.getByLabelText('Preserve aspect ratio'));
+    fireEvent.change(screen.getByRole('slider', { name: 'Brightness' }), { target: { value: '220' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Contrast' }), { target: { value: '-1' } });
+    fireEvent.change(screen.getByRole('slider', { name: 'Tint strength' }), { target: { value: '60' } });
     expect(onItemChange).toHaveBeenCalledWith({ preserveAspectRatio: false });
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, brightness: 200 } });
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, contrast: 0 } });
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, tintStrength: 60 } });
+  });
+
+  it('snaps brightness and contrast sliders to their neutral detents while leaving manual entry precise', () => {
+    const onItemChange = vi.fn();
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+      originalWidth: 20,
+      originalHeight: 10,
+    });
+
+    render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[imageItem]}
+        missingFontFamilies={[]}
+        selectedItem={imageItem}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={onItemChange}
+        onSelectItem={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    const brightnessSlider = screen.getByRole('slider', { name: 'Brightness' });
+    const contrastSlider = screen.getByRole('slider', { name: 'Contrast' });
+    const tintStrengthSlider = screen.getByRole('slider', { name: 'Tint strength' });
+
+    expect(brightnessSlider).toHaveAttribute('min', '0');
+    expect(brightnessSlider).toHaveAttribute('max', '200');
+    expect(contrastSlider).toHaveAttribute('min', '0');
+    expect(contrastSlider).toHaveAttribute('max', '100');
+    expect(tintStrengthSlider).toHaveAttribute('min', '0');
+    expect(tintStrengthSlider).toHaveAttribute('max', '100');
+
+    fireEvent.change(brightnessSlider, { target: { value: '98' } });
+    fireEvent.change(contrastSlider, { target: { value: '49' } });
+    fireEvent.change(tintStrengthSlider, { target: { value: '49' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Brightness value' }), { target: { value: '98' } });
+
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, brightness: 100 } });
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, contrast: 50 } });
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, tintStrength: 49 } });
+    expect(onItemChange).toHaveBeenCalledWith({ adjustments: { ...imageItem.adjustments, brightness: 98 } });
   });
 
   it('wires the reusable color picker for canvas and shape colors', async () => {
@@ -406,4 +529,82 @@ describe('PropertiesPanel', () => {
     expect(screen.getByRole('button', { name: 'Italic' })).toBeEnabled();
   });
 
+
+
+
+  it('allows negative text padding values from the Advanced text section', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const textItem = createTextItem();
+
+    render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[textItem]}
+        missingFontFamilies={[]}
+        selectedItem={textItem}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={onItemChange}
+        onSelectItem={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Advanced text' }));
+
+    fireEvent.change(screen.getByLabelText('Padding top'), { target: { value: '-12' } });
+    fireEvent.change(screen.getByLabelText('Padding left'), { target: { value: '-24' } });
+
+    expect(onItemChange).toHaveBeenCalledWith({
+      padding: { top: -12, right: 0, bottom: 0, left: 0 },
+    });
+    expect(onItemChange).toHaveBeenCalledWith({
+      padding: { top: 0, right: 0, bottom: 0, left: -24 },
+    });
+  });
+
+  it('updates text padding from the Advanced text section', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const textItem = createTextItem();
+
+    render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[textItem]}
+        missingFontFamilies={[]}
+        selectedItem={textItem}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={onItemChange}
+        onSelectItem={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Advanced text' }));
+
+    fireEvent.change(screen.getByLabelText('Padding top'), { target: { value: '12' } });
+    fireEvent.change(screen.getByLabelText('Padding right'), { target: { value: '16' } });
+    fireEvent.change(screen.getByLabelText('Padding bottom'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Padding left'), { target: { value: '24' } });
+
+    expect(onItemChange).toHaveBeenCalledWith({
+      padding: { top: 12, right: 0, bottom: 0, left: 0 },
+    });
+    expect(onItemChange).toHaveBeenCalledWith({
+      padding: { top: 0, right: 16, bottom: 0, left: 0 },
+    });
+    expect(onItemChange).toHaveBeenCalledWith({
+      padding: { top: 0, right: 0, bottom: 20, left: 0 },
+    });
+    expect(onItemChange).toHaveBeenCalledWith({
+      padding: { top: 0, right: 0, bottom: 0, left: 24 },
+    });
+  });
 });
