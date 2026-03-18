@@ -336,6 +336,19 @@ export async function beginCanvasHookDrag(page: Page, testId: string) {
   });
 }
 
+export async function beginCanvasHookMiddleDrag(page: Page, testId: string) {
+  const locator = page.getByTestId(testId);
+  const start = await hookCenter(locator);
+  await page.mouse.move(start.x, start.y);
+  await locator.dispatchEvent('mousedown', {
+    button: 1,
+    buttons: 4,
+    bubbles: true,
+    clientX: start.x,
+    clientY: start.y,
+  });
+}
+
 export async function dragCanvasHookToPoint(
   page: Page,
   testId: string,

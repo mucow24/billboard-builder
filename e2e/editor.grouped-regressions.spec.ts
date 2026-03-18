@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   beginCanvasHookDrag,
+  beginCanvasHookMiddleDrag,
   beginVisibleCanvasDrag,
   canvasPointToPage,
   createProjectDocument,
@@ -11,6 +12,7 @@ import {
   movePointerToPagePoint,
   openFreshEditor,
   readRenderSnapshot,
+  readStageDebug,
   releasePointer,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -199,6 +201,72 @@ test.describe('grouped manipulation regressions', () => {
     const dragPreview = await readRenderSnapshot(page);
     assertRenderSelectionUiVisible(dragPreview, 'regrab preview');
     assertRenderItemsFollowFrameTransform(baseline, dragPreview, 'regrab preview', 'drag');
+  });
+
+  test('pans the viewport when middle-dragging from the multi-select overlay or handles', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, rectangleGroupFixture, 'grouped-middle-pan.json');
+    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+
+    const initial = await readStageDebug(page);
+
+    await beginCanvasHookMiddleDrag(page, 'canvas-group-overlay');
+    await movePointerToPagePoint(page, { x: 420, y: 320 });
+    await releasePointer(page);
+
+    const afterOverlayPan = await readStageDebug(page);
+    expect(afterOverlayPan.viewport.panX).not.toBe(initial.viewport.panX);
+    expect(afterOverlayPan.viewport.panY).not.toBe(initial.viewport.panY);
+    expect(afterOverlayPan.sessionKind).toBeNull();
+
+    await beginCanvasHookMiddleDrag(page, 'canvas-group-handle-middle-right');
+    await movePointerToPagePoint(page, { x: 470, y: 350 });
+    await releasePointer(page);
+
+    const afterHandlePan = await readStageDebug(page);
+    expect(afterHandlePan.viewport.panX).not.toBe(afterOverlayPan.viewport.panX);
+    expect(afterHandlePan.viewport.panY).not.toBe(afterOverlayPan.viewport.panY);
+    expect(afterHandlePan.sessionKind).toBeNull();
+  });
+
+  test('snaps multi-select drag and resize interactions with the same guide behavior as single-item transforms', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, rectangleGroupFixture, 'grouped-snap-regression.json');
+    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+
+    let baseline = await readRenderSnapshot(page);
+    const initialFrame = requireRenderGroupFrame(baseline, 'initial snap baseline');
+    const dragDestination = {
+      x: initialFrame.center.x + (4 - initialFrame.x),
+      y: initialFrame.center.y,
+    };
+
+    await beginCanvasHookDrag(page, 'canvas-group-overlay');
+    await movePointerToCanvasPoint(page, dragDestination);
+    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-drag');
+
+    let snapshot = await readRenderSnapshot(page);
+    assertRenderSelectionUiVisible(snapshot, 'snapped drag preview');
+    expect(requireRenderGroupFrame(snapshot, 'snapped drag preview').x).toBeCloseTo(0, 1);
+    await releasePointer(page);
+
+    baseline = await readRenderSnapshot(page);
+    expect(requireRenderGroupFrame(baseline, 'snapped drag commit').x).toBeCloseTo(0, 1);
+
+    const resizedBaseline = requireRenderGroupFrame(baseline, 'snapped resize baseline');
+    const resizeDestination = {
+      x: 508,
+      y: resizedBaseline.center.y,
+    };
+
+    await beginCanvasHookDrag(page, 'canvas-group-handle-middle-right');
+    await movePointerToCanvasPoint(page, resizeDestination);
+    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
+
+    snapshot = await readRenderSnapshot(page);
+    assertRenderSelectionUiVisible(snapshot, 'snapped resize preview');
+    const resizedFrame = requireRenderGroupFrame(snapshot, 'snapped resize preview');
+    expect(resizedFrame.x + resizedFrame.width).toBeCloseTo(512, 1);
   });
 
   test('keeps real visible handle interactions aligned after rotate and handle switching', async ({ page }) => {

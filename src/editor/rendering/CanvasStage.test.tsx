@@ -366,6 +366,94 @@ describe('CanvasStage viewport controls', () => {
     );
   });
 
+  it('starts a pan drag instead of group drag when middle-clicking the group overlay hook', () => {
+    const document = createDefaultProjectDocument();
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+    document.items = [first, second];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [first, second],
+      renderedSelectedItems: [first, second],
+      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
+      renderedSelectionFrame: { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 0 },
+      selectedItemId: first.id,
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[first.id, second.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const overlayHook = screen.getByTestId('canvas-group-overlay');
+    const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+
+    fireEvent.mouseDown(overlayHook, { button: 1, clientX: 300, clientY: 220 });
+    fireEvent.mouseMove(window, { clientX: 360, clientY: 270 });
+
+    const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(mockInteractionSession.beginGroupDrag).not.toHaveBeenCalled();
+    expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
+    expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
+
+    fireEvent.mouseUp(window);
+    expect(window.document.body.style.cursor).toBe('');
+    expect(container.querySelector('[data-testid="canvas-group-overlay"]')).not.toBeNull();
+  });
+
+  it('starts a pan drag instead of group resize when middle-clicking a group handle hook', () => {
+    const document = createDefaultProjectDocument();
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+    document.items = [first, second];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [first, second],
+      renderedSelectedItems: [first, second],
+      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
+      renderedSelectionFrame: { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 0 },
+      selectedItemId: first.id,
+    });
+
+    render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[first.id, second.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onUpdateItems={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const handleHook = screen.getByTestId('canvas-group-handle-middle-right');
+    const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+
+    fireEvent.mouseDown(handleHook, { button: 1, clientX: 360, clientY: 220 });
+    fireEvent.mouseMove(window, { clientX: 410, clientY: 260 });
+
+    const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(mockInteractionSession.beginGroupResize).not.toHaveBeenCalled();
+    expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
+    expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
+  });
+
   it('uses preview group bounds during rotated drag and resize sessions', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });

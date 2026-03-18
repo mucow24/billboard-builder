@@ -24,6 +24,7 @@ import {
   itemIntersectsSelectionRect,
   type RenderBox,
 } from './transformGeometry';
+import { getResizeSnappedRect, getSnappedRect } from './snapping';
 import type {
   CanvasItem,
   CanvasTool,
@@ -95,6 +96,7 @@ interface GroupSessionBase extends InteractionSessionBase {
   itemIds: string[];
   originalItems: CanvasItem[];
   previewItems: CanvasItem[];
+  siblingItems: CanvasItem[];
   bounds: RenderBox;
   frameRotation: number;
 }
@@ -175,6 +177,55 @@ function normalizeRectFromPoints(start: Point, current: Point): RenderBox {
     y: Math.min(start.y, current.y),
     width: Math.max(1, Math.abs(current.x - start.x)),
     height: Math.max(1, Math.abs(current.y - start.y)),
+  };
+}
+
+function getGroupResizeRect(bounds: RenderBox, handle: ResizeHandle, pointer: Point): RenderBox {
+  const edges = {
+    left: bounds.x,
+    right: bounds.x + bounds.width,
+    top: bounds.y,
+    bottom: bounds.y + bounds.height,
+  };
+
+  if (handle.includes('left')) {
+    edges.left = pointer.x;
+  }
+  if (handle.includes('right')) {
+    edges.right = pointer.x;
+  }
+  if (handle.includes('top')) {
+    edges.top = pointer.y;
+  }
+  if (handle.includes('bottom')) {
+    edges.bottom = pointer.y;
+  }
+  if (handle === 'top-center' || handle === 'bottom-center') {
+    edges.left = bounds.x;
+    edges.right = bounds.x + bounds.width;
+  }
+  if (handle === 'middle-left' || handle === 'middle-right') {
+    edges.top = bounds.y;
+    edges.bottom = bounds.y + bounds.height;
+  }
+
+  return {
+    x: edges.left,
+    y: edges.top,
+    width: edges.right - edges.left,
+    height: edges.bottom - edges.top,
+  };
+}
+
+function getGroupResizePointer(rect: RenderBox, handle: ResizeHandle, bounds: RenderBox): Point {
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+
+  return {
+    x: handle.includes('left') ? rect.x : handle.includes('right') ? right : centerX,
+    y: handle.includes('top') ? rect.y : handle.includes('bottom') ? bottom : centerY,
   };
 }
 
@@ -336,28 +387,62 @@ export function useCanvasInteractionSession({
       }
       case 'marquee':
         return { ...current, currentPointer: pointer };
-      case 'group-drag':
+      case 'group-drag': {
+        const rawRect = {
+          x: current.bounds.x + (pointer.x - current.pointerStart.x),
+          y: current.bounds.y + (pointer.y - current.pointerStart.y),
+          width: current.bounds.width,
+          height: current.bounds.height,
+        };
+        const snapped = current.snapDisabled
+          ? { rect: rawRect, guides: [] }
+          : getSnappedRect(rawRect, current.siblingItems, stageBounds);
+        const resolvedPointer = {
+          x: current.pointerStart.x + (snapped.rect.x - current.bounds.x),
+          y: current.pointerStart.y + (snapped.rect.y - current.bounds.y),
+        };
         return {
           ...current,
-          currentPointer: pointer,
+          currentPointer: resolvedPointer,
+          guides: snapped.guides,
           previewItems: buildGroupDragPreviews(
             current.originalItems,
-            pointer.x - current.pointerStart.x,
-            pointer.y - current.pointerStart.y
+            snapped.rect.x - current.bounds.x,
+            snapped.rect.y - current.bounds.y
           ),
         };
-      case 'group-resize':
+      }
+      case 'group-resize': {
+        if (current.snapDisabled || Math.abs(current.frameRotation) >= 0.001) {
+          return {
+            ...current,
+            currentPointer: pointer,
+            guides: [],
+            previewItems: buildGroupResizePreviews(
+              current.originalItems,
+              current.bounds,
+              current.handle,
+              pointer,
+              current.frameRotation
+            ),
+          };
+        }
+        const rawRect = getGroupResizeRect(current.bounds, current.handle, pointer);
+        const snapped = getResizeSnappedRect(rawRect, current.siblingItems, stageBounds, current.handle);
+        const resolvedPointer = getGroupResizePointer(snapped.rect, current.handle, current.bounds);
         return {
           ...current,
-          currentPointer: pointer,
+          currentPointer: resolvedPointer,
+          guides: snapped.guides,
           previewItems: buildGroupResizePreviews(
             current.originalItems,
             current.bounds,
             current.handle,
-            pointer,
+            resolvedPointer,
             current.frameRotation
           ),
         };
+      }
       case 'group-rotate':
         return { ...current, currentPointer: pointer, previewItems: buildGroupRotatePreviews(current.originalItems, current.bounds, current.pointerStart, pointer, Boolean(currentWithModifiers.shiftConstrain)) };
     }
@@ -452,7 +537,17 @@ export function useCanvasInteractionSession({
       if (!current) {
         return;
       }
-      const next = resolveSession({ ...current, snapDisabled: current.kind === 'drag' || current.kind === 'line-handle' ? event.ctrlKey : current.snapDisabled, shiftConstrain: event.shiftKey } as SessionWithModifiers, pointer);
+      const next = resolveSession({
+        ...current,
+        snapDisabled:
+          current.kind === 'drag' ||
+          current.kind === 'line-handle' ||
+          current.kind === 'group-drag' ||
+          current.kind === 'group-resize'
+            ? event.ctrlKey
+            : current.snapDisabled,
+        shiftConstrain: event.shiftKey,
+      } as SessionWithModifiers, pointer);
       pendingMarqueeRef.current = null;
       onGuidesChange(next.guides);
       updateSession(next);
@@ -488,13 +583,15 @@ export function useCanvasInteractionSession({
       itemIds: selectedItems.map((item) => item.id),
       originalItems: selectedItems,
       previewItems: selectedItems,
+      siblingItems: orderedItems.filter((entry) => !selectedIdSet.has(entry.id)),
       bounds: activeSelectionFrame.bounds,
       frameRotation: activeSelectionFrame.rotation,
       pointerStart: pointer,
       currentPointer: pointer,
       guides: [],
+      snapDisabled: false,
     });
-  }, [activeSelectionFrame, selectedItems, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedIdSet, selectedItems, updateSession]);
 
   const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
     const handlePoint = getShapeHandlePoints(item)[handle];
@@ -508,14 +605,16 @@ export function useCanvasInteractionSession({
       itemIds: selectedItems.map((item) => item.id),
       originalItems: selectedItems,
       previewItems: selectedItems,
+      siblingItems: orderedItems.filter((entry) => !selectedIdSet.has(entry.id)),
       bounds: activeSelectionFrame.bounds,
       frameRotation: activeSelectionFrame.rotation,
       pointerStart: pointer,
       currentPointer: pointer,
       handle,
       guides: [],
+      snapDisabled: false,
     });
-  }, [activeSelectionFrame, selectedItems, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedIdSet, selectedItems, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point) => {
     updateSession({ kind: 'rotate', itemId: item.id, originalItem: item, previewItem: item, siblingItems: orderedItems.filter((entry) => entry.id !== item.id), pointerStart: pointer, handle: 'rotater', guides: [], snapDisabled: false });
@@ -523,8 +622,20 @@ export function useCanvasInteractionSession({
 
   const beginGroupRotate = useCallback((pointer: Point) => {
     if (!activeSelectionFrame || selectedItems.length <= 1) return;
-    updateSession({ kind: 'group-rotate', itemIds: selectedItems.map((item) => item.id), originalItems: selectedItems, previewItems: selectedItems, bounds: activeSelectionFrame.bounds, frameRotation: activeSelectionFrame.rotation, pointerStart: pointer, currentPointer: pointer, handle: 'rotater', guides: [] });
-  }, [activeSelectionFrame, selectedItems, updateSession]);
+    updateSession({
+      kind: 'group-rotate',
+      itemIds: selectedItems.map((item) => item.id),
+      originalItems: selectedItems,
+      previewItems: selectedItems,
+      siblingItems: orderedItems.filter((entry) => !selectedIdSet.has(entry.id)),
+      bounds: activeSelectionFrame.bounds,
+      frameRotation: activeSelectionFrame.rotation,
+      pointerStart: pointer,
+      currentPointer: pointer,
+      handle: 'rotater',
+      guides: [],
+    });
+  }, [activeSelectionFrame, orderedItems, selectedIdSet, selectedItems, updateSession]);
 
   const beginLineHandle = useCallback((item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => {
     const rect = getLineHandleRects(item)[handle];

@@ -8,36 +8,35 @@ REQUEST: Integrate generators
 Big ones:
 P0:
 P1:
-REQUEST: Rich text fields
+  REQUEST: Rich text fields
 P2:
-REQUEST: Templates
+  REQUEST: Templates
 P3:
 
 Medium:
 P0:
 P1:
-REQUEST: Crop images
+  REQUEST: Crop images
 P2:
-REDESIGN: Densification of properties panel.
-REDESIGN: Densification of layers panel.
-REQUEST: Make content off-canvas be visible "under" the background, with blurring and translucency.
-REQUEST: Drag and drop layers with autoscroll, insertion line, animations, etc.
+  REDESIGN: Densification of properties panel.
+  REDESIGN: Densification of layers panel.
+  REQUEST: Make content off-canvas be visible "under" the background, with blurring and translucency.
+  REQUEST: Drag and drop layers with autoscroll, insertion line, animations, etc.
 
 Small:
 P0:
-BUG: Middle-drag doesn't work on the selection box
-BUG: Multi-selections don't snap to guides
 P1:
-REQUEST: Grouping
+  REQUEST: Grouping
 P2:
 
 
-Make layer panel entries span the whole width, always show the delete button
 
 IN PROGRESS:
-REQUEST: Multi-select / copy / paste / manipulate
 
 DONE:
+REQUEST: Multi-select / copy / paste / manipulate
+BUG: Middle-drag doesn't work on the selection box
+BUG: Multi-selections don't snap to guides
 REQUEST: Image opacity slider
 BUG: Shape color previews always show the stroke color, even if stroke width is 0.
 BUG: Shape color previews have a rendering glitch, a small rectangle inside the preview.

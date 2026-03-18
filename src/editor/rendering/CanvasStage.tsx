@@ -673,6 +673,14 @@ export function CanvasStage({
     };
   }, []);
 
+  const startPanDrag = useCallback((startPointer: Point) => {
+    panDragRef.current = {
+      startPointer,
+      startPan: { ...panRef.current },
+    };
+    window.document.body.style.cursor = 'grabbing';
+  }, []);
+
   useEffect(() => {
     function stopPanDrag() {
       if (!panDragRef.current) {
@@ -1167,11 +1175,7 @@ export function CanvasStage({
           const pointer = stage?.getPointerPosition();
           if (pointer && isPanGesture(event.evt)) {
             event.evt.preventDefault();
-            panDragRef.current = {
-              startPointer: pointer,
-              startPan: { x: pan.x, y: pan.y },
-            };
-            window.document.body.style.cursor = 'grabbing';
+            startPanDrag(pointer);
             return;
           }
           if (activeTool === 'zoom' && pointer) {
@@ -1406,7 +1410,12 @@ export function CanvasStage({
                         fill={SHADOW_MIN_ALPHA_STROKE}
                         onMouseDown={(event) => {
                           const pointer = event.target.getStage()?.getPointerPosition();
-                          if (!pointer || event.evt.button === 1) {
+                          if (!pointer) {
+                            return;
+                          }
+                          if (event.evt.button === 1) {
+                            event.cancelBubble = true;
+                            startPanDrag(pointer);
                             return;
                           }
                           event.cancelBubble = true;
@@ -1435,7 +1444,12 @@ export function CanvasStage({
                             strokeWidth={2}
                             onMouseDown={(event) => {
                               const pointer = event.target.getStage()?.getPointerPosition();
-                              if (!pointer || event.evt.button === 1) {
+                              if (!pointer) {
+                                return;
+                              }
+                              if (event.evt.button === 1) {
+                                event.cancelBubble = true;
+                                startPanDrag(pointer);
                                 return;
                               }
                               event.cancelBubble = true;
@@ -1453,7 +1467,12 @@ export function CanvasStage({
                         strokeWidth={2}
                         onMouseDown={(event) => {
                           const pointer = event.target.getStage()?.getPointerPosition();
-                          if (!pointer || event.evt.button === 1) {
+                          if (!pointer) {
+                            return;
+                          }
+                          if (event.evt.button === 1) {
+                            event.cancelBubble = true;
+                            startPanDrag(pointer);
                             return;
                           }
                           event.cancelBubble = true;
@@ -1634,6 +1653,10 @@ export function CanvasStage({
             data-testid="canvas-group-overlay"
             onMouseDown={(event) => {
               if (event.button === 1) {
+                const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                if (pointer) {
+                  startPanDrag(pointer);
+                }
                 return;
               }
               setLastTestHookEvent('group-overlay');
@@ -1660,6 +1683,10 @@ export function CanvasStage({
                 data-testid={`canvas-group-handle-${handle}`}
                 onMouseDown={(event) => {
                   if (event.button === 1) {
+                    const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                    if (pointer) {
+                      startPanDrag(pointer);
+                    }
                     return;
                   }
                   setLastTestHookEvent(`group-handle-${handle}`);
@@ -1686,6 +1713,10 @@ export function CanvasStage({
             data-testid="canvas-group-rotater"
             onMouseDown={(event) => {
               if (event.button === 1) {
+                const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                if (pointer) {
+                  startPanDrag(pointer);
+                }
                 return;
               }
               setLastTestHookEvent('group-rotater');

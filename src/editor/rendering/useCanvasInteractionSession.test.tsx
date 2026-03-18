@@ -875,6 +875,160 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session?.kind).toBe('group-drag');
   });
 
+  it('snaps group drag previews and emits guides', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginGroupDrag({ x: 200, y: 120 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 104,
+          clientY: 120,
+        })
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('group-drag');
+    if (result.current.session?.kind !== 'group-drag') {
+      throw new Error('Expected group-drag session.');
+    }
+    expect(result.current.session.guides).toEqual([
+      expect.objectContaining({
+        orientation: 'vertical',
+        position: 0,
+      }),
+    ]);
+    expect(result.current.session.currentPointer).toEqual({ x: 100, y: 120 });
+    expect(result.current.renderedGroupBounds).toMatchObject({
+      x: 0,
+      y: 100,
+      width: 200,
+      height: 40,
+    });
+  });
+
+  it('disables group drag snapping while ctrl is held', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second]),
+      selectedItemIds: [first.id, second.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginGroupDrag({ x: 200, y: 120 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 104,
+          clientY: 120,
+          ctrlKey: true,
+        })
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('group-drag');
+    if (result.current.session?.kind !== 'group-drag') {
+      throw new Error('Expected group-drag session.');
+    }
+    expect(result.current.session.guides).toEqual([]);
+    expect(result.current.session.currentPointer).toEqual({ x: 104, y: 120 });
+    expect(result.current.renderedGroupBounds).toMatchObject({
+      x: 4,
+      y: 100,
+      width: 200,
+      height: 40,
+    });
+  });
+
+  it('snaps unrotated group resize previews and emits guides', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const sibling = createRectangleItem({ id: 'sibling', x: 366, y: 260, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second, sibling]),
+      selectedItemIds: [first.id, second.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginGroupResize('middle-right', { x: 300, y: 120 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 360,
+          clientY: 120,
+        })
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('group-resize');
+    if (result.current.session?.kind !== 'group-resize') {
+      throw new Error('Expected group-resize session.');
+    }
+    expect(result.current.session.guides).toEqual([
+      expect.objectContaining({
+        orientation: 'vertical',
+        position: 366,
+      }),
+    ]);
+    expect(result.current.session.currentPointer).toEqual({ x: 366, y: 120 });
+    expect(result.current.renderedGroupBounds).toMatchObject({
+      x: 100,
+      y: 100,
+      width: 266,
+      height: 40,
+    });
+  });
+
+  it('disables unrotated group resize snapping while ctrl is held', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const sibling = createRectangleItem({ id: 'sibling', x: 366, y: 260, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([first, second, sibling]),
+      selectedItemIds: [first.id, second.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginGroupResize('middle-right', { x: 300, y: 120 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 360,
+          clientY: 120,
+          ctrlKey: true,
+        })
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('group-resize');
+    if (result.current.session?.kind !== 'group-resize') {
+      throw new Error('Expected group-resize session.');
+    }
+    expect(result.current.session.guides).toEqual([]);
+    expect(result.current.session.currentPointer).toEqual({ x: 360, y: 120 });
+    expect(result.current.renderedGroupBounds).toMatchObject({
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 40,
+    });
+  });
+
   it('ignores non-canvas stage mouse downs and clears selection for pan tool clicks', () => {
     const panParams = createHookParams({
       activeTool: 'pan',
