@@ -62,31 +62,40 @@ function dispatchKeyDown(target: HTMLElement, options: KeyboardEventInit) {
 }
 
 function createShortcutHarness() {
-  const dispatch = vi.fn();
+  const applyTransaction = vi.fn();
+  const duplicateSelectedItems = vi.fn();
+  const nudgeSelectedItems = vi.fn();
   const onPasteImageFile = vi.fn();
   const redo = vi.fn();
   const reorderSelectedItem = vi.fn();
+  const selectAllItems = vi.fn();
   const setActiveTool = vi.fn();
   const undo = vi.fn();
 
   const args: Parameters<typeof useEditorShortcuts>[0] = {
+    applyTransaction,
     deleteSelectedItems: vi.fn(),
-    dispatch,
+    duplicateSelectedItems,
+    nudgeSelectedItems,
     onPasteImageFile,
     redo,
     reorderSelectedItem,
-    selectedItem: null,
+    selectedItems: [],
     setActiveTool,
+    selectAllItems,
     undo,
   };
 
   return {
+    applyTransaction,
     args,
     deleteSelectedItems: args.deleteSelectedItems,
-    dispatch,
+    duplicateSelectedItems,
+    nudgeSelectedItems,
     onPasteImageFile,
     redo,
     reorderSelectedItem,
+    selectAllItems,
     setActiveTool,
     undo,
   };
@@ -97,7 +106,7 @@ describe('useEditorShortcuts', () => {
     const selectedItem = createRectangleItem({ x: 40, y: 60 });
     const harness = createShortcutHarness();
     const clipboardData = makeClipboardData();
-    harness.args.selectedItem = selectedItem;
+    harness.args.selectedItems = [selectedItem];
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -105,7 +114,7 @@ describe('useEditorShortcuts', () => {
 
     expect(wasUnhandled).toBe(false);
     expect(clipboardData.getData(APP_CLIPBOARD_MIME_TYPE)).not.toBe('');
-    expect(harness.dispatch).not.toHaveBeenCalled();
+    expect(harness.applyTransaction).not.toHaveBeenCalled();
     expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
   });
 
@@ -113,7 +122,7 @@ describe('useEditorShortcuts', () => {
     const selectedItem = createRectangleItem({ x: 40, y: 60 });
     const harness = createShortcutHarness();
     const clipboardData = makeClipboardData();
-    harness.args.selectedItem = selectedItem;
+    harness.args.selectedItems = [selectedItem];
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -126,7 +135,7 @@ describe('useEditorShortcuts', () => {
 
   it('does not delete on cut when clipboard data is unavailable', () => {
     const harness = createShortcutHarness();
-    harness.args.selectedItem = createRectangleItem({ x: 40, y: 60 });
+    harness.args.selectedItems = [createRectangleItem({ x: 40, y: 60 })];
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -138,7 +147,7 @@ describe('useEditorShortcuts', () => {
 
   it('does not delete on cut when clipboard writing throws', () => {
     const harness = createShortcutHarness();
-    harness.args.selectedItem = createRectangleItem({ x: 40, y: 60 });
+    harness.args.selectedItems = [createRectangleItem({ x: 40, y: 60 })];
     const clipboardData = {
       getData: () => '',
       items: [],
@@ -169,7 +178,7 @@ describe('useEditorShortcuts', () => {
 
     expect(wasUnhandled).toBe(false);
     expect(harness.onPasteImageFile).toHaveBeenCalledWith(imageFile);
-    expect(harness.dispatch).not.toHaveBeenCalled();
+    expect(harness.applyTransaction).not.toHaveBeenCalled();
   });
 
   it('prefers the app clipboard payload over an image file when both are present', () => {
@@ -188,18 +197,27 @@ describe('useEditorShortcuts', () => {
 
     expect(wasUnhandled).toBe(false);
     expect(harness.onPasteImageFile).not.toHaveBeenCalled();
-    expect(harness.dispatch).toHaveBeenCalledOnce();
-
-    const command = harness.dispatch.mock.calls[0][0];
-    expect(command).toMatchObject({
-      type: 'add_item',
-      item: expect.objectContaining({
-        kind: 'rectangle',
-        x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
-        y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
-      }),
-    });
-    expect(command.item.id).not.toBe(copiedItem.id);
+    expect(harness.applyTransaction).toHaveBeenCalledOnce();
+    expect(harness.applyTransaction.mock.calls[0][0]).toEqual([
+      {
+        family: 'document',
+        command: {
+          type: 'add_item',
+          item: expect.objectContaining({
+            kind: 'rectangle',
+            x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
+            y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
+          }),
+        },
+      },
+      {
+        family: 'selection',
+        command: {
+          type: 'select_items',
+          itemIds: [expect.any(String)],
+        },
+      },
+    ]);
   });
 
   it('pastes every item from a valid app clipboard payload in order', () => {
@@ -215,23 +233,38 @@ describe('useEditorShortcuts', () => {
     const wasUnhandled = dispatchPaste(document.body, clipboardData);
 
     expect(wasUnhandled).toBe(false);
-    expect(harness.dispatch).toHaveBeenCalledTimes(2);
-    expect(harness.dispatch.mock.calls[0][0]).toMatchObject({
-      type: 'add_item',
-      item: expect.objectContaining({
-        kind: 'rectangle',
-        x: firstItem.x + DUPLICATE_ITEM_OFFSET,
-        y: firstItem.y + DUPLICATE_ITEM_OFFSET,
-      }),
-    });
-    expect(harness.dispatch.mock.calls[1][0]).toMatchObject({
-      type: 'add_item',
-      item: expect.objectContaining({
-        kind: 'rectangle',
-        x: secondItem.x + DUPLICATE_ITEM_OFFSET,
-        y: secondItem.y + DUPLICATE_ITEM_OFFSET,
-      }),
-    });
+    expect(harness.applyTransaction).toHaveBeenCalledOnce();
+    expect(harness.applyTransaction.mock.calls[0][0]).toEqual([
+      {
+        family: 'document',
+        command: {
+          type: 'add_item',
+          item: expect.objectContaining({
+            kind: 'rectangle',
+            x: firstItem.x + DUPLICATE_ITEM_OFFSET,
+            y: firstItem.y + DUPLICATE_ITEM_OFFSET,
+          }),
+        },
+      },
+      {
+        family: 'document',
+        command: {
+          type: 'add_item',
+          item: expect.objectContaining({
+            kind: 'rectangle',
+            x: secondItem.x + DUPLICATE_ITEM_OFFSET,
+            y: secondItem.y + DUPLICATE_ITEM_OFFSET,
+          }),
+        },
+      },
+      {
+        family: 'selection',
+        command: {
+          type: 'select_items',
+          itemIds: [expect.any(String), expect.any(String)],
+        },
+      },
+    ]);
   });
 
 
@@ -247,20 +280,26 @@ describe('useEditorShortcuts', () => {
     dispatchPaste(document.body, clipboardData);
     dispatchPaste(document.body, clipboardData);
 
-    expect(harness.dispatch).toHaveBeenCalledTimes(2);
-    expect(harness.dispatch.mock.calls[0][0]).toMatchObject({
-      type: 'add_item',
-      item: expect.objectContaining({
-        x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
-        y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
-      }),
+    expect(harness.applyTransaction).toHaveBeenCalledTimes(2);
+    expect(harness.applyTransaction.mock.calls[0][0][0]).toMatchObject({
+      family: 'document',
+      command: {
+        type: 'add_item',
+        item: expect.objectContaining({
+          x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
+          y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
+        }),
+      },
     });
-    expect(harness.dispatch.mock.calls[1][0]).toMatchObject({
-      type: 'add_item',
-      item: expect.objectContaining({
-        x: copiedItem.x + DUPLICATE_ITEM_OFFSET * 2,
-        y: copiedItem.y + DUPLICATE_ITEM_OFFSET * 2,
-      }),
+    expect(harness.applyTransaction.mock.calls[1][0][0]).toMatchObject({
+      family: 'document',
+      command: {
+        type: 'add_item',
+        item: expect.objectContaining({
+          x: copiedItem.x + DUPLICATE_ITEM_OFFSET * 2,
+          y: copiedItem.y + DUPLICATE_ITEM_OFFSET * 2,
+        }),
+      },
     });
   });
 
@@ -280,7 +319,7 @@ describe('useEditorShortcuts', () => {
     const wasUnhandled = dispatchPaste(input, clipboardData);
 
     expect(wasUnhandled).toBe(true);
-    expect(harness.dispatch).not.toHaveBeenCalled();
+    expect(harness.applyTransaction).not.toHaveBeenCalled();
     expect(harness.onPasteImageFile).not.toHaveBeenCalled();
 
     input.remove();
@@ -297,13 +336,12 @@ describe('useEditorShortcuts', () => {
     );
 
     expect(wasUnhandled).toBe(true);
-    expect(harness.dispatch).not.toHaveBeenCalled();
+    expect(harness.applyTransaction).not.toHaveBeenCalled();
     expect(harness.onPasteImageFile).not.toHaveBeenCalled();
   });
 
   it('handles keyboard shortcuts for history, selection, reordering, tools, and escape', () => {
     const harness = createShortcutHarness();
-    harness.args.selectAllItems = vi.fn();
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -318,72 +356,31 @@ describe('useEditorShortcuts', () => {
 
     expect(harness.undo).toHaveBeenCalledOnce();
     expect(harness.redo).toHaveBeenCalledTimes(2);
-    expect(harness.args.selectAllItems).toHaveBeenCalledOnce();
+    expect(harness.selectAllItems).toHaveBeenCalledOnce();
     expect(harness.reorderSelectedItem).toHaveBeenNthCalledWith(1, 'forward');
     expect(harness.reorderSelectedItem).toHaveBeenNthCalledWith(2, 'back');
     expect(harness.setActiveTool).toHaveBeenNthCalledWith(1, 'text');
-    expect(harness.dispatch).toHaveBeenLastCalledWith({ type: 'clear_selection' });
+    expect(harness.applyTransaction).toHaveBeenLastCalledWith([
+      { family: 'selection', command: { type: 'clear_selection' } },
+    ]);
     expect(harness.setActiveTool).toHaveBeenLastCalledWith('select');
   });
 
-  it('nudges selected items through the dispatch fallback when no store helper is provided', () => {
+  it('nudges selected items through the dedicated store helper', () => {
     const harness = createShortcutHarness();
-    const line = createLineItem({
-      id: 'line',
-      startX: 10,
-      startY: 20,
-      endX: 30,
-      endY: 40,
-    });
-    const rectangle = createRectangleItem({ id: 'rect', x: 50, y: 60 });
-    harness.args.selectedItems = [line, rectangle];
+    harness.args.selectedItems = [createLineItem(), createRectangleItem()];
 
     renderHook(() => useEditorShortcuts(harness.args));
 
     dispatchKeyDown(document.body, { key: 'ArrowRight' });
     dispatchKeyDown(document.body, { key: 'ArrowUp', shiftKey: true });
 
-    expect(harness.dispatch).toHaveBeenNthCalledWith(1, {
-      type: 'update_item',
-      itemId: 'line',
-      changes: {
-        startX: 11,
-        startY: 20,
-        endX: 31,
-        endY: 40,
-      },
-    });
-    expect(harness.dispatch).toHaveBeenNthCalledWith(2, {
-      type: 'update_item',
-      itemId: 'rect',
-      changes: {
-        x: 51,
-        y: 60,
-      },
-    });
-    expect(harness.dispatch).toHaveBeenNthCalledWith(3, {
-      type: 'update_item',
-      itemId: 'line',
-      changes: {
-        startX: 10,
-        startY: 15,
-        endX: 30,
-        endY: 35,
-      },
-    });
-    expect(harness.dispatch).toHaveBeenNthCalledWith(4, {
-      type: 'update_item',
-      itemId: 'rect',
-      changes: {
-        x: 50,
-        y: 55,
-      },
-    });
+    expect(harness.nudgeSelectedItems).toHaveBeenNthCalledWith(1, 1, 0);
+    expect(harness.nudgeSelectedItems).toHaveBeenNthCalledWith(2, 0, -5);
   });
 
   it('ignores keyboard shortcuts from editable targets', () => {
     const harness = createShortcutHarness();
-    harness.args.selectAllItems = vi.fn();
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -394,7 +391,7 @@ describe('useEditorShortcuts', () => {
     dispatchKeyDown(input, { key: 'Delete' });
     dispatchKeyDown(input, { key: 'Escape' });
 
-    expect(harness.args.selectAllItems).not.toHaveBeenCalled();
+    expect(harness.selectAllItems).not.toHaveBeenCalled();
     expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
     expect(harness.setActiveTool).not.toHaveBeenCalled();
 

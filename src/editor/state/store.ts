@@ -25,19 +25,12 @@ import type {
   ReorderMode,
   UploadedFont,
 } from '../document/documentTypes';
-import type { EditorState as CoreEditorState, HistoryState, SessionState } from '../core/editorState';
+import type { EditorState as CoreEditorState } from '../core/editorState';
 
 export { applyEditorCommand, ensureFontRegistered } from '../core/editorReducer';
 
 export interface EditorStoreState {
-  document: CoreEditorState['document'];
-  activeTool: SessionState['activeTool'];
-  availableFonts: SessionState['availableFonts'];
-  missingFontFamilies: SessionState['missingFontFamilies'];
-  exportScale: SessionState['exportScale'];
-  selectedItemIds: SessionState['selectedItemIds'];
-  historyPast: HistoryState['past'];
-  historyFuture: HistoryState['future'];
+  editor: CoreEditorState;
   dispatch: (command: EditorCommand) => void;
   applyTransaction: (actions: Parameters<typeof createTransactionAction>[0]) => void;
   setActiveTool: (tool: CanvasTool) => void;
@@ -66,45 +59,17 @@ export interface EditorStoreState {
   resetDocument: () => void;
 }
 
-function toStoreSlices(state: CoreEditorState) {
-  return {
-    document: state.document,
-    activeTool: state.session.activeTool,
-    availableFonts: state.session.availableFonts,
-    missingFontFamilies: state.session.missingFontFamilies,
-    exportScale: state.session.exportScale,
-    selectedItemIds: state.session.selectedItemIds,
-    historyPast: state.history.past,
-    historyFuture: state.history.future,
-  };
-}
-
-function fromStoreSlices(state: Pick<EditorStoreState, 'document' | 'activeTool' | 'availableFonts' | 'missingFontFamilies' | 'exportScale' | 'selectedItemIds' | 'historyPast' | 'historyFuture'>): CoreEditorState {
-  return {
-    document: state.document,
-    session: {
-      activeTool: state.activeTool,
-      availableFonts: state.availableFonts,
-      missingFontFamilies: state.missingFontFamilies,
-      exportScale: state.exportScale,
-      selectedItemIds: state.selectedItemIds,
-    },
-    history: {
-      past: state.historyPast,
-      future: state.historyFuture,
-    },
-  };
-}
-
 function applyStoreAction(state: EditorStoreState, action: EditorAction) {
-  return toStoreSlices(reduceEditorState(fromStoreSlices(state), action));
+  return {
+    editor: reduceEditorState(state.editor, action),
+  };
 }
 
 export const useEditorStore = create<EditorStoreState>((set, get) => {
   const initialState = createDefaultEditorState();
 
   return {
-    ...toStoreSlices(initialState),
+    editor: initialState,
     dispatch: (command) => set((state) => applyStoreAction(state, toEditorAction(command))),
     applyTransaction: (actions) => set((state) => applyStoreAction(state, createTransactionAction(actions))),
     setActiveTool: (tool) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_active_tool', tool })),
@@ -114,13 +79,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().setActiveTool('select');
     },
     updateSelectedItem: (changes) => {
-      const selectedId = selectPrimarySelectedItemId({
-        activeTool: get().activeTool,
-        availableFonts: get().availableFonts,
-        missingFontFamilies: get().missingFontFamilies,
-        exportScale: get().exportScale,
-        selectedItemIds: get().selectedItemIds,
-      });
+      const selectedId = selectPrimarySelectedItemId(get().editor);
       if (!selectedId) {
         return;
       }
@@ -134,31 +93,43 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     },
     selectSingleItem: (itemId) => get().dispatch(itemId ? { type: 'select_items', itemIds: [itemId] } : { type: 'clear_selection' }),
     toggleSelectedItem: (itemId) => {
-      const item = get().document.items.find((entry) => entry.id === itemId);
+      const item = get().editor.document.items.find((entry) => entry.id === itemId);
       if (!item || item.hidden) {
         return;
       }
-      get().dispatch({ type: 'select_items', itemIds: toggleSelectionItem(get().selectedItemIds, itemId) });
+      get().dispatch({
+        type: 'select_items',
+        itemIds: toggleSelectionItem(get().editor.session.selectedItemIds, itemId),
+      });
     },
     toggleSelectedItems: (itemIds) => {
-      const nextSelection = normalizeSelectionForItems(toggleSelectionItems(get().selectedItemIds, itemIds), get().document.items);
+      const nextSelection = normalizeSelectionForItems(
+        toggleSelectionItems(get().editor.session.selectedItemIds, itemIds),
+        get().editor.document.items
+      );
       get().dispatch({ type: 'select_items', itemIds: nextSelection });
     },
     selectAllItems: () => {
-      get().dispatch({ type: 'select_items', itemIds: selectAllItemIds(get().document.items) });
+      get().dispatch({
+        type: 'select_items',
+        itemIds: selectAllItemIds(get().editor.document.items),
+      });
     },
     deleteItem: (itemId) => {
       get().dispatch({ type: 'delete_items', itemIds: [itemId] });
     },
     deleteSelectedItems: () => {
-      const selectedIds = get().selectedItemIds;
+      const selectedIds = get().editor.session.selectedItemIds;
       if (selectedIds.length === 0) {
         return;
       }
       get().dispatch({ type: 'delete_items', itemIds: selectedIds });
     },
     reorderSelectedItem: (mode) => {
-      const selectedIds = normalizeSelectionForItems(get().selectedItemIds, get().document.items);
+      const selectedIds = normalizeSelectionForItems(
+        get().editor.session.selectedItemIds,
+        get().editor.document.items
+      );
       if (selectedIds.length === 0) {
         return;
       }
@@ -169,8 +140,13 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().dispatch({ type: 'reorder_items', itemIds: selectedIds, mode });
     },
     duplicateSelectedItems: () => {
-      const selectedIds = new Set(normalizeSelectionForItems(get().selectedItemIds, get().document.items));
-      const selectedItems = get().document.items.filter((item) => selectedIds.has(item.id));
+      const selectedIds = new Set(
+        normalizeSelectionForItems(
+          get().editor.session.selectedItemIds,
+          get().editor.document.items
+        )
+      );
+      const selectedItems = get().editor.document.items.filter((item) => selectedIds.has(item.id));
       if (selectedItems.length === 0) {
         return;
       }
@@ -181,8 +157,13 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       ]);
     },
     nudgeSelectedItems: (deltaX, deltaY) => {
-      const selectedIds = new Set(normalizeSelectionForItems(get().selectedItemIds, get().document.items));
-      const updates = get().document.items
+      const selectedIds = new Set(
+        normalizeSelectionForItems(
+          get().editor.session.selectedItemIds,
+          get().editor.document.items
+        )
+      );
+      const updates = get().editor.document.items
         .filter((item) => selectedIds.has(item.id) && !item.locked)
         .map((item) => ({
           itemId: item.id,
@@ -202,8 +183,8 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     },
     undo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'undo' })),
     redo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'redo' })),
-    canUndo: () => selectCanUndo({ past: get().historyPast, future: get().historyFuture }),
-    canRedo: () => selectCanRedo({ past: get().historyPast, future: get().historyFuture }),
+    canUndo: () => selectCanUndo(get().editor),
+    canRedo: () => selectCanRedo(get().editor),
     registerAvailableFont: (font) => set((state) => applyStoreAction(state, { family: 'session', type: 'register_available_font', font })),
     setMissingFontFamilies: (families) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_missing_font_families', families })),
     loadDocument: (document) => get().dispatch({ type: 'load_document', document }),

@@ -10,6 +10,10 @@ import { parseProjectDocument, serializeProjectDocument } from '../document/docu
 import { applyEditorCommand, useEditorStore } from './store';
 import { resetEditorStore } from '../../test/editorStore';
 
+function getEditorState() {
+  return useEditorStore.getState().editor;
+}
+
 describe('editor command reducer', () => {
   it('adds an item and selects it immediately', () => {
     const baseDocument = createDefaultProjectDocument();
@@ -76,7 +80,7 @@ describe('editor command reducer', () => {
       presetId: 'custom',
     });
     expect(fontDocument.background).toBe('#101010');
-    expect(useEditorStore.getState().selectedItemIds).toEqual([]);
+    expect(getEditorState().session.selectedItemIds).toEqual([]);
     expect(fontDocument.fonts).toHaveLength(1);
   });
 
@@ -229,11 +233,11 @@ describe('editor command reducer', () => {
     useEditorStore.getState().dispatch({ type: 'add_item', item: liveItem });
     useEditorStore.getState().loadDocument(loadedDocument);
 
-    const document = useEditorStore.getState().document;
+    const document = getEditorState().document;
 
     expect(document.items.map((item) => item.id)).toEqual(['loaded-2', 'loaded-1']);
     expect(document.items.map((item) => item.zIndex)).toEqual([0, 1]);
-    expect(useEditorStore.getState().selectedItemIds).toEqual([]);
+    expect(getEditorState().session.selectedItemIds).toEqual([]);
     expect(document.items[0].shadow).toEqual({
       color: '#000000',
       blur: 0,
@@ -249,20 +253,20 @@ describe('editor command reducer', () => {
 
 describe('editor store history', () => {
   beforeEach(() => {
-    resetEditorStore({ exportScale: 2 });
+    resetEditorStore({ session: { exportScale: 2 } });
   });
 
   it('records undo and redo history for document mutations', () => {
     const item = createRectangleItem();
 
     useEditorStore.getState().dispatch({ type: 'add_item', item });
-    expect(useEditorStore.getState().document.items).toHaveLength(1);
+    expect(getEditorState().document.items).toHaveLength(1);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().document.items).toHaveLength(0);
+    expect(getEditorState().document.items).toHaveLength(0);
 
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().document.items).toHaveLength(1);
+    expect(getEditorState().document.items).toHaveLength(1);
   });
 
   it('updates only the selected item through the convenience action', () => {
@@ -271,7 +275,7 @@ describe('editor store history', () => {
 
     useEditorStore.getState().updateSelectedItem({ width: 512, height: 256 });
 
-    const updatedItem = useEditorStore.getState().document.items[0];
+    const updatedItem = getEditorState().document.items[0];
     expect(updatedItem.width).toBe(512);
     expect(updatedItem.height).toBe(256);
   });
@@ -289,20 +293,20 @@ describe('editor store history', () => {
     useEditorStore.getState().setExportScale(4);
     useEditorStore.getState().setMissingFontFamilies(['Ghost Font']);
 
-    expect(useEditorStore.getState().document.items.at(-1)?.id).toBe(firstItem.id);
-    expect(useEditorStore.getState().document.canvas.width).toBe(800);
-    expect(useEditorStore.getState().exportScale).toBe(4);
-    expect(useEditorStore.getState().missingFontFamilies).toEqual(['Ghost Font']);
+    expect(getEditorState().document.items.at(-1)?.id).toBe(firstItem.id);
+    expect(getEditorState().document.canvas.width).toBe(800);
+    expect(getEditorState().session.exportScale).toBe(4);
+    expect(getEditorState().session.missingFontFamilies).toEqual(['Ghost Font']);
     expect(useEditorStore.getState().canUndo()).toBe(true);
 
     useEditorStore.getState().resetDocument();
 
-    expect(useEditorStore.getState().document.items).toHaveLength(0);
+    expect(getEditorState().document.items).toHaveLength(0);
     expect(useEditorStore.getState().canUndo()).toBe(true);
 
     useEditorStore.getState().undo();
 
-    expect(useEditorStore.getState().document.items).toHaveLength(2);
+    expect(getEditorState().document.items).toHaveLength(2);
   });
 
   it('deduplicates available fonts and supports explicit document loading', () => {
@@ -322,8 +326,8 @@ describe('editor store history', () => {
     useEditorStore.getState().registerAvailableFont(uploadedFont);
     useEditorStore.getState().loadDocument(loadedDocument);
 
-    expect(useEditorStore.getState().availableFonts).toEqual([uploadedFont]);
-    expect(useEditorStore.getState().document.background).toBe('#222222');
+    expect(getEditorState().session.availableFonts).toEqual([uploadedFont]);
+    expect(getEditorState().document.background).toBe('#222222');
     expect(useEditorStore.getState().canUndo()).toBe(false);
   });
 
@@ -332,9 +336,9 @@ describe('editor store history', () => {
     useEditorStore.getState().createItemAt('line', 10, 20);
     useEditorStore.getState().deleteSelectedItems();
 
-    expect(useEditorStore.getState().document.items).toHaveLength(0);
-    expect(useEditorStore.getState().historyPast.length).toBeGreaterThan(0);
-    expect(useEditorStore.getState().activeTool).toBe('select');
+    expect(getEditorState().document.items).toHaveLength(0);
+    expect(getEditorState().history.past.length).toBeGreaterThan(0);
+    expect(getEditorState().session.activeTool).toBe('select');
   });
 
   it('deletes a specific item by id while preserving unrelated selection and undo history', () => {
@@ -347,14 +351,14 @@ describe('editor store history', () => {
 
     useEditorStore.getState().deleteItem(firstItem.id);
 
-    expect(useEditorStore.getState().document.items).toHaveLength(1);
-    expect(useEditorStore.getState().document.items[0].id).toBe(secondItem.id);
-    expect(useEditorStore.getState().selectedItemIds).toEqual([secondItem.id]);
+    expect(getEditorState().document.items).toHaveLength(1);
+    expect(getEditorState().document.items[0].id).toBe(secondItem.id);
+    expect(getEditorState().session.selectedItemIds).toEqual([secondItem.id]);
     expect(useEditorStore.getState().canUndo()).toBe(true);
 
     useEditorStore.getState().undo();
 
-    expect(useEditorStore.getState().document.items).toHaveLength(2);
+    expect(getEditorState().document.items).toHaveLength(2);
   });
 
   it('treats empty undo, redo, and selection convenience actions as no-ops', () => {
@@ -364,7 +368,7 @@ describe('editor store history', () => {
     useEditorStore.getState().deleteSelectedItems();
     useEditorStore.getState().reorderSelectedItem('front');
 
-    expect(useEditorStore.getState().document).toEqual(createDefaultProjectDocument());
+    expect(getEditorState().document).toEqual(createDefaultProjectDocument());
     expect(useEditorStore.getState().canRedo()).toBe(false);
   });
 
@@ -396,7 +400,7 @@ describe('editor store history', () => {
       },
     });
 
-    expect(useEditorStore.getState().document.fonts).toEqual([
+    expect(getEditorState().document.fonts).toEqual([
       {
         family: 'Poster Sans',
         sourceName: 'PosterSans.ttf',

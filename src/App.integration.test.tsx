@@ -181,7 +181,7 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      const item = useEditorStore.getState().document.items[0];
+      const item = useEditorStore.getState().editor.document.items[0];
       expect(item.kind).toBe('rectangle');
       expect(item.kind === 'rectangle' ? item.cornerRadius : 0).toBe(24);
     });
@@ -211,19 +211,19 @@ describe('App integration', () => {
     fireEvent.keyDown(document, { key: 'ArrowDown', shiftKey: true });
 
     await waitFor(() => {
-      const item = useEditorStore.getState().document.items[0];
+      const item = useEditorStore.getState().editor.document.items[0];
       expect(item.x).toBe(101);
       expect(item.y).toBe(125);
     });
 
     fireEvent.keyDown(document, { key: 'Delete' });
     await waitFor(() => {
-      expect(useEditorStore.getState().document.items).toHaveLength(0);
+      expect(useEditorStore.getState().editor.document.items).toHaveLength(0);
     });
 
     fireEvent.keyDown(document, { key: 'z', ctrlKey: true });
     await waitFor(() => {
-      expect(useEditorStore.getState().document.items).toHaveLength(1);
+      expect(useEditorStore.getState().editor.document.items).toHaveLength(1);
     });
   });
 
@@ -266,8 +266,8 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().document.items).toHaveLength(1);
-      expect(useEditorStore.getState().document.items[0]?.id).toBe('opened-text');
+      expect(useEditorStore.getState().editor.document.items).toHaveLength(1);
+      expect(useEditorStore.getState().editor.document.items[0]?.id).toBe('opened-text');
     });
 
     fireEvent.change(screen.getByTestId('image-upload-input'), {
@@ -277,7 +277,7 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().document.items.some((item) => item.kind === 'image')).toBe(true);
+      expect(useEditorStore.getState().editor.document.items.some((item) => item.kind === 'image')).toBe(true);
     });
 
     fireEvent.change(screen.getByTestId('font-upload-input'), {
@@ -287,7 +287,7 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().availableFonts.some((font) => font.family === 'Cal Sans')).toBe(true);
+      expect(useEditorStore.getState().editor.session.availableFonts.some((font) => font.family === 'Cal Sans')).toBe(true);
     });
   });
 

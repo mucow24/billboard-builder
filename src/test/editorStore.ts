@@ -1,35 +1,34 @@
-import { createDefaultEditorState } from '../editor/core/editorState';
-import { useEditorStore, type EditorStoreState } from '../editor/state/store';
+import {
+  createDefaultEditorState,
+  type EditorState,
+} from '../editor/core/editorState';
+import { useEditorStore } from '../editor/state/store';
 
-type EditorStoreSlices = Pick<
-  EditorStoreState,
-  | 'document'
-  | 'activeTool'
-  | 'availableFonts'
-  | 'missingFontFamilies'
-  | 'exportScale'
-  | 'selectedItemIds'
-  | 'historyPast'
-  | 'historyFuture'
->;
+type EditorStateOverrides = Partial<Omit<EditorState, 'session' | 'history'>> & {
+  session?: Partial<EditorState['session']>;
+  history?: Partial<EditorState['history']>;
+};
 
-export function createEditorStoreSlices(
-  overrides: Partial<EditorStoreSlices> = {}
-): EditorStoreSlices {
+export function createEditorState(overrides: EditorStateOverrides = {}): EditorState {
   const initialState = createDefaultEditorState();
   return {
-    document: initialState.document,
-    activeTool: initialState.session.activeTool,
-    availableFonts: initialState.session.availableFonts,
-    missingFontFamilies: initialState.session.missingFontFamilies,
-    exportScale: initialState.session.exportScale,
-    selectedItemIds: initialState.session.selectedItemIds,
-    historyPast: initialState.history.past,
-    historyFuture: initialState.history.future,
+    ...initialState,
     ...overrides,
+    document: overrides.document ?? initialState.document,
+    session: {
+      ...initialState.session,
+      ...overrides.session,
+    },
+    history: {
+      ...initialState.history,
+      ...overrides.history,
+    },
   };
 }
 
-export function resetEditorStore(overrides: Partial<EditorStoreSlices> = {}) {
-  useEditorStore.setState(createEditorStoreSlices(overrides));
+export function resetEditorStore(overrides: EditorStateOverrides = {}) {
+  useEditorStore.setState((state) => ({
+    ...state,
+    editor: createEditorState(overrides),
+  }));
 }

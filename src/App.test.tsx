@@ -218,15 +218,11 @@ describe('App shell', () => {
     const first = createRectangleItem({ id: 'first', opacity: 0.2 });
     const second = createRectangleItem({ id: 'second', opacity: 0.8, x: 200 });
 
-    useEditorStore.setState({
+    resetEditorStore({
       document: { ...createDefaultProjectDocument(), items: [first, second] },
-      activeTool: 'select',
-      availableFonts: [],
-      missingFontFamilies: [],
-      exportScale: 1,
-      selectedItemIds: [first.id, second.id],
-      historyPast: [],
-      historyFuture: [],
+      session: {
+        selectedItemIds: [first.id, second.id],
+      },
     });
 
     render(<App />);
@@ -235,7 +231,7 @@ describe('App shell', () => {
     const opacityInput = await screen.findByLabelText('Opacity');
     fireEvent.change(opacityInput, { target: { value: '0.5' } });
 
-    const updatedItems = useEditorStore.getState().document.items;
+    const updatedItems = useEditorStore.getState().editor.document.items;
     expect(updatedItems.find((item) => item.id === first.id)?.opacity).toBe(0.5);
     expect(updatedItems.find((item) => item.id === second.id)?.opacity).toBe(0.5);
   });
@@ -261,12 +257,14 @@ describe('App shell', () => {
     const user = userEvent.setup();
     const rectangleItem = createRectangleItem({ x: 40, y: 60 });
     const clipboardData = makeClipboardData();
-    useEditorStore.setState({
+    resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
         items: [rectangleItem],
       },
-      selectedItemIds: [rectangleItem.id],
+      session: {
+        selectedItemIds: [rectangleItem.id],
+      },
     });
     render(<App />);
 
@@ -279,25 +277,25 @@ describe('App shell', () => {
       clipboardData,
     });
 
-    let items = useEditorStore.getState().document.items;
+    let items = useEditorStore.getState().editor.document.items;
     expect(items).toHaveLength(2);
     expect(items[1].x).toBe(rectangleItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[1].y).toBe(rectangleItem.y + DUPLICATE_ITEM_OFFSET);
 
     await user.keyboard('{Control>}d{/Control}');
-    items = useEditorStore.getState().document.items;
+    items = useEditorStore.getState().editor.document.items;
     expect(items).toHaveLength(3);
 
     const cutItem = items[2];
     fireEvent.cut(document.body, {
       clipboardData,
     });
-    expect(useEditorStore.getState().document.items).toHaveLength(2);
+    expect(useEditorStore.getState().editor.document.items).toHaveLength(2);
 
     fireEvent.paste(document.body, {
       clipboardData,
     });
-    items = useEditorStore.getState().document.items;
+    items = useEditorStore.getState().editor.document.items;
     expect(items).toHaveLength(3);
     expect(items[2].x).toBe(cutItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[2].y).toBe(cutItem.y + DUPLICATE_ITEM_OFFSET);
@@ -325,7 +323,7 @@ describe('App shell', () => {
       expect(mockImportImageFile).toHaveBeenCalledWith(imageFile);
     });
 
-    const items = useEditorStore.getState().document.items;
+    const items = useEditorStore.getState().editor.document.items;
     expect(items).toHaveLength(1);
     expect(items[0]).toEqual(
       expect.objectContaining({
@@ -360,12 +358,14 @@ describe('App shell', () => {
         sourceName: 'second-image.png',
       });
 
-    useEditorStore.setState({
+    resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
         items: [copiedItem],
       },
-      selectedItemIds: [copiedItem.id],
+      session: {
+        selectedItemIds: [copiedItem.id],
+      },
     });
 
     render(<App />);
@@ -377,7 +377,7 @@ describe('App shell', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().document.items).toHaveLength(2);
+      expect(useEditorStore.getState().editor.document.items).toHaveLength(2);
     });
 
     fireEvent.copy(document.body, {
@@ -393,7 +393,7 @@ describe('App shell', () => {
       }),
     });
 
-    const items = useEditorStore.getState().document.items;
+    const items = useEditorStore.getState().editor.document.items;
     expect(items).toHaveLength(3);
     expect(items[0]).toEqual(
       expect.objectContaining({
@@ -423,20 +423,22 @@ describe('App shell', () => {
   it('nudges the selected item with arrow keys', async () => {
     const user = userEvent.setup();
     const rectangleItem = createRectangleItem({ x: 40, y: 60 });
-    useEditorStore.setState({
+    resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
         items: [rectangleItem],
       },
-      selectedItemIds: [rectangleItem.id],
+      session: {
+        selectedItemIds: [rectangleItem.id],
+      },
     });
     render(<App />);
 
     await user.keyboard('{ArrowRight}');
-    expect(useEditorStore.getState().document.items[0].x).toBe(41);
+    expect(useEditorStore.getState().editor.document.items[0].x).toBe(41);
 
     await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
-    expect(useEditorStore.getState().document.items[0].y).toBe(65);
+    expect(useEditorStore.getState().editor.document.items[0].y).toBe(65);
   });
 
   it('updates canvas size controls from the top toolbar', async () => {
@@ -449,8 +451,8 @@ describe('App shell', () => {
       target: { value: '500' },
     });
 
-    expect(useEditorStore.getState().document.canvas.width).toBe(900);
-    expect(useEditorStore.getState().document.canvas.height).toBe(500);
+    expect(useEditorStore.getState().editor.document.canvas.width).toBe(900);
+    expect(useEditorStore.getState().editor.document.canvas.height).toBe(500);
   });
 
   it('shows a visible error when opening an invalid project file', async () => {
@@ -485,7 +487,7 @@ describe('App shell', () => {
     });
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(useEditorStore.getState().document.items).toHaveLength(0);
-    expect(useEditorStore.getState().availableFonts).toEqual([]);
+    expect(useEditorStore.getState().editor.document.items).toHaveLength(0);
+    expect(useEditorStore.getState().editor.session.availableFonts).toEqual([]);
   });
 });

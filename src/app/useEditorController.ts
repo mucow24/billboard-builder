@@ -27,15 +27,8 @@ export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
-    activeTool,
+    editor,
     applyTransaction,
-    availableFonts,
-    document,
-    historyFuture,
-    historyPast,
-    missingFontFamilies,
-    exportScale,
-    selectedItemIds,
     addImageItem,
     deleteItem,
     deleteSelectedItems,
@@ -59,18 +52,18 @@ export function useEditorController() {
     updateSelectedItems,
   } = useEditorStore();
 
-  const selectionState = {
+  const { document, history, session } = editor;
+  const {
     activeTool,
     availableFonts,
     missingFontFamilies,
-    exportScale,
     selectedItemIds,
-  };
-  const selectedItem = selectSelectedItem(document, selectionState);
-  const selectedItems = selectSelectedItems(document, selectionState);
+  } = session;
+  const selectedItem = selectSelectedItem(document, editor);
+  const selectedItems = selectSelectedItems(document, editor);
   const selectedItemOrNull = selectedItem ?? null;
-  const canUndo = selectCanUndo({ past: historyPast, future: historyFuture });
-  const canRedo = selectCanRedo({ past: historyPast, future: historyFuture });
+  const canUndo = selectCanUndo(history);
+  const canRedo = selectCanRedo(history);
 
   const { persistenceReady } = useCanvasBootstrap({
     dispatch,

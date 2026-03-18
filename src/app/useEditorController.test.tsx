@@ -6,7 +6,6 @@ import {
   createDefaultProjectDocument,
   createRectangleItem,
 } from '../editor/document/documentDefaults';
-import { useEditorStore } from '../editor/state/store';
 import { resetEditorStore } from '../test/editorStore';
 
 const {
@@ -94,13 +93,17 @@ describe('useEditorController', () => {
 
   it('exposes selected item state and undo availability', async () => {
     const rectangleItem = createRectangleItem();
-    useEditorStore.setState({
+    resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
         items: [rectangleItem],
       },
-      selectedItemIds: [rectangleItem.id],
-      historyPast: [createDefaultProjectDocument()],
+      session: {
+        selectedItemIds: [rectangleItem.id],
+      },
+      history: {
+        past: [createDefaultProjectDocument()],
+      },
     });
 
     const { result } = renderHook(() => useEditorController());
