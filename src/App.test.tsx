@@ -12,6 +12,7 @@ import {
   createRectangleItem,
 } from './editor/document/documentDefaults';
 import { useEditorStore } from './editor/state/store';
+import { resetEditorStore } from './test/editorStore';
 
 const { mockCanvasPersistenceService, mockImportImageFile } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
@@ -64,19 +65,6 @@ vi.mock('./editor/rendering/CanvasStage', () => ({
     </div>
   ),
 }));
-
-function resetEditorStore() {
-  useEditorStore.setState({
-    document: createDefaultProjectDocument(),
-    activeTool: 'select',
-    availableFonts: [],
-    missingFontFamilies: [],
-    exportScale: 1,
-    selectedItemIds: [],
-    historyPast: [],
-    historyFuture: [],
-  });
-}
 
 function makeClipboardItem(file: File | null, type = file?.type ?? 'image/png'): DataTransferItem {
   return {

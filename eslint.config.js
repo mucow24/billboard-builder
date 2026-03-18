@@ -38,5 +38,49 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
     },
+  },
+  {
+    files: ['src/editor/document/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['../ui/*', '../rendering/*', '../state/*', '../../app/*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/editor/core/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['../ui/*', '../rendering/*', '../state/*', '../../app/*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/editor/state/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['../ui/*', '../rendering/*', '../../app/*'],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/editor/rendering/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: ['../ui/*', '../../app/*'],
+        },
+      ],
+    },
   }
 );

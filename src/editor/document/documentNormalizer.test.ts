@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { createImageItem, createLineItem, createRectangleItem, createTextItem } from './documentDefaults';
-import { normalizeProjectDocument } from './documentNormalizer';
+import {
+  normalizeExistingProjectDocument,
+  normalizeProjectDocument,
+} from './documentNormalizer';
 
 describe('document normalizer', () => {
   it('normalizes item ordering, shadows, image adjustments, and font entries', () => {
@@ -67,5 +70,32 @@ describe('document normalizer', () => {
     expect(normalized.fonts).toEqual([
       { family: 'System Sans', sourceName: 'system', kind: 'system' },
     ]);
+  });
+
+  it('uses the same canonical normalization for loaded and live documents', () => {
+    const liveDocument = {
+      version: 1 as const,
+      canvas: {
+        width: Number.NaN,
+        height: 0,
+        presetId: 123 as unknown as string,
+      },
+      background: '#abcdef',
+      items: [
+        createRectangleItem({
+          id: 'rectangle',
+          zIndex: 9,
+          width: 0,
+          opacity: 3,
+        }),
+      ],
+      fonts: [
+        { family: 'Poster Sans', sourceName: 'PosterSans.ttf', kind: 'uploaded' as const },
+      ],
+    };
+
+    expect(normalizeExistingProjectDocument(liveDocument)).toEqual(
+      normalizeProjectDocument(liveDocument)
+    );
   });
 });

@@ -8,6 +8,7 @@ import {
 } from '../document/documentDefaults';
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
 import { applyEditorCommand, useEditorStore } from './store';
+import { resetEditorStore } from '../../test/editorStore';
 
 describe('editor command reducer', () => {
   it('adds an item and selects it immediately', () => {
@@ -248,16 +249,7 @@ describe('editor command reducer', () => {
 
 describe('editor store history', () => {
   beforeEach(() => {
-    useEditorStore.setState({
-      document: createDefaultProjectDocument(),
-      activeTool: 'select',
-      availableFonts: [],
-      missingFontFamilies: [],
-      exportScale: 2,
-      selectedItemIds: [],
-      historyPast: [],
-      historyFuture: [],
-    });
+    resetEditorStore({ exportScale: 2 });
   });
 
   it('records undo and redo history for document mutations', () => {

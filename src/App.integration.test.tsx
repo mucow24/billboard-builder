@@ -137,22 +137,8 @@ import {
   createRectangleItem,
   createTextItem,
 } from './editor/document/documentDefaults';
-import { createDefaultEditorState } from './editor/core/editorState';
 import { useEditorStore } from './editor/state/store';
-
-function resetEditorStore() {
-  const initialState = createDefaultEditorState();
-  useEditorStore.setState({
-    activeTool: initialState.session.activeTool,
-    availableFonts: initialState.session.availableFonts,
-    document: initialState.document,
-    exportScale: initialState.session.exportScale,
-    historyFuture: initialState.history.future,
-    historyPast: initialState.history.past,
-    missingFontFamilies: initialState.session.missingFontFamilies,
-    selectedItemIds: initialState.session.selectedItemIds,
-  });
-}
+import { resetEditorStore } from './test/editorStore';
 
 describe('App integration', () => {
   beforeEach(() => {

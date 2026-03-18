@@ -1,8 +1,8 @@
 import Konva from 'konva';
 
+import { parseHexColor } from '../color/hexColor';
 import type { ImageAdjustments } from '../document/documentTypes';
 import { normalizeImageAdjustments } from '../document/imageAdjustments';
-import { parseHexColor } from '../ui/colors';
 
 type KonvaFilter = (typeof Konva.Filters)[keyof typeof Konva.Filters];
 

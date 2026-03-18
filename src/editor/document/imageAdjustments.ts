@@ -1,5 +1,5 @@
 import type { ImageAdjustments } from './documentTypes';
-import { parseHexColor } from '../ui/colors';
+import { parseHexColor } from '../color/hexColor';
 
 export const DEFAULT_IMAGE_ADJUSTMENTS: ImageAdjustments = {
   brightness: 100,

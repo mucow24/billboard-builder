@@ -7,6 +7,7 @@ import {
   createRectangleItem,
 } from '../editor/document/documentDefaults';
 import { useEditorStore } from '../editor/state/store';
+import { resetEditorStore } from '../test/editorStore';
 
 const {
   mockCanvasPersistenceService,
@@ -64,19 +65,6 @@ vi.mock('../editor/fonts', async () => {
     registerFontFile: mockRegisterFontFile,
   };
 });
-
-function resetEditorStore() {
-  useEditorStore.setState({
-    document: createDefaultProjectDocument(),
-    activeTool: 'select',
-    availableFonts: [],
-    missingFontFamilies: [],
-    exportScale: 1,
-    selectedItemIds: [],
-    historyPast: [],
-    historyFuture: [],
-  });
-}
 
 function makeFileList(...files: File[]): FileList {
   const fileList: Record<number, File> & {

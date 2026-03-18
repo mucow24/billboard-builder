@@ -10,7 +10,7 @@ P0:
 P1:
   REQUEST: Rich text fields
 P2:
-  REQUEST: Templates
+  REQUEST: Templates (requires: grouping)
 P3:
 
 Medium:
@@ -25,6 +25,8 @@ P2:
 
 Small:
 P0:
+  REQUEST: Up/Down arrows for font menu
+  REQUEST: Sort fonts alphabetically
 P1:
   REQUEST: Grouping
 P2:
