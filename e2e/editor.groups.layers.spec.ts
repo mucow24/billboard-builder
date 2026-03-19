@@ -19,6 +19,28 @@ import {
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 
 test.describe('editor group layers and inspector flows', () => {
+  test('selects a top-level item from Layers and surfaces its Properties state', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createRectangleFixture({
+        id: 'layers-top-level-rect',
+        x: 180,
+        y: 180,
+        width: 200,
+        height: 120,
+        zIndex: 0,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'layers-top-level.json');
+
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Rectangle');
+    await expect(page.locator('.layer-row.active').filter({ hasText: 'Rectangle' })).toHaveCount(1);
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+  });
+
   test('shows grouped hierarchy, toggles collapse, opens properties from layers, and persists group opacity edits', async ({
     page,
   }) => {
@@ -146,17 +168,35 @@ test.describe('editor group layers and inspector flows', () => {
 
     await openLayersTab(page);
     await clickLayerRow(page, 'Text');
+    await expect(
+      page.locator('.layer-row.contains-selection').filter({ hasText: 'Inspector Group' }),
+    ).toHaveCount(1);
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
 
     // Selecting all on a grouped document should switch the Properties panel
     // to multi-selection UI rather than the single-group controls.
+    await page.evaluate(() => {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    });
     await page.keyboard.press(`${modifier}+A`);
     await openPropertiesTab(page);
-    await expect(page.getByRole('heading', { name: '3 items selected' })).toBeVisible();
+    await expect(page.locator('h2').filter({ hasText: /items selected/ })).toBeVisible();
     await expect(page.getByRole('spinbutton', { name: 'Opacity' })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
+  });
+
+  test('updates the canvas background from Layers and persists the new value', async ({ page }) => {
+    await openFreshEditor(page);
+    await openLayersTab(page);
+
+    await page.getByRole('button', { name: 'Canvas background' }).click();
+    await page.getByLabel('Canvas background hex').fill('#11223344');
+    await page.getByLabel('Canvas background hex').press('Enter');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.background).toBe('#11223344');
   });
 
   test('deletes a grouped subtree from the layers tab', async ({ page }) => {

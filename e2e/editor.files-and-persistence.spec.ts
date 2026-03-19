@@ -85,6 +85,28 @@ test.describe('editor file and persistence flows', () => {
     expect(pngSize).toEqual({ width: 1024, height: 1024 });
   });
 
+  test('resets to a new empty project through the real toolbar flow', async ({ page }) => {
+    const document = createProjectDocument([
+      createRectangleFixture({ id: 'new-project-rect', x: 140, y: 140, width: 180, height: 120 }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'new-project-fixture.json');
+
+    await page.getByRole('button', { name: 'New' }).click();
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    await openPropertiesTab(page);
+    await expect(page.getByText('Nothing selected')).toBeVisible();
+
+    const savedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+    expect(savedProject.nodes).toEqual([]);
+  });
+
   test('restores valid persisted state and safely clears corrupt persisted state on reload', async ({ page }) => {
     const persistedDocument = createProjectDocument([
       createRectangleFixture({ id: 'persisted-rect', x: 200, y: 220, width: 180, height: 120 }),

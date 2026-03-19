@@ -878,7 +878,7 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session?.kind).toBe('group-drag');
   });
 
-  it('starts dragging a group immediately when clicking grouped content that is not already selected', () => {
+  it('selects a group without starting a drag when clicking grouped content that is not already selected', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const group = createGroupNode([first, second], 'Poster Group');
@@ -893,7 +893,7 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(params.onSelectItem).toHaveBeenCalledWith(group.id);
-    expect(result.current.session?.kind).toBe('group-drag');
+    expect(result.current.session).toBeNull();
   });
 
   it('uses the outermost group as the selectable target before drill-in for nested groups', () => {
@@ -986,7 +986,7 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
-  it('drills into the next descendant on item pointer down when a group is selected', () => {
+  it('drills into the next descendant on item pointer down without starting an immediate drag', () => {
     const nestedLeaf = createRectangleItem({ id: 'nested-leaf' });
     const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
     nestedGroup.id = 'nested-group';
@@ -1020,7 +1020,7 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
-    expect(result.current.session?.kind).toBe('drag');
+    expect(result.current.session).toBeNull();
   });
 
   it('drills into the next descendant from a stage mouse down when a selected group click resolves as canvas surface input', () => {

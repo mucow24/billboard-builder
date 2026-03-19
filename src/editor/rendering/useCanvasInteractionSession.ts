@@ -377,31 +377,6 @@ export function useCanvasInteractionSession({
     }
   }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
-  const beginGroupDragForNode = useCallback((nodeId: string, pointer: Point) => {
-    const selectedNode = getNodeById(document.nodes, nodeId);
-    if (!selectedNode) {
-      return false;
-    }
-    const groupItems = collectLeafItems(selectedNode)
-      .slice()
-      .sort((left, right) => left.zIndex - right.zIndex);
-    const groupBounds = getSelectionRenderBounds(groupItems);
-    if (!groupBounds) {
-      return false;
-    }
-    const groupLeafIdSet = new Set(groupItems.map((item) => item.id));
-    const nextSession = createGroupDragSession(pointer, {
-      selectedItems: groupItems,
-      siblingItems: orderedItems.filter((entry) => !groupLeafIdSet.has(entry.id)),
-      activeSelectionFrame: { bounds: groupBounds, rotation: 0 },
-    });
-    if (!nextSession) {
-      return false;
-    }
-    updateSession(nextSession);
-    return true;
-  }, [document.nodes, orderedItems, updateSession]);
-
   const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
     updateSession(
       createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id))
@@ -468,11 +443,6 @@ export function useCanvasInteractionSession({
         const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedNodeId, item.id);
         if (nextNodeId && nextNodeId !== selectedNodeId) {
           onSelectItem(nextNodeId);
-          if (nextNodeId === item.id) {
-            beginDrag(item, pointer);
-            return;
-          }
-          beginGroupDragForNode(nextNodeId, pointer);
           return;
         }
       }
@@ -488,17 +458,9 @@ export function useCanvasInteractionSession({
       return;
     }
     onSelectItem(selectionNodeId);
-    if (selectionNodeId !== item.id) {
-      beginGroupDragForNode(selectionNodeId, pointer);
-      return;
-    }
-    if (selectionNodeId === item.id) {
-      beginDrag(item, pointer);
-    }
   }, [
     beginDrag,
     beginGroupDrag,
-    beginGroupDragForNode,
     document.nodes,
     onSelectItem,
     onToggleSelectItem,
@@ -539,11 +501,6 @@ export function useCanvasInteractionSession({
         if (drilledItem && nextNodeId && nextNodeId !== selectedNodeId) {
           onGuidesChange([]);
           onSelectItem(nextNodeId);
-          if (nextNodeId === drilledItem.id) {
-            beginDrag(drilledItem, pointer);
-            return;
-          }
-          beginGroupDragForNode(nextNodeId, pointer);
           return;
         }
       }
@@ -566,8 +523,6 @@ export function useCanvasInteractionSession({
   }, [
     activeTool,
     beginCreate,
-    beginDrag,
-    beginGroupDragForNode,
     document.nodes,
     onGuidesChange,
     onSelectItem,

@@ -16,7 +16,10 @@ import {
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
+  pasteClipboardPayloadOnActiveElement,
+  pasteClipboardPayloadWithImageFile,
   pasteClipboardPayload,
+  pasteImageClipboardFile,
   readDownloadedJson,
   uploadProject,
 } from './support/editor';
@@ -45,6 +48,25 @@ function expectSavedGroup(project: Record<string, unknown>, nodeId: string): Sav
 }
 
 test.describe('editor shortcuts', () => {
+  test('KB-01 switches tools through real browser keyboard input', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await page.keyboard.press('H');
+    await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Z');
+    await expect(page.getByRole('button', { name: 'Zoom (Z)' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('T');
+    await expect(page.getByRole('button', { name: 'Text (T)' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('R');
+    await expect(page.getByRole('button', { name: 'Rect (R)' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('O');
+    await expect(page.getByRole('button', { name: 'Ellipse (O)' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('L');
+    await expect(page.getByRole('button', { name: 'Line (L)' })).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('V');
+    await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   test('nudges, duplicates, deletes, undoes, and redoes against the real document state', async ({ page }) => {
     const rectangle = createRectangleFixture({
       id: 'nudge-shape',
@@ -286,6 +308,28 @@ test.describe('editor shortcuts', () => {
       'reorder-sibling',
     ]);
 
+    await page.keyboard.press(`Shift+${modifier}+ArrowUp`);
+    reorderedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+    expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
+      'reorder-sibling',
+      'reorder-group',
+    ]);
+
+    await page.keyboard.press(`Shift+${modifier}+ArrowDown`);
+    reorderedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+    expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
+      'reorder-group',
+      'reorder-sibling',
+    ]);
+
     await page.keyboard.press(`${modifier}+A`);
     await openLayersTab(page);
     await expect(page.locator('.layer-row.active')).toHaveCount(2);
@@ -407,5 +451,61 @@ test.describe('editor shortcuts', () => {
         kind: 'rectangle',
       }),
     ]);
+  });
+
+  test('CB-06 CB-07 CB-08 prioritizes app clipboard payloads, pastes images, and ignores clipboard events from editable targets', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'clipboard-priority-rect',
+      name: 'Clipboard Priority Rectangle',
+      x: 180,
+      y: 180,
+      width: 200,
+      height: 120,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'clipboard-priority.json');
+
+    await clickCanvas(page, { x: 280, y: 240 });
+    const copied = await copySelectionToClipboardPayload(page);
+    const prioritizedPaste = await pasteClipboardPayloadWithImageFile(page, copied.payload);
+    expect(prioritizedPaste.defaultPrevented).toBe(true);
+
+    let savedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+    expect((savedProject.nodes as SavedNode[])).toHaveLength(2);
+    expect((savedProject.nodes as SavedNode[]).every((node) => node.kind === 'rectangle')).toBe(true);
+
+    await page.getByRole('button', { name: 'New' }).click();
+    const pastedImage = await pasteImageClipboardFile(page);
+    expect(pastedImage.defaultPrevented).toBe(true);
+    await openLayersTab(page);
+    await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible();
+
+    savedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+    expect(savedProject.nodes).toEqual([expect.objectContaining({ kind: 'image' })]);
+
+    await page.evaluate(() => {
+      const input = document.createElement('input');
+      input.id = 'clipboard-editable-target';
+      document.body.appendChild(input);
+      input.focus();
+    });
+    const ignoredPaste = await pasteClipboardPayloadOnActiveElement(page, copied.payload);
+    expect(ignoredPaste.defaultPrevented).toBe(false);
+
+    await page.getByRole('button', { name: 'New' }).click();
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row-select')).toHaveCount(0);
   });
 });

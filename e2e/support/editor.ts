@@ -220,6 +220,30 @@ export function createTextFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+export function createEllipseFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ellipse-item',
+    kind: 'ellipse',
+    name: 'Ellipse',
+    x: 180,
+    y: 320,
+    width: 200,
+    height: 120,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    zIndex: 2,
+    locked: false,
+    hidden: false,
+    opacity: 1,
+    shadow: DEFAULT_SHADOW,
+    fill: '#0ea5e9',
+    stroke: '#0369a1ff',
+    strokeWidth: 0,
+    ...overrides,
+  };
+}
+
 export function createLineFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: 'line-item',
@@ -243,6 +267,51 @@ export function createLineFixture(overrides: Record<string, unknown> = {}) {
     startY: 160,
     endX: 400,
     endY: 184,
+    ...overrides,
+  };
+}
+
+function buildSvgFixture() {
+  return [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">',
+    '<rect width="160" height="90" fill="#111827"/>',
+    '<circle cx="45" cy="45" r="24" fill="#22d3ee"/>',
+    '<rect x="82" y="20" width="42" height="50" rx="8" fill="#f97316"/>',
+    '</svg>',
+  ].join('');
+}
+
+export function createImageFixture(overrides: Record<string, unknown> = {}) {
+  const svg = buildSvgFixture();
+  const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
+
+  return {
+    id: 'image-item',
+    kind: 'image',
+    name: 'Image',
+    x: 520,
+    y: 320,
+    width: 160,
+    height: 90,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    zIndex: 3,
+    locked: false,
+    hidden: false,
+    opacity: 1,
+    shadow: DEFAULT_SHADOW,
+    src: dataUrl,
+    mimeType: 'image/svg+xml',
+    originalWidth: 160,
+    originalHeight: 90,
+    preserveAspectRatio: true,
+    adjustments: {
+      brightness: 100,
+      contrast: 50,
+      tintColor: '#ffffff',
+      tintStrength: 0,
+    },
     ...overrides,
   };
 }
@@ -593,13 +662,7 @@ export async function uploadProject(page: Page, document: Record<string, unknown
 }
 
 export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
-  const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90">',
-    '<rect width="160" height="90" fill="#111827"/>',
-    '<circle cx="45" cy="45" r="24" fill="#22d3ee"/>',
-    '<rect x="82" y="20" width="42" height="50" rx="8" fill="#f97316"/>',
-    '</svg>',
-  ].join('');
+  const svg = buildSvgFixture();
 
   await page.getByTestId('image-upload-input').setInputFiles({
     name,
@@ -667,6 +730,94 @@ export async function cutSelectionToClipboardPayload(page: Page) {
 
 export async function pasteClipboardPayload(page: Page, payload: Record<string, string>) {
   return dispatchBrowserClipboardEvent(page, 'paste', payload);
+}
+
+export async function pasteClipboardPayloadOnActiveElement(
+  page: Page,
+  payload: Record<string, string>,
+) {
+  return page.evaluate(({ nextPayload }) => {
+    const dataTransfer = new DataTransfer();
+    for (const [mimeType, value] of Object.entries(nextPayload)) {
+      dataTransfer.setData(mimeType, value);
+    }
+    const event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+    const target = (document.activeElement as HTMLElement | null) ?? document.body;
+    target.dispatchEvent(event);
+
+    return {
+      defaultPrevented: event.defaultPrevented,
+      payload: Object.fromEntries(
+        Array.from(dataTransfer.types, (mimeType) => [mimeType, dataTransfer.getData(mimeType)]),
+      ),
+    };
+  }, { nextPayload: payload }) as Promise<BrowserClipboardEventResult>;
+}
+
+export async function pasteImageClipboardFile(page: Page, name = 'clipboard-image.svg') {
+  const svg = buildSvgFixture();
+  return page.evaluate(({ nextName, nextSvg }) => {
+    const dataTransfer = new DataTransfer();
+    const file = new File([nextSvg], nextName, { type: 'image/svg+xml' });
+    dataTransfer.items.add(file);
+
+    const event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+    document.dispatchEvent(event);
+
+    return {
+      defaultPrevented: event.defaultPrevented,
+      payload: Object.fromEntries(
+        Array.from(dataTransfer.types, (mimeType) => [mimeType, dataTransfer.getData(mimeType)]),
+      ),
+    };
+  }, { nextName: name, nextSvg: svg }) as Promise<BrowserClipboardEventResult>;
+}
+
+export async function pasteClipboardPayloadWithImageFile(
+  page: Page,
+  payload: Record<string, string>,
+  name = 'clipboard-image.svg',
+) {
+  const svg = buildSvgFixture();
+  return page.evaluate(({ nextPayload, nextName, nextSvg }) => {
+    const dataTransfer = new DataTransfer();
+    for (const [mimeType, value] of Object.entries(nextPayload)) {
+      dataTransfer.setData(mimeType, value);
+    }
+    const file = new File([nextSvg], nextName, { type: 'image/svg+xml' });
+    dataTransfer.items.add(file);
+
+    const event = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+    document.dispatchEvent(event);
+
+    return {
+      defaultPrevented: event.defaultPrevented,
+      payload: Object.fromEntries(
+        Array.from(dataTransfer.types, (mimeType) => [mimeType, dataTransfer.getData(mimeType)]),
+      ),
+    };
+  }, { nextPayload: payload, nextName: name, nextSvg: svg }) as Promise<BrowserClipboardEventResult>;
+}
+
+export async function middleDragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {
+  const start = await canvasPointToPage(page, from);
+  const end = await canvasPointToPage(page, to);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down({ button: 'middle' });
+  await page.mouse.move(end.x, end.y, { steps });
+  await page.mouse.up({ button: 'middle' });
 }
 
 async function materializeDownload(download: Download) {

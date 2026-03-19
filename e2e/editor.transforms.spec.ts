@@ -3,8 +3,10 @@ import { expect, test } from '@playwright/test';
 import {
   captureDownload,
   clickCanvas,
+  createLineFixture,
   createProjectDocument,
   createRectangleFixture,
+  createTextFixture,
   dragCanvas,
   dragCanvasHookToPoint,
   openFreshEditor,
@@ -103,6 +105,67 @@ test.describe('editor transforms', () => {
     await page.keyboard.press('Delete');
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(0);
+  });
+
+  test('ST-04 ST-05 ST-06 ST-10 ST-11 ST-12 supports text and line transform flows', async ({
+    page,
+  }) => {
+    const text = createTextFixture({
+      id: 'transform-text',
+      x: 160,
+      y: 140,
+      width: 260,
+      height: 92,
+      text: 'Transform text',
+      zIndex: 0,
+    });
+    const line = createLineFixture({
+      id: 'transform-line',
+      x: 140,
+      y: 520,
+      startX: 140,
+      startY: 520,
+      endX: 380,
+      endY: 560,
+      width: 240,
+      height: 40,
+      zIndex: 1,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([text, line]), 'transforms-mixed.json');
+
+    await clickCanvas(page, { x: 250, y: 180 });
+    await dragCanvasHookToPoint(page, 'canvas-selected-item-overlay', { x: 340, y: 250 });
+    await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 520, y: 250 });
+    await dragCanvasHookToPoint(page, 'canvas-shape-handle-rotater', { x: 520, y: 360 });
+
+    await clickCanvas(page, { x: 230, y: 540 });
+    await dragCanvasHookToPoint(page, 'canvas-selected-item-overlay', { x: 330, y: 620 });
+    await dragCanvasHookToPoint(page, 'canvas-line-handle-start', { x: 260, y: 600 });
+    await dragCanvasHookToPoint(page, 'canvas-line-handle-end', { x: 520, y: 660 });
+
+    const savedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+
+    const savedItems = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>);
+    const savedText = savedItems.find((item) => item.id === 'transform-text');
+    const savedLine = savedItems.find((item) => item.id === 'transform-line');
+
+    expect(savedText).toEqual(expect.objectContaining({ id: 'transform-text' }));
+    expect(Number(savedText?.x)).toBeGreaterThan(160);
+    expect(Number(savedText?.y)).toBeGreaterThan(140);
+    expect(Math.abs(Number(savedText?.width) - 260)).toBeGreaterThan(40);
+    expect(Math.abs(Number(savedText?.rotation))).toBeGreaterThan(10);
+
+    expect(savedLine).toEqual(expect.objectContaining({ id: 'transform-line' }));
+    expect(Number(savedLine?.startX)).toBeGreaterThan(140);
+    expect(Number(savedLine?.startY)).toBeGreaterThan(520);
+    expect(Number(savedLine?.endX)).toBeGreaterThan(380);
+    expect(Number(savedLine?.endY)).toBeGreaterThan(560);
   });
 
   test('keeps rotated group resizing aligned to the rotated frame across repeated transforms', async ({ page }) => {

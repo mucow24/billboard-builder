@@ -3,6 +3,8 @@ Project notes for Codex and other agents working in this repo:
 - Prefer TDD whenever possible. Start with or extend tests before implementing behavior changes when the workflow is practical.
 - For changes that affect user-facing interaction or browser behavior, add top-level browser-based tests whenever practical. Do not rely only on hook tests or mocked component wiring for gestures, focus/selection behavior, keyboard shortcuts, clipboard flows, drag/drop, or other browser-mediated UI interactions.
 - Interaction-heavy features need stricter browser-test discipline:
+  - Treat `docs/canvas-interaction-matrix.md` as the source of truth for interaction scenario coverage. Update it when interaction behavior changes or when coverage status meaningfully changes.
+  - Interaction-heavy patch summaries should reference the matrix IDs for newly proven `user-flow` scenarios and must call out remaining gaps explicitly.
   - Primary acceptance tests must use the same UI entrypoint the user uses. Canvas interactions must start from the canvas, Layers interactions must start from Layers, and keyboard flows must start from real browser keyboard input.
   - Do not count preselected state, store setup, or alternate entrypoints as proof of the main user interaction path.
   - Prefer spec-first browser tests for the critical user path, and make that path go red before implementation whenever practical.
