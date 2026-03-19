@@ -36,6 +36,9 @@ This editor is organized around a small set of ownership boundaries.
 - Interaction session state, resolution, and commit math belong in pure rendering helpers, not in React hooks.
 - Inspector derivation, labeling, and edit-payload helpers belong in pure UI helper modules, not in `PropertiesPanel`.
 - `PropertiesPanel` is a shell-only entrypoint that owns tab and scroll wiring while internal inspector modules own layers and selection editing behavior.
+- `CanvasStage` is a shell-only entrypoint that composes viewport state, scene rendering, and test/debug helpers.
+- Stage viewport math belongs in `src/editor/rendering/stage/viewportMath.ts` and `useCanvasViewport.ts`, not inline in `CanvasStage`.
+- Konva scene rendering, DOM test hooks, and debug snapshot plumbing must live in separate stage modules rather than a single mixed file.
 - Avoid optional fallback APIs that duplicate behavior across hooks or layers.
 
 ## Refactor stop conditions
