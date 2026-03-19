@@ -12,6 +12,7 @@ This editor is organized around a small set of ownership boundaries.
   - May depend on `document` only.
 - `src/editor/state`
   - Owns store hosting and convenience wiring.
+  - Hosts `editor: EditorState` directly.
   - May depend on `core` and `document`, but must not add duplicate business rules.
 - `src/editor/rendering`
   - Owns Konva integration, geometry, snapping, and interaction orchestration.
@@ -32,6 +33,7 @@ This editor is organized around a small set of ownership boundaries.
 
 - App, stage, and inspector shells should orchestrate rather than own large amounts of behavior.
 - Extract pure logic before splitting JSX when refactoring large modules.
+- Interaction session state, resolution, and commit math belong in pure rendering helpers, not in React hooks.
 - Avoid optional fallback APIs that duplicate behavior across hooks or layers.
 
 ## Refactor stop conditions
