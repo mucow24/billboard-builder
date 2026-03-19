@@ -121,11 +121,15 @@ describe('SelectionInspector', () => {
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Headline' },
     });
+    fireEvent.change(screen.getByLabelText('Size'), {
+      target: { value: '1' },
+    });
     await user.click(screen.getByRole('button', { name: 'Align center' }));
     await user.click(screen.getByRole('button', { name: 'Align middle' }));
 
     expect(onItemChange).toHaveBeenCalledWith({ fontFamily: 'Arial' });
     expect(onItemChange).toHaveBeenCalledWith({ text: 'Headline' });
+    expect(onItemChange).toHaveBeenCalledWith({ fontSize: 1 });
     expect(onItemChange).toHaveBeenCalledWith({ align: 'center' });
     expect(onItemChange).toHaveBeenCalledWith({ verticalAlign: 'middle' });
   });

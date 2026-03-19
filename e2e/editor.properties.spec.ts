@@ -78,6 +78,7 @@ test.describe('editor properties flows', () => {
     await openPropertiesTab(page);
 
     await page.getByLabel('Text content').fill('Edited text from Properties');
+    await page.getByRole('spinbutton', { name: 'Size' }).fill('1');
     await page.getByTestId('font-family-picker-trigger').click();
     await page.getByRole('option', { name: 'Georgia', exact: true }).click();
     const selectedFont = (await page.getByTestId('font-family-picker-trigger').textContent())?.trim();
@@ -108,6 +109,7 @@ test.describe('editor properties flows', () => {
       expect.objectContaining({
         id: 'properties-text',
         text: 'Edited text from Properties',
+        fontSize: 1,
         fontFamily: selectedFont,
         fontWeight: 'bold',
         align: 'center',

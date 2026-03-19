@@ -87,6 +87,8 @@ interface TextSectionProps {
   onItemChange: (changes: Partial<CanvasItem>) => void;
 }
 
+const MIN_TEXT_FONT_SIZE = 1;
+
 export function TextSection({
   canToggleBold,
   canToggleItalic,
@@ -118,7 +120,7 @@ export function TextSection({
       <div className="field-grid dense-grid two-up-grid">
         <NumberInput
           label="Size"
-          min={8}
+          min={MIN_TEXT_FONT_SIZE}
           digits={0}
           value={item.fontSize}
           onChange={(value) => onItemChange({ fontSize: value })}
