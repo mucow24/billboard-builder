@@ -335,7 +335,7 @@ describe('CanvasStage viewport controls', () => {
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 63%');
   });
 
-  it('forwards group overlay drag and resize handles to the interaction session', () => {
+  it('keeps the group frame visual-only while still forwarding group resize handles', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
@@ -377,7 +377,7 @@ describe('CanvasStage viewport controls', () => {
     fireEvent.mouseDown(groupOutline!, { button: 0 });
     fireEvent.mouseDown(rightHandle!, { button: 0 });
 
-    expect(mockInteractionSession.beginGroupDrag).toHaveBeenCalledOnce();
+    expect(mockInteractionSession.beginGroupDrag).not.toHaveBeenCalled();
     expect(mockInteractionSession.beginGroupResize).toHaveBeenCalledWith(
       'middle-right',
       expect.any(Object),

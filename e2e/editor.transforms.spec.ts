@@ -14,6 +14,15 @@ import {
   uploadProject,
 } from './support/editor';
 
+function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
+  return nodes.flatMap((node) => {
+    if (node.kind === 'group' && Array.isArray(node.children)) {
+      return collectLeafNodes(node.children as Array<Record<string, unknown>>);
+    }
+    return [node];
+  });
+}
+
 function rotatePoint(
   point: { x: number; y: number },
   origin: { x: number; y: number },
@@ -82,7 +91,7 @@ test.describe('editor transforms', () => {
       })
     );
 
-    const savedItem = (savedProject.items as Array<Record<string, number | string>>).find(
+    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'shape-under-test'
     );
     expect(savedItem).toBeDefined();
@@ -159,7 +168,7 @@ test.describe('editor transforms', () => {
         await page.getByRole('button', { name: 'Save' }).click();
       })
     );
-    const resizedItems = resizedProject.items as Array<Record<string, number | string>>;
+    const resizedItems = collectLeafNodes(resizedProject.nodes as Array<Record<string, number | string>>);
     for (const rotatedItem of rotatedSelection) {
       const resizedItem = resizedSelection.find((candidate) => candidate.id === rotatedItem.id);
       expect(resizedItem).toBeDefined();
@@ -192,6 +201,6 @@ test.describe('editor transforms', () => {
       })
     );
 
-    expect(JSON.stringify(finalProject.items)).not.toBe(JSON.stringify(resizedProject.items));
+    expect(JSON.stringify(finalProject.nodes)).not.toBe(JSON.stringify(resizedProject.nodes));
   });
 });

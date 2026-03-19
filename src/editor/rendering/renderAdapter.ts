@@ -1,4 +1,9 @@
-import { flattenVisibleLeafNodes, getNodeEntry, isCanvasItemNode } from '../document/sceneGraph';
+import {
+  flattenVisibleLeafNodes,
+  getNodeEntry,
+  isCanvasItemNode,
+  isGroupNode,
+} from '../document/sceneGraph';
 import type { CanvasItem, ProjectDocument } from '../document/documentTypes';
 
 export type RenderableCanvasItem = CanvasItem & {
@@ -11,7 +16,13 @@ function getEditableGroupId(document: ProjectDocument, selectedNodeIds: string[]
     return null;
   }
   const selectedEntry = getNodeEntry(document.nodes, selectedNodeIds[0]);
-  if (!selectedEntry || !isCanvasItemNode(selectedEntry.node) || !selectedEntry.parent) {
+  if (!selectedEntry) {
+    return null;
+  }
+  if (isGroupNode(selectedEntry.node)) {
+    return selectedEntry.node.id;
+  }
+  if (!isCanvasItemNode(selectedEntry.node) || !selectedEntry.parent) {
     return null;
   }
   return selectedEntry.parent.id;

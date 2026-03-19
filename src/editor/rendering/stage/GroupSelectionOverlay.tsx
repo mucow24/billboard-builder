@@ -13,13 +13,11 @@ import {
   HANDLE_FILL,
   HANDLE_STROKE,
   SELECTION_STROKE,
-  SHADOW_MIN_ALPHA_STROKE,
 } from './renderConstants';
 import { ShapeItemView } from './ShapeItemView';
 
 interface GroupSelectionOverlayProps {
   activeTool: CanvasTool;
-  beginGroupDrag: (pointer: Point) => void;
   beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
   beginGroupRotate: (pointer: Point) => void;
   beginLineHandle: (
@@ -53,7 +51,6 @@ interface GroupSelectionOverlayProps {
 
 export function GroupSelectionOverlay({
   activeTool,
-  beginGroupDrag,
   beginGroupResize,
   beginGroupRotate,
   beginLineHandle,
@@ -113,20 +110,8 @@ export function GroupSelectionOverlay({
             stroke={SELECTION_STROKE}
             strokeWidth={2}
             dash={[8, 4]}
-            fill={SHADOW_MIN_ALPHA_STROKE}
-            onMouseDown={(event) => {
-              const pointer = event.target.getStage()?.getPointerPosition();
-              if (!pointer) {
-                return;
-              }
-              if (event.evt.button === 1) {
-                event.cancelBubble = true;
-                startPanDrag(pointer);
-                return;
-              }
-              event.cancelBubble = true;
-              beginGroupDrag(toCanvasPointer(pointer));
-            }}
+            fillEnabled={false}
+            listening={false}
           />
           <Line
             points={[

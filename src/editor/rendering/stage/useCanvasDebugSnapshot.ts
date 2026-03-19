@@ -92,6 +92,7 @@ interface UseCanvasDebugSnapshotParams {
   selectedDocumentItem: CanvasItem | null;
   selectedItemIds: string[];
   selectedItemViewportRect: { left: number; top: number; width: number; height: number } | null;
+  selectedLineHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   selectedNode: {
     rotation: () => number;
     scaleX: () => number;
@@ -100,8 +101,14 @@ interface UseCanvasDebugSnapshotParams {
     y: () => number;
   } | null;
   selectedRenderedItem: CanvasItem | null;
+  selectedShapeHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   session: { kind: string; handle?: string } | null;
+  showGroupInteractionHooks: boolean;
   stageRef: React.RefObject<Konva.Stage | null>;
+  subgroupOutlineFrames: Array<{
+    nodeId: string;
+    bounds: { x: number; y: number; width: number; height: number };
+  }>;
   viewportRef: React.RefObject<HTMLDivElement | null>;
   viewportSize: { width: number; height: number };
   zoom: number;
@@ -122,10 +129,14 @@ export function useCanvasDebugSnapshot({
   selectedDocumentItem,
   selectedItemIds,
   selectedItemViewportRect,
+  selectedLineHandleRects,
   selectedNode,
   selectedRenderedItem,
+  selectedShapeHandleRects,
   session,
+  showGroupInteractionHooks,
   stageRef,
+  subgroupOutlineFrames,
   viewportRef,
   viewportSize,
   zoom,
@@ -194,6 +205,12 @@ export function useCanvasDebugSnapshot({
       groupOverlayViewportRect,
       groupHandleViewportPoints,
       groupRotaterViewportPoint,
+      subgroupOutlineFrames: subgroupOutlineFrames.map((frame) => ({
+        ...frame.bounds,
+      })),
+      hasGroupOverlay: showGroupInteractionHooks,
+      hasShapeHandles: Boolean(selectedShapeHandleRects),
+      hasLineHandles: Boolean(selectedLineHandleRects),
       selectedItems: renderedSelectedItems.map((item) =>
         item.kind === 'line'
           ? {
@@ -236,8 +253,12 @@ export function useCanvasDebugSnapshot({
       selectedDocumentItem,
       selectedNode,
       selectedRenderedItem,
+      selectedShapeHandleRects,
+      selectedLineHandleRects,
       session,
       selectedItemViewportRect,
+      showGroupInteractionHooks,
+      subgroupOutlineFrames,
       viewportSize,
       zoom,
     ],
@@ -306,6 +327,15 @@ export function useCanvasDebugSnapshot({
       const overlay = readViewportHookRect(
         root.querySelector<HTMLElement>('[data-testid="canvas-group-overlay"]'),
       );
+      const subgroupOutlines = stage
+        .find('.subgroup-selection-outline')
+        .map((node) => {
+          const x = Number(node.getAttr('x') ?? 0);
+          const y = Number(node.getAttr('y') ?? 0);
+          const width = Number(node.getAttr('width') ?? 0);
+          const height = Number(node.getAttr('height') ?? 0);
+          return { x, y, width, height };
+        });
       const handles = Object.fromEntries(
         RESIZE_HANDLE_NAMES.flatMap((handle) => {
           const point = readViewportHookPoint(
@@ -316,6 +346,12 @@ export function useCanvasDebugSnapshot({
       );
       const rotater = readViewportHookPoint(
         root.querySelector<HTMLElement>('[data-testid="canvas-group-rotater"]'),
+      );
+      const hasShapeHandles = Boolean(
+        root.querySelector<HTMLElement>('[data-testid^="canvas-shape-handle-"]'),
+      );
+      const hasLineHandles = Boolean(
+        root.querySelector<HTMLElement>('[data-testid^="canvas-line-handle-"]'),
       );
 
       const canvasOverlay = overlay
@@ -353,6 +389,10 @@ export function useCanvasDebugSnapshot({
         groupOverlay: canvasOverlay,
         groupHandles: handles,
         groupRotater: rotater,
+        subgroupOutlines,
+        hasGroupOverlay: Boolean(canvasOverlay),
+        hasShapeHandles,
+        hasLineHandles,
       };
     }
 

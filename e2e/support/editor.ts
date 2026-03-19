@@ -53,6 +53,15 @@ export interface StageDebugInfo {
     height: number;
     rotation: number;
   } | null;
+  subgroupOutlineFrames?: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null;
+  hasGroupOverlay?: boolean;
+  hasShapeHandles?: boolean;
+  hasLineHandles?: boolean;
   selectedItems?: Array<{
     id: string;
     kind: string;
@@ -108,7 +117,30 @@ export interface RenderSnapshot {
   } | null;
   groupHandles: Record<string, CanvasPoint>;
   groupRotater: CanvasPoint | null;
+  subgroupOutlines?: Array<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> | null;
+  hasGroupOverlay?: boolean;
+  hasShapeHandles?: boolean;
+  hasLineHandles?: boolean;
 }
+
+interface CanvasFixtureBase {
+  id: string;
+  kind: string;
+  name: string;
+}
+
+export interface GroupNodeFixture extends CanvasFixtureBase {
+  kind: 'group';
+  opacity: number;
+  children: CanvasNodeFixture[];
+}
+
+export type CanvasNodeFixture = GroupNodeFixture | Record<string, unknown>;
 
 const DEFAULT_SHADOW = {
   color: '#000000',
@@ -116,6 +148,12 @@ const DEFAULT_SHADOW = {
   offsetX: 0,
   offsetY: 0,
   opacity: 0,
+};
+
+const DEFAULT_CANVAS = {
+  width: 1024,
+  height: 1024,
+  presetId: 'square-lg',
 };
 
 export function createRectangleFixture(overrides: Record<string, unknown> = {}) {
@@ -203,13 +241,11 @@ export function createLineFixture(overrides: Record<string, unknown> = {}) {
 }
 
 export function createProjectDocument(items: Array<Record<string, unknown>> = []) {
+  // Flat project fixtures are for legacy and temporary multi-select coverage.
+  // True group-node workflows should use createGroupedProjectDocument().
   return {
     version: 1,
-    canvas: {
-      width: 1024,
-      height: 1024,
-      presetId: 'square-lg',
-    },
+    canvas: DEFAULT_CANVAS,
     background: '#ffffff00',
     fonts: [],
     items: items.map((item, index) => ({
@@ -217,6 +253,157 @@ export function createProjectDocument(items: Array<Record<string, unknown>> = []
       zIndex: Number(item.zIndex ?? index),
     })),
   };
+}
+
+export function createGroupNodeFixture(
+  children: CanvasNodeFixture[] = [],
+  overrides: Partial<GroupNodeFixture> = {},
+): GroupNodeFixture {
+  return {
+    id: 'group-node',
+    kind: 'group',
+    name: 'Group',
+    opacity: 1,
+    children,
+    ...overrides,
+  };
+}
+
+interface GroupedProjectOptions {
+  background?: string;
+  canvas?: typeof DEFAULT_CANVAS;
+  fonts?: Array<Record<string, unknown>>;
+}
+
+export function createGroupedProjectDocument(
+  nodes: CanvasNodeFixture[] = [],
+  options: GroupedProjectOptions = {},
+) {
+  return {
+    version: 2,
+    canvas: options.canvas ?? DEFAULT_CANVAS,
+    background: options.background ?? '#ffffff00',
+    fonts: options.fonts ?? [],
+    nodes,
+  };
+}
+
+export function createSimpleGroupFixture() {
+  return createGroupedProjectDocument([
+    createGroupNodeFixture([
+      createRectangleFixture({
+        id: 'group-rect-1',
+        x: 140,
+        y: 160,
+        width: 140,
+        height: 80,
+        zIndex: 0,
+      }),
+      createRectangleFixture({
+        id: 'group-rect-2',
+        x: 340,
+        y: 220,
+        width: 120,
+        height: 72,
+        fill: '#0ea5e9',
+        stroke: '#0369a1ff',
+        zIndex: 1,
+      }),
+    ], {
+      id: 'simple-group',
+      name: 'Simple Group',
+    }),
+  ]);
+}
+
+export function createNestedGroupFixture() {
+  return createGroupedProjectDocument([
+    createGroupNodeFixture([
+      createRectangleFixture({
+        id: 'outer-rect',
+        x: 120,
+        y: 140,
+        width: 140,
+        height: 90,
+        zIndex: 0,
+      }),
+      createGroupNodeFixture([
+        createRectangleFixture({
+          id: 'inner-rect',
+          x: 340,
+          y: 180,
+          width: 130,
+          height: 76,
+          fill: '#22c55e',
+          stroke: '#15803dff',
+          zIndex: 1,
+        }),
+      ], {
+        id: 'inner-group',
+        name: 'Inner Group',
+      }),
+    ], {
+      id: 'outer-group',
+      name: 'Outer Group',
+    }),
+  ]);
+}
+
+export function createMixedShapeTextGroupFixture() {
+  return createGroupedProjectDocument([
+    createGroupNodeFixture([
+      createRectangleFixture({
+        id: 'mixed-rect',
+        x: 140,
+        y: 180,
+        width: 220,
+        height: 140,
+        zIndex: 0,
+      }),
+      createTextFixture({
+        id: 'mixed-text',
+        x: 200,
+        y: 210,
+        width: 260,
+        height: 90,
+        text: 'Grouped text',
+        zIndex: 1,
+      }),
+    ], {
+      id: 'mixed-shape-text-group',
+      name: 'Mixed Shape Text',
+    }),
+  ]);
+}
+
+export function createMixedShapeLineGroupFixture() {
+  return createGroupedProjectDocument([
+    createGroupNodeFixture([
+      createRectangleFixture({
+        id: 'line-group-rect',
+        x: 140,
+        y: 160,
+        width: 180,
+        height: 100,
+        zIndex: 0,
+      }),
+      createLineFixture({
+        id: 'line-group-line',
+        x: 180,
+        y: 220,
+        startX: 180,
+        startY: 220,
+        endX: 440,
+        endY: 280,
+        width: 260,
+        height: 60,
+        zIndex: 1,
+      }),
+    ], {
+      id: 'mixed-shape-line-group',
+      name: 'Mixed Shape Line',
+    }),
+  ]);
 }
 
 export async function waitForEditor(page: Page) {
@@ -280,6 +467,11 @@ export async function clickCanvas(page: Page, point: CanvasPoint) {
   await page.mouse.click(target.x, target.y);
 }
 
+export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
+  const target = await canvasPointToPage(page, point);
+  await page.mouse.dblclick(target.x, target.y);
+}
+
 export async function dragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {
   const start = await canvasPointToPage(page, from);
   const end = await canvasPointToPage(page, to);
@@ -293,6 +485,7 @@ export async function setCanvasTestHooksEnabled(page: Page, enabled: boolean) {
   await page.evaluate((nextEnabled) => {
     const hooks = document.querySelector<HTMLElement>('[data-testid="canvas-test-hooks"]');
     if (hooks) {
+      hooks.style.display = nextEnabled ? '' : 'none';
       hooks.style.pointerEvents = nextEnabled ? 'auto' : 'none';
     }
   }, enabled);
@@ -376,6 +569,14 @@ export async function openPropertiesTab(page: Page) {
   await page.getByRole('tab', { name: 'Properties' }).click();
 }
 
+export async function clickLayerRow(page: Page, name: string) {
+  await page.getByRole('button', { name, exact: true }).click();
+}
+
+export async function doubleClickLayerRow(page: Page, name: string) {
+  await page.getByRole('button', { name, exact: true }).dblclick();
+}
+
 export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
   await page.getByTestId('project-open-input').setInputFiles({
     name: fileName,
@@ -412,6 +613,14 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
   return download;
 }
 
+export async function saveAndReadProject(page: Page) {
+  return readDownloadedJson(
+    await captureDownload(page, async () => {
+      await page.getByRole('button', { name: 'Save' }).click();
+    }),
+  );
+}
+
 async function materializeDownload(download: Download) {
   const existingPath = await download.path();
   if (existingPath) {
@@ -426,6 +635,28 @@ export async function readDownloadedJson(download: Download) {
   const filePath = await materializeDownload(download);
   const raw = await fs.readFile(filePath, 'utf8');
   return JSON.parse(raw) as Record<string, unknown>;
+}
+
+export async function assertNoDocumentTextSelection(page: Page) {
+  const selectionText = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+  expect(selectionText).toBe('');
+}
+
+export async function assertFocusNotInToolbarOrInputs(page: Page) {
+  const focusInfo = await page.evaluate(() => {
+    const active = document.activeElement as HTMLElement | null;
+    if (!active) {
+      return { tagName: null, inToolbar: false, dataTestId: null };
+    }
+    return {
+      tagName: active.tagName,
+      inToolbar: Boolean(active.closest('.top-toolbar')),
+      dataTestId: active.getAttribute('data-testid'),
+    };
+  });
+
+  expect(focusInfo.inToolbar).toBe(false);
+  expect(['INPUT', 'TEXTAREA', 'SELECT']).not.toContain(focusInfo.tagName);
 }
 
 export async function readDownloadedPngSize(download: Download) {

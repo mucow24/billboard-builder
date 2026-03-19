@@ -22,7 +22,6 @@ import { SingleSelectionOverlay } from './SingleSelectionOverlay';
 
 interface CanvasSceneProps {
   activeTool: CanvasTool;
-  beginGroupDrag: (pointer: Point) => void;
   beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
   beginGroupRotate: (pointer: Point) => void;
   beginLineHandle: (
@@ -91,7 +90,6 @@ interface CanvasSceneProps {
 
 export function CanvasScene({
   activeTool,
-  beginGroupDrag,
   beginGroupResize,
   beginGroupRotate,
   beginLineHandle,
@@ -209,7 +207,6 @@ export function CanvasScene({
             {showGroupSelection && groupOverlayFrame ? (
               <GroupSelectionOverlay
                 activeTool={activeTool}
-                beginGroupDrag={beginGroupDrag}
                 beginGroupResize={beginGroupResize}
                 beginGroupRotate={beginGroupRotate}
                 beginLineHandle={beginLineHandle}

@@ -3,10 +3,12 @@ import type Konva from 'konva';
 
 import {
   isCreateTool,
+  stageToLocal,
   type Point,
   type ResizeHandle,
 } from './interactionGeometry';
 import {
+  getRenderBox,
   getSelectionFrameForRotation,
   getSelectionRenderBounds,
 } from './transformGeometry';
@@ -60,6 +62,37 @@ interface UseCanvasInteractionSessionParams {
   onAddItem: (item: CanvasItem) => void;
   onSetActiveTool: (tool: CanvasTool) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
+}
+
+function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point) {
+  if (item.kind === 'line') {
+    const left = Math.min(item.startX, item.endX) - Math.max(item.strokeWidth / 2, 8);
+    const right = Math.max(item.startX, item.endX) + Math.max(item.strokeWidth / 2, 8);
+    const top = Math.min(item.startY, item.endY) - Math.max(item.strokeWidth / 2, 8);
+    const bottom = Math.max(item.startY, item.endY) + Math.max(item.strokeWidth / 2, 8);
+    return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+  }
+
+  const renderBox = getRenderBox(item);
+  const local = stageToLocal(point, { x: renderBox.x, y: renderBox.y }, item.rotation);
+  return (
+    local.x >= 0 &&
+    local.x <= renderBox.width &&
+    local.y >= 0 &&
+    local.y <= renderBox.height
+  );
+}
+
+function getGroupDescendantAtPoint(
+  renderedItems: RenderableCanvasItem[],
+  groupId: string,
+  point: Point,
+) {
+  return renderedItems
+    .filter((item) => item.groupPath.includes(groupId))
+    .slice()
+    .reverse()
+    .find((item) => pointHitsRenderableItem(item, point)) ?? null;
 }
 
 export function useCanvasInteractionSession({
@@ -428,6 +461,22 @@ export function useCanvasInteractionSession({
       onToggleSelectItem(selectionNodeId);
       return;
     }
+    if (selectedItemIds.length === 1) {
+      const selectedNodeId = selectedItemIds[0];
+      const selectedNode = getNodeById(document.nodes, selectedNodeId);
+      if (selectedNode && isGroupNode(selectedNode)) {
+        const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedNodeId, item.id);
+        if (nextNodeId && nextNodeId !== selectedNodeId) {
+          onSelectItem(nextNodeId);
+          if (nextNodeId === item.id) {
+            beginDrag(item, pointer);
+            return;
+          }
+          beginGroupDragForNode(nextNodeId, pointer);
+          return;
+        }
+      }
+    }
     if (selectedIdSet.has(selectionNodeId)) {
       if (selectedItems.length > 1) {
         beginGroupDrag(pointer);
@@ -446,7 +495,17 @@ export function useCanvasInteractionSession({
     if (selectionNodeId === item.id) {
       beginDrag(item, pointer);
     }
-  }, [beginDrag, beginGroupDrag, beginGroupDragForNode, onSelectItem, onToggleSelectItem, selectedIdSet, selectedItems.length]);
+  }, [
+    beginDrag,
+    beginGroupDrag,
+    beginGroupDragForNode,
+    document.nodes,
+    onSelectItem,
+    onToggleSelectItem,
+    selectedIdSet,
+    selectedItemIds,
+    selectedItems.length,
+  ]);
 
   const handleItemDoubleClick = useCallback((item: CanvasItem) => {
     if (selectedItemIds.length !== 1) {
@@ -464,6 +523,31 @@ export function useCanvasInteractionSession({
     const stage = event.target.getStage();
     const rawPointer = stage?.getPointerPosition();
     const pointer = rawPointer ? { x: (rawPointer.x - viewport.panX) / viewport.zoom, y: (rawPointer.y - viewport.panY) / viewport.zoom } : null;
+    if (
+      pointer &&
+      activeTool === 'select' &&
+      event.evt?.button !== 1 &&
+      selectedItemIds.length === 1
+    ) {
+      const selectedNodeId = selectedItemIds[0];
+      const selectedNode = getNodeById(document.nodes, selectedNodeId);
+      if (selectedNode && isGroupNode(selectedNode)) {
+        const drilledItem = getGroupDescendantAtPoint(renderedItems, selectedNodeId, pointer);
+        const nextNodeId = drilledItem
+          ? getNextDrilldownNodeId(document.nodes, selectedNodeId, drilledItem.id)
+          : null;
+        if (drilledItem && nextNodeId && nextNodeId !== selectedNodeId) {
+          onGuidesChange([]);
+          onSelectItem(nextNodeId);
+          if (nextNodeId === drilledItem.id) {
+            beginDrag(drilledItem, pointer);
+            return;
+          }
+          beginGroupDragForNode(nextNodeId, pointer);
+          return;
+        }
+      }
+    }
     const isCanvasSurface = target === stage || target.hasName?.('canvas-surface') || target.hasName?.('canvas-background') || target.hasName?.('canvas-backdrop') || target.name() === 'canvas-surface' || target.name() === 'canvas-background' || target.name() === 'canvas-backdrop';
     if (!pointer || !isCanvasSurface) return;
     if (isCreateTool(activeTool)) {
@@ -479,7 +563,21 @@ export function useCanvasInteractionSession({
     }
     onGuidesChange([]);
     onSelectItem(undefined);
-  }, [activeTool, beginCreate, onGuidesChange, onSelectItem, updateSession, viewport.panX, viewport.panY, viewport.zoom]);
+  }, [
+    activeTool,
+    beginCreate,
+    beginDrag,
+    beginGroupDragForNode,
+    document.nodes,
+    onGuidesChange,
+    onSelectItem,
+    renderedItems,
+    selectedItemIds,
+    updateSession,
+    viewport.panX,
+    viewport.panY,
+    viewport.zoom,
+  ]);
 
   const handleStageMouseUp = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
     if (!sessionRef.current) return;

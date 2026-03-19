@@ -33,6 +33,7 @@ describe('useCanvasDebugSnapshot', () => {
         selectedDocumentItem: rectangle,
         selectedItemIds: [rectangle.id],
         selectedItemViewportRect: { left: 110, top: 140, width: 160, height: 100 },
+        selectedLineHandleRects: null,
         selectedNode: {
           x: () => rectangle.x,
           y: () => rectangle.y,
@@ -41,8 +42,11 @@ describe('useCanvasDebugSnapshot', () => {
           scaleY: () => rectangle.scaleY,
         },
         selectedRenderedItem: rectangle,
+        selectedShapeHandleRects: { rotater: { left: 140, top: 70, width: 16, height: 16 } },
         session: { kind: 'group-resize', handle: 'middle-right' },
+        showGroupInteractionHooks: true,
         stageRef: { current: null },
+        subgroupOutlineFrames: [{ nodeId: 'group-1', bounds: { x: 8, y: 18, width: 84, height: 54 } }],
         viewportRef: { current: null },
         viewportSize: { width: 1280, height: 720 },
         zoom: 2,
@@ -65,6 +69,12 @@ describe('useCanvasDebugSnapshot', () => {
     expect(result.current.groupFrame).toEqual(
       expect.objectContaining({ x: 10, y: 20, width: 80, height: 50, rotation: 15 }),
     );
+    expect(result.current.subgroupOutlineFrames).toEqual([
+      expect.objectContaining({ x: 8, y: 18, width: 84, height: 54 }),
+    ]);
+    expect(result.current.hasGroupOverlay).toBe(true);
+    expect(result.current.hasShapeHandles).toBe(true);
+    expect(result.current.hasLineHandles).toBe(false);
 
     unmount();
     expect(window.__BB_TEST__).toBeUndefined();
@@ -112,8 +122,11 @@ describe('useCanvasDebugSnapshot', () => {
         toJSON: () => ({}),
       }) as DOMRect;
 
+    const shapeHandle = document.createElement('div');
+    shapeHandle.dataset.testid = 'canvas-shape-handle-rotater';
+
     const root = document.createElement('div');
-    root.append(overlay, handle, rotater);
+    root.append(overlay, handle, rotater, shapeHandle);
 
     const stageNode = {
       findOne: (selector: string) => {
@@ -131,6 +144,29 @@ describe('useCanvasDebugSnapshot', () => {
           };
         }
         return null;
+      },
+      find: (selector: string) => {
+        if (selector === '.subgroup-selection-outline') {
+          return [
+            {
+              getAttr: (name: string) => {
+                switch (name) {
+                  case 'x':
+                    return 14;
+                  case 'y':
+                    return 22;
+                  case 'width':
+                    return 108;
+                  case 'height':
+                    return 76;
+                  default:
+                    return null;
+                }
+              },
+            },
+          ];
+        }
+        return [];
       },
     };
 
@@ -150,10 +186,14 @@ describe('useCanvasDebugSnapshot', () => {
         selectedDocumentItem: rectangle,
         selectedItemIds: ['shape', 'line'],
         selectedItemViewportRect: null,
+        selectedLineHandleRects: { start: { left: 10, top: 20, width: 16, height: 16 } },
         selectedNode: null,
         selectedRenderedItem: rectangle,
+        selectedShapeHandleRects: { rotater: { left: 140, top: 70, width: 16, height: 16 } },
         session: { kind: 'group-drag' },
+        showGroupInteractionHooks: true,
         stageRef: { current: stageNode as never },
+        subgroupOutlineFrames: [{ nodeId: 'group-1', bounds: { x: 14, y: 22, width: 108, height: 76 } }],
         viewportRef: { current: root },
         viewportSize: { width: 1280, height: 720 },
         zoom: 2,
@@ -166,6 +206,10 @@ describe('useCanvasDebugSnapshot', () => {
       groupOverlay: { rotation: number; width: number };
       groupHandles: Record<string, { x: number; y: number }>;
       groupRotater: { x: number; y: number };
+      subgroupOutlines: Array<{ x: number; y: number; width: number; height: number }>;
+      hasGroupOverlay: boolean;
+      hasShapeHandles: boolean;
+      hasLineHandles: boolean;
     };
 
     expect(snapshot.sessionKind).toBe('group-drag');
@@ -188,5 +232,11 @@ describe('useCanvasDebugSnapshot', () => {
       expect.objectContaining({ x: 218, y: 158 }),
     );
     expect(snapshot.groupRotater).toEqual(expect.objectContaining({ x: 188, y: 78 }));
+    expect(snapshot.subgroupOutlines).toEqual([
+      expect.objectContaining({ x: 14, y: 22, width: 108, height: 76 }),
+    ]);
+    expect(snapshot.hasGroupOverlay).toBe(true);
+    expect(snapshot.hasShapeHandles).toBe(true);
+    expect(snapshot.hasLineHandles).toBe(false);
   });
 });

@@ -5,6 +5,9 @@ import { expect, test } from '@playwright/test';
 import {
   captureDownload,
   clearPersistence,
+  clickCanvas,
+  createGroupNodeFixture,
+  createGroupedProjectDocument,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
@@ -14,6 +17,7 @@ import {
   openPropertiesTab,
   readDownloadedJson,
   readDownloadedPngSize,
+  setCanvasTestHooksEnabled,
   seedPersistence,
   uploadFont,
   uploadProject,
@@ -57,7 +61,8 @@ test.describe('editor file and persistence flows', () => {
     });
     const savedDocument = await readDownloadedJson(projectDownload);
 
-    expect((savedDocument.items as Array<unknown>).length).toBe(2);
+    expect(savedDocument.version).toBe(2);
+    expect((savedDocument.nodes as Array<unknown>).length).toBe(2);
     expect(savedDocument.canvas).toEqual(document.canvas);
 
     await page.getByRole('button', { name: 'New' }).click();
@@ -97,5 +102,88 @@ test.describe('editor file and persistence flows', () => {
     await waitForEditor(page);
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(0);
+  });
+
+  test('round-trips grouped documents through save/open and restores grouped persistence on reload', async ({ page }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'persisted-group-rect',
+            name: 'Persisted Group Rect',
+            x: 180,
+            y: 220,
+            width: 180,
+            height: 120,
+            zIndex: 0,
+          }),
+          createTextFixture({
+            id: 'persisted-group-text',
+            name: 'Persisted Group Text',
+            x: 230,
+            y: 250,
+            width: 220,
+            height: 80,
+            text: 'Persisted group',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'persisted-group',
+          name: 'Persisted Group',
+          opacity: 0.72,
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'persisted-group.json');
+
+    const savedGroupedDocument = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+
+    expect(savedGroupedDocument.version).toBe(2);
+    expect(savedGroupedDocument.nodes).toEqual([
+      expect.objectContaining({
+        id: 'persisted-group',
+        kind: 'group',
+        opacity: 0.72,
+        children: [
+          expect.objectContaining({ id: 'persisted-group-rect' }),
+          expect.objectContaining({ id: 'persisted-group-text' }),
+        ],
+      }),
+    ]);
+
+    await page.getByRole('button', { name: 'New' }).click();
+    await uploadProject(page, savedGroupedDocument, 'persisted-group-roundtrip.json');
+
+    await openLayersTab(page);
+    await expect(page.getByRole('button', { name: 'Persisted Group', exact: true })).toBeVisible();
+    const persistedChevron = page.getByRole('button', { name: /^(Expand|Collapse) Persisted Group$/ });
+    const persistedChevronLabel = await persistedChevron.getAttribute('aria-label');
+    if (persistedChevronLabel?.startsWith('Expand')) {
+      await persistedChevron.click();
+    }
+    await expect(page.getByRole('button', { name: 'Rectangle', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeVisible();
+
+    await setCanvasTestHooksEnabled(page, false);
+    await clickCanvas(page, { x: 220, y: 260 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
+
+    await primePersistenceBeforeLoad(page, savedGroupedDocument);
+    await page.goto('/');
+    await waitForEditor(page);
+    await openLayersTab(page);
+    await expect(page.getByRole('button', { name: 'Persisted Group', exact: true })).toBeVisible();
+    await setCanvasTestHooksEnabled(page, false);
+    await clickCanvas(page, { x: 220, y: 260 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
   });
 });

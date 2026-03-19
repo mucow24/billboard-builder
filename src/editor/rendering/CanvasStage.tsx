@@ -146,10 +146,14 @@ export function CanvasStage({
     selectedDocumentItem,
     selectedItemIds,
     selectedItemViewportRect,
+    selectedLineHandleRects,
     selectedNode,
     selectedRenderedItem,
+    selectedShapeHandleRects,
     session,
+    showGroupInteractionHooks,
     stageRef,
+    subgroupOutlineFrames,
     viewportRef: viewport.viewportRef,
     viewportSize: viewport.viewportSize,
     zoom: viewport.zoom,
@@ -172,7 +176,6 @@ export function CanvasStage({
       />
       <CanvasScene
         activeTool={activeTool}
-        beginGroupDrag={beginGroupDrag}
         beginGroupResize={beginGroupResize}
         beginGroupRotate={beginGroupRotate}
         beginLineHandle={beginLineHandle}

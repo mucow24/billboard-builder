@@ -986,6 +986,70 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
+  it('drills into the next descendant on item pointer down when a group is selected', () => {
+    const nestedLeaf = createRectangleItem({ id: 'nested-leaf' });
+    const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
+    nestedGroup.id = 'nested-group';
+    const outerGroup = createGroupNode([nestedGroup], 'Outer');
+    outerGroup.id = 'outer-group';
+    const params = createHookParams({
+      document: createDocument([outerGroup]),
+      selectedItemIds: [outerGroup.id],
+    });
+    const { result, rerender } = renderHook(
+      (hookParams) => useCanvasInteractionSession(hookParams),
+      { initialProps: params },
+    );
+
+    act(() => {
+      result.current.handleItemPointerDown(nestedLeaf, outerGroup.id, { x: 120, y: 120 }, false);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+    expect(result.current.session).toBeNull();
+
+    const innerParams = {
+      ...params,
+      onSelectItem: vi.fn(),
+      selectedItemIds: [nestedGroup.id],
+    };
+    rerender(innerParams);
+
+    act(() => {
+      result.current.handleItemPointerDown(nestedLeaf, nestedGroup.id, { x: 120, y: 120 }, false);
+    });
+
+    expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
+    expect(result.current.session?.kind).toBe('drag');
+  });
+
+  it('drills into the next descendant from a stage mouse down when a selected group click resolves as canvas surface input', () => {
+    const nestedLeaf = createRectangleItem({
+      id: 'nested-leaf',
+      x: 340,
+      y: 180,
+      width: 130,
+      height: 76,
+    });
+    const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
+    nestedGroup.id = 'nested-group';
+    const outerGroup = createGroupNode([nestedGroup], 'Outer');
+    outerGroup.id = 'outer-group';
+    const params = createHookParams({
+      document: createDocument([outerGroup]),
+      selectedItemIds: [outerGroup.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleStageMouseDown(
+        makeStageEvent({ x: 360, y: 200 }, 'canvas-background'),
+      );
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+  });
+
   it('drills into the next descendant on item double-click when a group is selected', () => {
     const nestedLeaf = createRectangleItem({ id: 'nested-leaf' });
     const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
