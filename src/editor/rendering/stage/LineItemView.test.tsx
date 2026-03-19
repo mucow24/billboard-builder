@@ -86,7 +86,13 @@ describe('LineItemView', () => {
     fireEvent.mouseDown(lineNode!, { button: 0 });
     fireEvent.mouseDown(handleNode!, { button: 0 });
 
-    expect(onItemPointerDown).toHaveBeenCalledWith(line, line.id, { x: 240, y: 160 }, false);
+    expect(onItemPointerDown).toHaveBeenCalledWith(
+      line,
+      line.id,
+      { x: 240, y: 160 },
+      false,
+      expect.anything(),
+    );
     expect(onBeginLineHandle).toHaveBeenCalledWith(line, 'start', { x: 240, y: 160 });
   });
 

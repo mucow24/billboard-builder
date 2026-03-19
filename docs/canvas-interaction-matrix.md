@@ -44,6 +44,8 @@ For any interaction-heavy patch, use this matrix to decide what must be tested, 
 - canvas select group
 - canvas drill into child
 - canvas switch to sibling child
+- canvas pickup drag from an unselected item
+- canvas pickup drag from an unselected group
 - canvas child drag without parent movement
 - escape climb
 - blank-canvas clear
@@ -86,6 +88,7 @@ For any interaction-heavy patch, use this matrix to decide what must be tested, 
 | CS-11 | Canvas | Select tool | Mouse down/up without marquee movement | No accidental marquee UI remains | No selection change from zero-distance marquee | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | CS-12 | Canvas | Locked item visible | Click locked item | No manipulation starts | No drag/resize/rotate session | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | CS-13 | Canvas | Hidden item in document | Attempt click at hidden item position | No hidden affordance | Hidden item not selected | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
+| CS-14 | Canvas | Select tool, a different item may already be selected, visible leaf item is unselected | Mouse down on item body, drag, then mouse up | Drag target selects and moves in one gesture | Pickup drag commits without needing a prior selection click | user-flow | Chromium + cross-browser subset | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 
 ## 2. Group and Drill-In Flows
 
@@ -156,6 +159,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | GT-07 | Canvas | Group already rotated | Drag again | Overlay stays coherent | Rotated group drags correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-08 | Canvas | Group already rotated | Resize again | Overlay and items stay coherent | Rotated group resizes correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-09 | Canvas | Group with line + shape | Transform group | Handles, preview, and result stay coherent | Mixed descendants transform correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GT-10 | Canvas | Real group node is unselected | Mouse down on grouped content, drag, then mouse up | Group overlay appears and the group moves in one gesture | Group pickup drag commits without needing a prior selection click | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 
 ## 6. Viewport and Navigation Flows
 

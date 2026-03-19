@@ -35,7 +35,8 @@ interface ShapeItemViewProps {
     item: ShapeItem,
     selectionNodeId: string,
     pointer: Point,
-    shiftKey: boolean
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
   ) => void;
   renderContent?: boolean;
   renderHandles?: boolean;
@@ -91,7 +92,13 @@ export function ShapeItemView({
               return;
             }
             event.cancelBubble = true;
-            onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
+            onItemPointerDown(
+              item,
+              selectableNodeId,
+              toCanvasPointer(pointer),
+              event.evt.shiftKey,
+              event.evt,
+            );
           }}
           onTap={() => {
             if (interactionEnabled) {
@@ -193,7 +200,13 @@ export function ShapeItemView({
                 return;
               }
               event.cancelBubble = true;
-              onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
+              onItemPointerDown(
+                item,
+                selectableNodeId,
+                toCanvasPointer(pointer),
+                event.evt.shiftKey,
+                event.evt,
+              );
             }}
           >
             <Rect

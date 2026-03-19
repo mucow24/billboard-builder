@@ -8,6 +8,7 @@ interface BuildStageSceneHandlersParams {
   handleScenePointerMove: (pointer: { x: number; y: number } | null) => void;
   handleScenePointerUp: () => boolean;
   handleStageMouseDown: (event: KonvaEventObject<MouseEvent>) => void;
+  handleStagePointerMove: (event: KonvaEventObject<MouseEvent>) => void;
   handleStageMouseUp: (event: KonvaEventObject<MouseEvent>) => void;
   hasActiveSession: boolean;
   isPanGesture: (event: MouseEvent, hasActiveSession: boolean) => boolean;
@@ -21,6 +22,7 @@ export function buildStageSceneHandlers({
   handleScenePointerMove,
   handleScenePointerUp,
   handleStageMouseDown,
+  handleStagePointerMove,
   handleStageMouseUp,
   hasActiveSession,
   isPanGesture,
@@ -42,7 +44,9 @@ export function buildStageSceneHandlers({
       handleStageMouseDown(event);
     },
     onStageMouseMove(event: KonvaEventObject<MouseEvent>) {
-      handleScenePointerMove(event.target.getStage()?.getPointerPosition() ?? null);
+      const pointer = event.target.getStage()?.getPointerPosition() ?? null;
+      handleScenePointerMove(pointer);
+      handleStagePointerMove(event);
     },
     onStageMouseUp(event: KonvaEventObject<MouseEvent>) {
       if (handleScenePointerUp()) {

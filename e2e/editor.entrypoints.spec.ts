@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  beginCanvasDrag,
   clickCanvas,
   createEllipseFixture,
   createImageFixture,
@@ -10,9 +11,13 @@ import {
   createTextFixture,
   dragCanvas,
   middleDragCanvas,
+  movePointerToCanvasPoint,
   openFreshEditor,
   openPropertiesTab,
+  readRenderSnapshot,
   readStageDebug,
+  releasePointer,
+  saveAndReadProject,
   selectTool,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -21,6 +26,125 @@ import {
 async function expectNoActiveSelection(page: Page) {
   await expect(page.locator('.layer-row.active')).toHaveCount(0);
 }
+
+interface LeafPickupCase {
+  id: string;
+  kind: 'rectangle' | 'ellipse' | 'text' | 'image' | 'line';
+  name: string;
+  item: Record<string, unknown>;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+  expectCommittedMovement: (savedItem: Record<string, unknown>) => void;
+}
+
+const leafPickupCases: LeafPickupCase[] = [
+  {
+    id: 'pickup-rect',
+    kind: 'rectangle',
+    name: 'Rectangle',
+    item: createRectangleFixture({
+      id: 'pickup-rect',
+      name: 'Pickup Rectangle',
+      x: 140,
+      y: 160,
+      width: 180,
+      height: 110,
+    }),
+    from: { x: 200, y: 220 },
+    to: { x: 320, y: 300 },
+    expectCommittedMovement(savedItem) {
+      expect(Number(savedItem.x)).toBeGreaterThan(220);
+      expect(Number(savedItem.y)).toBeGreaterThan(220);
+    },
+  },
+  {
+    id: 'pickup-ellipse',
+    kind: 'ellipse',
+    name: 'Ellipse',
+    item: createEllipseFixture({
+      id: 'pickup-ellipse',
+      name: 'Pickup Ellipse',
+      x: 180,
+      y: 140,
+      width: 180,
+      height: 120,
+      zIndex: 0,
+    }),
+    from: { x: 240, y: 200 },
+    to: { x: 360, y: 290 },
+    expectCommittedMovement(savedItem) {
+      expect(Number(savedItem.x)).toBeGreaterThan(260);
+      expect(Number(savedItem.y)).toBeGreaterThan(200);
+    },
+  },
+  {
+    id: 'pickup-text',
+    kind: 'text',
+    name: 'Text',
+    item: createTextFixture({
+      id: 'pickup-text',
+      name: 'Pickup Text',
+      x: 150,
+      y: 160,
+      width: 260,
+      height: 96,
+      text: 'Pickup text',
+      zIndex: 0,
+    }),
+    from: { x: 230, y: 205 },
+    to: { x: 350, y: 285 },
+    expectCommittedMovement(savedItem) {
+      expect(Number(savedItem.x)).toBeGreaterThan(240);
+      expect(Number(savedItem.y)).toBeGreaterThan(220);
+    },
+  },
+  {
+    id: 'pickup-image',
+    kind: 'image',
+    name: 'Image',
+    item: createImageFixture({
+      id: 'pickup-image',
+      name: 'Pickup Image',
+      x: 180,
+      y: 160,
+      width: 160,
+      height: 90,
+      zIndex: 0,
+    }),
+    from: { x: 230, y: 200 },
+    to: { x: 350, y: 285 },
+    expectCommittedMovement(savedItem) {
+      expect(Number(savedItem.x)).toBeGreaterThan(260);
+      expect(Number(savedItem.y)).toBeGreaterThan(220);
+    },
+  },
+  {
+    id: 'pickup-line',
+    kind: 'line',
+    name: 'Line',
+    item: createLineFixture({
+      id: 'pickup-line',
+      name: 'Pickup Line',
+      x: 140,
+      y: 520,
+      startX: 140,
+      startY: 520,
+      endX: 420,
+      endY: 560,
+      width: 280,
+      height: 40,
+      zIndex: 0,
+    }),
+    from: { x: 220, y: 540 },
+    to: { x: 340, y: 620 },
+    expectCommittedMovement(savedItem) {
+      expect(Number(savedItem.startX)).toBeGreaterThan(220);
+      expect(Number(savedItem.startY)).toBeGreaterThan(580);
+      expect(Number(savedItem.endX)).toBeGreaterThan(500);
+      expect(Number(savedItem.endY)).toBeGreaterThan(620);
+    },
+  },
+];
 
 test.describe('editor canvas entrypoints', () => {
   test('CS-02 CS-03 CS-04 CS-05 CS-06 CS-08 CS-09 CS-11 CS-12 CS-13 selects visible item kinds and honors toggle, marquee, locked, and hidden behavior', async ({
@@ -207,4 +331,79 @@ test.describe('editor canvas entrypoints', () => {
     stageDebug = await readStageDebug(page);
     expect(stageDebug.viewport.zoom).toBeGreaterThan(0.5);
   });
+
+  for (const pickupCase of leafPickupCases) {
+    test(`CS-14 starts a one-gesture pickup drag from an unselected ${pickupCase.kind} item on the canvas`, async ({
+      page,
+    }) => {
+      const alreadySelected = createRectangleFixture({
+        id: `selected-before-${pickupCase.id}`,
+        name: 'Already Selected Rectangle',
+        x: 40,
+        y: 40,
+        width: 120,
+        height: 80,
+        zIndex: 0,
+      });
+
+      await openFreshEditor(page);
+      await uploadProject(
+        page,
+        createProjectDocument([
+          alreadySelected,
+          {
+            ...pickupCase.item,
+            zIndex: 1,
+          },
+        ]),
+        `${pickupCase.id}.json`,
+      );
+      await setCanvasTestHooksEnabled(page, false);
+
+      await clickCanvas(page, { x: 90, y: 80 });
+      let stageDebug = await readStageDebug(page);
+      expect(stageDebug.hasShapeHandles).toBe(true);
+      expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual([alreadySelected.id]);
+
+      await beginCanvasDrag(page, pickupCase.from);
+      await movePointerToCanvasPoint(page, pickupCase.to);
+      await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
+
+      const previewSnapshot = await readRenderSnapshot(page);
+      expect(previewSnapshot.selectedItemIds).toEqual([pickupCase.id]);
+      expect(previewSnapshot.selectedItems).toHaveLength(1);
+
+      const previewItem = previewSnapshot.selectedItems[0];
+      expect(previewItem.id).toBe(pickupCase.id);
+      expect(previewItem.geometry.x).toBeGreaterThan(
+        Number((pickupCase.item.x ?? pickupCase.item.startX) as number),
+      );
+      expect(previewItem.geometry.y).toBeGreaterThan(
+        Number((pickupCase.item.y ?? pickupCase.item.startY) as number),
+      );
+
+      await releasePointer(page);
+
+      stageDebug = await readStageDebug(page);
+      expect(stageDebug.hasGroupOverlay).toBe(false);
+      expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual([pickupCase.id]);
+      if (pickupCase.kind === 'line') {
+        expect(stageDebug.hasLineHandles).toBe(true);
+        expect(stageDebug.hasShapeHandles).toBe(false);
+      } else {
+        expect(stageDebug.hasShapeHandles).toBe(true);
+        expect(stageDebug.hasLineHandles).toBe(false);
+      }
+
+      const savedProject = await saveAndReadProject(page);
+      const savedItem = (savedProject.nodes as Array<Record<string, unknown>>).find(
+        (item) => item.id === pickupCase.id,
+      );
+      expect(savedItem).toEqual(expect.objectContaining({ id: pickupCase.id }));
+      if (!savedItem) {
+        throw new Error(`Expected saved item ${pickupCase.id}.`);
+      }
+      pickupCase.expectCommittedMovement(savedItem);
+    });
+  }
 });

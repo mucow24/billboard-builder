@@ -42,7 +42,8 @@ interface GroupSelectionOverlayProps {
     item: CanvasItem,
     selectionNodeId: string,
     pointer: Point,
-    shiftKey: boolean
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
   ) => void;
   renderedSelectedItems: RenderableCanvasItem[];
   startPanDrag: (pointer: Point) => void;

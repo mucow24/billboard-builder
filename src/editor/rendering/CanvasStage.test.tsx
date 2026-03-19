@@ -16,6 +16,7 @@ const { mockInteractionSession } = vi.hoisted(() => ({
     handleItemDoubleClick: vi.fn(),
     handleItemPointerDown: vi.fn(),
     handleStageMouseDown: vi.fn(),
+    handleStagePointerMove: vi.fn(),
     handleStageMouseUp: vi.fn(),
     nodeClientRect: null,
     registerShapeRef: vi.fn(),
@@ -155,6 +156,7 @@ describe('CanvasStage viewport controls', () => {
       handleItemDoubleClick: vi.fn(),
       handleItemPointerDown: vi.fn(),
       handleStageMouseDown: vi.fn(),
+      handleStagePointerMove: vi.fn(),
       handleStageMouseUp: vi.fn(),
       nodeClientRect: null,
       registerShapeRef: vi.fn(),
@@ -825,6 +827,7 @@ describe('CanvasStage viewport controls', () => {
       rectangle.id,
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
       true,
+      expect.anything(),
     );
     expect(mockInteractionSession.beginResize).toHaveBeenCalledWith(
       rectangle,
@@ -1009,9 +1012,11 @@ describe('CanvasStage viewport controls', () => {
 
   it('wires stage wheel, zoom-tool clicks, pan gestures, and mouse-up forwarding', () => {
     const handleStageMouseDown = vi.fn();
+    const handleStagePointerMove = vi.fn();
     const handleStageMouseUp = vi.fn();
     Object.assign(mockInteractionSession, {
       handleStageMouseDown,
+      handleStagePointerMove,
       handleStageMouseUp,
     });
 

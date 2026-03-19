@@ -152,6 +152,7 @@ describe('CanvasTestHooks', () => {
       renderedRectangle.selectableNodeId,
       { x: 120, y: 90 },
       false,
+      expect.any(MouseEvent),
     );
     expect(beginResize).not.toHaveBeenCalled();
     expect(onTestEvent).toHaveBeenCalledWith('selected-item-overlay');

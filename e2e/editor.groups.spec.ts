@@ -180,6 +180,29 @@ test.describe('editor groups', () => {
     ]);
   });
 
+  test('GT-10 starts a one-gesture pickup drag from an unselected real group node on the canvas', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createSimpleGroupFixture(), 'pickup-group.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await dragCanvas(page, { x: 210, y: 200 }, { x: 330, y: 280 });
+
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Simple Group');
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+
+    const savedProject = await saveAndReadProject(page);
+    expect(Number(expectSavedNode(savedProject, 'group-rect-1').x)).toBeGreaterThan(240);
+    expect(Number(expectSavedNode(savedProject, 'group-rect-1').y)).toBeGreaterThan(220);
+    expect(Number(expectSavedNode(savedProject, 'group-rect-2').x)).toBeGreaterThan(430);
+    expect(Number(expectSavedNode(savedProject, 'group-rect-2').y)).toBeGreaterThan(280);
+  });
+
   test('GD-01 GD-02 GD-04 GD-05 GD-06 GD-07 CS-01 KB-11 selects from the canvas, drills into nested descendants, clears, and escapes back out', async ({
     page,
   }) => {

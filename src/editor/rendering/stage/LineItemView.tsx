@@ -26,6 +26,7 @@ interface LineItemViewProps {
     selectionNodeId: string,
     pointer: Point,
     shiftKey: boolean,
+    nativeEvent?: MouseEvent,
   ) => void;
   renderContent?: boolean;
   renderHandles?: boolean;
@@ -81,7 +82,13 @@ export function LineItemView({
               return;
             }
             event.cancelBubble = true;
-            onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
+            onItemPointerDown(
+              item,
+              selectableNodeId,
+              toCanvasPointer(pointer),
+              event.evt.shiftKey,
+              event.evt,
+            );
           }}
           onTap={() => {
             if (interactionEnabled) {
@@ -112,7 +119,13 @@ export function LineItemView({
                 return;
               }
               event.cancelBubble = true;
-              onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
+              onItemPointerDown(
+                item,
+                selectableNodeId,
+                toCanvasPointer(pointer),
+                event.evt.shiftKey,
+                event.evt,
+              );
             }}
           />
           {renderHandles

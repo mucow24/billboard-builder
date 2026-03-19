@@ -34,7 +34,8 @@ interface CanvasTestHooksProps {
     item: CanvasItem,
     selectionNodeId: string,
     pointer: { x: number; y: number },
-    shiftKey: boolean
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
   ) => void;
   marqueeViewportRect: { left: number; top: number; width: number; height: number } | null;
   onTestEvent: (eventName: string) => void;
@@ -153,6 +154,7 @@ export function CanvasTestHooks({
                 selectedRenderedItem.selectableNodeId,
                 toCanvasPointer(pointer),
                 false,
+                event.nativeEvent,
               );
             }}
             style={{

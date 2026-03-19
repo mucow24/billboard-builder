@@ -49,7 +49,8 @@ interface CanvasSceneProps {
     item: CanvasItem,
     selectionNodeId: string,
     pointer: Point,
-    shiftKey: boolean
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
   ) => void;
   onStageMouseDown: (event: KonvaEventObject<MouseEvent>) => void;
   onStageMouseLeave: () => void;

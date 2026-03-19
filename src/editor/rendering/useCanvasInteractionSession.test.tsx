@@ -878,7 +878,7 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session?.kind).toBe('group-drag');
   });
 
-  it('selects a group without starting a drag when clicking grouped content that is not already selected', () => {
+  it('selects a group without committing movement when clicking grouped content that is not already selected', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const group = createGroupNode([first, second], 'Poster Group');
@@ -893,7 +893,171 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(params.onSelectItem).toHaveBeenCalledWith(group.id);
+    expect(result.current.session?.kind).toBe('group-drag');
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 120,
+          clientY: 120,
+        }),
+      );
+    });
+
+    expect(params.onUpdateItem).not.toHaveBeenCalled();
     expect(result.current.session).toBeNull();
+  });
+
+  it('starts a pickup drag for an unselected leaf item after the pointer moves', () => {
+    const item = createRectangleItem({ id: 'pickup-item', x: 100, y: 100, width: 80, height: 40 });
+    let params = createHookParams({
+      document: createDocument([item]),
+    });
+    const { result, rerender } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(item, item.id, { x: 120, y: 120 }, false);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(item.id);
+    expect(result.current.session?.kind).toBe('drag');
+
+    params = {
+      ...params,
+      selectedItemIds: [item.id],
+    };
+
+    rerender();
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 150,
+          clientY: 145,
+        }),
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('drag');
+  });
+
+  it('starts a pickup drag for an unselected group after the pointer moves', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+    let params = createHookParams({
+      document: createDocument([group]),
+    });
+    const { result, rerender } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(first, group.id, { x: 120, y: 120 }, false);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(group.id);
+    expect(result.current.session?.kind).toBe('group-drag');
+
+    params = {
+      ...params,
+      selectedItemIds: [group.id],
+    };
+
+    rerender();
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 160,
+          clientY: 150,
+        }),
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('group-drag');
+  });
+
+  it('commits a pickup drag for an unselected leaf item on mouseup when move events were missed', () => {
+    const item = createRectangleItem({ id: 'pickup-item', x: 100, y: 100, width: 80, height: 40 });
+    let params = createHookParams({
+      document: createDocument([item]),
+    });
+    const { result, rerender } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(item, item.id, { x: 120, y: 120 }, false);
+    });
+
+    params = {
+      ...params,
+      selectedItemIds: [item.id],
+    };
+    rerender();
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 170,
+          clientY: 150,
+        }),
+      );
+    });
+
+    expect(params.onUpdateItem).toHaveBeenCalledWith(
+      item.id,
+      expect.objectContaining({
+        x: 150,
+        y: 130,
+      }),
+    );
+  });
+
+  it('commits a pickup drag for an unselected group on mouseup when move events were missed', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+    let params = createHookParams({
+      document: createDocument([group]),
+    });
+    const { result, rerender } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(first, group.id, { x: 120, y: 120 }, false);
+    });
+
+    params = {
+      ...params,
+      selectedItemIds: [group.id],
+    };
+    rerender();
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 180,
+          clientY: 150,
+        }),
+      );
+    });
+
+    expect(params.onUpdateItem).toHaveBeenCalledTimes(2);
+    expect(params.onUpdateItem).toHaveBeenNthCalledWith(
+      1,
+      first.id,
+      expect.objectContaining({
+        x: 160,
+        y: 130,
+      }),
+    );
+    expect(params.onUpdateItem).toHaveBeenNthCalledWith(
+      2,
+      second.id,
+      expect.objectContaining({
+        x: 280,
+        y: 130,
+      }),
+    );
   });
 
   it('uses the outermost group as the selectable target before drill-in for nested groups', () => {

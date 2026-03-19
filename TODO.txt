@@ -1,40 +1,18 @@
-Huge:
-P0:
-P1:
-P2:
-P3:
-REQUEST: Integrate generators
-
-Big ones:
 P0:
 P1:
   REQUEST: Rich text fields
 P2:
-  REQUEST: Templates (requires: grouping)
-P3:
-
-Medium:
-P0:
-P1:
+  REQUEST: Template library
   REQUEST: Crop images
-P2:
   REDESIGN: Densification of properties panel.
   REDESIGN: Densification of layers panel.
+P3:
   REQUEST: Make content off-canvas be visible "under" the background, with blurring and translucency.
   REQUEST: Drag and drop layers with autoscroll, insertion line, animations, etc.
-
-Small:
-P0:
-  Canvas edges are messy. Checkerboard spills out, etc.
-P1:
-P2:
-
-
-
-IN PROGRESS:
-  REQUEST: Grouping
+  REQUEST: Integrate generators
 
 DONE:
+  REQUEST: Grouping
   REQUEST: Up/Down arrows for font menu
   REQUEST: Sort fonts alphabetically
   REQUEST: Multi-select / copy / paste / manipulate
