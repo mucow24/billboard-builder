@@ -1,0 +1,192 @@
+import { renderHook } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import {
+  createLineItem,
+  createRectangleItem,
+} from '../../document/documentDefaults';
+
+import { useCanvasDebugSnapshot } from './useCanvasDebugSnapshot';
+
+describe('useCanvasDebugSnapshot', () => {
+  afterEach(() => {
+    delete window.__BB_TEST__;
+  });
+
+  it('builds debug info for the current selection and preview state', () => {
+    const rectangle = createRectangleItem({ id: 'shape', x: 10, y: 20, width: 80, height: 50 });
+    const preview = createRectangleItem({ id: 'preview', x: 15, y: 25, width: 90, height: 60 });
+
+    const { result, unmount } = renderHook(() =>
+      useCanvasDebugSnapshot({
+        groupHandleViewportPoints: { 'middle-right': { x: 200, y: 160 } },
+        groupOverlayFrame: { bounds: { x: 10, y: 20, width: 80, height: 50 }, rotation: 15 },
+        groupOverlayViewportRect: { left: 100, top: 120, width: 160, height: 100 },
+        groupRotaterViewportPoint: { x: 180, y: 80 },
+        lastTestHookEvent: 'group-overlay',
+        marqueeViewportRect: { left: 30, top: 40, width: 50, height: 60 },
+        nodeClientRect: { x: 10, y: 20, width: 80, height: 50 },
+        pan: { x: 100, y: 120 },
+        previewItem: preview,
+        renderedItems: [rectangle],
+        renderedSelectedItems: [rectangle],
+        selectedDocumentItem: rectangle,
+        selectedItemIds: [rectangle.id],
+        selectedItemViewportRect: { left: 110, top: 140, width: 160, height: 100 },
+        selectedNode: {
+          x: () => rectangle.x,
+          y: () => rectangle.y,
+          rotation: () => rectangle.rotation,
+          scaleX: () => rectangle.scaleX,
+          scaleY: () => rectangle.scaleY,
+        },
+        selectedRenderedItem: rectangle,
+        session: { kind: 'group-resize', handle: 'middle-right' },
+        stageRef: { current: null },
+        viewportRef: { current: null },
+        viewportSize: { width: 1280, height: 720 },
+        zoom: 2,
+      }),
+    );
+
+    expect(result.current.sessionKind).toBe('group-resize');
+    expect(result.current.sessionHandle).toBe('middle-right');
+    expect(result.current.documentItem).toEqual(
+      expect.objectContaining({ id: rectangle.id, x: rectangle.x, y: rectangle.y }),
+    );
+    expect(result.current.previewItem).toEqual(
+      expect.objectContaining({ id: preview.id, x: preview.x, y: preview.y }),
+    );
+    expect(result.current.handles).toEqual(
+      expect.objectContaining({
+        rightMiddle: expect.objectContaining({ x: 90, y: 45 }),
+      }),
+    );
+    expect(result.current.groupFrame).toEqual(
+      expect.objectContaining({ x: 10, y: 20, width: 80, height: 50, rotation: 15 }),
+    );
+
+    unmount();
+    expect(window.__BB_TEST__).toBeUndefined();
+  });
+
+  it('registers a snapshot function that reads selected item geometry and group hook overlays', () => {
+    const rectangle = createRectangleItem({ id: 'shape', x: 10, y: 20, width: 80, height: 50 });
+    const line = createLineItem({ id: 'line', startX: 20, startY: 30, endX: 120, endY: 80 });
+
+    const overlay = document.createElement('div');
+    overlay.dataset.testid = 'canvas-group-overlay';
+    overlay.style.left = '100px';
+    overlay.style.top = '120px';
+    overlay.style.width = '200px';
+    overlay.style.height = '80px';
+    overlay.style.transform = 'rotate(15deg)';
+
+    const handle = document.createElement('div');
+    handle.dataset.testid = 'canvas-group-handle-middle-right';
+    handle.getBoundingClientRect = () =>
+      ({
+        left: 210,
+        top: 150,
+        width: 16,
+        height: 16,
+        right: 226,
+        bottom: 166,
+        x: 210,
+        y: 150,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    const rotater = document.createElement('div');
+    rotater.dataset.testid = 'canvas-group-rotater';
+    rotater.getBoundingClientRect = () =>
+      ({
+        left: 180,
+        top: 70,
+        width: 16,
+        height: 16,
+        right: 196,
+        bottom: 86,
+        x: 180,
+        y: 70,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    const root = document.createElement('div');
+    root.append(overlay, handle, rotater);
+
+    const stageNode = {
+      findOne: (selector: string) => {
+        if (selector === '#render-item-shape') {
+          return {
+            getAttr: (name: string) => (name === 'renderWidth' ? 80 : 50),
+            x: () => 10,
+            y: () => 20,
+            rotation: () => 0,
+          };
+        }
+        if (selector === '#render-item-line') {
+          return {
+            points: () => [20, 30, 120, 80],
+          };
+        }
+        return null;
+      },
+    };
+
+    renderHook(() =>
+      useCanvasDebugSnapshot({
+        groupHandleViewportPoints: null,
+        groupOverlayFrame: null,
+        groupOverlayViewportRect: null,
+        groupRotaterViewportPoint: null,
+        lastTestHookEvent: null,
+        marqueeViewportRect: null,
+        nodeClientRect: null,
+        pan: { x: 100, y: 120 },
+        previewItem: null,
+        renderedItems: [rectangle, line],
+        renderedSelectedItems: [rectangle, line],
+        selectedDocumentItem: rectangle,
+        selectedItemIds: ['shape', 'line'],
+        selectedItemViewportRect: null,
+        selectedNode: null,
+        selectedRenderedItem: rectangle,
+        session: { kind: 'group-drag' },
+        stageRef: { current: stageNode as never },
+        viewportRef: { current: root },
+        viewportSize: { width: 1280, height: 720 },
+        zoom: 2,
+      }),
+    );
+
+    const snapshot = window.__BB_TEST__?.captureRenderSnapshot?.() as {
+      sessionKind: string;
+      selectedItems: Array<{ id: string; geometry: { width: number; height: number } }>;
+      groupOverlay: { rotation: number; width: number };
+      groupHandles: Record<string, { x: number; y: number }>;
+      groupRotater: { x: number; y: number };
+    };
+
+    expect(snapshot.sessionKind).toBe('group-drag');
+    expect(snapshot.selectedItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'shape',
+          geometry: expect.objectContaining({ width: 80, height: 50 }),
+        }),
+        expect.objectContaining({
+          id: 'line',
+          geometry: expect.objectContaining({ width: 100, height: 50 }),
+        }),
+      ]),
+    );
+    expect(snapshot.groupOverlay).toEqual(
+      expect.objectContaining({ rotation: 15, width: 100 }),
+    );
+    expect(snapshot.groupHandles['middle-right']).toEqual(
+      expect.objectContaining({ x: 218, y: 158 }),
+    );
+    expect(snapshot.groupRotater).toEqual(expect.objectContaining({ x: 188, y: 78 }));
+  });
+});

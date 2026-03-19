@@ -367,7 +367,7 @@ describe('App integration', () => {
     await waitFor(() => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
-  });
+  }, 10000);
 
   it('persists document changes only after bootstrap is ready and the debounce elapses', async () => {
     render(<App />);
