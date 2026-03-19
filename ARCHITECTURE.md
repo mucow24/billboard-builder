@@ -34,6 +34,8 @@ This editor is organized around a small set of ownership boundaries.
 - App, stage, and inspector shells should orchestrate rather than own large amounts of behavior.
 - Extract pure logic before splitting JSX when refactoring large modules.
 - Interaction session state, resolution, and commit math belong in pure rendering helpers, not in React hooks.
+- Inspector derivation, labeling, and edit-payload helpers belong in pure UI helper modules, not in `PropertiesPanel`.
+- `PropertiesPanel` is a shell-only entrypoint that owns tab and scroll wiring while internal inspector modules own layers and selection editing behavior.
 - Avoid optional fallback APIs that duplicate behavior across hooks or layers.
 
 ## Refactor stop conditions

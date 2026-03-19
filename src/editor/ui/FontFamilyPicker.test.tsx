@@ -94,4 +94,35 @@ describe('FontFamilyPicker', () => {
     fireEvent.pointerDown(outsideButton);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
+
+  it('opens from trigger arrow keys, toggles closed on trigger click, and closes on tab without restoring focus', async () => {
+    const user = userEvent.setup();
+    const { outsideButton, trigger } = renderFontFamilyPicker();
+
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    expect(screen.getByRole('listbox', { name: 'Font family' })).toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(trigger, { key: 'ArrowUp' });
+    const listbox = screen.getByRole('listbox', { name: 'Font family' });
+    fireEvent.keyDown(listbox, { key: 'Tab' });
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(outsideButton).not.toHaveFocus();
+  });
+
+  it('falls back to the first option when the current value is missing', async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderFontFamilyPicker(vi.fn(), 'Missing Family');
+
+    expect(trigger).toHaveTextContent('Missing Family');
+
+    await user.click(trigger);
+
+    const listbox = screen.getByRole('listbox', { name: 'Font family' });
+    expect(listbox.getAttribute('aria-activedescendant')).toContain('option-0');
+  });
 });
