@@ -15,6 +15,7 @@ interface LineItemViewProps {
   isSelected: boolean;
   item: LineCanvasItem;
   selectableNodeId?: string;
+  onItemDoubleClick?: (item: LineCanvasItem) => void;
   onBeginLineHandle: (
     item: LineCanvasItem,
     handle: 'start' | 'end',
@@ -38,6 +39,7 @@ export function LineItemView({
   isSelected,
   item,
   selectableNodeId = item.id,
+  onItemDoubleClick,
   onBeginLineHandle,
   onItemPointerDown,
   renderContent = true,
@@ -85,6 +87,12 @@ export function LineItemView({
             if (interactionEnabled) {
               onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
             }
+          }}
+          onDblClick={() => {
+            if (!interactionEnabled || item.locked) {
+              return;
+            }
+            onItemDoubleClick?.(item);
           }}
         />
       ) : null}

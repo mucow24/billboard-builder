@@ -44,6 +44,7 @@ interface CanvasSceneProps {
     rotation: number;
   } | null;
   guides: GuideLine[];
+  handleItemDoubleClick: (item: CanvasItem) => void;
   handleItemPointerDown: (
     item: CanvasItem,
     selectionNodeId: string,
@@ -94,6 +95,7 @@ export function CanvasScene({
   document,
   groupOverlayFrame,
   guides,
+  handleItemDoubleClick,
   handleItemPointerDown,
   onStageMouseDown,
   onStageMouseLeave,
@@ -154,6 +156,7 @@ export function CanvasScene({
                   isSelected={item.id === selectedItemId}
                   item={item}
                   selectableNodeId={item.selectableNodeId}
+                  onItemDoubleClick={handleItemDoubleClick}
                   onBeginLineHandle={beginLineHandle}
                   onItemPointerDown={handleItemPointerDown}
                   renderSelection={false}
@@ -167,6 +170,7 @@ export function CanvasScene({
                   isSelected={item.id === selectedItemId}
                   item={item}
                   selectableNodeId={item.selectableNodeId}
+                  onItemDoubleClick={handleItemDoubleClick}
                   onBeginResize={beginResize}
                   onBeginRotate={beginRotate}
                   onItemPointerDown={handleItemPointerDown}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  createGroupNode,
   createDefaultProjectDocument,
   createLineItem,
   createRectangleItem,
@@ -339,6 +340,26 @@ describe('editor store history', () => {
     expect(getEditorState().document.items).toHaveLength(0);
     expect(getEditorState().history.past.length).toBeGreaterThan(0);
     expect(getEditorState().session.activeTool).toBe('select');
+  });
+
+  it('selects the parent group of the current node when requested', () => {
+    const child = createRectangleItem({ id: 'child' });
+    const group = createGroupNode([child], 'Parent Group');
+    group.id = 'group-1';
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [group],
+        items: [child],
+      },
+      session: {
+        selectedNodeIds: [child.id],
+      },
+    });
+
+    expect(useEditorStore.getState().selectParentNode()).toBe(true);
+    expect(getEditorState().session.selectedNodeIds).toEqual([group.id]);
   });
 
   it('deletes a specific item by id while preserving unrelated selection and undo history', () => {

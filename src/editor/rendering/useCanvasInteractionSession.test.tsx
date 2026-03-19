@@ -6,12 +6,15 @@ import { useCanvasInteractionSession } from './useCanvasInteractionSession';
 import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
 import { getSelectionFrameForRotation } from './transformGeometry';
 import {
+  createGroupNode,
   createDefaultProjectDocument,
   createLineItem,
   createRectangleItem,
 } from '../document/documentDefaults';
+import { collectLeafItems } from '../document/sceneGraph';
 import type {
   CanvasItem,
+  CanvasNode,
   CanvasTool,
   ProjectDocument,
 } from '../document/documentTypes';
@@ -93,11 +96,11 @@ function makeStageEvent(
   } as unknown as Konva.KonvaEventObject<MouseEvent>;
 }
 
-function createDocument(items: CanvasItem[] = []) {
+function createDocument(nodes: CanvasNode[] = []) {
   return {
     ...createDefaultProjectDocument(),
-    nodes: items,
-    items,
+    nodes,
+    items: nodes.flatMap(collectLeafItems),
   } satisfies ProjectDocument;
 }
 
@@ -873,6 +876,64 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(result.current.session?.kind).toBe('group-drag');
+  });
+
+  it('makes sibling leaves directly selectable when editing a child inside a group', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createRectangleItem({ id: 'second' });
+    const nestedLeaf = createRectangleItem({ id: 'nested-leaf' });
+    const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
+    nestedGroup.id = 'nested-group';
+    const group = createGroupNode([first, second, nestedGroup], 'Outer');
+    group.id = 'outer-group';
+    const params = createHookParams({
+      document: createDocument([group]),
+      selectedItemIds: [first.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    const selectableById = new Map(
+      result.current.renderedItems.map((item) => [item.id, item.selectableNodeId]),
+    );
+
+    expect(selectableById.get(first.id)).toBe(first.id);
+    expect(selectableById.get(second.id)).toBe(second.id);
+    expect(selectableById.get(nestedLeaf.id)).toBe(nestedGroup.id);
+  });
+
+  it('drills into the next descendant on item double-click when a group is selected', () => {
+    const nestedLeaf = createRectangleItem({ id: 'nested-leaf' });
+    const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
+    nestedGroup.id = 'nested-group';
+    const outerGroup = createGroupNode([nestedGroup], 'Outer');
+    outerGroup.id = 'outer-group';
+    const params = createHookParams({
+      document: createDocument([outerGroup]),
+      selectedItemIds: [outerGroup.id],
+    });
+    const { result, rerender } = renderHook(
+      (hookParams) => useCanvasInteractionSession(hookParams),
+      { initialProps: params },
+    );
+
+    act(() => {
+      result.current.handleItemDoubleClick(nestedLeaf);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+
+    const innerParams = {
+      ...params,
+      onSelectItem: vi.fn(),
+      selectedItemIds: [nestedGroup.id],
+    };
+    rerender(innerParams);
+
+    act(() => {
+      result.current.handleItemDoubleClick(nestedLeaf);
+    });
+
+    expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
   });
 
   it('snaps group drag previews and emits guides', () => {

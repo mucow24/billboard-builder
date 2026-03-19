@@ -64,6 +64,7 @@ export function CanvasStage({
     beginLineHandle,
     beginResize,
     beginRotate,
+    handleItemDoubleClick,
     handleItemPointerDown,
     handleStageMouseDown,
     handleStageMouseUp,
@@ -179,6 +180,7 @@ export function CanvasStage({
         document={document}
         groupOverlayFrame={groupOverlayFrame}
         guides={guides}
+        handleItemDoubleClick={handleItemDoubleClick}
         handleItemPointerDown={handleItemPointerDown}
         onStageMouseDown={sceneHandlers.onStageMouseDown}
         onStageMouseLeave={viewport.handleStagePointerLeave}

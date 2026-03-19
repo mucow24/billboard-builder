@@ -94,6 +94,7 @@ describe('CanvasTestHooks', () => {
     const rectangle = createRectangleItem();
     const renderedRectangle: RenderableCanvasItem = {
       ...rectangle,
+      groupPath: [],
       selectableNodeId: rectangle.id,
     };
     const handleItemPointerDown = vi.fn();
@@ -163,6 +164,7 @@ describe('CanvasTestHooks', () => {
     const line = createLineItem();
     const renderedLine: RenderableCanvasItem = {
       ...line,
+      groupPath: [],
       selectableNodeId: line.id,
     };
     const beginLineHandle = vi.fn();

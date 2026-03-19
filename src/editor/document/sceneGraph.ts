@@ -90,6 +90,10 @@ export function getNodeById(nodes: CanvasNode[], nodeId: string): CanvasNode | u
   return getNodeEntry(nodes, nodeId)?.node;
 }
 
+export function getParentNodeId(nodes: CanvasNode[], nodeId: string): string | null {
+  return getNodeEntry(nodes, nodeId)?.parent?.id ?? null;
+}
+
 export function getNodeIds(nodes: CanvasNode[]): string[] {
   const ids: string[] = [];
   visitNodes(nodes, (node) => {
@@ -433,4 +437,25 @@ export function reorderNodes(
 
 export function collectSelectableNodeIds(nodes: CanvasNode[]): string[] {
   return nodes.filter((node) => isGroupNode(node) || !node.hidden).map((node) => node.id);
+}
+
+export function getNextDrilldownNodeId(
+  nodes: CanvasNode[],
+  currentNodeId: string,
+  leafNodeId: string
+): string | null {
+  const currentEntry = getNodeEntry(nodes, currentNodeId);
+  const leafEntry = getNodeEntry(nodes, leafNodeId);
+  if (!currentEntry || !leafEntry || !isCanvasItemNode(leafEntry.node)) {
+    return null;
+  }
+  if (currentNodeId === leafNodeId) {
+    return leafNodeId;
+  }
+  const ancestorIds = leafEntry.ancestors.map((ancestor) => ancestor.id);
+  const currentAncestorIndex = ancestorIds.indexOf(currentNodeId);
+  if (currentAncestorIndex === -1) {
+    return null;
+  }
+  return ancestorIds[currentAncestorIndex + 1] ?? leafNodeId;
 }

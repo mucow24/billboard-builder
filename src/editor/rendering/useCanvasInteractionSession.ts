@@ -29,7 +29,12 @@ import {
   type ShapeItem,
 } from './interactionSession';
 import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
-import { collectLeafItems, getNodeById, isCanvasItemNode } from '../document/sceneGraph';
+import {
+  collectLeafItems,
+  getNextDrilldownNodeId,
+  getNodeById,
+  isCanvasItemNode,
+} from '../document/sceneGraph';
 import type {
   CanvasItem,
   CanvasTool,
@@ -77,7 +82,10 @@ export function useCanvasInteractionSession({
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
 
   const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
-  const renderables = useMemo(() => buildRenderableCanvasItems(document), [document]);
+  const renderables = useMemo(
+    () => buildRenderableCanvasItems(document, selectedItemIds),
+    [document, selectedItemIds]
+  );
   const orderedItems = useMemo(
     () => renderables.map(({ selectableNodeId, ...item }) => {
       void selectableNodeId;
@@ -383,6 +391,17 @@ export function useCanvasInteractionSession({
     }
   }, [beginDrag, beginGroupDrag, onSelectItem, onToggleSelectItem, selectedIdSet, selectedItems.length]);
 
+  const handleItemDoubleClick = useCallback((item: CanvasItem) => {
+    if (selectedItemIds.length !== 1) {
+      return;
+    }
+    const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedItemIds[0], item.id);
+    if (!nextNodeId || nextNodeId === selectedItemIds[0]) {
+      return;
+    }
+    onSelectItem(nextNodeId);
+  }, [document.nodes, onSelectItem, selectedItemIds]);
+
   const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
     const target = event.target;
     const stage = event.target.getStage();
@@ -420,6 +439,7 @@ export function useCanvasInteractionSession({
     beginLineHandle,
     beginResize,
     beginRotate,
+    handleItemDoubleClick,
     handleItemPointerDown,
     handleStageMouseDown,
     handleStageMouseUp,

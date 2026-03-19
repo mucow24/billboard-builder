@@ -19,7 +19,13 @@ import {
   toggleSelectionNode,
   toggleSelectionNodes,
 } from '../core/selectionOps';
-import { cloneCanvasNode, collectLeafItems, getNodeById, getSelectionParentInfo } from '../document/sceneGraph';
+import {
+  cloneCanvasNode,
+  collectLeafItems,
+  getNodeById,
+  getNodeEntry,
+  getSelectionParentInfo,
+} from '../document/sceneGraph';
 import type {
   CanvasItem,
   CanvasLeafKind,
@@ -46,6 +52,7 @@ export interface EditorStoreState {
   updateSelectedGroup: (opacity: number) => void;
   selectSingleItem: (nodeId?: string) => void;
   selectSingleNode: (nodeId?: string) => void;
+  selectParentNode: () => boolean;
   toggleSelectedItem: (nodeId: string) => void;
   toggleSelectedNode: (nodeId: string) => void;
   toggleSelectedItems: (nodeIds: string[]) => void;
@@ -129,6 +136,18 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().dispatch(nodeId ? { type: 'select_nodes', nodeIds: [nodeId] } : { type: 'clear_selection' }),
     selectSingleItem: (nodeId) => {
       get().selectSingleNode(nodeId);
+    },
+    selectParentNode: () => {
+      const selectedId = selectPrimarySelectedNodeId(get().editor);
+      if (!selectedId) {
+        return false;
+      }
+      const entry = getNodeEntry(get().editor.document.nodes, selectedId);
+      if (!entry?.parent) {
+        return false;
+      }
+      get().dispatch({ type: 'select_nodes', nodeIds: [entry.parent.id] });
+      return true;
     },
     toggleSelectedNode: (nodeId) => {
       const node = getNodeById(get().editor.document.nodes, nodeId);

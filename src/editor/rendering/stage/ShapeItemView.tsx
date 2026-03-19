@@ -28,6 +28,7 @@ interface ShapeItemViewProps {
   isSelected: boolean;
   item: ShapeItem;
   selectableNodeId?: string;
+  onItemDoubleClick?: (item: ShapeItem) => void;
   onBeginResize: (item: ShapeItem, handle: ResizeHandle, pointer: Point) => void;
   onBeginRotate: (item: ShapeItem, pointer: Point) => void;
   onItemPointerDown: (
@@ -48,6 +49,7 @@ export function ShapeItemView({
   isSelected,
   item,
   selectableNodeId = item.id,
+  onItemDoubleClick,
   onBeginResize,
   onBeginRotate,
   onItemPointerDown,
@@ -95,6 +97,12 @@ export function ShapeItemView({
             if (interactionEnabled) {
               onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
             }
+          }}
+          onDblClick={() => {
+            if (!interactionEnabled || item.locked) {
+              return;
+            }
+            onItemDoubleClick?.(item);
           }}
         >
           <Rect

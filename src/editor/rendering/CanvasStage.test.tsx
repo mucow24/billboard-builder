@@ -13,6 +13,7 @@ const { mockInteractionSession } = vi.hoisted(() => ({
     beginLineHandle: vi.fn(),
     beginResize: vi.fn(),
     beginRotate: vi.fn(),
+    handleItemDoubleClick: vi.fn(),
     handleItemPointerDown: vi.fn(),
     handleStageMouseDown: vi.fn(),
     handleStageMouseUp: vi.fn(),
@@ -81,9 +82,10 @@ vi.mock('react-konva', () => {
             return [];
           }
           if (typeof value === 'function') {
-            if (/^on(MouseDown|MouseUp|MouseMove|MouseLeave|Wheel)$/.test(key)) {
+            if (/^on(MouseDown|MouseUp|MouseMove|MouseLeave|Wheel|DblClick)$/.test(key)) {
+              const domEventName = key === 'onDblClick' ? 'onDoubleClick' : key;
               return [[
-                key,
+                domEventName,
                 (event: MouseEvent | WheelEvent) => {
                   value(buildKonvaEvent(event, nodeRef));
                 },
@@ -149,6 +151,7 @@ describe('CanvasStage viewport controls', () => {
       beginLineHandle: vi.fn(),
       beginResize: vi.fn(),
       beginRotate: vi.fn(),
+      handleItemDoubleClick: vi.fn(),
       handleItemPointerDown: vi.fn(),
       handleStageMouseDown: vi.fn(),
       handleStageMouseUp: vi.fn(),
@@ -817,6 +820,48 @@ describe('CanvasStage viewport controls', () => {
       rectangle,
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
     );
+  });
+
+  it('forwards item double-clicks to the interaction session', () => {
+    const document = createDefaultProjectDocument();
+    const rectangle = createRectangleItem({
+      id: 'shape',
+      x: 120,
+      y: 80,
+      width: 160,
+      height: 100,
+    });
+    document.items = [rectangle];
+    document.nodes = [rectangle];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [rectangle],
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const shapeGroup = container.querySelector(
+      `[data-konva-node="Group"][data-prop-x="${rectangle.x}"][data-prop-y="${rectangle.y}"]`,
+    );
+
+    expect(shapeGroup).not.toBeNull();
+
+    fireEvent.dblClick(shapeGroup!, { button: 0, clientX: 240, clientY: 160 });
+
+    expect(mockInteractionSession.handleItemDoubleClick).toHaveBeenCalledWith(rectangle);
   });
 
   it('renders marquee and text-create previews plus active guide lines', () => {

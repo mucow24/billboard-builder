@@ -13,6 +13,8 @@ import {
   flattenLayerRows,
   flattenVisibleLeafNodes,
   getNodeEntry,
+  getNextDrilldownNodeId,
+  getParentNodeId,
   groupNodes,
   normalizeLeafZIndices,
   ungroupNode,
@@ -129,5 +131,18 @@ describe('scene graph helpers', () => {
       parent: expect.objectContaining({ id: 'group' }),
     });
     expect(entry?.ancestors.map((ancestor) => ancestor.id)).toEqual(['group']);
+  });
+
+  it('resolves the parent group and next drilldown target for nested selections', () => {
+    const leaf = createRectangleItem({ id: 'leaf' });
+    const innerGroup = createGroupNode([leaf], 'Inner');
+    innerGroup.id = 'inner-group';
+    const outerGroup = createGroupNode([innerGroup], 'Outer');
+    outerGroup.id = 'outer-group';
+
+    expect(getParentNodeId([outerGroup], leaf.id)).toBe(innerGroup.id);
+    expect(getParentNodeId([outerGroup], innerGroup.id)).toBe(outerGroup.id);
+    expect(getNextDrilldownNodeId([outerGroup], outerGroup.id, leaf.id)).toBe(innerGroup.id);
+    expect(getNextDrilldownNodeId([outerGroup], innerGroup.id, leaf.id)).toBe(leaf.id);
   });
 });

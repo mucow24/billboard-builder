@@ -34,6 +34,7 @@ interface UseEditorShortcutsArgs {
   redo: EditorStoreState['redo'];
   reorderSelectedItem?: EditorStoreState['reorderSelectedItem'];
   reorderSelectedNode: EditorStoreState['reorderSelectedNode'];
+  selectParentNode: EditorStoreState['selectParentNode'];
   selectedItems?: CanvasNode[];
   selectedNodes: CanvasNode[];
   selectAllItems?: EditorStoreState['selectAllItems'];
@@ -56,6 +57,7 @@ export function useEditorShortcuts({
   redo,
   reorderSelectedItem,
   reorderSelectedNode,
+  selectParentNode,
   selectedItems,
   selectedNodes,
   selectAllItems,
@@ -155,6 +157,10 @@ export function useEditorShortcuts({
         if (isEditable) {
           return;
         }
+        event.preventDefault();
+        if (selectParentNode()) {
+          return;
+        }
         clearSelection();
         setActiveTool('select');
         return;
@@ -247,6 +253,7 @@ export function useEditorShortcuts({
     redo,
     reorderSelectedItem,
     reorderSelectedNode,
+    selectParentNode,
     selectedItems,
     selectedNodes,
     selectAllItems,

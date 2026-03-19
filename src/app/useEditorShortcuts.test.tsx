@@ -75,6 +75,7 @@ function createShortcutHarness() {
   const reorderSelectedItem = vi.fn();
   const selectAllNodes = vi.fn();
   const selectAllItems = vi.fn();
+  const selectParentNode = vi.fn().mockReturnValue(false);
   const setActiveTool = vi.fn();
   const undo = vi.fn();
   const ungroupSelectedNode = vi.fn();
@@ -95,6 +96,7 @@ function createShortcutHarness() {
     selectedNodes: [],
     selectedItems: [],
     selectAllNodes,
+    selectParentNode,
     setActiveTool,
     selectAllItems,
     undo,
@@ -117,6 +119,7 @@ function createShortcutHarness() {
     reorderSelectedItem,
     selectAllNodes,
     selectAllItems,
+    selectParentNode,
     setActiveTool,
     undo,
     ungroupSelectedNode,
@@ -425,5 +428,20 @@ describe('useEditorShortcuts', () => {
     expect(harness.setActiveTool).not.toHaveBeenCalled();
 
     input.remove();
+  });
+
+  it('climbs to the parent selection on Escape before clearing the canvas selection', () => {
+    const harness = createShortcutHarness();
+    harness.selectParentNode.mockReturnValue(true);
+    harness.args.selectedItems = [createRectangleItem({ id: 'child' })];
+    harness.args.selectedNodes = harness.args.selectedItems;
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchKeyDown(document.body, { key: 'Escape' });
+
+    expect(harness.selectParentNode).toHaveBeenCalledOnce();
+    expect(harness.applyTransaction).not.toHaveBeenCalled();
+    expect(harness.setActiveTool).not.toHaveBeenCalled();
   });
 });
