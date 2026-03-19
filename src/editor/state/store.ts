@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 
 import { createDefaultEditorState } from '../core/editorState';
-import { selectCanRedo, selectCanUndo, selectPrimarySelectedItemId } from '../core/selectors';
+import {
+  selectCanRedo,
+  selectCanUndo,
+  selectPrimarySelectedNodeId,
+  selectSelectedGroup,
+} from '../core/selectors';
 import {
   createItemForKind,
   createResetDocumentTransaction,
@@ -9,19 +14,20 @@ import {
 } from '../core/editorReducer';
 import { createTransactionAction, toEditorAction, type EditorAction } from '../core/editorActions';
 import {
-  normalizeSelectionForItems,
-  selectAllItems as selectAllItemIds,
-  toggleSelectionItem,
-  toggleSelectionItems,
+  normalizeSelectionForNodes,
+  selectAllNodes as selectAllNodeIds,
+  toggleSelectionNode,
+  toggleSelectionNodes,
 } from '../core/selectionOps';
-import { cloneCanvasItem } from '../document/documentDefaults';
+import { cloneCanvasNode, collectLeafItems, getNodeById, getSelectionParentInfo } from '../document/sceneGraph';
 import type {
   CanvasItem,
-  CanvasItemKind,
+  CanvasLeafKind,
+  CanvasNode,
   CanvasSize,
   CanvasTool,
   EditorCommand,
-  ProjectDocumentV1,
+  ProjectDocument,
   ReorderMode,
   UploadedFont,
 } from '../document/documentTypes';
@@ -34,25 +40,37 @@ export interface EditorStoreState {
   dispatch: (command: EditorCommand) => void;
   applyTransaction: (actions: Parameters<typeof createTransactionAction>[0]) => void;
   setActiveTool: (tool: CanvasTool) => void;
-  createItemAt: (kind: Exclude<CanvasItemKind, 'image'>, x: number, y: number) => void;
+  createItemAt: (kind: Exclude<CanvasLeafKind, 'image'>, x: number, y: number) => void;
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
-  selectSingleItem: (itemId?: string) => void;
-  toggleSelectedItem: (itemId: string) => void;
-  toggleSelectedItems: (itemIds: string[]) => void;
+  updateSelectedGroup: (opacity: number) => void;
+  selectSingleItem: (nodeId?: string) => void;
+  selectSingleNode: (nodeId?: string) => void;
+  toggleSelectedItem: (nodeId: string) => void;
+  toggleSelectedNode: (nodeId: string) => void;
+  toggleSelectedItems: (nodeIds: string[]) => void;
+  toggleSelectedNodes: (nodeIds: string[]) => void;
   selectAllItems: () => void;
-  deleteItem: (itemId: string) => void;
+  selectAllNodes: () => void;
+  deleteItem: (nodeId: string) => void;
+  deleteNode: (nodeId: string) => void;
   deleteSelectedItems: () => void;
+  deleteSelectedNodes: () => void;
   reorderSelectedItem: (mode: ReorderMode) => void;
+  reorderSelectedNode: (mode: ReorderMode) => void;
   duplicateSelectedItems: () => void;
+  groupSelectedNodes: () => void;
+  ungroupSelectedNode: () => void;
+  duplicateSelectedNodes: () => void;
   nudgeSelectedItems: (deltaX: number, deltaY: number) => void;
+  nudgeSelectedNodes: (deltaX: number, deltaY: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
   registerAvailableFont: (font: UploadedFont) => void;
   setMissingFontFamilies: (families: string[]) => void;
-  loadDocument: (document: ProjectDocumentV1) => void;
+  loadDocument: (document: ProjectDocument) => void;
   addImageItem: (item: CanvasItem) => void;
   setCanvasSize: (canvas: CanvasSize) => void;
   setExportScale: (scale: number) => void;
@@ -79,8 +97,12 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().setActiveTool('select');
     },
     updateSelectedItem: (changes) => {
-      const selectedId = selectPrimarySelectedItemId(get().editor);
+      const selectedId = selectPrimarySelectedNodeId(get().editor);
       if (!selectedId) {
+        return;
+      }
+      const selectedNode = getNodeById(get().editor.document.nodes, selectedId);
+      if (!selectedNode || selectedNode.kind === 'group') {
         return;
       }
       get().dispatch({ type: 'update_item', itemId: selectedId, changes });
@@ -89,82 +111,141 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       if (changesById.length === 0) {
         return;
       }
-      get().applyTransaction(changesById.map(({ itemId, changes }) => ({ family: 'document', command: { type: 'update_item', itemId, changes } })));
+      get().applyTransaction(
+        changesById.map(({ itemId, changes }) => ({
+          family: 'document' as const,
+          command: { type: 'update_item' as const, itemId, changes },
+        }))
+      );
     },
-    selectSingleItem: (itemId) => get().dispatch(itemId ? { type: 'select_items', itemIds: [itemId] } : { type: 'clear_selection' }),
-    toggleSelectedItem: (itemId) => {
-      const item = get().editor.document.items.find((entry) => entry.id === itemId);
-      if (!item || item.hidden) {
+    updateSelectedGroup: (opacity) => {
+      const selectedGroup = selectSelectedGroup(get().editor.document, get().editor);
+      if (!selectedGroup) {
+        return;
+      }
+      get().dispatch({ type: 'update_group', groupId: selectedGroup.id, changes: { opacity } });
+    },
+    selectSingleNode: (nodeId) =>
+      get().dispatch(nodeId ? { type: 'select_nodes', nodeIds: [nodeId] } : { type: 'clear_selection' }),
+    selectSingleItem: (nodeId) => {
+      get().selectSingleNode(nodeId);
+    },
+    toggleSelectedNode: (nodeId) => {
+      const node = getNodeById(get().editor.document.nodes, nodeId);
+      if (!node) {
         return;
       }
       get().dispatch({
-        type: 'select_items',
-        itemIds: toggleSelectionItem(get().editor.session.selectedItemIds, itemId),
+        type: 'select_nodes',
+        nodeIds: toggleSelectionNode(get().editor.session.selectedNodeIds, nodeId),
       });
     },
-    toggleSelectedItems: (itemIds) => {
-      const nextSelection = normalizeSelectionForItems(
-        toggleSelectionItems(get().editor.session.selectedItemIds, itemIds),
-        get().editor.document.items
+    toggleSelectedItem: (nodeId) => {
+      get().toggleSelectedNode(nodeId);
+    },
+    toggleSelectedNodes: (nodeIds) => {
+      const nextSelection = normalizeSelectionForNodes(
+        toggleSelectionNodes(get().editor.session.selectedNodeIds, nodeIds),
+        get().editor.document.nodes
       );
-      get().dispatch({ type: 'select_items', itemIds: nextSelection });
+      get().dispatch({ type: 'select_nodes', nodeIds: nextSelection });
+    },
+    toggleSelectedItems: (nodeIds) => {
+      get().toggleSelectedNodes(nodeIds);
+    },
+    selectAllNodes: () => {
+      get().dispatch({
+        type: 'select_nodes',
+        nodeIds: selectAllNodeIds(get().editor.document.nodes),
+      });
     },
     selectAllItems: () => {
-      get().dispatch({
-        type: 'select_items',
-        itemIds: selectAllItemIds(get().editor.document.items),
-      });
+      get().selectAllNodes();
     },
-    deleteItem: (itemId) => {
-      get().dispatch({ type: 'delete_items', itemIds: [itemId] });
+    deleteNode: (nodeId) => {
+      get().dispatch({ type: 'delete_nodes', nodeIds: [nodeId] });
     },
-    deleteSelectedItems: () => {
-      const selectedIds = get().editor.session.selectedItemIds;
+    deleteItem: (nodeId) => {
+      get().deleteNode(nodeId);
+    },
+    deleteSelectedNodes: () => {
+      const selectedIds = get().editor.session.selectedNodeIds;
       if (selectedIds.length === 0) {
         return;
       }
-      get().dispatch({ type: 'delete_items', itemIds: selectedIds });
+      get().dispatch({ type: 'delete_nodes', nodeIds: selectedIds });
     },
-    reorderSelectedItem: (mode) => {
-      const selectedIds = normalizeSelectionForItems(
-        get().editor.session.selectedItemIds,
-        get().editor.document.items
+    deleteSelectedItems: () => {
+      get().deleteSelectedNodes();
+    },
+    reorderSelectedNode: (mode) => {
+      const selectedIds = normalizeSelectionForNodes(
+        get().editor.session.selectedNodeIds,
+        get().editor.document.nodes
       );
       if (selectedIds.length === 0) {
         return;
       }
       if (selectedIds.length === 1) {
-        get().dispatch({ type: 'reorder_item', itemId: selectedIds[0], mode });
+        get().dispatch({ type: 'reorder_node', nodeId: selectedIds[0], mode });
         return;
       }
-      get().dispatch({ type: 'reorder_items', itemIds: selectedIds, mode });
+      get().dispatch({ type: 'reorder_nodes', nodeIds: selectedIds, mode });
+    },
+    reorderSelectedItem: (mode) => {
+      get().reorderSelectedNode(mode);
+    },
+    groupSelectedNodes: () => {
+      const selectedIds = normalizeSelectionForNodes(
+        get().editor.session.selectedNodeIds,
+        get().editor.document.nodes
+      );
+      if (selectedIds.length < 2) {
+        return;
+      }
+      get().dispatch({ type: 'group_nodes', nodeIds: selectedIds });
+    },
+    ungroupSelectedNode: () => {
+      const selectedId = selectPrimarySelectedNodeId(get().editor);
+      const selectedNode = selectedId ? getNodeById(get().editor.document.nodes, selectedId) : undefined;
+      if (!selectedId || !selectedNode || selectedNode.kind !== 'group') {
+        return;
+      }
+      get().dispatch({ type: 'ungroup_node', groupId: selectedId });
+    },
+    duplicateSelectedNodes: () => {
+      const selectedIds = normalizeSelectionForNodes(
+        get().editor.session.selectedNodeIds,
+        get().editor.document.nodes
+      );
+      const parentInfo = getSelectionParentInfo(get().editor.document.nodes, selectedIds);
+      if (!parentInfo || selectedIds.length === 0) {
+        return;
+      }
+      const sortedEntries = parentInfo.entries.slice().sort((left, right) => left.index - right.index);
+      const clones = sortedEntries.map(({ node }) => cloneCanvasNode(node));
+      get().dispatch({
+        type: 'insert_nodes',
+        nodes: clones,
+        parentId: parentInfo.parentId ?? undefined,
+        index: sortedEntries.at(-1)!.index + 1,
+      });
+      get().dispatch({ type: 'select_nodes', nodeIds: clones.map((node) => node.id) });
     },
     duplicateSelectedItems: () => {
-      const selectedIds = new Set(
-        normalizeSelectionForItems(
-          get().editor.session.selectedItemIds,
-          get().editor.document.items
-        )
-      );
-      const selectedItems = get().editor.document.items.filter((item) => selectedIds.has(item.id));
-      if (selectedItems.length === 0) {
-        return;
-      }
-      const clones = selectedItems.map((item) => cloneCanvasItem(item));
-      get().applyTransaction([
-        ...clones.map((item) => ({ family: 'document' as const, command: { type: 'add_item' as const, item } })),
-        { family: 'selection' as const, command: { type: 'select_items' as const, itemIds: clones.map((item) => item.id) } },
-      ]);
+      get().duplicateSelectedNodes();
     },
-    nudgeSelectedItems: (deltaX, deltaY) => {
-      const selectedIds = new Set(
-        normalizeSelectionForItems(
-          get().editor.session.selectedItemIds,
-          get().editor.document.items
-        )
+    nudgeSelectedNodes: (deltaX, deltaY) => {
+      const selectedIds = normalizeSelectionForNodes(
+        get().editor.session.selectedNodeIds,
+        get().editor.document.nodes
       );
-      const updates = get().editor.document.items
-        .filter((item) => selectedIds.has(item.id) && !item.locked)
+      const selectedNodes = selectedIds
+        .map((nodeId) => getNodeById(get().editor.document.nodes, nodeId))
+        .filter((node): node is CanvasNode => Boolean(node));
+      const updates = selectedNodes
+        .flatMap(collectLeafItems)
+        .filter((item) => !item.locked)
         .map((item) => ({
           itemId: item.id,
           changes: item.kind === 'line'
@@ -180,6 +261,9 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
               },
         }));
       get().updateSelectedItems(updates);
+    },
+    nudgeSelectedItems: (deltaX, deltaY) => {
+      get().nudgeSelectedNodes(deltaX, deltaY);
     },
     undo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'undo' })),
     redo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'redo' })),

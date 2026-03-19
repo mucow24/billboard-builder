@@ -29,8 +29,8 @@ describe('clipboard helpers', () => {
 
     expect(didWrite).toBe(true);
     expect(JSON.parse(clipboardData.getData(APP_CLIPBOARD_MIME_TYPE))).toEqual({
-      version: 1,
-      items: [item],
+      version: 2,
+      nodes: [item],
     });
   });
 
@@ -38,8 +38,8 @@ describe('clipboard helpers', () => {
     const item = createRectangleItem({ id: 'item-1' });
     const clipboardData = makeClipboardData({
       [APP_CLIPBOARD_MIME_TYPE]: JSON.stringify({
-        version: 1,
-        items: [item],
+        version: 2,
+        nodes: [item],
       }),
     });
 
@@ -48,11 +48,11 @@ describe('clipboard helpers', () => {
 
   it('reads a valid multi-item selection payload', () => {
     const firstItem = createRectangleItem({ id: 'item-1' });
-    const secondItem = createRectangleItem({ id: 'item-2', x: 320, y: 240 });
+    const secondItem = createRectangleItem({ id: 'item-2', x: 320, y: 240, zIndex: 1 });
     const clipboardData = makeClipboardData({
       [APP_CLIPBOARD_MIME_TYPE]: JSON.stringify({
-        version: 1,
-        items: [firstItem, secondItem],
+        version: 2,
+        nodes: [firstItem, secondItem],
       }),
     });
 
@@ -64,7 +64,7 @@ describe('clipboard helpers', () => {
       '',
       '{',
       JSON.stringify({ version: 2, items: [] }),
-      JSON.stringify({ version: 1, items: [{ id: '' }] }),
+      JSON.stringify({ version: 2, nodes: [{ id: '' }] }),
     ];
 
     for (const payload of invalidPayloads) {

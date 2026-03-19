@@ -11,14 +11,17 @@ export function PropertiesPanel({
   background,
   fonts,
   items,
+  layerRows,
   missingFontFamilies,
+  selectedGroup,
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
   onBackgroundChange,
+  onGroupOpacityChange,
   onDeleteItem,
   onItemChange,
   onReorder,
-  onSelectItem,
+  onSelectNode,
 }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState<'properties' | 'layers'>('properties');
   const layersScrollRef = useRef<HTMLDivElement | null>(null);
@@ -27,9 +30,9 @@ export function PropertiesPanel({
   const isMultiSelection = selectedItems.length > 1;
 
   useEffect(() => {
-    const nextTab = selectedItem || isMultiSelection ? 'properties' : activeTab;
+    const nextTab = selectedItem || selectedGroup || isMultiSelection ? 'properties' : activeTab;
     setActiveTab((current) => (current === 'layers' ? current : nextTab));
-  }, [activeTab, isMultiSelection, selectedItem]);
+  }, [activeTab, isMultiSelection, selectedGroup, selectedItem]);
 
   useEffect(() => {
     const target =
@@ -84,14 +87,14 @@ export function PropertiesPanel({
           <div ref={layersScrollRef}>
             <LayersInspectorTab
               background={background}
-              canReorder={Boolean(selectedItem)}
-              items={items}
+              canReorder={Boolean(selectedItem || selectedGroup)}
+              rows={layerRows}
               onBackgroundChange={onBackgroundChange}
               onDeleteItem={onDeleteItem}
               onOpenProperties={() => handleTabChange('properties')}
               onReorder={onReorder}
-              onSelectItem={onSelectItem}
-              selectedItems={selectedItems}
+              onSelectNode={onSelectNode}
+              selectedNodeIds={selectedGroup ? [selectedGroup.id] : selectedItem ? [selectedItem.id] : []}
             />
           </div>
         ) : (
@@ -99,7 +102,9 @@ export function PropertiesPanel({
             <SelectionInspector
               availableFonts={availableFonts}
               fonts={fonts}
+              onGroupOpacityChange={onGroupOpacityChange}
               onItemChange={onItemChange}
+              selectedGroup={selectedGroup}
               selectedItem={selectedItem}
               selectedItems={selectedItems}
             />

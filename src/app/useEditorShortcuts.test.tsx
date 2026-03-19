@@ -63,41 +63,63 @@ function dispatchKeyDown(target: HTMLElement, options: KeyboardEventInit) {
 
 function createShortcutHarness() {
   const applyTransaction = vi.fn();
+  const deleteSelectedNodes = vi.fn();
+  const duplicateSelectedNodes = vi.fn();
+  const groupSelectedNodes = vi.fn();
+  const nudgeSelectedNodes = vi.fn();
   const duplicateSelectedItems = vi.fn();
   const nudgeSelectedItems = vi.fn();
   const onPasteImageFile = vi.fn();
   const redo = vi.fn();
+  const reorderSelectedNode = vi.fn();
   const reorderSelectedItem = vi.fn();
+  const selectAllNodes = vi.fn();
   const selectAllItems = vi.fn();
   const setActiveTool = vi.fn();
   const undo = vi.fn();
+  const ungroupSelectedNode = vi.fn();
 
   const args: Parameters<typeof useEditorShortcuts>[0] = {
     applyTransaction,
+    deleteSelectedNodes,
     deleteSelectedItems: vi.fn(),
+    duplicateSelectedNodes,
     duplicateSelectedItems,
+    groupSelectedNodes,
+    nudgeSelectedNodes,
     nudgeSelectedItems,
     onPasteImageFile,
     redo,
+    reorderSelectedNode,
     reorderSelectedItem,
+    selectedNodes: [],
     selectedItems: [],
+    selectAllNodes,
     setActiveTool,
     selectAllItems,
     undo,
+    ungroupSelectedNode,
   };
 
   return {
     applyTransaction,
     args,
+    deleteSelectedNodes,
     deleteSelectedItems: args.deleteSelectedItems,
+    duplicateSelectedNodes,
     duplicateSelectedItems,
+    groupSelectedNodes,
+    nudgeSelectedNodes,
     nudgeSelectedItems,
     onPasteImageFile,
     redo,
+    reorderSelectedNode,
     reorderSelectedItem,
+    selectAllNodes,
     selectAllItems,
     setActiveTool,
     undo,
+    ungroupSelectedNode,
   };
 }
 
@@ -107,6 +129,7 @@ describe('useEditorShortcuts', () => {
     const harness = createShortcutHarness();
     const clipboardData = makeClipboardData();
     harness.args.selectedItems = [selectedItem];
+    harness.args.selectedNodes = [selectedItem];
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -115,7 +138,7 @@ describe('useEditorShortcuts', () => {
     expect(wasUnhandled).toBe(false);
     expect(clipboardData.getData(APP_CLIPBOARD_MIME_TYPE)).not.toBe('');
     expect(harness.applyTransaction).not.toHaveBeenCalled();
-    expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
+    expect(harness.deleteSelectedNodes).not.toHaveBeenCalled();
   });
 
   it('writes the selected item to the clipboard on cut and deletes after a successful write', () => {
@@ -123,6 +146,7 @@ describe('useEditorShortcuts', () => {
     const harness = createShortcutHarness();
     const clipboardData = makeClipboardData();
     harness.args.selectedItems = [selectedItem];
+    harness.args.selectedNodes = [selectedItem];
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -130,24 +154,26 @@ describe('useEditorShortcuts', () => {
 
     expect(wasUnhandled).toBe(false);
     expect(clipboardData.getData(APP_CLIPBOARD_MIME_TYPE)).not.toBe('');
-    expect(harness.deleteSelectedItems).toHaveBeenCalledOnce();
+    expect(harness.deleteSelectedNodes).toHaveBeenCalledOnce();
   });
 
   it('does not delete on cut when clipboard data is unavailable', () => {
     const harness = createShortcutHarness();
     harness.args.selectedItems = [createRectangleItem({ x: 40, y: 60 })];
+    harness.args.selectedNodes = harness.args.selectedItems;
 
     renderHook(() => useEditorShortcuts(harness.args));
 
     const wasUnhandled = dispatchCut(document.body);
 
     expect(wasUnhandled).toBe(true);
-    expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
+    expect(harness.deleteSelectedNodes).not.toHaveBeenCalled();
   });
 
   it('does not delete on cut when clipboard writing throws', () => {
     const harness = createShortcutHarness();
     harness.args.selectedItems = [createRectangleItem({ x: 40, y: 60 })];
+    harness.args.selectedNodes = harness.args.selectedItems;
     const clipboardData = {
       getData: () => '',
       items: [],
@@ -162,7 +188,7 @@ describe('useEditorShortcuts', () => {
     const wasUnhandled = dispatchCut(document.body, clipboardData);
 
     expect(wasUnhandled).toBe(true);
-    expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
+    expect(harness.deleteSelectedNodes).not.toHaveBeenCalled();
   });
 
   it('imports a clipboard image when the app clipboard is empty', () => {
@@ -202,19 +228,21 @@ describe('useEditorShortcuts', () => {
       {
         family: 'document',
         command: {
-          type: 'add_item',
-          item: expect.objectContaining({
-            kind: 'rectangle',
-            x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
-            y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
-          }),
+          type: 'insert_nodes',
+          nodes: [
+            expect.objectContaining({
+              kind: 'rectangle',
+              x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
+              y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
+            }),
+          ],
         },
       },
       {
         family: 'selection',
         command: {
-          type: 'select_items',
-          itemIds: [expect.any(String)],
+          type: 'select_nodes',
+          nodeIds: [expect.any(String)],
         },
       },
     ]);
@@ -238,30 +266,26 @@ describe('useEditorShortcuts', () => {
       {
         family: 'document',
         command: {
-          type: 'add_item',
-          item: expect.objectContaining({
-            kind: 'rectangle',
-            x: firstItem.x + DUPLICATE_ITEM_OFFSET,
-            y: firstItem.y + DUPLICATE_ITEM_OFFSET,
-          }),
-        },
-      },
-      {
-        family: 'document',
-        command: {
-          type: 'add_item',
-          item: expect.objectContaining({
-            kind: 'rectangle',
-            x: secondItem.x + DUPLICATE_ITEM_OFFSET,
-            y: secondItem.y + DUPLICATE_ITEM_OFFSET,
-          }),
+          type: 'insert_nodes',
+          nodes: [
+            expect.objectContaining({
+              kind: 'rectangle',
+              x: firstItem.x + DUPLICATE_ITEM_OFFSET,
+              y: firstItem.y + DUPLICATE_ITEM_OFFSET,
+            }),
+            expect.objectContaining({
+              kind: 'rectangle',
+              x: secondItem.x + DUPLICATE_ITEM_OFFSET,
+              y: secondItem.y + DUPLICATE_ITEM_OFFSET,
+            }),
+          ],
         },
       },
       {
         family: 'selection',
         command: {
-          type: 'select_items',
-          itemIds: [expect.any(String), expect.any(String)],
+          type: 'select_nodes',
+          nodeIds: [expect.any(String), expect.any(String)],
         },
       },
     ]);
@@ -284,21 +308,25 @@ describe('useEditorShortcuts', () => {
     expect(harness.applyTransaction.mock.calls[0][0][0]).toMatchObject({
       family: 'document',
       command: {
-        type: 'add_item',
-        item: expect.objectContaining({
-          x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
-          y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
-        }),
+        type: 'insert_nodes',
+        nodes: [
+          expect.objectContaining({
+            x: copiedItem.x + DUPLICATE_ITEM_OFFSET,
+            y: copiedItem.y + DUPLICATE_ITEM_OFFSET,
+          }),
+        ],
       },
     });
     expect(harness.applyTransaction.mock.calls[1][0][0]).toMatchObject({
       family: 'document',
       command: {
-        type: 'add_item',
-        item: expect.objectContaining({
-          x: copiedItem.x + DUPLICATE_ITEM_OFFSET * 2,
-          y: copiedItem.y + DUPLICATE_ITEM_OFFSET * 2,
-        }),
+        type: 'insert_nodes',
+        nodes: [
+          expect.objectContaining({
+            x: copiedItem.x + DUPLICATE_ITEM_OFFSET * 2,
+            y: copiedItem.y + DUPLICATE_ITEM_OFFSET * 2,
+          }),
+        ],
       },
     });
   });
@@ -356,9 +384,9 @@ describe('useEditorShortcuts', () => {
 
     expect(harness.undo).toHaveBeenCalledOnce();
     expect(harness.redo).toHaveBeenCalledTimes(2);
-    expect(harness.selectAllItems).toHaveBeenCalledOnce();
-    expect(harness.reorderSelectedItem).toHaveBeenNthCalledWith(1, 'forward');
-    expect(harness.reorderSelectedItem).toHaveBeenNthCalledWith(2, 'back');
+    expect(harness.selectAllNodes).toHaveBeenCalledOnce();
+    expect(harness.reorderSelectedNode).toHaveBeenNthCalledWith(1, 'forward');
+    expect(harness.reorderSelectedNode).toHaveBeenNthCalledWith(2, 'back');
     expect(harness.setActiveTool).toHaveBeenNthCalledWith(1, 'text');
     expect(harness.applyTransaction).toHaveBeenLastCalledWith([
       { family: 'selection', command: { type: 'clear_selection' } },
@@ -369,14 +397,15 @@ describe('useEditorShortcuts', () => {
   it('nudges selected items through the dedicated store helper', () => {
     const harness = createShortcutHarness();
     harness.args.selectedItems = [createLineItem(), createRectangleItem()];
+    harness.args.selectedNodes = harness.args.selectedItems;
 
     renderHook(() => useEditorShortcuts(harness.args));
 
     dispatchKeyDown(document.body, { key: 'ArrowRight' });
     dispatchKeyDown(document.body, { key: 'ArrowUp', shiftKey: true });
 
-    expect(harness.nudgeSelectedItems).toHaveBeenNthCalledWith(1, 1, 0);
-    expect(harness.nudgeSelectedItems).toHaveBeenNthCalledWith(2, 0, -5);
+    expect(harness.nudgeSelectedNodes).toHaveBeenNthCalledWith(1, 1, 0);
+    expect(harness.nudgeSelectedNodes).toHaveBeenNthCalledWith(2, 0, -5);
   });
 
   it('ignores keyboard shortcuts from editable targets', () => {
@@ -391,8 +420,8 @@ describe('useEditorShortcuts', () => {
     dispatchKeyDown(input, { key: 'Delete' });
     dispatchKeyDown(input, { key: 'Escape' });
 
-    expect(harness.selectAllItems).not.toHaveBeenCalled();
-    expect(harness.deleteSelectedItems).not.toHaveBeenCalled();
+    expect(harness.selectAllNodes).not.toHaveBeenCalled();
+    expect(harness.deleteSelectedNodes).not.toHaveBeenCalled();
     expect(harness.setActiveTool).not.toHaveBeenCalled();
 
     input.remove();

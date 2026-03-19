@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 
-import type { ProjectDocumentV1 } from '../editor/document/documentTypes';
+import type { ProjectDocument } from '../editor/document/documentTypes';
 import { defaultCanvasPersistenceService } from '../editor/persistence/canvasPersistenceService';
 
 interface UseCanvasPersistenceArgs {
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
   persistenceReady: boolean;
 }
 

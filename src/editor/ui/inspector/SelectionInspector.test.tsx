@@ -25,6 +25,7 @@ describe('SelectionInspector', () => {
           },
         ]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={vi.fn()}
         selectedItems={[]}
       />,
@@ -43,6 +44,7 @@ describe('SelectionInspector', () => {
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItems={[first, second]}
       />,
@@ -97,6 +99,7 @@ describe('SelectionInspector', () => {
             kind: 'uploaded',
           },
         ]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={textItem}
         selectedItems={[textItem]}
@@ -148,6 +151,7 @@ describe('SelectionInspector', () => {
           },
         ]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={textItem}
         selectedItems={[textItem]}
@@ -187,6 +191,7 @@ describe('SelectionInspector', () => {
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={lineItem}
         selectedItems={[lineItem]}
@@ -213,6 +218,7 @@ describe('SelectionInspector', () => {
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={imageItem}
         selectedItems={[imageItem]}
@@ -248,6 +254,7 @@ describe('SelectionInspector', () => {
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={imageItem}
         selectedItems={[imageItem]}
@@ -280,6 +287,7 @@ describe('SelectionInspector', () => {
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={lineItem}
         selectedItems={[lineItem]}
@@ -296,6 +304,7 @@ describe('SelectionInspector', () => {
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
+        onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
         selectedItem={textItem}
         selectedItems={[textItem]}

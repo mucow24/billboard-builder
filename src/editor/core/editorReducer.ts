@@ -2,18 +2,26 @@ import {
   createDefaultProjectDocument,
   createEllipseItem,
   createLineItem,
-  normalizeZIndices,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
-import { normalizeExistingProjectDocument } from '../document/documentNormalizer';
+import { normalizeExistingProjectDocument, normalizeProjectDocument } from '../document/documentNormalizer';
+import {
+  getNodeIds,
+  groupNodes,
+  insertNodesAt,
+  removeNodesByIds,
+  reorderNodes,
+  ungroupNode,
+  updateGroupNode,
+  updateItemNode,
+} from '../document/sceneGraph';
 import type {
   CanvasItem,
-  CanvasItemKind,
+  CanvasLeafKind,
   DocumentFontReference,
   EditorCommand,
-  ProjectDocumentV1,
-  ReorderMode,
+  ProjectDocument,
   UploadedFont,
 } from '../document/documentTypes';
 import {
@@ -33,16 +41,15 @@ import {
   type SessionAction,
   type TransactionAction,
 } from './editorActions';
-import { reorderItemsBySelection } from './reorderItems';
 
 function normalizeSelectionForDocument(
-  selectedItemIds: string[],
-  document: ProjectDocumentV1
+  selectedNodeIds: string[],
+  document: ProjectDocument
 ): string[] {
-  const itemIds = new Set(document.items.map((item) => item.id));
+  const nodeIds = new Set(getNodeIds(document.nodes));
   const seenSelectionIds = new Set<string>();
-  return selectedItemIds.filter((id) => {
-    if (!itemIds.has(id) || seenSelectionIds.has(id)) {
+  return selectedNodeIds.filter((id) => {
+    if (!nodeIds.has(id) || seenSelectionIds.has(id)) {
       return false;
     }
     seenSelectionIds.add(id);
@@ -50,105 +57,154 @@ function normalizeSelectionForDocument(
   });
 }
 
-function applyItemChanges(item: CanvasItem, changes: Partial<CanvasItem>): CanvasItem {
-  return {
-    ...item,
-    ...changes,
-  } as CanvasItem;
+interface DocumentCommandResult {
+  nextDocument: ProjectDocument;
+  selectionOverride?: string[];
 }
 
-function reorderItems(items: CanvasItem[], itemId: string, mode: ReorderMode): CanvasItem[] {
-  const orderedItems = items.slice().sort((left, right) => left.zIndex - right.zIndex);
-  const currentIndex = orderedItems.findIndex((item) => item.id === itemId);
-  if (currentIndex < 0) {
-    return orderedItems;
-  }
-
-  const [item] = orderedItems.splice(currentIndex, 1);
-  let nextIndex = currentIndex;
-
-  switch (mode) {
-    case 'front':
-      nextIndex = orderedItems.length;
-      break;
-    case 'back':
-      nextIndex = 0;
-      break;
-    case 'forward':
-      nextIndex = Math.min(currentIndex + 1, orderedItems.length);
-      break;
-    case 'backward':
-      nextIndex = Math.max(currentIndex - 1, 0);
-      break;
-  }
-
-  orderedItems.splice(nextIndex, 0, item);
-  return normalizeZIndices(orderedItems);
+function replaceDocumentNodes(document: ProjectDocument, nodes: ProjectDocument['nodes']): ProjectDocument {
+  return {
+    ...document,
+    nodes,
+    // Keep compatibility inputs from reviving stale leaves after normalization.
+    items: [],
+  };
 }
 
 export function applyDocumentCommand(
-  document: ProjectDocumentV1,
+  document: ProjectDocument,
   command: DocumentCommand
-): ProjectDocumentV1 {
-  let nextDocument: ProjectDocumentV1;
+): ProjectDocument {
+  return applyDocumentCommandWithEffects(document, command).nextDocument;
+}
+
+function applyDocumentCommandWithEffects(
+  document: ProjectDocument,
+  command: DocumentCommand
+): DocumentCommandResult {
+  const currentDocument = normalizeExistingProjectDocument(document);
+  let result: DocumentCommandResult;
 
   switch (command.type) {
-    case 'add_item': {
-      const items = normalizeZIndices([
-        ...document.items,
-        { ...command.item, zIndex: document.items.length },
-      ]);
-      nextDocument = {
-        ...document,
-        items,
+    case 'add_item':
+      result = {
+        nextDocument: replaceDocumentNodes(currentDocument, [...currentDocument.nodes, command.item]),
+        selectionOverride: [command.item.id],
       };
       break;
-    }
-    case 'delete_items': {
-      const deletedIds = new Set(command.itemIds);
-      const items = normalizeZIndices(
-        document.items.filter((item) => !deletedIds.has(item.id))
-      );
-      nextDocument = {
-        ...document,
-        items,
+    case 'insert_nodes':
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          insertNodesAt(currentDocument.nodes, command.nodes, command.parentId ?? null, command.index)
+        ),
+        selectionOverride: command.nodes.map((node) => node.id),
+      };
+      break;
+    case 'delete_items':
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          removeNodesByIds(currentDocument.nodes, new Set(command.itemIds))
+        ),
+      };
+      break;
+    case 'delete_nodes': {
+      const deletedIds = new Set(command.nodeIds);
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          removeNodesByIds(currentDocument.nodes, deletedIds)
+        ),
       };
       break;
     }
     case 'update_item':
-      nextDocument = {
-        ...document,
-        items: document.items.map((item) =>
-          item.id === command.itemId ? applyItemChanges(item, command.changes) : item
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          updateItemNode(currentDocument.nodes, command.itemId, command.changes)
         ),
       };
       break;
+    case 'update_group':
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          updateGroupNode(currentDocument.nodes, command.groupId, command.changes)
+        ),
+      };
+      break;
+    case 'group_nodes': {
+      const grouped = groupNodes(currentDocument.nodes, command.nodeIds);
+      result = grouped
+        ? {
+            nextDocument: replaceDocumentNodes(currentDocument, grouped.nextNodes),
+            selectionOverride: [grouped.groupId],
+          }
+        : { nextDocument: currentDocument };
+      break;
+    }
+    case 'ungroup_node': {
+      const ungrouped = ungroupNode(currentDocument.nodes, command.groupId);
+      result = ungrouped
+        ? {
+            nextDocument: replaceDocumentNodes(currentDocument, ungrouped.nextNodes),
+            selectionOverride: ungrouped.childIds,
+          }
+        : { nextDocument: currentDocument };
+      break;
+    }
     case 'set_canvas_size':
-      nextDocument = {
-        ...document,
-        canvas: {
-          width: command.canvas.width,
-          height: command.canvas.height,
-          presetId: command.canvas.presetId,
+      result = {
+        nextDocument: {
+          ...currentDocument,
+          canvas: {
+            width: command.canvas.width,
+            height: command.canvas.height,
+            presetId: command.canvas.presetId,
+          },
         },
       };
       break;
     case 'set_background':
-      nextDocument = {
-        ...document,
-        background: command.background,
+      result = {
+        nextDocument: {
+          ...currentDocument,
+          background: command.background,
+        },
+      };
+      break;
+    case 'reorder_node':
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          reorderNodes(currentDocument.nodes, [command.nodeId], command.mode)
+        ),
       };
       break;
     case 'reorder_item':
-      nextDocument = {
-        ...document,
-        items: reorderItems(document.items, command.itemId, command.mode),
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          reorderNodes(currentDocument.nodes, [command.itemId], command.mode)
+        ),
       };
       break;
     case 'reorder_items':
-      nextDocument = {
-        ...document,
-        items: reorderItemsBySelection(document.items, command.itemIds, command.mode),
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          reorderNodes(currentDocument.nodes, command.itemIds, command.mode)
+        ),
+      };
+      break;
+    case 'reorder_nodes':
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          reorderNodes(currentDocument.nodes, command.nodeIds, command.mode)
+        ),
       };
       break;
     case 'register_font': {
@@ -158,20 +214,27 @@ export function applyDocumentCommand(
           font.sourceName === command.font.sourceName &&
           font.kind === command.font.kind
       );
-      nextDocument = alreadyRegistered
-        ? document
-        : {
-            ...document,
-            fonts: [...document.fonts, command.font],
-          };
+      result = {
+        nextDocument: alreadyRegistered
+          ? currentDocument
+          : {
+              ...currentDocument,
+              fonts: [...currentDocument.fonts, command.font],
+            },
+      };
       break;
     }
     case 'load_document':
-      nextDocument = command.document;
+      result = {
+        nextDocument: normalizeProjectDocument(command.document as ProjectDocument),
+      };
       break;
   }
 
-  return normalizeExistingProjectDocument(nextDocument);
+  return {
+    ...result,
+    nextDocument: normalizeExistingProjectDocument(result.nextDocument),
+  };
 }
 
 function registerAvailableFont(session: SessionState, font: UploadedFont): SessionState {
@@ -185,27 +248,16 @@ function registerAvailableFont(session: SessionState, font: UploadedFont): Sessi
 
 function applyDocumentSelectionEffects(
   session: SessionState,
-  command: DocumentCommand,
-  nextDocument: ProjectDocumentV1
+  commandResult: DocumentCommandResult
 ): SessionState {
-  switch (command.type) {
-    case 'add_item':
-      return { ...session, selectedItemIds: [command.item.id] };
-    case 'delete_items': {
-      const deletedIds = new Set(command.itemIds);
-      return {
-        ...session,
-        selectedItemIds: session.selectedItemIds.filter((id) => !deletedIds.has(id)),
-      };
-    }
-    case 'load_document':
-      return { ...session, selectedItemIds: [] };
-    default:
-      return {
-        ...session,
-        selectedItemIds: normalizeSelectionForDocument(session.selectedItemIds, nextDocument),
-      };
-  }
+  const selectedNodeIds = commandResult.selectionOverride
+    ? commandResult.selectionOverride
+    : normalizeSelectionForDocument(session.selectedNodeIds, commandResult.nextDocument);
+  return {
+    ...session,
+    selectedNodeIds,
+    selectedItemIds: selectedNodeIds,
+  };
 }
 
 function isHistoryWorthyDocumentCommand(command: DocumentCommand): boolean {
@@ -223,12 +275,12 @@ function reduceDocumentAction(
   action: DocumentAction,
   options: { suppressHistory?: boolean } = {}
 ): EditorState {
-  const nextDocument = applyDocumentCommand(state.document, action.command);
-  const nextSession = applyDocumentSelectionEffects(state.session, action.command, nextDocument);
+  const commandResult = applyDocumentCommandWithEffects(state.document, action.command);
+  const nextSession = applyDocumentSelectionEffects(state.session, commandResult);
 
   if (!options.suppressHistory && action.command.type === 'load_document') {
     return {
-      document: nextDocument,
+      document: commandResult.nextDocument,
       session: { ...createDefaultSessionState(), availableFonts: state.session.availableFonts },
       history: createDefaultHistoryState(),
     };
@@ -236,7 +288,7 @@ function reduceDocumentAction(
 
   return {
     ...state,
-    document: nextDocument,
+    document: commandResult.nextDocument,
     session: nextSession,
     history:
       options.suppressHistory || !isHistoryWorthyDocumentCommand(action.command)
@@ -253,8 +305,20 @@ function reduceSelectionAction(state: EditorState, action: SelectionAction): Edi
     ...state,
     session: {
       ...state.session,
+      selectedNodeIds: normalizeSelectionForDocument(
+        action.command.type === 'select_nodes'
+          ? action.command.nodeIds
+          : action.command.type === 'select_items'
+            ? action.command.itemIds
+            : [],
+        state.document
+      ),
       selectedItemIds: normalizeSelectionForDocument(
-        action.command.type === 'select_items' ? action.command.itemIds : [],
+        action.command.type === 'select_nodes'
+          ? action.command.nodeIds
+          : action.command.type === 'select_items'
+            ? action.command.itemIds
+            : [],
         state.document
       ),
     },
@@ -345,8 +409,12 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
             document: previousDocument,
             session: {
               ...state.session,
+              selectedNodeIds: normalizeSelectionForDocument(
+                state.session.selectedNodeIds,
+                previousDocument
+              ),
               selectedItemIds: normalizeSelectionForDocument(
-                state.session.selectedItemIds,
+                state.session.selectedNodeIds,
                 previousDocument
               ),
             },
@@ -366,8 +434,12 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
             document: nextDocument,
             session: {
               ...state.session,
+              selectedNodeIds: normalizeSelectionForDocument(
+                state.session.selectedNodeIds,
+                nextDocument
+              ),
               selectedItemIds: normalizeSelectionForDocument(
-                state.session.selectedItemIds,
+                state.session.selectedNodeIds,
                 nextDocument
               ),
             },
@@ -384,7 +456,7 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
 }
 
 export function createItemForKind(
-  kind: Exclude<CanvasItemKind, 'image'>,
+  kind: Exclude<CanvasLeafKind, 'image'>,
   x: number,
   y: number
 ): CanvasItem {
@@ -402,13 +474,13 @@ export function createItemForKind(
 }
 
 export function ensureFontRegistered(
-  document: ProjectDocumentV1,
+  document: ProjectDocument,
   font: DocumentFontReference
-): ProjectDocumentV1 {
+): ProjectDocument {
   return applyDocumentCommand(document, { type: 'register_font', font });
 }
 
-export function applyEditorCommand(document: ProjectDocumentV1, command: EditorCommand): ProjectDocumentV1 {
+export function applyEditorCommand(document: ProjectDocument, command: EditorCommand): ProjectDocument {
   return reduceEditorState(createDefaultEditorState(document), toEditorAction(command)).document;
 }
 

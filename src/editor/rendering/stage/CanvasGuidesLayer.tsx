@@ -1,11 +1,11 @@
 import { Group, Line } from 'react-konva';
 
-import type { GuideLine, ProjectDocumentV1 } from '../../document/documentTypes';
+import type { GuideLine, ProjectDocument } from '../../document/documentTypes';
 
 import { SELECTION_STROKE } from './renderConstants';
 
 interface CanvasGuidesLayerProps {
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
   guides: GuideLine[];
 }
 

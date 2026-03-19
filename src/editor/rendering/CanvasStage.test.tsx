@@ -804,6 +804,7 @@ describe('CanvasStage viewport controls', () => {
 
     expect(mockInteractionSession.handleItemPointerDown).toHaveBeenCalledWith(
       rectangle,
+      rectangle.id,
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
       true,
     );

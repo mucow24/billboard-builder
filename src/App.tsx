@@ -7,6 +7,7 @@ import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
+import { canGroupNodes, canUngroupNode } from './editor/document/sceneGraph';
 
 export default function App() {
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -22,6 +23,7 @@ export default function App() {
       deleteItem,
       deleteSelectedItems,
       dispatch,
+      groupSelectedNodes,
       handleExport,
       handleFontUpload,
       handleImageUpload,
@@ -36,6 +38,8 @@ export default function App() {
       toggleSelectedItem,
       toggleSelectedItems,
       undo,
+      ungroupSelectedNode,
+      updateSelectedGroup,
       updateSelectedItem,
       updateSelectedItems,
     },
@@ -46,10 +50,14 @@ export default function App() {
       canUndo,
       document,
       errorMessage,
+      layerRows,
       missingFontFamilies,
+      selectedGroup,
       selectedItem,
       selectedItemIds,
       selectedItems,
+      selectedNode,
+      selectedNodeIds,
     },
   } = useEditorController();
 
@@ -102,12 +110,15 @@ export default function App() {
           <div ref={topbarRef} className="overlay-topbar">
             <Toolbar
               canvas={document.canvas}
+              canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
+              canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
               canUndo={canUndo}
               canRedo={canRedo}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedItems}
               onExport={() => handleExport(stageRef.current)}
               onFontUpload={() => fontInputRef.current?.click()}
+              onGroup={groupSelectedNodes}
               onImageUpload={() => imageInputRef.current?.click()}
               onLoad={() => openInputRef.current?.click()}
               onNewProject={() => {
@@ -118,6 +129,7 @@ export default function App() {
               onRedo={redo}
               onSave={handleSave}
               onUndo={undo}
+              onUngroup={ungroupSelectedNode}
             />
           </div>
 
@@ -138,10 +150,13 @@ export default function App() {
                 background={document.background}
                 fonts={document.fonts}
                 items={document.items}
+                layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
+                selectedGroup={selectedGroup ?? undefined}
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
+                onGroupOpacityChange={updateSelectedGroup}
                 onDeleteItem={deleteItem}
                 onItemChange={(changes: Partial<CanvasItem>) => {
                   if (selectedItems.length > 1) {
@@ -150,7 +165,7 @@ export default function App() {
                   }
                   updateSelectedItem(changes);
                 }}
-                onSelectItem={selectSingleItem}
+                onSelectNode={selectSingleItem}
                 onReorder={reorderSelectedItem}
               />
             </div>

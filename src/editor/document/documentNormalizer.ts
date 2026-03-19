@@ -1,18 +1,17 @@
-import {
-  createDefaultProjectDocument,
-  DEFAULT_ITEM_SHADOW,
-  normalizeZIndices,
-  sortByZIndex,
-} from './documentDefaults';
+import { createDefaultProjectDocument, DEFAULT_ITEM_SHADOW } from './documentDefaults';
 import { normalizeImageAdjustments } from './imageAdjustments';
+import { collectLeafItems, normalizeLeafZIndices, isGroupNode } from './sceneGraph';
 import { normalizeTextPadding } from './textPadding';
 import type {
   CanvasItem,
+  CanvasNode,
   CanvasShadow,
   EllipseCanvasItem,
+  GroupNode,
   ImageCanvasItem,
   LineCanvasItem,
-  ProjectDocumentV1,
+  ProjectDocument,
+  LegacyProjectDocumentV1,
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
@@ -175,14 +174,40 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
   }
 }
 
+function normalizeCanvasNode(node: CanvasNode): CanvasNode {
+  if (isGroupNode(node)) {
+    const normalizedGroupNode: GroupNode = {
+      id: typeof node.id === 'string' && node.id.length > 0 ? node.id : crypto.randomUUID(),
+      kind: 'group',
+      name: typeof node.name === 'string' && node.name.length > 0 ? node.name : 'Group',
+      opacity: clampOpacity(node.opacity),
+      children: Array.isArray(node.children) ? node.children.map(normalizeCanvasNode) : [],
+    };
+    return normalizedGroupNode;
+  }
+  return normalizeCanvasItem(node);
+}
+
+function normalizeCanvasNodes(nodes: CanvasNode[]): CanvasNode[] {
+  return normalizeLeafZIndices(nodes.map(normalizeCanvasNode));
+}
+
+type ProjectInput = Partial<ProjectDocument> | Partial<LegacyProjectDocumentV1> | undefined;
+
 export function normalizeProjectDocument(
-  input: Partial<ProjectDocumentV1> | undefined,
-): ProjectDocumentV1 {
+  input: ProjectInput
+): ProjectDocument {
   const baseDocument = createDefaultProjectDocument();
-  const items = normalizeZIndices(sortByZIndex((input?.items ?? []).map(normalizeCanvasItem)));
+  const projectInput = input ?? {};
+  const projectNodes = 'nodes' in projectInput
+    ? ((projectInput as Partial<ProjectDocument>).nodes ?? [])
+    : undefined;
+  const legacyItems = (projectInput as Partial<ProjectDocument> & Partial<LegacyProjectDocumentV1>).items ?? [];
+  const rawNodes = projectNodes && projectNodes.length > 0 ? projectNodes : legacyItems;
+  const normalizedNodes = normalizeCanvasNodes(rawNodes);
 
   return {
-    version: 1,
+    version: 2,
     canvas: {
       width: clampDimension(input?.canvas?.width ?? baseDocument.canvas.width),
       height: clampDimension(input?.canvas?.height ?? baseDocument.canvas.height),
@@ -190,8 +215,9 @@ export function normalizeProjectDocument(
         typeof input?.canvas?.presetId === 'string' ? input.canvas.presetId : undefined,
     },
     background: input?.background ?? baseDocument.background,
-    items,
-    fonts: (input?.fonts ?? []).filter((font): font is ProjectDocumentV1['fonts'][number] => {
+    nodes: normalizedNodes,
+    items: normalizedNodes.flatMap(collectLeafItems),
+    fonts: (input?.fonts ?? []).filter((font): font is ProjectDocument['fonts'][number] => {
       return (
         typeof font?.family === 'string' &&
         typeof font?.sourceName === 'string' &&
@@ -201,6 +227,6 @@ export function normalizeProjectDocument(
   };
 }
 
-export function normalizeExistingProjectDocument(document: ProjectDocumentV1): ProjectDocumentV1 {
+export function normalizeExistingProjectDocument(document: ProjectDocument): ProjectDocument {
   return normalizeProjectDocument(document);
 }

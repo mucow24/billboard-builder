@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
 import { fileDtoToDocument, documentToFileDto } from './documentCodec';
-import type { ProjectFileV1 } from './documentFileDto';
-import type { CanvasItem, ProjectDocumentV1 } from './documentTypes';
+import { normalizeProjectDocument } from './documentNormalizer';
+import type { CanvasItem, CanvasNode, ProjectDocument } from './documentTypes';
+import type { ProjectFile } from './documentFileDto';
 
 const CanvasShadowSchema = z.object({
   color: z.string(),
@@ -26,7 +27,7 @@ const TextPaddingSchema = z.object({
   left: z.number(),
 });
 
-const BaseCanvasItemSchema = z.object({
+const BaseCanvasItemSchemaV1 = z.object({
   id: z.string().min(1),
   kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line']),
   name: z.string().min(1),
@@ -44,7 +45,7 @@ const BaseCanvasItemSchema = z.object({
   shadow: CanvasShadowSchema.optional(),
 });
 
-const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
+const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('text'),
   text: z.string(),
   fontFamily: z.string(),
@@ -59,7 +60,7 @@ const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   padding: TextPaddingSchema.optional(),
 });
 
-const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({
+const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('image'),
   src: z.string(),
   mimeType: z.string(),
@@ -69,7 +70,7 @@ const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({
   adjustments: ImageAdjustmentsSchema.optional(),
 });
 
-const RectangleCanvasItemSchema = BaseCanvasItemSchema.extend({
+const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('rectangle'),
   fill: z.string(),
   stroke: z.string(),
@@ -77,14 +78,14 @@ const RectangleCanvasItemSchema = BaseCanvasItemSchema.extend({
   cornerRadius: z.number().nonnegative(),
 });
 
-const EllipseCanvasItemSchema = BaseCanvasItemSchema.extend({
+const EllipseCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('ellipse'),
   fill: z.string(),
   stroke: z.string(),
   strokeWidth: z.number().nonnegative(),
 });
 
-const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
+const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('line'),
   stroke: z.string(),
   strokeWidth: z.number().positive(),
@@ -94,15 +95,42 @@ const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
   endY: z.number().optional(),
 });
 
-const CanvasItemSchema = z.discriminatedUnion('kind', [
-  TextCanvasItemSchema,
-  ImageCanvasItemSchema,
-  RectangleCanvasItemSchema,
-  EllipseCanvasItemSchema,
-  LineCanvasItemSchema,
+const TextCanvasItemSchemaV2 = TextCanvasItemSchemaV1.omit({ zIndex: true });
+const ImageCanvasItemSchemaV2 = ImageCanvasItemSchemaV1.omit({ zIndex: true });
+const RectangleCanvasItemSchemaV2 = RectangleCanvasItemSchemaV1.omit({ zIndex: true });
+const EllipseCanvasItemSchemaV2 = EllipseCanvasItemSchemaV1.omit({ zIndex: true });
+const LineCanvasItemSchemaV2 = LineCanvasItemSchemaV1.omit({ zIndex: true });
+
+const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
+  TextCanvasItemSchemaV1,
+  ImageCanvasItemSchemaV1,
+  RectangleCanvasItemSchemaV1,
+  EllipseCanvasItemSchemaV1,
+  LineCanvasItemSchemaV1,
 ]);
 
-const ProjectFileSchema = z.object({
+const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
+  TextCanvasItemSchemaV2,
+  ImageCanvasItemSchemaV2,
+  RectangleCanvasItemSchemaV2,
+  EllipseCanvasItemSchemaV2,
+  LineCanvasItemSchemaV2,
+]);
+
+const CanvasNodeSchemaV2: z.ZodTypeAny = z.lazy(() =>
+  z.discriminatedUnion('kind', [
+    z.object({
+      id: z.string().min(1),
+      kind: z.literal('group'),
+      name: z.string().min(1),
+      opacity: z.number().min(0).max(1),
+      children: z.array(CanvasNodeSchemaV2),
+    }),
+    CanvasItemSchemaV2,
+  ])
+);
+
+const ProjectFileSchemaV1 = z.object({
   version: z.literal(1),
   canvas: z.object({
     width: z.number().positive(),
@@ -110,7 +138,7 @@ const ProjectFileSchema = z.object({
     presetId: z.string().optional(),
   }),
   background: z.string(),
-  items: z.array(CanvasItemSchema),
+  items: z.array(CanvasItemSchemaV1),
   fonts: z.array(
     z.object({
       family: z.string(),
@@ -120,15 +148,41 @@ const ProjectFileSchema = z.object({
   ),
 });
 
-export function parseProjectDocument(input: unknown): ProjectDocumentV1 {
-  const parsedFile = ProjectFileSchema.parse(input) as ProjectFileV1;
+const ProjectFileSchemaV2 = z.object({
+  version: z.literal(2),
+  canvas: z.object({
+    width: z.number().positive(),
+    height: z.number().positive(),
+    presetId: z.string().optional(),
+  }),
+  background: z.string(),
+  nodes: z.array(CanvasNodeSchemaV2),
+  items: z.array(CanvasItemSchemaV1).optional(),
+  fonts: z.array(
+    z.object({
+      family: z.string(),
+      sourceName: z.string(),
+      kind: z.enum(['system', 'bundled', 'uploaded']),
+    })
+  ),
+});
+
+const ProjectFileSchema = z.union([ProjectFileSchemaV1, ProjectFileSchemaV2]);
+
+export function parseProjectDocument(input: unknown): ProjectDocument {
+  const parsedFile = ProjectFileSchema.parse(input) as ProjectFile;
   return fileDtoToDocument(parsedFile);
 }
 
 export function parseCanvasItems(input: unknown): CanvasItem[] {
-  return z.array(CanvasItemSchema).parse(input) as CanvasItem[];
+  return z.array(CanvasItemSchemaV1).parse(input) as CanvasItem[];
 }
 
-export function serializeProjectDocument(document: ProjectDocumentV1): string {
+export function parseCanvasNodes(input: unknown): CanvasNode[] {
+  const parsedNodes = z.array(CanvasNodeSchemaV2).parse(input) as CanvasNode[];
+  return normalizeProjectDocument({ version: 2, nodes: parsedNodes }).nodes;
+}
+
+export function serializeProjectDocument(document: ProjectDocument): string {
   return JSON.stringify(documentToFileDto(document), null, 2);
 }

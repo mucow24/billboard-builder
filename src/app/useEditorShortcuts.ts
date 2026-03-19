@@ -5,9 +5,9 @@ import {
   readSelectionFromClipboardData,
   writeSelectionToClipboardData,
 } from './clipboard';
-import { cloneCanvasItem, DUPLICATE_ITEM_OFFSET } from '../editor/document/documentDefaults';
 import { getFirstImageFileFromClipboardData } from '../editor/io/images';
-import type { CanvasItem, CanvasTool } from '../editor/document/documentTypes';
+import { cloneCanvasNode } from '../editor/document/sceneGraph';
+import type { CanvasNode, CanvasTool } from '../editor/document/documentTypes';
 import type { EditorStoreState } from '../editor/state/store';
 
 function isEditableTarget(target: EventTarget | null) {
@@ -23,34 +23,57 @@ function isEditableTarget(target: EventTarget | null) {
 
 interface UseEditorShortcutsArgs {
   applyTransaction: EditorStoreState['applyTransaction'];
-  deleteSelectedItems: EditorStoreState['deleteSelectedItems'];
-  duplicateSelectedItems: EditorStoreState['duplicateSelectedItems'];
-  nudgeSelectedItems: EditorStoreState['nudgeSelectedItems'];
+  deleteSelectedItems?: EditorStoreState['deleteSelectedItems'];
+  deleteSelectedNodes: EditorStoreState['deleteSelectedNodes'];
+  duplicateSelectedItems?: EditorStoreState['duplicateSelectedItems'];
+  duplicateSelectedNodes: EditorStoreState['duplicateSelectedNodes'];
+  groupSelectedNodes: EditorStoreState['groupSelectedNodes'];
+  nudgeSelectedItems?: EditorStoreState['nudgeSelectedItems'];
+  nudgeSelectedNodes: EditorStoreState['nudgeSelectedNodes'];
   onPasteImageFile: (file: File) => void | Promise<void>;
   redo: EditorStoreState['redo'];
-  selectedItems: CanvasItem[];
+  reorderSelectedItem?: EditorStoreState['reorderSelectedItem'];
+  reorderSelectedNode: EditorStoreState['reorderSelectedNode'];
+  selectedItems?: CanvasNode[];
+  selectedNodes: CanvasNode[];
+  selectAllItems?: EditorStoreState['selectAllItems'];
+  selectAllNodes: EditorStoreState['selectAllNodes'];
   setActiveTool: EditorStoreState['setActiveTool'];
-  selectAllItems: EditorStoreState['selectAllItems'];
   undo: EditorStoreState['undo'];
-  reorderSelectedItem: EditorStoreState['reorderSelectedItem'];
+  ungroupSelectedNode: EditorStoreState['ungroupSelectedNode'];
 }
 
 export function useEditorShortcuts({
   applyTransaction,
   deleteSelectedItems,
+  deleteSelectedNodes,
   duplicateSelectedItems,
+  duplicateSelectedNodes,
+  groupSelectedNodes,
   nudgeSelectedItems,
+  nudgeSelectedNodes,
   onPasteImageFile,
   redo,
-  selectedItems,
-  setActiveTool,
-  selectAllItems,
-  undo,
   reorderSelectedItem,
+  reorderSelectedNode,
+  selectedItems,
+  selectedNodes,
+  selectAllItems,
+  selectAllNodes,
+  setActiveTool,
+  undo,
+  ungroupSelectedNode,
 }: UseEditorShortcutsArgs) {
   const pasteStateRef = useRef<{ payload: string; count: number } | null>(null);
 
   useEffect(() => {
+    const resolvedDeleteSelectedNodes = deleteSelectedNodes ?? deleteSelectedItems!;
+    const resolvedDuplicateSelectedNodes = duplicateSelectedNodes ?? duplicateSelectedItems!;
+    const resolvedNudgeSelectedNodes = nudgeSelectedNodes ?? nudgeSelectedItems!;
+    const resolvedReorderSelectedNode = reorderSelectedNode ?? reorderSelectedItem!;
+    const resolvedSelectedNodes = selectedNodes ?? selectedItems ?? [];
+    const resolvedSelectAllNodes = selectAllNodes ?? selectAllItems!;
+
     function clearSelection() {
       applyTransaction([{ family: 'selection', command: { type: 'clear_selection' } }]);
     }
@@ -76,30 +99,39 @@ export function useEditorShortcuts({
       }
       if (hasModifier && !isEditable && pressedKey === 'a') {
         event.preventDefault();
-        selectAllItems();
+        resolvedSelectAllNodes();
         return;
       }
       if (hasModifier && !isEditable && pressedKey === 'd') {
         event.preventDefault();
-        duplicateSelectedItems();
+        resolvedDuplicateSelectedNodes();
+        return;
+      }
+      if (hasModifier && !isEditable && pressedKey === 'g') {
+        event.preventDefault();
+        if (event.shiftKey) {
+          ungroupSelectedNode();
+          return;
+        }
+        groupSelectedNodes();
         return;
       }
       if (hasModifier && !isEditable && event.key === 'ArrowUp') {
         event.preventDefault();
-        reorderSelectedItem(event.shiftKey ? 'front' : 'forward');
+        resolvedReorderSelectedNode(event.shiftKey ? 'front' : 'forward');
         return;
       }
       if (hasModifier && !isEditable && event.key === 'ArrowDown') {
         event.preventDefault();
-        reorderSelectedItem(event.shiftKey ? 'back' : 'backward');
+        resolvedReorderSelectedNode(event.shiftKey ? 'back' : 'backward');
         return;
       }
-      if (!hasModifier && !isEditable && selectedItems.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      if (!hasModifier && !isEditable && resolvedSelectedNodes.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         event.preventDefault();
         const distance = event.shiftKey ? 5 : 1;
         const deltaX = event.key === 'ArrowLeft' ? -distance : event.key === 'ArrowRight' ? distance : 0;
         const deltaY = event.key === 'ArrowUp' ? -distance : event.key === 'ArrowDown' ? distance : 0;
-        nudgeSelectedItems(deltaX, deltaY);
+        resolvedNudgeSelectedNodes(deltaX, deltaY);
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -107,7 +139,7 @@ export function useEditorShortcuts({
           return;
         }
         event.preventDefault();
-        deleteSelectedItems();
+        resolvedDeleteSelectedNodes();
         return;
       }
       const hotkeyMap = new Map<string, CanvasTool>([
@@ -137,10 +169,10 @@ export function useEditorShortcuts({
     }
 
     function handleCopy(event: ClipboardEvent) {
-      if (isEditableTarget(event.target) || selectedItems.length === 0) {
+      if (isEditableTarget(event.target) || resolvedSelectedNodes.length === 0) {
         return;
       }
-      if (!writeSelectionToClipboardData(event.clipboardData, selectedItems)) {
+      if (!writeSelectionToClipboardData(event.clipboardData, resolvedSelectedNodes)) {
         return;
       }
       pasteStateRef.current = null;
@@ -148,15 +180,15 @@ export function useEditorShortcuts({
     }
 
     function handleCut(event: ClipboardEvent) {
-      if (isEditableTarget(event.target) || selectedItems.length === 0) {
+      if (isEditableTarget(event.target) || resolvedSelectedNodes.length === 0) {
         return;
       }
-      if (!writeSelectionToClipboardData(event.clipboardData, selectedItems)) {
+      if (!writeSelectionToClipboardData(event.clipboardData, resolvedSelectedNodes)) {
         return;
       }
       pasteStateRef.current = null;
       event.preventDefault();
-      deleteSelectedItems();
+      resolvedDeleteSelectedNodes();
     }
 
     function handlePaste(event: ClipboardEvent) {
@@ -164,22 +196,21 @@ export function useEditorShortcuts({
         return;
       }
 
-      const pastedItems = readSelectionFromClipboardData(event.clipboardData);
-      if (pastedItems && pastedItems.length > 0) {
+      const pastedNodes = readSelectionFromClipboardData(event.clipboardData);
+      if (pastedNodes && pastedNodes.length > 0) {
         const payload = event.clipboardData?.getData(APP_CLIPBOARD_MIME_TYPE) ?? '';
         const nextPasteCount = pasteStateRef.current?.payload === payload ? pasteStateRef.current.count + 1 : 1;
         pasteStateRef.current = { payload, count: nextPasteCount };
         event.preventDefault();
-        const offset = DUPLICATE_ITEM_OFFSET * nextPasteCount;
-        const clones = pastedItems.map((item) => cloneCanvasItem(item, offset));
+        const clones = pastedNodes.map((node) => cloneCanvasNode(node, 24 * nextPasteCount));
         applyTransaction([
-          ...clones.map((item) => ({
+          {
             family: 'document' as const,
-            command: { type: 'add_item' as const, item },
-          })),
+            command: { type: 'insert_nodes' as const, nodes: clones },
+          },
           {
             family: 'selection' as const,
-            command: { type: 'select_items' as const, itemIds: clones.map((item) => item.id) },
+            command: { type: 'select_nodes' as const, nodeIds: clones.map((node) => node.id) },
           },
         ]);
         return;
@@ -189,10 +220,6 @@ export function useEditorShortcuts({
       if (imageFile) {
         event.preventDefault();
         void onPasteImageFile(imageFile);
-        return;
-      }
-
-      if (!pastedItems || pastedItems.length === 0) {
         return;
       }
     }
@@ -210,14 +237,22 @@ export function useEditorShortcuts({
   }, [
     applyTransaction,
     deleteSelectedItems,
+    deleteSelectedNodes,
     duplicateSelectedItems,
+    duplicateSelectedNodes,
+    groupSelectedNodes,
     nudgeSelectedItems,
+    nudgeSelectedNodes,
     onPasteImageFile,
     redo,
     reorderSelectedItem,
+    reorderSelectedNode,
     selectedItems,
+    selectedNodes,
     selectAllItems,
+    selectAllNodes,
     setActiveTool,
     undo,
+    ungroupSelectedNode,
   ]);
 }

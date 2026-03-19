@@ -27,9 +27,15 @@ interface ShapeItemViewProps {
   activeTool: CanvasTool;
   isSelected: boolean;
   item: ShapeItem;
+  selectableNodeId?: string;
   onBeginResize: (item: ShapeItem, handle: ResizeHandle, pointer: Point) => void;
   onBeginRotate: (item: ShapeItem, pointer: Point) => void;
-  onItemPointerDown: (item: ShapeItem, pointer: Point, shiftKey: boolean) => void;
+  onItemPointerDown: (
+    item: ShapeItem,
+    selectionNodeId: string,
+    pointer: Point,
+    shiftKey: boolean
+  ) => void;
   renderContent?: boolean;
   renderHandles?: boolean;
   renderSelection?: boolean;
@@ -41,6 +47,7 @@ export function ShapeItemView({
   activeTool,
   isSelected,
   item,
+  selectableNodeId = item.id,
   onBeginResize,
   onBeginRotate,
   onItemPointerDown,
@@ -82,11 +89,11 @@ export function ShapeItemView({
               return;
             }
             event.cancelBubble = true;
-            onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
+            onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
           }}
           onTap={() => {
             if (interactionEnabled) {
-              onItemPointerDown(item, { x: item.x, y: item.y }, false);
+              onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
             }
           }}
         >
@@ -178,7 +185,7 @@ export function ShapeItemView({
                 return;
               }
               event.cancelBubble = true;
-              onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
+              onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
             }}
           >
             <Rect

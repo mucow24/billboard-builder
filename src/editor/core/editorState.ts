@@ -1,21 +1,22 @@
 import { createDefaultProjectDocument } from '../document/documentDefaults';
-import type { CanvasTool, ProjectDocumentV1, UploadedFont } from '../document/documentTypes';
+import type { CanvasTool, ProjectDocument, UploadedFont } from '../document/documentTypes';
 
 export interface SessionState {
   activeTool: CanvasTool;
   availableFonts: UploadedFont[];
   missingFontFamilies: string[];
   exportScale: number;
+  selectedNodeIds: string[];
   selectedItemIds: string[];
 }
 
 export interface HistoryState {
-  past: ProjectDocumentV1[];
-  future: ProjectDocumentV1[];
+  past: ProjectDocument[];
+  future: ProjectDocument[];
 }
 
 export interface EditorState {
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
   session: SessionState;
   history: HistoryState;
 }
@@ -26,6 +27,7 @@ export function createDefaultSessionState(): SessionState {
     availableFonts: [],
     missingFontFamilies: [],
     exportScale: 1,
+    selectedNodeIds: [],
     selectedItemIds: [],
   };
 }
@@ -38,7 +40,7 @@ export function createDefaultHistoryState(): HistoryState {
 }
 
 export function createDefaultEditorState(
-  document: ProjectDocumentV1 = createDefaultProjectDocument()
+  document: ProjectDocument = createDefaultProjectDocument()
 ): EditorState {
   return {
     document,

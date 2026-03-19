@@ -6,9 +6,10 @@ import type {
   CanvasItem,
   CanvasTool,
   GuideLine,
-  ProjectDocumentV1,
+  ProjectDocument,
 } from '../../document/documentTypes';
 import type { Point, ResizeHandle } from '../interactionGeometry';
+import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { CanvasGuidesLayer } from './CanvasGuidesLayer';
 import { CanvasPreviewLayer } from './CanvasPreviewLayer';
@@ -37,23 +38,28 @@ interface CanvasSceneProps {
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: Point,
   ) => void;
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
   groupOverlayFrame: {
     bounds: { x: number; y: number; width: number; height: number };
     rotation: number;
   } | null;
   guides: GuideLine[];
-  handleItemPointerDown: (item: CanvasItem, pointer: Point, shiftKey: boolean) => void;
+  handleItemPointerDown: (
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    shiftKey: boolean
+  ) => void;
   onStageMouseDown: (event: KonvaEventObject<MouseEvent>) => void;
   onStageMouseLeave: () => void;
   onStageMouseMove: (event: KonvaEventObject<MouseEvent>) => void;
   onStageMouseUp: (event: KonvaEventObject<MouseEvent>) => void;
   onStageWheel: (event: KonvaEventObject<WheelEvent>) => void;
   registerShapeRef: (itemId: string, node: Konva.Node | null) => void;
-  renderedItems: CanvasItem[];
-  renderedSelectedItems: CanvasItem[];
+  renderedItems: RenderableCanvasItem[];
+  renderedSelectedItems: RenderableCanvasItem[];
   selectedItemId?: string;
-  selectedRenderedItem: CanvasItem | null;
+  selectedRenderedItem: RenderableCanvasItem | null;
   session: {
     kind: string;
     tool?: string;
@@ -147,6 +153,7 @@ export function CanvasScene({
                   activeTool={activeTool}
                   isSelected={item.id === selectedItemId}
                   item={item}
+                  selectableNodeId={item.selectableNodeId}
                   onBeginLineHandle={beginLineHandle}
                   onItemPointerDown={handleItemPointerDown}
                   renderSelection={false}
@@ -159,6 +166,7 @@ export function CanvasScene({
                   activeTool={activeTool}
                   isSelected={item.id === selectedItemId}
                   item={item}
+                  selectableNodeId={item.selectableNodeId}
                   onBeginResize={beginResize}
                   onBeginRotate={beginRotate}
                   onItemPointerDown={handleItemPointerDown}

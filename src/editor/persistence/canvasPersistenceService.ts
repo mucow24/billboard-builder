@@ -1,5 +1,5 @@
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
-import type { ProjectDocumentV1 } from '../document/documentTypes';
+import type { ProjectDocument } from '../document/documentTypes';
 import {
   createDefaultRawCanvasStore,
   type RawCanvasStore,
@@ -12,7 +12,7 @@ export class CanvasPersistenceService {
     this.store = store;
   }
 
-  async load(): Promise<ProjectDocumentV1 | null> {
+  async load(): Promise<ProjectDocument | null> {
     const serializedDocument = await this.store.read();
     if (!serializedDocument) {
       return null;
@@ -26,7 +26,7 @@ export class CanvasPersistenceService {
     }
   }
 
-  async save(document: ProjectDocumentV1): Promise<void> {
+  async save(document: ProjectDocument): Promise<void> {
     await this.store.write(serializeProjectDocument(document));
   }
 

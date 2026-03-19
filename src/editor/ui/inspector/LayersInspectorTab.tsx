@@ -1,72 +1,88 @@
 import { ColorPickerControl } from '../ColorPickerControl';
+import { isCanvasItemNode } from '../../document/sceneGraph';
 
 import {
   getItemGlyph,
   getLayerPreviewStyle,
   getLayerPrimaryLabel,
   getLayerSecondaryLabel,
-  getSortedLayerItems,
 } from './inspectorModel';
 import type { LayersInspectorTabProps } from './types';
 
 export function LayersInspectorTab({
   background,
   canReorder,
-  items,
+  rows,
   onBackgroundChange,
   onDeleteItem,
   onOpenProperties,
   onReorder,
-  onSelectItem,
-  selectedItems,
+  onSelectNode,
+  selectedNodeIds,
 }: LayersInspectorTabProps) {
   return (
     <div className="rail-tab-body rail-tab-body-layers">
       <div className="layer-list layer-list-tabbed">
-        {getSortedLayerItems(items).map((item) => {
-          const secondary = getLayerSecondaryLabel(item);
+        {rows.map((row) => {
+          const isGroup = row.node.kind === 'group';
+          const secondary = isCanvasItemNode(row.node) ? getLayerSecondaryLabel(row.node) : null;
+          const isSelected = selectedNodeIds.includes(row.selectableNodeId);
+          const rowLabel = isGroup
+            ? row.node.name
+            : isCanvasItemNode(row.node)
+              ? getLayerPrimaryLabel(row.node)
+              : row.node.name;
+          const rowGlyph = isCanvasItemNode(row.node) ? getItemGlyph(row.node.kind) : 'G';
           return (
             <div
-              key={item.id}
-              className={
-                selectedItems.some((selected) => selected.id === item.id)
-                  ? 'layer-row active'
-                  : 'layer-row'
-              }
+              key={row.node.id}
+              className={isSelected ? 'layer-row active' : 'layer-row'}
+              style={{ paddingLeft: `${row.depth * 18}px` }}
             >
               <button
-                aria-label={getLayerPrimaryLabel(item)}
+                aria-label={rowLabel}
                 className="layer-row-select"
+                disabled={!row.isSelectable}
                 type="button"
-                onClick={() => onSelectItem(item.id)}
+                onClick={() => {
+                  if (!row.isSelectable) {
+                    return;
+                  }
+                  onSelectNode(row.selectableNodeId);
+                }}
                 onDoubleClick={() => {
-                  onSelectItem(item.id);
+                  if (!row.isSelectable) {
+                    return;
+                  }
+                  onSelectNode(row.selectableNodeId);
                   onOpenProperties();
                 }}
               >
                 <span
-                  className={`layer-row-type layer-row-type-${item.kind}`}
+                  className={isGroup ? 'layer-row-type layer-row-type-group' : `layer-row-type layer-row-type-${row.node.kind}`}
                   aria-hidden="true"
-                  style={getLayerPreviewStyle(item)}
+                  style={isCanvasItemNode(row.node) ? getLayerPreviewStyle(row.node) : undefined}
                 >
-                  {getItemGlyph(item.kind)}
+                  {rowGlyph}
                 </span>
                 <span className="layer-row-copy compact richer">
-                  <strong>{getLayerPrimaryLabel(item)}</strong>
+                  <strong>{rowLabel}</strong>
                   {secondary ? <small>{secondary}</small> : null}
                 </span>
               </button>
-              <button
-                aria-label={`Delete ${getLayerPrimaryLabel(item)}`}
-                className="layer-row-delete"
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onDeleteItem(item.id);
-                }}
-              >
-                ×
-              </button>
+              {row.isSelectable ? (
+                <button
+                  aria-label={`Delete ${rowLabel}`}
+                  className="layer-row-delete"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDeleteItem(row.selectableNodeId);
+                  }}
+                >
+                  ×
+                </button>
+              ) : null}
             </div>
           );
         })}

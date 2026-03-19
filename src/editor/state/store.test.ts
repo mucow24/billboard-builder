@@ -235,18 +235,18 @@ describe('editor command reducer', () => {
 
     const document = getEditorState().document;
 
-    expect(document.items.map((item) => item.id)).toEqual(['loaded-2', 'loaded-1']);
+    expect(document.items.map((item) => item.id)).toEqual(['loaded-1', 'loaded-2']);
     expect(document.items.map((item) => item.zIndex)).toEqual([0, 1]);
     expect(getEditorState().session.selectedItemIds).toEqual([]);
-    expect(document.items[0].shadow).toEqual({
+    expect(document.items[1].shadow).toEqual({
       color: '#000000',
       blur: 0,
       offsetX: 0,
       offsetY: 0,
       opacity: 0,
     });
-    expect(document.items[1].opacity).toBe(1);
-    expect(document.items[1].shadow.opacity).toBe(1);
+    expect(document.items[0].opacity).toBe(1);
+    expect(document.items[0].shadow.opacity).toBe(1);
     expect(useEditorStore.getState().canUndo()).toBe(false);
   });
 });

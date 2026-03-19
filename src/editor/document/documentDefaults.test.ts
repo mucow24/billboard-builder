@@ -6,6 +6,7 @@ import {
   cloneCanvasItem,
   createDefaultProjectDocument,
   createEllipseItem,
+  createGroupNode,
   createImageItem,
   createLineItem,
   createRectangleItem,
@@ -19,9 +20,9 @@ describe('document defaults', () => {
     const document = createDefaultProjectDocument();
 
     expect(document).toMatchObject({
-      version: 1,
+      version: 2,
       background: '#ffffff00',
-      items: [],
+      nodes: [],
       fonts: [],
     });
     expect(document.canvas).toEqual({
@@ -70,7 +71,7 @@ describe('document defaults', () => {
     });
   });
 
-  it('sorts and normalizes z-indices deterministically', () => {
+  it('sorts and normalizes derived z-indices deterministically', () => {
     const first = createRectangleItem({ zIndex: 9 });
     const second = createRectangleItem({ zIndex: 3 });
 
@@ -102,12 +103,21 @@ describe('document defaults', () => {
     expect(clonedLine.y).toBe(lineItem.y + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.kind).toBe('line');
     if (clonedLine.kind !== 'line') {
-      throw new Error('Expected a line item clone');
+      throw new Error('Expected a line item clone.');
     }
     expect(clonedLine.startX).toBe(lineItem.startX + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.startY).toBe(lineItem.startY + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.endX).toBe(lineItem.endX + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.endY).toBe(lineItem.endY + DUPLICATE_ITEM_OFFSET);
+  });
+
+  it('creates a default group node shell', () => {
+    expect(createGroupNode()).toMatchObject({
+      kind: 'group',
+      name: 'Group',
+      opacity: 1,
+      children: [],
+    });
   });
 
   it('defines the expected preset sizes', () => {

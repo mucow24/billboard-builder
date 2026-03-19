@@ -1,41 +1,48 @@
 import type {
   CanvasItem,
   DocumentFontReference,
+  GroupNode,
   ReorderMode,
   UploadedFont,
 } from '../../document/documentTypes';
+import type { LayerRow } from '../../document/sceneGraph';
 
 export interface PropertiesPanelProps {
   availableFonts: UploadedFont[];
   background: string;
   fonts: DocumentFontReference[];
   items: CanvasItem[];
+  layerRows: LayerRow[];
   missingFontFamilies: string[];
+  selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedItems?: CanvasItem[];
   onBackgroundChange: (background: string) => void;
+  onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: Partial<CanvasItem>) => void;
   onDeleteItem: (itemId: string) => void;
-  onSelectItem: (itemId: string) => void;
+  onSelectNode: (nodeId: string) => void;
   onReorder: (mode: ReorderMode) => void;
 }
 
 export interface LayersInspectorTabProps {
   background: string;
   canReorder: boolean;
-  items: CanvasItem[];
+  rows: LayerRow[];
   onBackgroundChange: (background: string) => void;
   onDeleteItem: (itemId: string) => void;
   onOpenProperties: () => void;
   onReorder: (mode: ReorderMode) => void;
-  onSelectItem: (itemId: string) => void;
-  selectedItems: CanvasItem[];
+  onSelectNode: (nodeId: string) => void;
+  selectedNodeIds: string[];
 }
 
 export interface SelectionInspectorProps {
   availableFonts: UploadedFont[];
   fonts: DocumentFontReference[];
+  onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: Partial<CanvasItem>) => void;
+  selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedItems: CanvasItem[];
 }

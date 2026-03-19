@@ -1,5 +1,6 @@
 import type { CanvasItem } from '../../document/documentTypes';
 import { type ResizeHandle } from '../interactionGeometry';
+import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { toOverlayStyle } from './viewportMath';
 
@@ -29,12 +30,17 @@ interface CanvasTestHooksProps {
   groupOverlayFrame: { rotation: number } | null;
   groupOverlayViewportRect: { left: number; top: number; width: number; height: number } | null;
   groupRotaterViewportPoint: { x: number; y: number } | null;
-  handleItemPointerDown: (item: CanvasItem, pointer: { x: number; y: number }, shiftKey: boolean) => void;
+  handleItemPointerDown: (
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: { x: number; y: number },
+    shiftKey: boolean
+  ) => void;
   marqueeViewportRect: { left: number; top: number; width: number; height: number } | null;
   onTestEvent: (eventName: string) => void;
   selectedItemViewportRect: { left: number; top: number; width: number; height: number } | null;
   selectedLineHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
-  selectedRenderedItem: CanvasItem | null;
+  selectedRenderedItem: RenderableCanvasItem | null;
   selectedShapeHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   session: {
     kind: string;
@@ -144,6 +150,7 @@ export function CanvasTestHooks({
               }
               handleItemPointerDown(
                 selectedRenderedItem,
+                selectedRenderedItem.selectableNodeId,
                 toCanvasPointer(pointer),
                 false,
               );

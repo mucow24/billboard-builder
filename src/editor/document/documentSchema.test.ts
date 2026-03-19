@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createDefaultProjectDocument,
+  createGroupNode,
   createImageItem,
   createRectangleItem,
   createTextItem,
@@ -9,38 +10,60 @@ import {
 import { parseProjectDocument, serializeProjectDocument } from './documentSchema';
 
 describe('document schema', () => {
-  it('round-trips a valid project document and normalizes item order', () => {
+  it('round-trips a valid recursive project document and preserves node order', () => {
     const document = createDefaultProjectDocument();
     const firstItem = createRectangleItem({ zIndex: 4 });
     const secondItem = createRectangleItem({ zIndex: 2 });
 
-    document.items = [firstItem, secondItem];
+    document.nodes = [createGroupNode([firstItem, secondItem])];
 
     const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
 
-    expect(parsed.items.map((item) => item.zIndex)).toEqual([0, 1]);
+    expect(parsed.nodes[0]?.kind).toBe('group');
+    if (parsed.nodes[0]?.kind !== 'group') {
+      throw new Error('Expected group node.');
+    }
+    expect(parsed.nodes[0].children.map((node) => node.id)).toEqual([firstItem.id, secondItem.id]);
+  });
+
+  it('migrates supported legacy version 1 documents into version 2 trees', () => {
+    const legacy = {
+      version: 1 as const,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      items: [createRectangleItem({ id: 'legacy-item', zIndex: 0 })],
+    };
+
+    const parsed = parseProjectDocument(legacy);
+
+    expect(parsed.version).toBe(2);
+    expect(parsed.nodes).toHaveLength(1);
+    expect(parsed.nodes[0]).toMatchObject({ id: 'legacy-item', kind: 'rectangle' });
   });
 
   it('rejects unsupported document versions', () => {
     expect(() =>
       parseProjectDocument({
-        version: 2 as 1,
+        version: 3,
       })
     ).toThrow();
   });
 
-  it('rejects malformed item payloads that do not satisfy the file DTO schema', () => {
+  it('rejects malformed recursive payloads that do not satisfy the file DTO schema', () => {
     expect(() =>
       parseProjectDocument({
-        version: 1,
+        version: 2,
         canvas: { width: 1024, height: 1024 },
         background: '#ffffff00',
         fonts: [],
-        items: [
+        nodes: [
           {
-            ...createRectangleItem(),
+            kind: 'group',
+            id: '',
             name: '',
-            locked: undefined,
+            opacity: 1,
+            children: [],
           },
         ],
       })
@@ -49,20 +72,19 @@ describe('document schema', () => {
 
   it('parses and preserves explicit text vertical alignment values', () => {
     const document = createDefaultProjectDocument();
-    document.items = [createTextItem({ verticalAlign: 'bottom' })];
+    document.nodes = [createTextItem({ verticalAlign: 'bottom' })];
 
     const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
 
-    expect(parsed.items[0]).toMatchObject({
+    expect(parsed.nodes[0]).toMatchObject({
       kind: 'text',
       verticalAlign: 'bottom',
     });
   });
 
-
   it('serializes and parses image adjustments in saved project files', () => {
     const document = createDefaultProjectDocument();
-    document.items = [
+    document.nodes = [
       createImageItem({
         src: 'data:image/png;base64,AAA',
         mimeType: 'image/png',
@@ -70,10 +92,10 @@ describe('document schema', () => {
         originalHeight: 20,
       }),
     ];
-    if (document.items[0]?.kind !== 'image') {
+    if (document.nodes[0]?.kind !== 'image') {
       throw new Error('Expected image item');
     }
-    document.items[0].adjustments = {
+    document.nodes[0].adjustments = {
       brightness: 120,
       contrast: 30,
       tintColor: '#336699',
@@ -82,7 +104,7 @@ describe('document schema', () => {
 
     const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
 
-    expect(parsed.items[0]).toMatchObject({
+    expect(parsed.nodes[0]).toMatchObject({
       kind: 'image',
       adjustments: {
         brightness: 120,
@@ -93,10 +115,9 @@ describe('document schema', () => {
     });
   });
 
-
   it('serializes and parses text padding in saved project files', () => {
     const document = createDefaultProjectDocument();
-    document.items = [
+    document.nodes = [
       createTextItem({
         padding: { top: 12, right: 18, bottom: 24, left: 30 },
       }),
@@ -104,7 +125,7 @@ describe('document schema', () => {
 
     const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
 
-    expect(parsed.items[0]).toMatchObject({
+    expect(parsed.nodes[0]).toMatchObject({
       kind: 'text',
       padding: {
         top: 12,
@@ -128,7 +149,7 @@ describe('document schema', () => {
       items: [legacyPayload],
     });
 
-    expect(parsed.items[0]).toMatchObject({
+    expect(parsed.nodes[0]).toMatchObject({
       kind: 'text',
       padding: {
         top: 0,
@@ -141,10 +162,10 @@ describe('document schema', () => {
 
   it('does not serialize selection into saved project files', () => {
     const document = createDefaultProjectDocument();
-    document.items = [createRectangleItem({ id: 'selected-item' })];
+    document.nodes = [createRectangleItem({ id: 'selected-item' })];
 
     const serialized = JSON.parse(serializeProjectDocument(document));
 
-    expect(serialized.selectedItemIds).toBeUndefined();
+    expect(serialized.selectedNodeIds).toBeUndefined();
   });
 });

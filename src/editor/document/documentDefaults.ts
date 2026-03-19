@@ -4,16 +4,18 @@ import { DEFAULT_TEXT_PADDING } from './textPadding';
 import type {
   BaseCanvasItem,
   CanvasItem,
+  CanvasLeafKind,
   CanvasPreset,
   CanvasSize,
+  CanvasShadow,
   EllipseCanvasItem,
   ImageCanvasItem,
   LineCanvasItem,
-  ProjectDocumentV1,
-  CanvasShadow,
+  ProjectDocument,
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
+import { cloneCanvasNode, createGroupNode } from './sceneGraph';
 
 export const DEFAULT_FONT_FAMILY = 'Arial';
 
@@ -51,7 +53,7 @@ const DEFAULT_CANVAS: CanvasSize = {
   presetId: 'square-lg',
 };
 
-function createBaseItem<TKind extends CanvasItem['kind']>(
+function createBaseItem<TKind extends CanvasLeafKind>(
   kind: TKind,
   name: string
 ): BaseCanvasItem & { kind: TKind } {
@@ -74,11 +76,12 @@ function createBaseItem<TKind extends CanvasItem['kind']>(
   };
 }
 
-export function createDefaultProjectDocument(): ProjectDocumentV1 {
+export function createDefaultProjectDocument(): ProjectDocument {
   return {
-    version: 1,
+    version: 2,
     canvas: DEFAULT_CANVAS,
     background: '#ffffff00',
+    nodes: [],
     items: [],
     fonts: [],
   };
@@ -181,29 +184,8 @@ export function createImageItem(params: {
   };
 }
 
+export { createGroupNode };
+
 export function cloneCanvasItem(item: CanvasItem, offset = DUPLICATE_ITEM_OFFSET): CanvasItem {
-  const nextId = crypto.randomUUID();
-  const basePosition = {
-    x: item.x + offset,
-    y: item.y + offset,
-  };
-
-  if (item.kind === 'line') {
-    return {
-      ...item,
-      id: nextId,
-      x: item.x + offset,
-      y: item.y + offset,
-      startX: item.startX + offset,
-      startY: item.startY + offset,
-      endX: item.endX + offset,
-      endY: item.endY + offset,
-    };
-  }
-
-  return {
-    ...item,
-    id: nextId,
-    ...basePosition,
-  };
+  return cloneCanvasNode(item, offset) as CanvasItem;
 }

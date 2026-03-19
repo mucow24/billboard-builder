@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createDefaultProjectDocument, createRectangleItem, createTextItem } from '../document/documentDefaults';
-import type { ProjectDocumentV1 } from '../document/documentTypes';
+import type { ProjectDocument } from '../document/documentTypes';
 import { createDefaultEditorState } from './editorState';
 import {
   selectAvailableFonts,
@@ -13,11 +13,12 @@ import {
   selectSelectedItems,
 } from './selectors';
 
-function buildDocument(): ProjectDocumentV1 {
+function buildDocument(): ProjectDocument {
   const first = createTextItem({ x: 10, y: 20 });
   const second = createRectangleItem({ x: 40, y: 60 });
   return {
     ...createDefaultProjectDocument(),
+    nodes: [first, second],
     items: [first, second],
   };
 }
@@ -25,18 +26,21 @@ function buildDocument(): ProjectDocumentV1 {
 describe('selectors', () => {
   it('returns the primary selected item id', () => {
     const state = createDefaultEditorState(buildDocument());
+    state.session.selectedNodeIds = [state.document.items[1].id, state.document.items[0].id];
     state.session.selectedItemIds = [state.document.items[1].id, state.document.items[0].id];
     expect(selectPrimarySelectedItemId(state)).toBe(state.session.selectedItemIds[0]);
   });
 
   it('returns the selected item', () => {
     const state = createDefaultEditorState(buildDocument());
+    state.session.selectedNodeIds = [state.document.items[1].id, state.document.items[0].id];
     state.session.selectedItemIds = [state.document.items[1].id, state.document.items[0].id];
     expect(selectSelectedItem(state.document, state)?.id).toBe(state.session.selectedItemIds[0]);
   });
 
   it('returns all selected items in document order', () => {
     const state = createDefaultEditorState(buildDocument());
+    state.session.selectedNodeIds = [state.document.items[1].id, state.document.items[0].id];
     state.session.selectedItemIds = [state.document.items[1].id, state.document.items[0].id];
     expect(selectSelectedItems(state.document, state).map((item) => item.id)).toEqual(state.document.items.map((item) => item.id));
   });

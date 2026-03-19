@@ -14,6 +14,7 @@ interface LineItemViewProps {
   activeTool: CanvasTool;
   isSelected: boolean;
   item: LineCanvasItem;
+  selectableNodeId?: string;
   onBeginLineHandle: (
     item: LineCanvasItem,
     handle: 'start' | 'end',
@@ -21,6 +22,7 @@ interface LineItemViewProps {
   ) => void;
   onItemPointerDown: (
     item: LineCanvasItem,
+    selectionNodeId: string,
     pointer: Point,
     shiftKey: boolean,
   ) => void;
@@ -35,6 +37,7 @@ export function LineItemView({
   activeTool,
   isSelected,
   item,
+  selectableNodeId = item.id,
   onBeginLineHandle,
   onItemPointerDown,
   renderContent = true,
@@ -76,11 +79,11 @@ export function LineItemView({
               return;
             }
             event.cancelBubble = true;
-            onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
+            onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
           }}
           onTap={() => {
             if (interactionEnabled) {
-              onItemPointerDown(item, { x: item.x, y: item.y }, false);
+              onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
             }
           }}
         />
@@ -101,7 +104,7 @@ export function LineItemView({
                 return;
               }
               event.cancelBubble = true;
-              onItemPointerDown(item, toCanvasPointer(pointer), event.evt.shiftKey);
+              onItemPointerDown(item, selectableNodeId, toCanvasPointer(pointer), event.evt.shiftKey);
             }}
           />
           {renderHandles

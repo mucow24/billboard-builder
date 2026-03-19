@@ -5,7 +5,7 @@ import type {
   CanvasItem,
   CanvasTool,
   GuideLine,
-  ProjectDocumentV1,
+  ProjectDocument,
 } from '../document/documentTypes';
 import {
 } from './interactionGeometry';
@@ -20,7 +20,7 @@ import { useCanvasViewport } from './stage/useCanvasViewport';
 
 export interface CanvasStageProps {
   activeTool: CanvasTool;
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
   selectedItemIds: string[];
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;

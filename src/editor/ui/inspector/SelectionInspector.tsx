@@ -17,12 +17,14 @@ import {
   getTextStyleCapabilities,
 } from './inspectorModel';
 import type { SelectionInspectorProps } from './types';
-import { SectionBlock } from './inspectorControls';
+import { NumberInput, SectionBlock } from './inspectorControls';
 
 export function SelectionInspector({
   availableFonts,
   fonts,
+  onGroupOpacityChange,
   onItemChange,
+  selectedGroup,
   selectedItem,
   selectedItems,
 }: SelectionInspectorProps) {
@@ -44,6 +46,25 @@ export function SelectionInspector({
           opacityValue={selectionSummary.opacityValue}
           selectedCount={selectedItems.length}
         />
+      </div>
+    );
+  }
+
+  if (selectedGroup) {
+    return (
+      <div className="rail-tab-body rail-tab-body-properties">
+        <SectionBlock title="Group">
+          <NumberInput
+            label="Group Opacity"
+            min={0}
+            max={1}
+            step={0.01}
+            digits={2}
+            slider
+            value={selectedGroup.opacity}
+            onChange={onGroupOpacityChange}
+          />
+        </SectionBlock>
       </div>
     );
   }

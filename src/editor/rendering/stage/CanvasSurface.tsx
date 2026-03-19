@@ -1,6 +1,6 @@
 import { Group, Rect } from 'react-konva';
 
-import type { ProjectDocumentV1 } from '../../document/documentTypes';
+import type { ProjectDocument } from '../../document/documentTypes';
 
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 
@@ -25,7 +25,7 @@ function buildCheckerboardTiles(width: number, height: number, cellSize = 20) {
 }
 
 interface CanvasSurfaceProps {
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
 }
 
 export function CanvasSurface({ document }: CanvasSurfaceProps) {

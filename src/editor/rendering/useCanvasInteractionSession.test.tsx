@@ -13,7 +13,7 @@ import {
 import type {
   CanvasItem,
   CanvasTool,
-  ProjectDocumentV1,
+  ProjectDocument,
 } from '../document/documentTypes';
 
 function rotatePoint(
@@ -93,12 +93,12 @@ function makeStageEvent(
   } as unknown as Konva.KonvaEventObject<MouseEvent>;
 }
 
-function createDocument(items: CanvasItem[] = [], selectedItemIds: string[] = []) {
-  void selectedItemIds;
+function createDocument(items: CanvasItem[] = []) {
   return {
     ...createDefaultProjectDocument(),
+    nodes: items,
     items,
-  } satisfies ProjectDocumentV1;
+  } satisfies ProjectDocument;
 }
 
 function createHookParamsBase() {
@@ -189,7 +189,7 @@ describe('useCanvasInteractionSession', () => {
   it('clears selection when the select tool clicks blank canvas', () => {
     const item = createRectangleItem();
     const params = createHookParams({
-      document: createDocument([item], [item.id]),
+      document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -210,7 +210,7 @@ describe('useCanvasInteractionSession', () => {
       height: 120,
     });
     const params = createHookParams({
-      document: createDocument([item], [item.id]),
+      document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -238,7 +238,7 @@ describe('useCanvasInteractionSession', () => {
       height: 120,
     });
     const params = createHookParams({
-      document: createDocument([item], [item.id]),
+      document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
     const handlePoint = getShapeHandlePoints(item)['top-center'];
@@ -269,7 +269,7 @@ describe('useCanvasInteractionSession', () => {
       height: 120,
     });
     const params = createHookParams({
-      document: createDocument([item], [item.id]),
+      document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
     const center = { x: item.x + item.width / 2, y: item.y + item.height / 2 };
@@ -611,7 +611,7 @@ describe('useCanvasInteractionSession', () => {
       endY: 184,
     });
     const params = createHookParams({
-      document: createDocument([item], [item.id]),
+      document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
     const startHandle = getLineHandleRects(item).start;
@@ -652,7 +652,7 @@ describe('useCanvasInteractionSession', () => {
       height: 120,
     });
     const params = createHookParams({
-      document: createDocument([item, sibling], [item.id]),
+      document: createDocument([item, sibling]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -774,7 +774,7 @@ describe('useCanvasInteractionSession', () => {
       height: 80,
     });
     const params = createHookParams({
-      document: createDocument([item], [item.id]),
+      document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -816,7 +816,7 @@ describe('useCanvasInteractionSession', () => {
       height: 120,
     });
     const params = createHookParams({
-      document: createDocument([item, sibling], [item.id]),
+      document: createDocument([item, sibling]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -852,7 +852,7 @@ describe('useCanvasInteractionSession', () => {
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
     act(() => {
-      result.current.handleItemPointerDown(item, { x: 10, y: 20 }, true);
+      result.current.handleItemPointerDown(item, item.id, { x: 10, y: 20 }, true);
     });
 
     expect(params.onToggleSelectItem).toHaveBeenCalledWith(item.id);
@@ -869,7 +869,7 @@ describe('useCanvasInteractionSession', () => {
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
     act(() => {
-      result.current.handleItemPointerDown(first, { x: 120, y: 120 }, false);
+      result.current.handleItemPointerDown(first, first.id, { x: 120, y: 120 }, false);
     });
 
     expect(result.current.session?.kind).toBe('group-drag');

@@ -9,18 +9,22 @@ describe('Toolbar', () => {
     render(
       <Toolbar
         canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
+        canGroup={false}
+        canUngroup={false}
         canUndo={false}
         canRedo={false}
         onCanvasSizeChange={vi.fn()}
         onDelete={vi.fn()}
         onExport={vi.fn()}
         onFontUpload={vi.fn()}
+        onGroup={vi.fn()}
         onImageUpload={vi.fn()}
         onLoad={vi.fn()}
         onNewProject={vi.fn()}
         onRedo={vi.fn()}
         onSave={vi.fn()}
         onUndo={vi.fn()}
+        onUngroup={vi.fn()}
       />
     );
 
@@ -35,18 +39,22 @@ describe('Toolbar', () => {
     render(
       <Toolbar
         canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
+        canGroup={false}
+        canUngroup={false}
         canUndo
         canRedo
         onCanvasSizeChange={onCanvasSizeChange}
         onDelete={vi.fn()}
         onExport={vi.fn()}
         onFontUpload={vi.fn()}
+        onGroup={vi.fn()}
         onImageUpload={vi.fn()}
         onLoad={vi.fn()}
         onNewProject={vi.fn()}
         onRedo={vi.fn()}
         onSave={vi.fn()}
         onUndo={vi.fn()}
+        onUngroup={vi.fn()}
       />
     );
 

@@ -6,13 +6,14 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import { flattenLayerRows } from '../../document/sceneGraph';
 
 import { LayersInspectorTab } from './LayersInspectorTab';
 
 describe('LayersInspectorTab', () => {
   it('renders layers in z-index order and selects or deletes rows correctly', async () => {
     const user = userEvent.setup();
-    const onSelectItem = vi.fn();
+    const onSelectNode = vi.fn();
     const onDeleteItem = vi.fn();
     const backItem = createRectangleItem({ zIndex: 0 });
     const frontItem = createTextItem({ zIndex: 1 });
@@ -21,13 +22,13 @@ describe('LayersInspectorTab', () => {
       <LayersInspectorTab
         background="#ffffff00"
         canReorder
-        items={[backItem, frontItem]}
+        rows={flattenLayerRows([frontItem, backItem])}
         onBackgroundChange={vi.fn()}
         onDeleteItem={onDeleteItem}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
-        onSelectItem={onSelectItem}
-        selectedItems={[frontItem]}
+        onSelectNode={onSelectNode}
+        selectedNodeIds={[frontItem.id]}
       />,
     );
 
@@ -36,7 +37,7 @@ describe('LayersInspectorTab', () => {
     expect(layerRows[1]).toHaveTextContent('Rectangle');
 
     await user.click(layerRows[0]);
-    expect(onSelectItem).toHaveBeenCalledWith(frontItem.id);
+    expect(onSelectNode).toHaveBeenCalledWith(frontItem.id);
 
     await user.click(screen.getByRole('button', { name: 'Delete Rectangle' }));
     expect(onDeleteItem).toHaveBeenCalledWith(backItem.id);
@@ -46,25 +47,25 @@ describe('LayersInspectorTab', () => {
     const user = userEvent.setup();
     const onOpenProperties = vi.fn();
     const onReorder = vi.fn();
-    const onSelectItem = vi.fn();
+    const onSelectNode = vi.fn();
     const item = createRectangleItem();
 
     render(
       <LayersInspectorTab
         background="#ffffff00"
         canReorder
-        items={[item]}
+        rows={flattenLayerRows([item])}
         onBackgroundChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onOpenProperties={onOpenProperties}
         onReorder={onReorder}
-        onSelectItem={onSelectItem}
-        selectedItems={[item]}
+        onSelectNode={onSelectNode}
+        selectedNodeIds={[item.id]}
       />,
     );
 
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Rectangle' }));
-    expect(onSelectItem).toHaveBeenCalledWith(item.id);
+    expect(onSelectNode).toHaveBeenCalledWith(item.id);
     expect(onOpenProperties).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('button', { name: 'Bring front' }));
@@ -80,13 +81,13 @@ describe('LayersInspectorTab', () => {
       <LayersInspectorTab
         background="#ffffff00"
         canReorder={false}
-        items={[item]}
+        rows={flattenLayerRows([item])}
         onBackgroundChange={onBackgroundChange}
         onDeleteItem={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
-        onSelectItem={vi.fn()}
-        selectedItems={[]}
+        onSelectNode={vi.fn()}
+        selectedNodeIds={[]}
       />,
     );
 

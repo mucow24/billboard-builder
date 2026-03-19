@@ -7,6 +7,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
+import { flattenLayerRows } from '../document/sceneGraph';
 
 describe('PropertiesPanel', () => {
   it('shows the missing font warning and shell tabs', async () => {
@@ -19,11 +20,13 @@ describe('PropertiesPanel', () => {
         background="#ffffff00"
         fonts={[]}
         items={[item]}
+        layerRows={flattenLayerRows([item])}
         missingFontFamilies={['Ghost Sans']}
         onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onItemChange={vi.fn()}
-        onSelectItem={vi.fn()}
+        onSelectNode={vi.fn()}
         onReorder={vi.fn()}
       />,
     );
@@ -44,12 +47,14 @@ describe('PropertiesPanel', () => {
         background="#ffffff00"
         fonts={[]}
         items={[item]}
+        layerRows={flattenLayerRows([item])}
         missingFontFamilies={[]}
         selectedItem={item}
         onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onItemChange={vi.fn()}
-        onSelectItem={vi.fn()}
+        onSelectNode={vi.fn()}
         onReorder={vi.fn()}
       />,
     );
@@ -78,11 +83,13 @@ describe('PropertiesPanel', () => {
         background="#ffffff00"
         fonts={[]}
         items={[]}
+        layerRows={[]}
         missingFontFamilies={[]}
         onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
         onDeleteItem={vi.fn()}
         onItemChange={vi.fn()}
-        onSelectItem={vi.fn()}
+        onSelectNode={vi.fn()}
         onReorder={vi.fn()}
       />,
     );

@@ -28,17 +28,20 @@ import {
   type SessionWithModifiers,
   type ShapeItem,
 } from './interactionSession';
+import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
+import { collectLeafItems, getNodeById, isCanvasItemNode } from '../document/sceneGraph';
 import type {
   CanvasItem,
   CanvasTool,
+  CanvasNode,
   GuideLine,
   LineCanvasItem,
-  ProjectDocumentV1,
+  ProjectDocument,
 } from '../document/documentTypes';
 
 interface UseCanvasInteractionSessionParams {
   activeTool: CanvasTool;
-  document: ProjectDocumentV1;
+  document: ProjectDocument;
   selectedItemIds: string[];
   viewport?: { zoom: number; panX: number; panY: number };
   onGuidesChange: (guides: GuideLine[]) => void;
@@ -74,14 +77,51 @@ export function useCanvasInteractionSession({
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
 
   const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
-  const orderedItems = useMemo(() => document.items.slice().sort((left, right) => left.zIndex - right.zIndex), [document.items]);
-  const selectedItems = useMemo(() => orderedItems.filter((item) => selectedIdSet.has(item.id)), [orderedItems, selectedIdSet]);
+  const renderables = useMemo(() => buildRenderableCanvasItems(document), [document]);
+  const orderedItems = useMemo(
+    () => renderables.map(({ selectableNodeId, ...item }) => {
+      void selectableNodeId;
+      return item;
+    }),
+    [renderables]
+  );
+  const renderableByLeafId = useMemo(
+    () => new Map(renderables.map((item) => [item.id, item])),
+    [renderables]
+  );
+  const selectedNodes = useMemo(
+    () =>
+      selectedItemIds
+        .map((nodeId) => getNodeById(document.nodes, nodeId))
+        .filter((node): node is CanvasNode => Boolean(node)),
+    [document.nodes, selectedItemIds]
+  );
+  const selectedItems = useMemo(
+    () =>
+      selectedNodes
+        .flatMap(collectLeafItems)
+        .slice()
+        .sort((left, right) => left.zIndex - right.zIndex),
+    [selectedNodes]
+  );
+  const selectedLeafIdSet = useMemo(() => new Set(selectedItems.map((item) => item.id)), [selectedItems]);
   const groupBounds = useMemo(() => getSelectionRenderBounds(selectedItems), [selectedItems]);
   const stageBounds = useMemo(() => ({ x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }), [document.canvas.height, document.canvas.width]);
 
-  const renderedItems = useMemo(() => buildRenderedItems(orderedItems, session), [orderedItems, session]);
+  const renderedItems = useMemo(
+    () =>
+      buildRenderedItems(orderedItems, session).map((item) => {
+        const renderable = renderableByLeafId.get(item.id);
+        return {
+          ...item,
+          opacity: renderable?.opacity ?? item.opacity,
+          selectableNodeId: renderable?.selectableNodeId ?? item.id,
+        } as RenderableCanvasItem;
+      }),
+    [orderedItems, renderableByLeafId, session]
+  );
 
-  const renderedSelectedItems = useMemo(() => renderedItems.filter((item) => selectedIdSet.has(item.id)), [renderedItems, selectedIdSet]);
+  const renderedSelectedItems = useMemo(() => renderedItems.filter((item) => selectedLeafIdSet.has(item.id)), [renderedItems, selectedLeafIdSet]);
   const renderedGroupBounds = useMemo(() => getSelectionRenderBounds(renderedSelectedItems), [renderedSelectedItems]);
   const renderedSelectionFrame = useMemo(() => {
     if (renderedSelectedItems.length <= 1) {
@@ -96,8 +136,11 @@ export function useCanvasInteractionSession({
     () => renderedSelectionFrame ?? (groupBounds ? { bounds: groupBounds, rotation: 0 } : null),
     [groupBounds, renderedSelectionFrame]
   );
-  const selectedItemId = selectedItemIds[0];
-  const selectedDocumentItem = orderedItems.find((item) => item.id === selectedItemId) ?? null;
+  const selectedDocumentItem = useMemo(
+    () => (selectedNodes[0] && isCanvasItemNode(selectedNodes[0]) ? selectedNodes[0] : null),
+    [selectedNodes]
+  );
+  const selectedItemId = selectedDocumentItem?.id;
   const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId) ?? null;
 
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
@@ -113,7 +156,7 @@ export function useCanvasInteractionSession({
     }
   }, [activeTool, onGuidesChange, session, updateSession]);
 
-  const selectionSetSignature = useMemo(() => currentSelectionSetSignature(selectedItemIds), [selectedItemIds]);
+  const selectionSetSignature = useMemo(() => currentSelectionSetSignature(selectedItems.map((item) => item.id)), [selectedItems]);
 
   useEffect(() => {
     if (selectedItems.length <= 1) {
@@ -164,12 +207,13 @@ export function useCanvasInteractionSession({
         return;
       case 'marquee':
         if (commit.toggleMode && onToggleSelectItems) {
-          onToggleSelectItems(commit.hitIds);
+          onToggleSelectItems(Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId))));
         } else if (commit.hitIds.length > 0) {
-          onSelectItem(commit.hitIds[0]);
-          if (commit.hitIds.length > 1 && onToggleSelectItems) {
+          const selectableIds = Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId)));
+          onSelectItem(selectableIds[0]);
+          if (selectableIds.length > 1 && onToggleSelectItems) {
             onSelectItem(undefined);
-            onToggleSelectItems(commit.hitIds);
+            onToggleSelectItems(selectableIds);
           }
         } else {
           onSelectItem(undefined);
@@ -187,7 +231,7 @@ export function useCanvasInteractionSession({
         onUpdateItem(commit.itemId, commit.changes);
         return;
     }
-  }, [onAddItem, onGuidesChange, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, resolveSession]);
+  }, [onAddItem, onGuidesChange, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
@@ -256,13 +300,13 @@ export function useCanvasInteractionSession({
   const beginGroupDrag = useCallback((pointer: Point) => {
     const nextSession = createGroupDragSession(pointer, {
       selectedItems,
-      siblingItems: orderedItems.filter((entry) => !selectedIdSet.has(entry.id)),
+      siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
       activeSelectionFrame,
     });
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedIdSet, selectedItems, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
   const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
     updateSession(
@@ -273,13 +317,13 @@ export function useCanvasInteractionSession({
   const beginGroupResize = useCallback((handle: ResizeHandle, pointer: Point) => {
     const nextSession = createGroupResizeSession(handle, pointer, {
       selectedItems,
-      siblingItems: orderedItems.filter((entry) => !selectedIdSet.has(entry.id)),
+      siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
       activeSelectionFrame,
     });
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedIdSet, selectedItems, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point) => {
     updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id)));
@@ -288,13 +332,13 @@ export function useCanvasInteractionSession({
   const beginGroupRotate = useCallback((pointer: Point) => {
     const nextSession = createGroupRotateSession(pointer, {
       selectedItems,
-      siblingItems: orderedItems.filter((entry) => !selectedIdSet.has(entry.id)),
+      siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
       activeSelectionFrame,
     });
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedIdSet, selectedItems, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
   const beginLineHandle = useCallback((item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => {
     updateSession(
@@ -318,21 +362,25 @@ export function useCanvasInteractionSession({
   const selectedNode = selectedItemId ? shapeRefs.current.get(selectedItemId) ?? null : null;
   const nodeClientRect = selectedNode && stageRef.current ? selectedNode.getClientRect({ relativeTo: stageRef.current }) : null;
 
-  const handleItemPointerDown = useCallback((item: CanvasItem, pointer: Point, shiftKey: boolean) => {
+  const handleItemPointerDown = useCallback((item: CanvasItem, selectionNodeId: string, pointer: Point, shiftKey: boolean) => {
     if (shiftKey && onToggleSelectItem) {
-      onToggleSelectItem(item.id);
+      onToggleSelectItem(selectionNodeId);
       return;
     }
-    if (selectedIdSet.has(item.id)) {
+    if (selectedIdSet.has(selectionNodeId)) {
       if (selectedItems.length > 1) {
         beginGroupDrag(pointer);
         return;
       }
-      beginDrag(item, pointer);
+      if (selectionNodeId === item.id) {
+        beginDrag(item, pointer);
+      }
       return;
     }
-    onSelectItem(item.id);
-    beginDrag(item, pointer);
+    onSelectItem(selectionNodeId);
+    if (selectionNodeId === item.id) {
+      beginDrag(item, pointer);
+    }
   }, [beginDrag, beginGroupDrag, onSelectItem, onToggleSelectItem, selectedIdSet, selectedItems.length]);
 
   const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {

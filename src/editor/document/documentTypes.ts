@@ -7,12 +7,14 @@ export type CanvasTool =
   | 'ellipse'
   | 'line';
 
-export type CanvasItemKind =
+export type CanvasLeafKind =
   | 'text'
   | 'image'
   | 'rectangle'
   | 'ellipse'
   | 'line';
+
+export type CanvasNodeKind = CanvasLeafKind | 'group';
 
 export type TextAlign = 'left' | 'center' | 'right';
 
@@ -59,7 +61,7 @@ export interface TextPadding {
 
 export interface BaseCanvasItem {
   id: string;
-  kind: CanvasItemKind;
+  kind: CanvasLeafKind;
   name: string;
   x: number;
   y: number;
@@ -68,6 +70,7 @@ export interface BaseCanvasItem {
   rotation: number;
   scaleX: number;
   scaleY: number;
+  // Derived runtime ordering for leaf helpers that still assume flat items.
   zIndex: number;
   locked: boolean;
   hidden: boolean;
@@ -132,7 +135,17 @@ export type CanvasItem =
   | EllipseCanvasItem
   | LineCanvasItem;
 
-export interface ProjectDocumentV1 {
+export interface GroupNode {
+  id: string;
+  kind: 'group';
+  name: string;
+  opacity: number;
+  children: CanvasNode[];
+}
+
+export type CanvasNode = GroupNode | CanvasItem;
+
+export interface LegacyProjectDocumentV1 {
   version: 1;
   canvas: CanvasSize;
   background: string;
@@ -140,22 +153,41 @@ export interface ProjectDocumentV1 {
   fonts: DocumentFontReference[];
 }
 
-export type ProjectDocument = ProjectDocumentV1;
+export interface ProjectDocumentV2 {
+  version: 2;
+  canvas: CanvasSize;
+  background: string;
+  nodes: CanvasNode[];
+  // Derived compatibility view during the scene-graph migration.
+  items: CanvasItem[];
+  fonts: DocumentFontReference[];
+}
+
+export type ProjectDocument = ProjectDocumentV2;
+export type ProjectDocumentV1 = LegacyProjectDocumentV1 | ProjectDocumentV2;
 
 export type ReorderMode = 'forward' | 'backward' | 'front' | 'back';
 
 export type EditorCommand =
   | { type: 'add_item'; item: CanvasItem }
+  | { type: 'insert_nodes'; nodes: CanvasNode[]; parentId?: string; index?: number }
   | { type: 'delete_items'; itemIds: string[] }
+  | { type: 'delete_nodes'; nodeIds: string[] }
   | { type: 'select_items'; itemIds: string[] }
+  | { type: 'select_nodes'; nodeIds: string[] }
   | { type: 'clear_selection' }
   | { type: 'update_item'; itemId: string; changes: Partial<CanvasItem> }
+  | { type: 'update_group'; groupId: string; changes: Partial<Pick<GroupNode, 'name' | 'opacity'>> }
+  | { type: 'group_nodes'; nodeIds: string[] }
+  | { type: 'ungroup_node'; groupId: string }
   | { type: 'set_canvas_size'; canvas: CanvasSize }
   | { type: 'set_background'; background: string }
   | { type: 'reorder_item'; itemId: string; mode: ReorderMode }
+  | { type: 'reorder_node'; nodeId: string; mode: ReorderMode }
   | { type: 'reorder_items'; itemIds: string[]; mode: ReorderMode }
+  | { type: 'reorder_nodes'; nodeIds: string[]; mode: ReorderMode }
   | { type: 'register_font'; font: DocumentFontReference }
-  | { type: 'load_document'; document: ProjectDocumentV1 };
+  | { type: 'load_document'; document: ProjectDocument | ProjectDocumentV1 };
 
 export interface UploadedFont {
   family: string;

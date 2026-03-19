@@ -8,8 +8,17 @@ import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
-import { selectCanRedo, selectCanUndo, selectSelectedItem, selectSelectedItems } from '../editor/core/selectors';
+import {
+  selectCanRedo,
+  selectCanUndo,
+  selectSelectedGroup,
+  selectSelectedItem,
+  selectSelectedItems,
+  selectSelectedNode,
+  selectSelectedNodes,
+} from '../editor/core/selectors';
 import { createImageItem } from '../editor/document/documentDefaults';
+import { flattenLayerRows } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
 
 function getPointerCenteredPosition(x: number, y: number) {
@@ -30,24 +39,27 @@ export function useEditorController() {
     editor,
     applyTransaction,
     addImageItem,
-    deleteItem,
-    deleteSelectedItems,
+    deleteNode,
+    deleteSelectedNodes,
     dispatch,
-    duplicateSelectedItems,
+    duplicateSelectedNodes,
+    groupSelectedNodes,
     loadDocument,
-    nudgeSelectedItems,
+    nudgeSelectedNodes,
     redo,
     registerAvailableFont,
-    reorderSelectedItem,
+    reorderSelectedNode,
     resetDocument,
-    selectAllItems,
-    selectSingleItem,
+    selectAllNodes,
+    selectSingleNode,
     setActiveTool,
     setCanvasSize,
     setMissingFontFamilies,
-    toggleSelectedItem,
-    toggleSelectedItems,
+    toggleSelectedNode,
+    toggleSelectedNodes,
     undo,
+    ungroupSelectedNode,
+    updateSelectedGroup,
     updateSelectedItem,
     updateSelectedItems,
   } = useEditorStore();
@@ -57,11 +69,14 @@ export function useEditorController() {
     activeTool,
     availableFonts,
     missingFontFamilies,
-    selectedItemIds,
+    selectedNodeIds,
   } = session;
-  const selectedItem = selectSelectedItem(document, editor);
+  const selectedNode = selectSelectedNode(document, editor) ?? null;
+  const selectedNodes = selectSelectedNodes(document, editor);
+  const selectedItem = selectSelectedItem(document, editor) ?? null;
+  const selectedGroup = selectSelectedGroup(document, editor) ?? null;
   const selectedItems = selectSelectedItems(document, editor);
-  const selectedItemOrNull = selectedItem ?? null;
+  const layerRows = flattenLayerRows(document.nodes);
   const canUndo = selectCanUndo(history);
   const canRedo = selectCanRedo(history);
 
@@ -79,16 +94,18 @@ export function useEditorController() {
 
   useEditorShortcuts({
     applyTransaction,
-    deleteSelectedItems,
-    duplicateSelectedItems,
-    nudgeSelectedItems,
+    deleteSelectedNodes,
+    duplicateSelectedNodes,
+    groupSelectedNodes,
+    nudgeSelectedNodes,
     onPasteImageFile: handleImageFile,
     redo,
-    reorderSelectedItem,
-    selectAllItems,
-    selectedItems,
+    reorderSelectedNode,
+    selectedNodes,
+    selectAllNodes,
     setActiveTool,
     undo,
+    ungroupSelectedNode,
   });
 
   async function handleImageFile(file: File) {
@@ -170,26 +187,38 @@ export function useEditorController() {
   return {
     actions: {
       applyTransaction,
-      deleteItem,
-      deleteSelectedItems,
+      deleteItem: deleteNode,
+      deleteNode,
+      deleteSelectedItems: deleteSelectedNodes,
+      deleteSelectedNodes,
       dispatch,
-      duplicateSelectedItems,
+      duplicateSelectedItems: duplicateSelectedNodes,
+      duplicateSelectedNodes,
+      groupSelectedNodes,
       handleExport,
       handleFontUpload,
       handleImageUpload,
       handleNewProject,
       handleOpenProject,
       handleSave,
-      nudgeSelectedItems,
+      nudgeSelectedItems: nudgeSelectedNodes,
+      nudgeSelectedNodes,
       redo,
-      reorderSelectedItem,
-      selectAllItems,
-      selectSingleItem,
+      reorderSelectedItem: reorderSelectedNode,
+      reorderSelectedNode,
+      selectAllItems: selectAllNodes,
+      selectAllNodes,
+      selectSingleItem: selectSingleNode,
+      selectSingleNode,
       setActiveTool,
       setCanvasSize,
-      toggleSelectedItem,
-      toggleSelectedItems,
+      toggleSelectedItem: toggleSelectedNode,
+      toggleSelectedNode,
+      toggleSelectedItems: toggleSelectedNodes,
+      toggleSelectedNodes,
       undo,
+      ungroupSelectedNode,
+      updateSelectedGroup,
       updateSelectedItem,
       updateSelectedItems,
     },
@@ -200,10 +229,15 @@ export function useEditorController() {
       canUndo,
       document,
       errorMessage,
+      layerRows,
       missingFontFamilies,
-      selectedItem: selectedItemOrNull,
-      selectedItemIds,
+      selectedGroup,
+      selectedItem,
       selectedItems,
+      selectedItemIds: selectedNodeIds,
+      selectedNode,
+      selectedNodeIds,
+      selectedNodes,
     },
   };
 }

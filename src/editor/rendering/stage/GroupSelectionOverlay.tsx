@@ -1,6 +1,7 @@
 import { Circle, Group, Line, Rect } from 'react-konva';
 
 import type { CanvasItem, CanvasTool } from '../../document/documentTypes';
+import type { RenderableCanvasItem } from '../renderAdapter';
 import {
   RESIZE_HANDLE_NAMES,
   type Point,
@@ -39,8 +40,13 @@ interface GroupSelectionOverlayProps {
     bounds: { x: number; y: number; width: number; height: number };
     rotation: number;
   } | null;
-  handleItemPointerDown: (item: CanvasItem, pointer: Point, shiftKey: boolean) => void;
-  renderedSelectedItems: CanvasItem[];
+  handleItemPointerDown: (
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    shiftKey: boolean
+  ) => void;
+  renderedSelectedItems: RenderableCanvasItem[];
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
@@ -68,6 +74,7 @@ export function GroupSelectionOverlay({
             activeTool={activeTool}
             isSelected
             item={selectedRenderedItem}
+            selectableNodeId={selectedRenderedItem.selectableNodeId}
             onBeginLineHandle={beginLineHandle}
             onItemPointerDown={handleItemPointerDown}
             renderContent={false}
@@ -81,6 +88,7 @@ export function GroupSelectionOverlay({
             activeTool={activeTool}
             isSelected
             item={selectedRenderedItem}
+            selectableNodeId={selectedRenderedItem.selectableNodeId}
             onBeginResize={beginResize}
             onBeginRotate={beginRotate}
             onItemPointerDown={handleItemPointerDown}

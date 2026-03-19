@@ -1,24 +1,24 @@
-import type { CanvasItem } from '../editor/document/documentTypes';
-import { parseCanvasItems } from '../editor/document/documentSchema';
+import type { CanvasNode } from '../editor/document/documentTypes';
+import { parseCanvasNodes } from '../editor/document/documentSchema';
 
 export const APP_CLIPBOARD_MIME_TYPE = 'application/x-billboard-builder-selection+json';
 
 interface ClipboardSelectionPayload {
-  version: 1;
-  items: CanvasItem[];
+  version: 2;
+  nodes: CanvasNode[];
 }
 
 export function writeSelectionToClipboardData(
   dataTransfer: DataTransfer | null,
-  items: CanvasItem[]
+  nodes: CanvasNode[]
 ): boolean {
-  if (!dataTransfer || items.length === 0) {
+  if (!dataTransfer || nodes.length === 0) {
     return false;
   }
 
   const payload: ClipboardSelectionPayload = {
-    version: 1,
-    items,
+    version: 2,
+    nodes,
   };
 
   try {
@@ -31,7 +31,7 @@ export function writeSelectionToClipboardData(
 
 export function readSelectionFromClipboardData(
   dataTransfer: DataTransfer | null
-): CanvasItem[] | null {
+): CanvasNode[] | null {
   if (!dataTransfer) {
     return null;
   }
@@ -43,11 +43,11 @@ export function readSelectionFromClipboardData(
 
   try {
     const parsed = JSON.parse(payload) as Partial<ClipboardSelectionPayload>;
-    if (parsed.version !== 1 || !Array.isArray(parsed.items)) {
+    if (parsed.version !== 2 || !Array.isArray(parsed.nodes)) {
       return null;
     }
 
-    return parseCanvasItems(parsed.items);
+    return parseCanvasNodes(parsed.nodes);
   } catch {
     return null;
   }

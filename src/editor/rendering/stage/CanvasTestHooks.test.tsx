@@ -6,6 +6,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { CanvasTestHooks } from './CanvasTestHooks';
 
@@ -91,6 +92,10 @@ describe('CanvasTestHooks', () => {
 
   it('forwards selected item, shape handle, and group overlay events', () => {
     const rectangle = createRectangleItem();
+    const renderedRectangle: RenderableCanvasItem = {
+      ...rectangle,
+      selectableNodeId: rectangle.id,
+    };
     const handleItemPointerDown = vi.fn();
     const beginResize = vi.fn();
     const beginGroupDrag = vi.fn();
@@ -115,7 +120,7 @@ describe('CanvasTestHooks', () => {
         onTestEvent={onTestEvent}
         selectedItemViewportRect={{ left: 120, top: 110, width: 80, height: 50 }}
         selectedLineHandleRects={null}
-        selectedRenderedItem={rectangle}
+        selectedRenderedItem={renderedRectangle}
         selectedShapeHandleRects={{ rotater: { left: 140, top: 70, width: 16, height: 16 } }}
         session={null}
         showGroupInteractionHooks
@@ -142,7 +147,8 @@ describe('CanvasTestHooks', () => {
     });
 
     expect(handleItemPointerDown).toHaveBeenCalledWith(
-      rectangle,
+      renderedRectangle,
+      renderedRectangle.selectableNodeId,
       { x: 120, y: 90 },
       false,
     );
@@ -155,6 +161,10 @@ describe('CanvasTestHooks', () => {
 
   it('forwards line handles, group handles, and group rotater hooks', () => {
     const line = createLineItem();
+    const renderedLine: RenderableCanvasItem = {
+      ...line,
+      selectableNodeId: line.id,
+    };
     const beginLineHandle = vi.fn();
     const beginGroupResize = vi.fn();
     const beginGroupRotate = vi.fn();
@@ -177,7 +187,7 @@ describe('CanvasTestHooks', () => {
         onTestEvent={vi.fn()}
         selectedItemViewportRect={null}
         selectedLineHandleRects={{ start: { left: 10, top: 20, width: 16, height: 16 } }}
-        selectedRenderedItem={line}
+        selectedRenderedItem={renderedLine}
         selectedShapeHandleRects={null}
         session={null}
         showGroupInteractionHooks
@@ -203,7 +213,7 @@ describe('CanvasTestHooks', () => {
       clientY: 40,
     });
 
-    expect(beginLineHandle).toHaveBeenCalledWith(line, 'start', { x: 30, y: 40 });
+    expect(beginLineHandle).toHaveBeenCalledWith(renderedLine, 'start', { x: 30, y: 40 });
     expect(beginGroupResize).toHaveBeenCalledWith('middle-right', { x: 110, y: 70 });
     expect(beginGroupRotate).toHaveBeenCalledWith({ x: 90, y: 20 });
   });
