@@ -12,21 +12,40 @@ import type { LayersInspectorTabProps } from './types';
 export function LayersInspectorTab({
   background,
   canReorder,
+  collapsedGroupIds,
   rows,
   onBackgroundChange,
   onDeleteItem,
   onOpenProperties,
   onReorder,
   onSelectNode,
+  onToggleGroupCollapse,
   selectedNodeIds,
 }: LayersInspectorTabProps) {
+  const selectedNodeIdSet = new Set(selectedNodeIds);
+  const visibleRows = rows.filter((row) =>
+    row.ancestorGroupIds.every((groupId) => !collapsedGroupIds.has(groupId))
+  );
+
   return (
     <div className="rail-tab-body rail-tab-body-layers">
       <div className="layer-list layer-list-tabbed">
-        {rows.map((row) => {
+        {visibleRows.map((row) => {
           const isGroup = row.node.kind === 'group';
-          const secondary = isCanvasItemNode(row.node) ? getLayerSecondaryLabel(row.node) : null;
-          const isSelected = selectedNodeIds.includes(row.selectableNodeId);
+          const isCollapsed = isGroup && collapsedGroupIds.has(row.node.id);
+          const hasSelectedDescendant =
+            row.hasChildren &&
+            rows.some(
+              (candidate) =>
+                selectedNodeIdSet.has(candidate.node.id) &&
+                candidate.ancestorGroupIds.includes(row.node.id)
+            );
+          const secondary = isGroup
+            ? `${row.childCount} item${row.childCount === 1 ? '' : 's'}`
+            : isCanvasItemNode(row.node)
+              ? getLayerSecondaryLabel(row.node)
+              : null;
+          const isSelected = selectedNodeIdSet.has(row.selectableNodeId);
           const rowLabel = isGroup
             ? row.node.name
             : isCanvasItemNode(row.node)
@@ -36,24 +55,31 @@ export function LayersInspectorTab({
           return (
             <div
               key={row.node.id}
-              className={isSelected ? 'layer-row active' : 'layer-row'}
+              className={isSelected ? 'layer-row active' : hasSelectedDescendant ? 'layer-row contains-selection' : 'layer-row'}
               style={{ paddingLeft: `${row.depth * 18}px` }}
             >
+              {isGroup && row.hasChildren ? (
+                <button
+                  type="button"
+                  aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`}
+                  className="layer-row-chevron-button"
+                  onClick={() => onToggleGroupCollapse(row.node.id)}
+                >
+                  <span className="layer-row-chevron" aria-hidden="true">
+                    {isCollapsed ? '▸' : '▾'}
+                  </span>
+                </button>
+              ) : (
+                <span className="layer-row-chevron-spacer" aria-hidden="true" />
+              )}
               <button
                 aria-label={rowLabel}
                 className="layer-row-select"
-                disabled={!row.isSelectable}
                 type="button"
                 onClick={() => {
-                  if (!row.isSelectable) {
-                    return;
-                  }
                   onSelectNode(row.selectableNodeId);
                 }}
                 onDoubleClick={() => {
-                  if (!row.isSelectable) {
-                    return;
-                  }
                   onSelectNode(row.selectableNodeId);
                   onOpenProperties();
                 }}
@@ -70,19 +96,17 @@ export function LayersInspectorTab({
                   {secondary ? <small>{secondary}</small> : null}
                 </span>
               </button>
-              {row.isSelectable ? (
-                <button
-                  aria-label={`Delete ${rowLabel}`}
-                  className="layer-row-delete"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDeleteItem(row.selectableNodeId);
-                  }}
-                >
-                  ×
-                </button>
-              ) : null}
+              <button
+                aria-label={`Delete ${rowLabel}`}
+                className="layer-row-delete"
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteItem(row.selectableNodeId);
+                }}
+              >
+                ×
+              </button>
             </div>
           );
         })}

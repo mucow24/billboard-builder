@@ -840,6 +840,24 @@ button {
   width: 100%;
 }
 
+.layer-row-chevron-button,
+.layer-row-chevron-spacer {
+  flex: 0 0 1.85rem;
+  width: 1.85rem;
+}
+
+.layer-row-chevron-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 12px;
+}
+
+.layer-row-chevron-spacer {
+  display: inline-block;
+}
+
 .layer-row-select {
   display: flex;
   flex: 1;
@@ -875,8 +893,14 @@ button {
   background: rgba(79, 70, 229, 0.12);
 }
 
+.layer-row.contains-selection {
+  border-radius: 18px;
+  background: rgba(59, 130, 246, 0.08);
+}
+
 .layer-row.active .layer-row-select,
-.layer-row.active .layer-row-delete {
+.layer-row.active .layer-row-delete,
+.layer-row.active .layer-row-chevron-button {
   border-color: rgba(96, 165, 250, 0.52);
 }
 
@@ -1250,7 +1274,8 @@ button {
 
 .layer-row-select,
 .layer-row-delete,
-.toolbar-icon-button {
+.toolbar-icon-button,
+.layer-row-chevron-button {
   padding: 0.3rem 0.42rem;
   border-radius: 12px;
 }

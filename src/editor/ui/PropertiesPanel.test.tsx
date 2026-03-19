@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PropertiesPanel } from './PropertiesPanel';
 import {
+  createGroupNode,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
@@ -28,6 +29,7 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        selectedNodeIds={[]}
       />,
     );
 
@@ -56,6 +58,7 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        selectedNodeIds={[item.id]}
       />,
     );
 
@@ -91,10 +94,66 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        selectedNodeIds={[]}
       />,
     );
 
     expect(screen.getByText('Nothing selected')).toBeInTheDocument();
     expect(screen.getByText('1 uploaded font(s) ready in this session.')).toBeInTheDocument();
+  });
+
+  it('preserves collapsed layer groups when switching tabs and re-expands ancestors of the selection', async () => {
+    const user = userEvent.setup();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Content Group');
+    group.id = 'group-1';
+
+    const { rerender } = render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[child]}
+        layerRows={flattenLayerRows([group])}
+        missingFontFamilies={[]}
+        onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={vi.fn()}
+        onSelectNode={vi.fn()}
+        onReorder={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    await user.click(screen.getByRole('button', { name: 'Collapse Content Group' }));
+    expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Properties/i }));
+    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
+
+    rerender(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[child]}
+        layerRows={flattenLayerRows([group])}
+        missingFontFamilies={[]}
+        onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={vi.fn()}
+        onSelectNode={vi.fn()}
+        onReorder={vi.fn()}
+        selectedItem={child}
+        selectedNodeIds={[child.id]}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument();
   });
 });

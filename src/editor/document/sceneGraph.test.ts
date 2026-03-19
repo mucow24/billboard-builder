@@ -39,14 +39,28 @@ describe('scene graph helpers', () => {
     });
   });
 
-  it('builds minimal layer rows with child rows marked non-selectable under groups', () => {
+  it('builds layer rows with ancestor metadata and selectable child rows', () => {
     const child = createRectangleItem({ id: 'child-1' });
     const group = createGroupNode([child]);
     group.id = 'group-1';
 
     expect(flattenLayerRows([group])).toEqual([
-      expect.objectContaining({ depth: 0, isSelectable: true, selectableNodeId: 'group-1' }),
-      expect.objectContaining({ depth: 1, isSelectable: false, selectableNodeId: 'group-1' }),
+      expect.objectContaining({
+        depth: 0,
+        isSelectable: true,
+        selectableNodeId: 'group-1',
+        ancestorGroupIds: [],
+        childCount: 1,
+        hasChildren: true,
+      }),
+      expect.objectContaining({
+        depth: 1,
+        isSelectable: true,
+        selectableNodeId: 'child-1',
+        ancestorGroupIds: ['group-1'],
+        childCount: 0,
+        hasChildren: false,
+      }),
     ]);
   });
 

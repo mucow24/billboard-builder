@@ -155,6 +155,7 @@ export default function App() {
                 selectedGroup={selectedGroup ?? undefined}
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
+                selectedNodeIds={selectedNodeIds}
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onGroupOpacityChange={updateSelectedGroup}
                 onDeleteItem={deleteItem}

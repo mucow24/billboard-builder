@@ -16,6 +16,7 @@ export function PropertiesPanel({
   selectedGroup,
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
+  selectedNodeIds,
   onBackgroundChange,
   onGroupOpacityChange,
   onDeleteItem,
@@ -24,6 +25,7 @@ export function PropertiesPanel({
   onSelectNode,
 }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState<'properties' | 'layers'>('properties');
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const layersScrollRef = useRef<HTMLDivElement | null>(null);
   const propertiesScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsRef = useRef({ layers: 0, properties: 0 });
@@ -33,6 +35,30 @@ export function PropertiesPanel({
     const nextTab = selectedItem || selectedGroup || isMultiSelection ? 'properties' : activeTab;
     setActiveTab((current) => (current === 'layers' ? current : nextTab));
   }, [activeTab, isMultiSelection, selectedGroup, selectedItem]);
+
+  useEffect(() => {
+    if (selectedNodeIds.length === 0) {
+      return;
+    }
+    const selectedAncestorIds = new Set(
+      layerRows
+        .filter((row) => selectedNodeIds.includes(row.node.id))
+        .flatMap((row) => row.ancestorGroupIds)
+    );
+    if (selectedAncestorIds.size === 0) {
+      return;
+    }
+    setCollapsedGroupIds((current) => {
+      let changed = false;
+      const next = new Set(current);
+      for (const groupId of selectedAncestorIds) {
+        if (next.delete(groupId)) {
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [layerRows, selectedNodeIds]);
 
   useEffect(() => {
     const target =
@@ -49,6 +75,18 @@ export function PropertiesPanel({
       propertiesScrollRef.current?.scrollTop ??
       scrollPositionsRef.current.properties;
     setActiveTab(nextTab);
+  }
+
+  function handleToggleGroupCollapse(groupId: string) {
+    setCollapsedGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
   }
 
   return (
@@ -87,14 +125,16 @@ export function PropertiesPanel({
           <div ref={layersScrollRef}>
             <LayersInspectorTab
               background={background}
-              canReorder={Boolean(selectedItem || selectedGroup)}
+              canReorder={selectedNodeIds.length > 0}
+              collapsedGroupIds={collapsedGroupIds}
               rows={layerRows}
               onBackgroundChange={onBackgroundChange}
               onDeleteItem={onDeleteItem}
               onOpenProperties={() => handleTabChange('properties')}
               onReorder={onReorder}
               onSelectNode={onSelectNode}
-              selectedNodeIds={selectedGroup ? [selectedGroup.id] : selectedItem ? [selectedItem.id] : []}
+              onToggleGroupCollapse={handleToggleGroupCollapse}
+              selectedNodeIds={selectedNodeIds}
             />
           </div>
         ) : (

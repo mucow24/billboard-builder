@@ -15,7 +15,10 @@ export interface FlattenedLeafNode {
 }
 
 export interface LayerRow {
+  ancestorGroupIds: string[];
+  childCount: number;
   depth: number;
+  hasChildren: boolean;
   isSelectable: boolean;
   node: CanvasNode;
   selectableNodeId: string;
@@ -132,20 +135,22 @@ export function flattenVisibleLeafNodes(
 export function flattenLayerRows(
   nodes: CanvasNode[],
   depth = 0,
-  nearestSelectableId?: string
+  ancestorGroupIds: string[] = []
 ): LayerRow[] {
   const rows: LayerRow[] = [];
 
   for (const node of nodes) {
-    const selectableNodeId = isGroupNode(node) ? node.id : nearestSelectableId ?? node.id;
     rows.push({
+      ancestorGroupIds,
+      childCount: isGroupNode(node) ? collectLeafItems(node).length : 0,
       depth,
-      isSelectable: isGroupNode(node) || !nearestSelectableId,
+      hasChildren: isGroupNode(node) && node.children.length > 0,
+      isSelectable: true,
       node,
-      selectableNodeId,
+      selectableNodeId: node.id,
     });
     if (isGroupNode(node)) {
-      rows.push(...flattenLayerRows(node.children, depth + 1, node.id));
+      rows.push(...flattenLayerRows(node.children, depth + 1, [...ancestorGroupIds, node.id]));
     }
   }
 

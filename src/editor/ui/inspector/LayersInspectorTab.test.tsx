@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createGroupNode,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -28,6 +29,8 @@ describe('LayersInspectorTab', () => {
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[frontItem.id]}
       />,
     );
@@ -60,6 +63,8 @@ describe('LayersInspectorTab', () => {
         onOpenProperties={onOpenProperties}
         onReorder={onReorder}
         onSelectNode={onSelectNode}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[item.id]}
       />,
     );
@@ -87,6 +92,8 @@ describe('LayersInspectorTab', () => {
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[]}
       />,
     );
@@ -101,5 +108,74 @@ describe('LayersInspectorTab', () => {
     );
 
     expect(onBackgroundChange).toHaveBeenCalledWith('#11223344');
+  });
+
+  it('toggles group disclosure and allows selecting child rows from layers', async () => {
+    const user = userEvent.setup();
+    const onSelectNode = vi.fn();
+    const onToggleGroupCollapse = vi.fn();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+
+    const { rerender } = render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={onSelectNode}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={onToggleGroupCollapse}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Hero Group' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Collapse Hero Group' }));
+    expect(onToggleGroupCollapse).toHaveBeenCalledWith(group.id);
+
+    rerender(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={onSelectNode}
+        collapsedGroupIds={new Set([group.id])}
+        onToggleGroupCollapse={onToggleGroupCollapse}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand Hero Group' })).toBeInTheDocument();
+
+    rerender(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={onSelectNode}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={onToggleGroupCollapse}
+        selectedNodeIds={[child.id]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rectangle' }));
+    expect(onSelectNode).toHaveBeenCalledWith(child.id);
   });
 });
