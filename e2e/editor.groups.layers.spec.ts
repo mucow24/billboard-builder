@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   clickLayerRow,
+  clickCanvas,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createRectangleFixture,
@@ -11,6 +12,7 @@ import {
   openLayersTab,
   openPropertiesTab,
   saveAndReadProject,
+  setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
 
@@ -186,5 +188,140 @@ test.describe('editor group layers and inspector flows', () => {
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([]);
+  });
+
+  test('reorders groups from the layers footer controls as whole top-level nodes', async ({
+    page,
+  }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createRectangleFixture({
+        id: 'layers-order-first',
+        name: 'Layers Order First',
+        x: 100,
+        y: 160,
+        width: 140,
+        height: 90,
+        zIndex: 0,
+      }),
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'layers-order-group-child',
+            x: 300,
+            y: 180,
+            width: 180,
+            height: 120,
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'layers-order-group',
+          name: 'Layers Order Group',
+        },
+      ),
+      createRectangleFixture({
+        id: 'layers-order-last',
+        name: 'Layers Order Last',
+        x: 620,
+        y: 180,
+        width: 160,
+        height: 110,
+        fill: '#0ea5e9',
+        stroke: '#0369a1ff',
+        zIndex: 2,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'layers-order-group.json');
+
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Layers Order Group');
+
+    await page.getByRole('button', { name: 'Forward' }).click();
+    let savedProject = await saveAndReadProject(page);
+    expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
+      'layers-order-first',
+      'layers-order-last',
+      'layers-order-group',
+    ]);
+
+    await page.getByRole('button', { name: 'Backward' }).click();
+    savedProject = await saveAndReadProject(page);
+    expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
+      'layers-order-first',
+      'layers-order-group',
+      'layers-order-last',
+    ]);
+
+    await page.getByRole('button', { name: 'Bring front' }).click();
+    savedProject = await saveAndReadProject(page);
+    expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
+      'layers-order-first',
+      'layers-order-last',
+      'layers-order-group',
+    ]);
+
+    await page.getByRole('button', { name: 'Send back' }).click();
+    savedProject = await saveAndReadProject(page);
+    expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
+      'layers-order-group',
+      'layers-order-first',
+      'layers-order-last',
+    ]);
+  });
+
+  test('keeps group actions disabled for mixed-parent selections built through real browser interaction', async ({
+    page,
+  }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createTextFixture({
+            id: 'mixed-parent-text',
+            name: 'Mixed Parent Text',
+            x: 180,
+            y: 200,
+            width: 240,
+            height: 80,
+            text: 'Child inside group',
+            zIndex: 0,
+          }),
+        ],
+        {
+          id: 'mixed-parent-group',
+          name: 'Mixed Parent Group',
+        },
+      ),
+      createRectangleFixture({
+        id: 'mixed-parent-top-level',
+        name: 'Mixed Parent Top Level',
+        x: 620,
+        y: 220,
+        width: 180,
+        height: 120,
+        fill: '#0ea5e9',
+        stroke: '#0369a1ff',
+        zIndex: 1,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'mixed-parent-group.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Text');
+
+    // Build a mixed-parent selection through the visible browser path: one
+    // child leaf from inside the group plus one top-level sibling.
+    await page.keyboard.down('Shift');
+    await clickCanvas(page, { x: 710, y: 280 });
+    await page.keyboard.up('Shift');
+
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeDisabled();
   });
 });

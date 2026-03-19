@@ -287,6 +287,13 @@ test.describe('editor shortcuts', () => {
     ]);
 
     await page.keyboard.press(`${modifier}+A`);
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row.active')).toHaveCount(2);
+    await expect(page.locator('.layer-row.active').filter({ hasText: 'Reorder Group' })).toHaveCount(1);
+    await expect(page.locator('.layer-row.active .layer-row-select')).toContainText([
+      'Reorder Group',
+      'Rectangle',
+    ]);
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
     await expect(page.getByRole('spinbutton', { name: 'Opacity' })).toBeVisible();
