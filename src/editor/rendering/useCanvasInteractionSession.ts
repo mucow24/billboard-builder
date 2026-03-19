@@ -115,6 +115,7 @@ export function useCanvasInteractionSession({
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
+  const [lastDrilldownSource, setLastDrilldownSource] = useState<'item-hit' | 'stage-surface' | null>(null);
 
   const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const renderables = useMemo(
@@ -433,6 +434,7 @@ export function useCanvasInteractionSession({
 
   const handleItemPointerDown = useCallback((item: CanvasItem, selectionNodeId: string, pointer: Point, shiftKey: boolean) => {
     if (shiftKey && onToggleSelectItem) {
+      setLastDrilldownSource(null);
       onToggleSelectItem(selectionNodeId);
       return;
     }
@@ -442,12 +444,14 @@ export function useCanvasInteractionSession({
       if (selectedNode && isGroupNode(selectedNode)) {
         const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedNodeId, item.id);
         if (nextNodeId && nextNodeId !== selectedNodeId) {
+          setLastDrilldownSource('item-hit');
           onSelectItem(nextNodeId);
           return;
         }
       }
     }
     if (selectedIdSet.has(selectionNodeId)) {
+      setLastDrilldownSource(null);
       if (selectedItems.length > 1) {
         beginGroupDrag(pointer);
         return;
@@ -457,6 +461,7 @@ export function useCanvasInteractionSession({
       }
       return;
     }
+    setLastDrilldownSource(null);
     onSelectItem(selectionNodeId);
   }, [
     beginDrag,
@@ -499,6 +504,7 @@ export function useCanvasInteractionSession({
           ? getNextDrilldownNodeId(document.nodes, selectedNodeId, drilledItem.id)
           : null;
         if (drilledItem && nextNodeId && nextNodeId !== selectedNodeId) {
+          setLastDrilldownSource('stage-surface');
           onGuidesChange([]);
           onSelectItem(nextNodeId);
           return;
@@ -508,16 +514,19 @@ export function useCanvasInteractionSession({
     const isCanvasSurface = target === stage || target.hasName?.('canvas-surface') || target.hasName?.('canvas-background') || target.hasName?.('canvas-backdrop') || target.name() === 'canvas-surface' || target.name() === 'canvas-background' || target.name() === 'canvas-backdrop';
     if (!pointer || !isCanvasSurface) return;
     if (isCreateTool(activeTool)) {
+      setLastDrilldownSource(null);
       beginCreate(activeTool, pointer);
       return;
     }
     if (activeTool === 'select') {
+      setLastDrilldownSource(null);
       onGuidesChange([]);
       onSelectItem(undefined);
       pendingMarqueeRef.current = { pointerStart: pointer, toggleMode: Boolean(event.evt?.shiftKey) };
       updateSession(null);
       return;
     }
+    setLastDrilldownSource(null);
     onGuidesChange([]);
     onSelectItem(undefined);
   }, [
@@ -560,6 +569,7 @@ export function useCanvasInteractionSession({
     renderedGroupBounds,
     renderedSelectionFrame,
     selectedDocumentItem,
+    lastDrilldownSource,
     selectedNode,
     selectedRenderedItem,
     selectedItemId,

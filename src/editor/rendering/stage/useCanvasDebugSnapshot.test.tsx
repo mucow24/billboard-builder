@@ -27,6 +27,7 @@ describe('useCanvasDebugSnapshot', () => {
         marqueeViewportRect: { left: 30, top: 40, width: 50, height: 60 },
         nodeClientRect: { x: 10, y: 20, width: 80, height: 50 },
         pan: { x: 100, y: 120 },
+        lastDrilldownSource: 'item-hit',
         previewItem: preview,
         renderedItems: [rectangle],
         renderedSelectedItems: [rectangle],
@@ -75,6 +76,7 @@ describe('useCanvasDebugSnapshot', () => {
     expect(result.current.hasGroupOverlay).toBe(true);
     expect(result.current.hasShapeHandles).toBe(true);
     expect(result.current.hasLineHandles).toBe(false);
+    expect(result.current.lastDrilldownSource).toBe('item-hit');
 
     unmount();
     expect(window.__BB_TEST__).toBeUndefined();
@@ -180,6 +182,7 @@ describe('useCanvasDebugSnapshot', () => {
         marqueeViewportRect: null,
         nodeClientRect: null,
         pan: { x: 100, y: 120 },
+        lastDrilldownSource: 'stage-surface',
         previewItem: null,
         renderedItems: [rectangle, line],
         renderedSelectedItems: [rectangle, line],

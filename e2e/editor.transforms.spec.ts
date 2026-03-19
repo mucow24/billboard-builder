@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   captureDownload,
   clickCanvas,
+  createImageFixture,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
@@ -166,6 +167,41 @@ test.describe('editor transforms', () => {
     expect(Number(savedLine?.startY)).toBeGreaterThan(520);
     expect(Number(savedLine?.endX)).toBeGreaterThan(380);
     expect(Number(savedLine?.endY)).toBeGreaterThan(560);
+  });
+
+  test('ST-07 ST-08 ST-09 supports image transform flows through real canvas interaction', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'transform-image',
+      x: 520,
+      y: 280,
+      width: 160,
+      height: 90,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([image]), 'transform-image.json');
+
+    await clickCanvas(page, { x: 600, y: 325 });
+    await dragCanvas(page, { x: 600, y: 325 }, { x: 720, y: 405 });
+    await dragCanvas(page, { x: 800, y: 405 }, { x: 940, y: 405 });
+    await dragCanvas(page, { x: 790, y: 310 }, { x: 930, y: 450 });
+
+    const savedProject = await readDownloadedJson(
+      await captureDownload(page, async () => {
+        await page.getByRole('button', { name: 'Save' }).click();
+      }),
+    );
+
+    const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-image',
+    );
+    expect(savedImage).toEqual(expect.objectContaining({ id: 'transform-image' }));
+    expect(Number(savedImage?.x)).toBeGreaterThan(620);
+    expect(Number(savedImage?.width)).toBeGreaterThan(240);
+    expect(Math.abs(Number(savedImage?.rotation))).toBeGreaterThan(10);
   });
 
   test('keeps rotated group resizing aligned to the rotated frame across repeated transforms', async ({ page }) => {

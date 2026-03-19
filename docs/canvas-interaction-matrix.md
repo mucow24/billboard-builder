@@ -114,15 +114,15 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | NI-01 | Canvas | Group selected | Click child, then drag child body | Child manipulator visible, group overlay handles inactive | Only child moves | user-flow | Chromium + cross-browser subset | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | NI-02 | Canvas | Group selected | Click child, then rotate child | Child rotater visible, parent group not rotating | Only child rotates | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | NI-03 | Canvas | Group selected | Click child, then resize child | Child resize handles visible, parent group overlay inactive | Only child resizes | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
-| NI-04 | Canvas | Group selected, line child exists | Click line child, then drag line start handle | Line handle visible, parent group not moving | Only line start endpoint changes | user-flow | Chromium | Missing |
-| NI-05 | Canvas | Group selected, line child exists | Click line child, then drag line body | Line affordance visible, parent group not moving | Only line moves | user-flow | Chromium | Missing |
+| NI-04 | Canvas | Group selected, line child exists | Click line child, then drag line start handle | Line handle visible, parent group not moving | Only line start endpoint changes | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| NI-05 | Canvas | Group selected, line child exists | Click line child, then drag line body | Line affordance visible, parent group not moving | Only line moves | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | NI-06 | Canvas | Outer group selected | Click inner group, then drag inner group | Inner group selected, outer subgroup outline remains correct | Only inner group moves | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | NI-07 | Canvas | Outer group selected | Click inner group, then rotate inner group | Inner group rotation affordance visible | Only inner group rotates | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | NI-08 | Canvas | Outer group selected | Click inner group, then resize inner group | Inner group handles visible | Only inner group resizes | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
-| NI-09 | Canvas | Child selected inside group | Click sibling child | Sibling child handles visible | Sibling child selected directly | user-flow | Chromium | Missing explicit browser proof |
-| NI-10 | Canvas | Inner group selected inside outer group | Click descendant leaf | Leaf handles visible, outer outline state still correct | Leaf selected, ancestor hierarchy preserved | user-flow | Chromium | Missing |
-| NI-11 | Keyboard | Child or inner group manipulated | Undo, then redo | Visible affordances restore to correct hierarchy | Document and selection restore correctly | user-flow | Chromium | Missing |
-| NI-12 | Keyboard | Child manipulated inside group | Escape after manipulation | Parent affordance restored | Selection climbs correctly | user-flow | Chromium | Missing |
+| NI-09 | Canvas | Child selected inside group | Click sibling child | Sibling child handles visible | Sibling child selected directly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| NI-10 | Canvas | Inner group selected inside outer group | Click descendant leaf | Leaf handles visible, outer outline state still correct | Leaf selected, ancestor hierarchy preserved | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| NI-11 | Keyboard | Child or inner group manipulated | Undo, then redo | Visible affordances restore to correct hierarchy | Document and selection restore correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| NI-12 | Keyboard | Child manipulated inside group | Escape after manipulation | Parent affordance restored | Selection climbs correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 
 ## 4. Single-Item Transform Flows
 
@@ -134,9 +134,9 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | ST-04 | Canvas | Text selected | Drag body | Text selection affordance follows | Text moves | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-05 | Canvas | Text selected | Drag resize handle | Text resize preview visible | Text resizes | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-06 | Canvas | Text selected | Drag rotater | Text rotation preview visible | Text rotates | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
-| ST-07 | Canvas | Image selected | Drag body | Image selection affordance follows | Image moves | user-flow | Chromium | Deferred: image direct-transform browser proof is still missing; image property editing is covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
-| ST-08 | Canvas | Image selected | Drag resize handle | Image resize preview visible | Image resizes | user-flow | Chromium | Deferred: image direct-transform browser proof is still missing; image property editing is covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
-| ST-09 | Canvas | Image selected | Drag rotater | Image rotation preview visible | Image rotates | user-flow | Chromium | Deferred: image direct-transform browser proof is still missing; image property editing is covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
+| ST-07 | Canvas | Image selected | Drag body | Image selection affordance follows | Image moves | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
+| ST-08 | Canvas | Image selected | Drag resize handle | Image resize preview visible | Image resizes | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
+| ST-09 | Canvas | Image selected | Drag rotater | Image rotation preview visible | Image rotates | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-10 | Canvas | Line selected | Drag body | Line selection affordance follows | Line moves | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-11 | Canvas | Line selected | Drag start endpoint | Line start handle follows | Start endpoint changes only | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-12 | Canvas | Line selected | Drag end endpoint | Line end handle follows | End endpoint changes only | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
@@ -150,11 +150,11 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | GT-01 | Canvas | Multi-selection active | Drag selected item | Shared overlay follows | All selected items move | user-flow | Chromium | Covered in grouped regression suites |
 | GT-02 | Canvas | Multi-selection active | Drag group resize handle | Shared resize preview visible | All selected items resize coherently | user-flow | Chromium | Covered in grouped regression suites |
 | GT-03 | Canvas | Multi-selection active | Drag group rotater | Shared rotate preview visible | All selected items rotate coherently | user-flow | Chromium | Covered in rotated/grouped regression suites |
-| GT-04 | Canvas | Real group node selected | Drag group | Group overlay follows | Group descendants move as a unit | user-flow | Chromium | Partial: selection semantics covered, true grouped drag smoke missing |
-| GT-05 | Canvas | Real group node selected | Resize group | Group resize preview visible | Group descendants resize as a unit | user-flow | Chromium | Missing |
-| GT-06 | Canvas | Real group node selected | Rotate group | Group rotate preview visible | Group descendants rotate as a unit | user-flow | Chromium | Missing |
-| GT-07 | Canvas | Group already rotated | Drag again | Overlay stays coherent | Rotated group drags correctly | user-flow | Chromium | Covered for temporary group overlays, missing for true grouped node |
-| GT-08 | Canvas | Group already rotated | Resize again | Overlay and items stay coherent | Rotated group resizes correctly | user-flow | Chromium | Covered for temporary group overlays, missing for true grouped node |
+| GT-04 | Canvas | Real group node selected | Drag group | Group overlay follows | Group descendants move as a unit | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GT-05 | Canvas | Real group node selected | Resize group | Group resize preview visible | Group descendants resize as a unit | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GT-06 | Canvas | Real group node selected | Rotate group | Group rotate preview visible | Group descendants rotate as a unit | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GT-07 | Canvas | Group already rotated | Drag again | Overlay stays coherent | Rotated group drags correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GT-08 | Canvas | Group already rotated | Resize again | Overlay and items stay coherent | Rotated group resizes correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-09 | Canvas | Group with line + shape | Transform group | Handles, preview, and result stay coherent | Mixed descendants transform correctly | user-flow | Chromium | Partial: rotated group suites cover overlay case |
 
 ## 6. Viewport and Navigation Flows
@@ -255,13 +255,13 @@ These are state snapshots and affordance checks, not just behavior checks.
 
 | ID | State | Required Visible Assertions | Current Coverage |
 | --- | --- | --- | --- |
-| UI-01 | Top-level group selected | Group border visible, group handles visible, rotater visible, no child-only handles | Partial |
-| UI-02 | Drilled-in child selected | Child manipulator visible, parent group border or subgroup outline visible if intended, group handles inactive | Missing |
+| UI-01 | Top-level group selected | Group border visible, group handles visible, rotater visible, no child-only handles | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
+| UI-02 | Drilled-in child selected | Child manipulator visible, parent group border or subgroup outline visible if intended, group handles inactive | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
 | UI-03 | Nested group selected | Correct nested group affordance visible | Missing |
-| UI-04 | Nested drilled-in child selected | Correct child manipulator plus ancestor outline state | Missing |
+| UI-04 | Nested drilled-in child selected | Correct child manipulator plus ancestor outline state | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
 | UI-05 | Temporary multi-selection selected | Shared overlay visible, correct group handles/rotater visible | Covered in grouped regression and visual suites |
-| UI-06 | Line selected | Line handles visible, no shape handles | Partial |
-| UI-07 | Text selected | Text item affordance visible, no group-only controls | Partial |
+| UI-06 | Line selected | Line handles visible, no shape handles | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
+| UI-07 | Text selected | Text item affordance visible, no group-only controls | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
 | UI-08 | Rotated group selected | Rotated group overlay remains coherent | Covered in rotated suites |
 | UI-09 | Rotated group live drag/resize/rotate preview | Preview overlay remains coherent throughout gesture | Covered in rotated suites |
 
@@ -272,10 +272,9 @@ These are the highest-priority gaps until proven by browser `user-flow` tests:
 - explicit browser proof for both drill-in hit paths:
   - direct item-hit path
   - stage-surface fallback path
-- canvas-first drill-in and child manipulation across remaining item kinds, especially grouped line children
-- parent-group border / subgroup outline / manipulator coexistence during drilled-in editing
+- nested-group selected UI state (`UI-03`)
+- mixed true grouped line-and-shape transform coverage (`GT-09`)
 - true grouped-node UI states distinguished from temporary multi-selection overlay states
-- image direct-transform browser coverage (`ST-07` through `ST-09`)
 - browser proof for snapping-disable and axis-constrained drag semantics (`ST-13`, `ST-14`)
 
 ## Patch Closeout Template

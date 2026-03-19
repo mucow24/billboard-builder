@@ -6,6 +6,7 @@ import {
   clickCanvas,
   createGroupNodeFixture,
   createGroupedProjectDocument,
+  createLineFixture,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
@@ -30,6 +31,10 @@ type SavedNode = {
   width?: number;
   height?: number;
   rotation?: number;
+  startX?: number;
+  startY?: number;
+  endX?: number;
+  endY?: number;
   children?: SavedNode[];
 };
 
@@ -58,6 +63,51 @@ function expectSavedNode(project: Record<string, unknown>, nodeId: string): Save
     throw new Error(`Expected saved project to contain node ${nodeId}.`);
   }
   return found;
+}
+
+function frameCenter(frame: NonNullable<Awaited<ReturnType<typeof readStageDebug>>['groupFrame']>) {
+  return {
+    x: frame.x + frame.width / 2,
+    y: frame.y + frame.height / 2,
+  };
+}
+
+function rotatePoint(
+  point: { x: number; y: number },
+  origin: { x: number; y: number },
+  rotation: number,
+) {
+  const radians = (rotation * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return {
+    x: origin.x + (point.x - origin.x) * cos - (point.y - origin.y) * sin,
+    y: origin.y + (point.x - origin.x) * sin + (point.y - origin.y) * cos,
+  };
+}
+
+function groupHandlePoint(
+  frame: NonNullable<Awaited<ReturnType<typeof readStageDebug>>['groupFrame']>,
+  handle: 'middle-right' | 'bottom-right',
+) {
+  const center = frameCenter(frame);
+  const local =
+    handle === 'middle-right'
+      ? { x: frame.x + frame.width, y: frame.y + frame.height / 2 }
+      : { x: frame.x + frame.width, y: frame.y + frame.height };
+  return rotatePoint(local, center, frame.rotation);
+}
+
+function groupRotaterPoint(frame: NonNullable<Awaited<ReturnType<typeof readStageDebug>>['groupFrame']>) {
+  const center = frameCenter(frame);
+  return rotatePoint(
+    {
+      x: frame.x + frame.width / 2,
+      y: frame.y - 50,
+    },
+    center,
+    frame.rotation,
+  );
 }
 
 test.describe('editor groups', () => {
@@ -323,6 +373,8 @@ test.describe('editor groups', () => {
 
     await clickCanvas(page, { x: 180, y: 210 });
     await clickCanvas(page, { x: 180, y: 210 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
     await expect(page.getByLabel('Fill')).toBeVisible();
 
@@ -332,6 +384,8 @@ test.describe('editor groups', () => {
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
 
     await clickCanvas(page, { x: 360, y: 260 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
     await dragCanvas(page, { x: 360, y: 260 }, { x: 480, y: 340 });
 
     stageDebug = await readStageDebug(page);
@@ -353,6 +407,10 @@ test.describe('editor groups', () => {
     );
     expect(Number(expectSavedNode(savedProject, 'beta-child').x)).toBeGreaterThan(430);
     expect(Number(expectSavedNode(savedProject, 'beta-child').y)).toBeGreaterThan(295);
+
+    await page.keyboard.press('Escape');
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Drag Group');
   });
 
   test('NI-02 NI-03 rotates and resizes only the drilled-in child, not the parent group', async ({
@@ -549,4 +607,291 @@ test.describe('editor groups', () => {
       }),
     );
   });
+
+  test('NI-04 NI-05 drills into and manipulates only the grouped line child', async ({
+    page,
+  }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'line-parent-rect',
+            name: 'Line Parent Rect',
+            x: 140,
+            y: 160,
+            width: 120,
+            height: 60,
+            zIndex: 0,
+          }),
+          createLineFixture({
+            id: 'line-child',
+            name: 'Line Child',
+            x: 180,
+            y: 220,
+            startX: 180,
+            startY: 220,
+            endX: 440,
+            endY: 280,
+            width: 260,
+            height: 60,
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'line-child-group',
+          name: 'Line Child Group',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'grouped-line-child.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 220, y: 210 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Line Child Group');
+
+    // This click lands inside the line bounding box but away from the visible stroke,
+    // so the stage-surface fallback path is the one that must resolve the drill-in.
+    await clickCanvas(page, { x: 320, y: 228 });
+    await assertNoDocumentTextSelection(page);
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Line');
+
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+    expect(stageDebug.hasLineHandles).toBe(true);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+
+    await dragCanvas(page, { x: 180, y: 220 }, { x: 260, y: 260 });
+    await dragCanvas(page, { x: 350, y: 260 }, { x: 470, y: 340 });
+
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasLineHandles).toBe(true);
+
+    const savedProject = await saveAndReadProject(page);
+    expect(expectSavedNode(savedProject, 'line-parent-rect')).toEqual(
+      expect.objectContaining({
+        x: 140,
+        y: 160,
+        width: 120,
+        rotation: 0,
+      }),
+    );
+    expect(expectSavedNode(savedProject, 'line-child')).toEqual(
+      expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+        startX: expect.any(Number),
+        startY: expect.any(Number),
+        endX: expect.any(Number),
+        endY: expect.any(Number),
+      }),
+    );
+    expect(Number(expectSavedNode(savedProject, 'line-child').startX)).toBeGreaterThan(240);
+    expect(Number(expectSavedNode(savedProject, 'line-child').startY)).toBeGreaterThan(250);
+    expect(Number(expectSavedNode(savedProject, 'line-child').x)).toBeGreaterThan(280);
+    expect(Number(expectSavedNode(savedProject, 'line-child').y)).toBeGreaterThan(300);
+  });
+
+  test('NI-11 NI-12 true grouped-node child manipulation survives undo, redo, and escape with the correct hierarchy state', async ({
+    page,
+  }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'undo-child',
+            name: 'Undo Child',
+            x: 160,
+            y: 180,
+            width: 180,
+            height: 120,
+            zIndex: 0,
+          }),
+          createRectangleFixture({
+            id: 'undo-sibling',
+            name: 'Undo Sibling',
+            x: 420,
+            y: 220,
+            width: 140,
+            height: 96,
+            fill: '#22c55e',
+            stroke: '#15803dff',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'undo-group',
+          name: 'Undo Group',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'undo-group-child.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 240, y: 240 });
+    await clickCanvas(page, { x: 240, y: 240 });
+    await dragCanvas(page, { x: 240, y: 240 }, { x: 360, y: 340 });
+
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
+
+    await page.keyboard.press(`${modifier}+Z`);
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Fill')).toBeVisible();
+
+    let savedProject = await saveAndReadProject(page);
+    expect(expectSavedNode(savedProject, 'undo-child')).toEqual(
+      expect.objectContaining({
+        x: 160,
+        y: 180,
+      }),
+    );
+
+    await page.keyboard.press(`${modifier}+Shift+Z`);
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Fill')).toBeVisible();
+
+    savedProject = await saveAndReadProject(page);
+    expect(Number(expectSavedNode(savedProject, 'undo-child').x)).toBeGreaterThan(250);
+    expect(Number(expectSavedNode(savedProject, 'undo-child').y)).toBeGreaterThan(275);
+
+    await page.keyboard.press('Escape');
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Group');
+  });
+
+  test('GT-04 GT-05 GT-06 GT-07 GT-08 transforms a true group node through real canvas overlay interactions', async ({
+    page,
+  }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'transform-group-left',
+            name: 'Transform Group Left',
+            x: 140,
+            y: 180,
+            width: 160,
+            height: 100,
+            zIndex: 0,
+          }),
+          createRectangleFixture({
+            id: 'transform-group-right',
+            name: 'Transform Group Right',
+            x: 360,
+            y: 220,
+            width: 150,
+            height: 96,
+            fill: '#0ea5e9',
+            stroke: '#0369a1ff',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'transform-group-node',
+          name: 'Transform Group Node',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'true-group-transform.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 220, y: 230 });
+
+    let stageDebug = await readStageDebug(page);
+    const initialFrame = stageDebug.groupFrame;
+    expect(initialFrame).not.toBeNull();
+    if (!initialFrame) {
+      throw new Error('Expected an initial true group frame.');
+    }
+    expect(stageDebug.hasGroupOverlay).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+
+    const initialCenter = frameCenter(initialFrame);
+    await dragCanvas(page, initialCenter, { x: initialCenter.x + 110, y: initialCenter.y + 70 });
+
+    stageDebug = await readStageDebug(page);
+    const draggedFrame = stageDebug.groupFrame;
+    expect(draggedFrame).not.toBeNull();
+    if (!draggedFrame) {
+      throw new Error('Expected a committed dragged true group frame.');
+    }
+
+    const resizeStart = groupHandlePoint(draggedFrame, 'middle-right');
+    await dragCanvas(page, resizeStart, { x: resizeStart.x + 90, y: resizeStart.y });
+
+    stageDebug = await readStageDebug(page);
+    const resizedFrame = stageDebug.groupFrame;
+    expect(resizedFrame).not.toBeNull();
+    if (!resizedFrame) {
+      throw new Error('Expected a committed resized true group frame.');
+    }
+    expect(resizedFrame.width).toBeGreaterThan(draggedFrame.width + 40);
+
+    const rotaterStart = groupRotaterPoint(resizedFrame);
+    await dragCanvas(page, rotaterStart, { x: resizedFrame.x + resizedFrame.width + 80, y: resizedFrame.y + resizedFrame.height / 2 });
+
+    stageDebug = await readStageDebug(page);
+    const rotatedFrame = stageDebug.groupFrame;
+    expect(rotatedFrame).not.toBeNull();
+    if (!rotatedFrame) {
+      throw new Error('Expected a committed rotated true group frame.');
+    }
+    expect(Math.abs(rotatedFrame.rotation)).toBeGreaterThan(10);
+
+    const rotatedCenter = frameCenter(rotatedFrame);
+    await dragCanvas(page, rotatedCenter, { x: rotatedCenter.x + 60, y: rotatedCenter.y - 90 });
+
+    stageDebug = await readStageDebug(page);
+    const redraggedFrame = stageDebug.groupFrame;
+    expect(redraggedFrame).not.toBeNull();
+    if (!redraggedFrame) {
+      throw new Error('Expected a committed re-dragged true group frame.');
+    }
+    expect(redraggedFrame.x).not.toBeCloseTo(rotatedFrame.x, 2);
+
+    const rotatedResizeStart = groupHandlePoint(redraggedFrame, 'bottom-right');
+    await dragCanvas(page, rotatedResizeStart, {
+      x: rotatedResizeStart.x + 70,
+      y: rotatedResizeStart.y + 60,
+    });
+
+    const savedProject = await saveAndReadProject(page);
+    expect(expectSavedNode(savedProject, 'transform-group-left')).toEqual(
+      expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+        width: expect.any(Number),
+        rotation: expect.any(Number),
+      }),
+    );
+    expect(expectSavedNode(savedProject, 'transform-group-right')).toEqual(
+      expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+        width: expect.any(Number),
+        rotation: expect.any(Number),
+      }),
+    );
+    expect(Number(expectSavedNode(savedProject, 'transform-group-left').x)).toBeGreaterThan(250);
+    expect(Math.abs(Number(expectSavedNode(savedProject, 'transform-group-left').rotation))).toBeGreaterThan(10);
+    expect(Number(expectSavedNode(savedProject, 'transform-group-right').width)).toBeGreaterThan(180);
+  });
+
 });

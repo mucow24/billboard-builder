@@ -1007,6 +1007,7 @@ describe('useCanvasInteractionSession', () => {
 
     expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
     expect(result.current.session).toBeNull();
+    expect(result.current.lastDrilldownSource).toBe('item-hit');
 
     const innerParams = {
       ...params,
@@ -1021,6 +1022,7 @@ describe('useCanvasInteractionSession', () => {
 
     expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
     expect(result.current.session).toBeNull();
+    expect(result.current.lastDrilldownSource).toBe('item-hit');
   });
 
   it('drills into the next descendant from a stage mouse down when a selected group click resolves as canvas surface input', () => {
@@ -1048,6 +1050,7 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+    expect(result.current.lastDrilldownSource).toBe('stage-surface');
   });
 
   it('drills into the next descendant on item double-click when a group is selected', () => {

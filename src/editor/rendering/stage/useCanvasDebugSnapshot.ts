@@ -86,6 +86,7 @@ interface UseCanvasDebugSnapshotParams {
   marqueeViewportRect: { left: number; top: number; width: number; height: number } | null;
   nodeClientRect: { x: number; y: number; width: number; height: number } | null;
   pan: Point;
+  lastDrilldownSource: 'item-hit' | 'stage-surface' | null;
   previewItem: CanvasItem | null;
   renderedItems: CanvasItem[];
   renderedSelectedItems: CanvasItem[];
@@ -123,6 +124,7 @@ export function useCanvasDebugSnapshot({
   marqueeViewportRect,
   nodeClientRect,
   pan,
+  lastDrilldownSource,
   previewItem,
   renderedItems,
   renderedSelectedItems,
@@ -211,6 +213,7 @@ export function useCanvasDebugSnapshot({
       hasGroupOverlay: showGroupInteractionHooks,
       hasShapeHandles: Boolean(selectedShapeHandleRects),
       hasLineHandles: Boolean(selectedLineHandleRects),
+      lastDrilldownSource,
       selectedItems: renderedSelectedItems.map((item) =>
         item.kind === 'line'
           ? {
@@ -248,6 +251,7 @@ export function useCanvasDebugSnapshot({
       nodeClientRect,
       pan.x,
       pan.y,
+      lastDrilldownSource,
       previewItem,
       renderedSelectedItems,
       selectedDocumentItem,

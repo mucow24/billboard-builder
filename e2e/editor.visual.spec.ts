@@ -4,13 +4,19 @@ import {
   beginCanvasHookDrag,
   canvasPointToPage,
   clickCanvas,
+  createLineFixture,
+  createMixedShapeTextGroupFixture,
+  createNestedGroupFixture,
   createProjectDocument,
   createRectangleFixture,
+  createSimpleGroupFixture,
+  createTextFixture,
   dragCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
   readStageDebug,
   releasePointer,
+  setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
 
@@ -181,6 +187,116 @@ test.describe('editor visual regression', () => {
 
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('rotated-group-overlay.png');
     await releasePointer(page);
+  });
+
+  test('UI-01 captures a true top-level group selection state', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createSimpleGroupFixture(), 'visual-true-group.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 210, y: 200 });
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+    expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(0);
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('true-group-selected.png');
+  });
+
+  test('UI-02 captures a drilled-in grouped child selection state', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createSimpleGroupFixture(), 'visual-drilled-child.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 210, y: 200 });
+    await clickCanvas(page, { x: 210, y: 200 });
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('group-child-selected.png');
+  });
+
+  test('UI-04 captures a nested drilled-in child selection state with ancestor outline', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createNestedGroupFixture(), 'visual-nested-child.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 400, y: 210 });
+    await clickCanvas(page, { x: 400, y: 210 });
+    await clickCanvas(page, { x: 400, y: 210 });
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('nested-group-child-selected.png');
+  });
+
+  test('UI-02 captures grouped text drill-in affordances without group handles', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createMixedShapeTextGroupFixture(), 'visual-grouped-text.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 320, y: 245 });
+    await clickCanvas(page, { x: 320, y: 245 });
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('grouped-text-child-selected.png');
+  });
+
+  test('UI-06 UI-07 captures line and text single-selection affordances distinctly', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createLineFixture({
+          id: 'visual-line',
+          x: 180,
+          y: 220,
+          startX: 180,
+          startY: 220,
+          endX: 420,
+          endY: 280,
+          width: 240,
+          height: 60,
+          zIndex: 0,
+        }),
+        createTextFixture({
+          id: 'visual-text',
+          x: 180,
+          y: 420,
+          width: 260,
+          height: 96,
+          text: 'Visual text item',
+          zIndex: 1,
+        }),
+      ]),
+      'visual-line-text.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 300, y: 250 });
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasLineHandles).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('single-line-selection.png');
+
+    await clickCanvas(page, { x: 300, y: 465 });
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('single-text-selection.png');
   });
 
   test('captures live rotated-group rotate previews at an arbitrary angle', async ({ page }) => {

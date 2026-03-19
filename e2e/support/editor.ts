@@ -64,6 +64,7 @@ export interface StageDebugInfo {
   hasGroupOverlay?: boolean;
   hasShapeHandles?: boolean;
   hasLineHandles?: boolean;
+  lastDrilldownSource?: 'item-hit' | 'stage-surface' | null;
   selectedItems?: Array<{
     id: string;
     kind: string;
