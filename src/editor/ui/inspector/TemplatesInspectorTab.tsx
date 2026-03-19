@@ -1,6 +1,6 @@
 import { collectLeafItems } from '../../document/sceneGraph';
+import { summarizeTemplateNodes } from '../../document/templateLibrary';
 
-import { getItemGlyph } from './inspectorModel';
 import type { TemplatesInspectorTabProps } from './types';
 
 function buildKindSummary(templatesLeafKinds: string[]) {
@@ -33,7 +33,7 @@ export function TemplatesInspectorTab({
     <div className="template-library-list">
       {templates.map((template) => {
         const leafItems = template.nodes.flatMap(collectLeafItems);
-        const previewGlyphs = leafItems.slice(0, 3).map((item) => getItemGlyph(item.kind));
+        const { previewColors } = summarizeTemplateNodes(template.nodes);
         const itemCount = leafItems.length;
         const kindSummary = buildKindSummary(leafItems.map((item) => item.kind));
 
@@ -46,11 +46,21 @@ export function TemplatesInspectorTab({
               aria-label={`Insert ${template.name}`}
             >
               <span className="template-card-preview" aria-hidden="true">
-                {previewGlyphs.map((glyph, index) => (
-                  <span key={`${template.id}-${index}`} className="template-card-glyph">
-                    {glyph}
-                  </span>
-                ))}
+                <span
+                  className="template-card-swatch-strip"
+                  data-testid={`template-preview-${template.id}`}
+                  style={{
+                    gridTemplateColumns: `repeat(${Math.max(previewColors.length, 1)}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {(previewColors.length > 0 ? previewColors : ['#334155']).map((color, index) => (
+                    <span
+                      key={`${template.id}-${index}`}
+                      className="template-card-swatch"
+                      style={{ background: color }}
+                    />
+                  ))}
+                </span>
               </span>
               <span className="template-card-copy">
                 <strong>{template.name}</strong>

@@ -10,7 +10,6 @@ export type { PropertiesPanelProps } from './inspector/types';
 export function PropertiesPanel({
   availableFonts,
   background,
-  canSaveTemplate = false,
   fonts,
   items,
   layerRows,
@@ -26,7 +25,6 @@ export function PropertiesPanel({
   onItemChange,
   onInsertTemplate = () => {},
   onReorder,
-  onSaveTemplate = () => {},
   onSelectNode,
   templates = [],
 }: PropertiesPanelProps) {
@@ -185,11 +183,9 @@ export function PropertiesPanel({
           >
             <SelectionInspector
               availableFonts={availableFonts}
-              canSaveTemplate={canSaveTemplate}
               fonts={fonts}
               onGroupOpacityChange={onGroupOpacityChange}
               onItemChange={onItemChange}
-              onSaveTemplate={onSaveTemplate}
               selectedGroup={selectedGroup}
               selectedItem={selectedItem}
               selectedNodeCount={selectedNodeIds.length}

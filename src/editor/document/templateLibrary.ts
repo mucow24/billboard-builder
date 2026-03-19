@@ -10,6 +10,14 @@ export interface TemplateSelectionPayload {
   nodes: CanvasNode[];
 }
 
+export interface TemplateNodeSummary {
+  itemCount: number;
+  kindCounts: Map<string, number>;
+  previewColors: string[];
+}
+
+const MAX_TEMPLATE_PREVIEW_COLORS = 4;
+
 export function getTemplateSelectionRoots(
   nodes: CanvasNode[],
   selectedNodeIds: readonly string[],
@@ -57,5 +65,55 @@ export function buildTemplateSelectionPayload(
   return {
     fonts: collectTemplateFontReferences(nodes, document.fonts),
     nodes,
+  };
+}
+
+export function summarizeTemplateNodes(nodes: readonly CanvasNode[]): TemplateNodeSummary {
+  const leafItems = nodes.flatMap(collectLeafItems);
+  const kindCounts = new Map<string, number>();
+  const previewColors: string[] = [];
+  const seenColors = new Set<string>();
+
+  function pushPreviewColor(color: string | undefined) {
+    if (!color || previewColors.length >= MAX_TEMPLATE_PREVIEW_COLORS) {
+      return;
+    }
+    const normalizedColor = color.trim().toLowerCase();
+    if (!normalizedColor || seenColors.has(normalizedColor)) {
+      return;
+    }
+    seenColors.add(normalizedColor);
+    previewColors.push(color);
+  }
+
+  for (const item of leafItems) {
+    kindCounts.set(item.kind, (kindCounts.get(item.kind) ?? 0) + 1);
+
+    switch (item.kind) {
+      case 'rectangle':
+      case 'ellipse':
+        pushPreviewColor(item.fill);
+        if (item.strokeWidth > 0) {
+          pushPreviewColor(item.stroke);
+        }
+        break;
+      case 'text':
+        pushPreviewColor(item.fill);
+        break;
+      case 'line':
+        pushPreviewColor(item.stroke);
+        break;
+      case 'image':
+        if (item.adjustments.tintStrength > 0) {
+          pushPreviewColor(item.adjustments.tintColor);
+        }
+        break;
+    }
+  }
+
+  return {
+    itemCount: leafItems.length,
+    kindCounts,
+    previewColors,
   };
 }

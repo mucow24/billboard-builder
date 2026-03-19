@@ -1669,10 +1669,8 @@ button {
 }
 
 .template-card-preview {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  gap: 0.25rem;
+  display: flex;
+  align-items: stretch;
   min-height: 4.1rem;
   padding: 0.45rem;
   border-radius: 12px;
@@ -1680,18 +1678,21 @@ button {
   background:
     linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.78)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+  overflow: hidden;
 }
 
-.template-card-glyph {
+.template-card-swatch-strip {
   display: grid;
-  place-items: center;
+  flex: 1 1 auto;
   min-width: 0;
-  min-height: 1.9rem;
-  border-radius: 10px;
-  background: rgba(96, 165, 250, 0.12);
-  color: #dbeafe;
-  font-size: 1rem;
-  font-weight: 700;
+  min-height: 100%;
+  gap: 0.2rem;
+}
+
+.template-card-swatch {
+  min-width: 0;
+  min-height: 100%;
+  border-radius: 9px;
 }
 
 .template-card-copy {

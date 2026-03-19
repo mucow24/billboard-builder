@@ -1,7 +1,15 @@
 import { DUPLICATE_ITEM_OFFSET } from '../editor/document/documentDefaults';
-import { cloneCanvasNode, collectLeafItems, isGroupNode } from '../editor/document/sceneGraph';
+import { cloneCanvasNode, isGroupNode } from '../editor/document/sceneGraph';
 import type { CanvasNode } from '../editor/document/documentTypes';
 import type { StoredTemplate } from '../editor/persistence/templateLibraryService';
+
+function normalizeTemplateTextContent(text: string): string {
+  const compactText = text.trim().replace(/\s+/g, ' ');
+  if (!compactText) {
+    return 'Empty text';
+  }
+  return compactText.length > 40 ? `${compactText.slice(0, 40)}...` : compactText;
+}
 
 function getSingleNodeTemplateLabel(node: CanvasNode): string {
   if (isGroupNode(node)) {
@@ -16,7 +24,7 @@ function getSingleNodeTemplateLabel(node: CanvasNode): string {
     case 'line':
       return 'Line';
     case 'text':
-      return 'Text';
+      return `Text:${normalizeTemplateTextContent(node.text)}`;
     case 'image':
       return 'Image';
   }
@@ -24,7 +32,8 @@ function getSingleNodeTemplateLabel(node: CanvasNode): string {
 
 export function buildDefaultTemplateName(nodes: readonly CanvasNode[]): string {
   if (nodes.length === 1) {
-    return `${getSingleNodeTemplateLabel(nodes[0]!)} template`;
+    const label = getSingleNodeTemplateLabel(nodes[0]!);
+    return label.startsWith('Text:') ? label : `${label} template`;
   }
   return `${nodes.length} items template`;
 }
@@ -53,18 +62,4 @@ export function instantiateTemplateNodes(
   repeatCount: number,
 ): CanvasNode[] {
   return nodes.map((node) => cloneCanvasNode(node, DUPLICATE_ITEM_OFFSET * repeatCount));
-}
-
-export function summarizeTemplateNodes(nodes: readonly CanvasNode[]) {
-  const leafItems = nodes.flatMap(collectLeafItems);
-  const kindCounts = new Map<string, number>();
-
-  for (const item of leafItems) {
-    kindCounts.set(item.kind, (kindCounts.get(item.kind) ?? 0) + 1);
-  }
-
-  return {
-    itemCount: leafItems.length,
-    kindCounts,
-  };
 }

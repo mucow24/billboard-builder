@@ -13,6 +13,7 @@ describe('Toolbar', () => {
         canUngroup={false}
         canUndo={false}
         canRedo={false}
+        canSaveTemplate={false}
         onCanvasSizeChange={vi.fn()}
         onDelete={vi.fn()}
         onExport={vi.fn()}
@@ -23,6 +24,7 @@ describe('Toolbar', () => {
         onNewProject={vi.fn()}
         onRedo={vi.fn()}
         onSave={vi.fn()}
+        onSaveTemplate={vi.fn()}
         onUndo={vi.fn()}
         onUngroup={vi.fn()}
       />
@@ -43,6 +45,7 @@ describe('Toolbar', () => {
         canUngroup={false}
         canUndo
         canRedo
+        canSaveTemplate={false}
         onCanvasSizeChange={onCanvasSizeChange}
         onDelete={vi.fn()}
         onExport={vi.fn()}
@@ -53,6 +56,7 @@ describe('Toolbar', () => {
         onNewProject={vi.fn()}
         onRedo={vi.fn()}
         onSave={vi.fn()}
+        onSaveTemplate={vi.fn()}
         onUndo={vi.fn()}
         onUngroup={vi.fn()}
       />
@@ -80,5 +84,63 @@ describe('Toolbar', () => {
       height: 480,
       presetId: undefined,
     });
+  });
+
+  it('shows save as template in the top bar only when a selection exists', async () => {
+    const user = userEvent.setup();
+    const onSaveTemplate = vi.fn();
+
+    const { rerender } = render(
+      <Toolbar
+        canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
+        canGroup={false}
+        canRedo
+        canSaveTemplate={false}
+        canUndo
+        canUngroup={false}
+        onCanvasSizeChange={vi.fn()}
+        onDelete={vi.fn()}
+        onExport={vi.fn()}
+        onFontUpload={vi.fn()}
+        onGroup={vi.fn()}
+        onImageUpload={vi.fn()}
+        onLoad={vi.fn()}
+        onNewProject={vi.fn()}
+        onRedo={vi.fn()}
+        onSave={vi.fn()}
+        onSaveTemplate={onSaveTemplate}
+        onUndo={vi.fn()}
+        onUngroup={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: 'Save as template' })).not.toBeInTheDocument();
+
+    rerender(
+      <Toolbar
+        canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
+        canGroup={false}
+        canRedo
+        canSaveTemplate
+        canUndo
+        canUngroup={false}
+        onCanvasSizeChange={vi.fn()}
+        onDelete={vi.fn()}
+        onExport={vi.fn()}
+        onFontUpload={vi.fn()}
+        onGroup={vi.fn()}
+        onImageUpload={vi.fn()}
+        onLoad={vi.fn()}
+        onNewProject={vi.fn()}
+        onRedo={vi.fn()}
+        onSave={vi.fn()}
+        onSaveTemplate={onSaveTemplate}
+        onUndo={vi.fn()}
+        onUngroup={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save as template' }));
+    expect(onSaveTemplate).toHaveBeenCalledOnce();
   });
 });

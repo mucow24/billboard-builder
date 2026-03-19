@@ -6,7 +6,6 @@ import {
   createRectangleFixture,
   openFreshEditor,
   openLayersTab,
-  openPropertiesTab,
   openTemplatesTab,
   waitForEditor,
   uploadProject,
@@ -32,7 +31,6 @@ test.describe('editor template library flows', () => {
     );
 
     await clickCanvas(page, { x: 240, y: 220 });
-    await openPropertiesTab(page);
     await page.getByRole('button', { name: 'Save as template' }).click();
 
     await openTemplatesTab(page);

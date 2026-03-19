@@ -11,7 +11,6 @@ import type { StoredTemplate } from '../../persistence/templateLibraryService';
 export interface PropertiesPanelProps {
   availableFonts: UploadedFont[];
   background: string;
-  canSaveTemplate?: boolean;
   fonts: DocumentFontReference[];
   items: CanvasItem[];
   layerRows: LayerRow[];
@@ -25,7 +24,6 @@ export interface PropertiesPanelProps {
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: Partial<CanvasItem>) => void;
   onInsertTemplate?: (templateId: string) => void;
-  onSaveTemplate?: () => void;
   onDeleteItem: (itemId: string) => void;
   onSelectNode: (nodeId: string) => void;
   onReorder: (mode: ReorderMode) => void;
@@ -48,11 +46,9 @@ export interface LayersInspectorTabProps {
 
 export interface SelectionInspectorProps {
   availableFonts: UploadedFont[];
-  canSaveTemplate?: boolean;
   fonts: DocumentFontReference[];
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: Partial<CanvasItem>) => void;
-  onSaveTemplate?: () => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedNodeCount: number;

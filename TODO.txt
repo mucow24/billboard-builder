@@ -2,7 +2,6 @@ P0:
 P1:
   REQUEST: Rich text fields
 P2:
-  REQUEST: Template library
   REQUEST: Crop images
   REDESIGN: Densification of properties panel.
   REDESIGN: Densification of layers panel.
@@ -12,6 +11,7 @@ P3:
   REQUEST: Integrate generators
 
 DONE:
+  REQUEST: Template library
   REQUEST: Grouping
   REQUEST: Up/Down arrows for font menu
   REQUEST: Sort fonts alphabetically

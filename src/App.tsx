@@ -118,6 +118,7 @@ export default function App() {
               canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
               canUndo={canUndo}
               canRedo={canRedo}
+              canSaveTemplate={selectedNodeIds.length > 0}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedItems}
               onExport={() => handleExport(stageRef.current)}
@@ -132,6 +133,7 @@ export default function App() {
               }}
               onRedo={redo}
               onSave={handleSave}
+              onSaveTemplate={saveSelectionAsTemplate}
               onUndo={undo}
               onUngroup={ungroupSelectedNode}
             />
@@ -152,7 +154,6 @@ export default function App() {
               <PropertiesPanel
                 availableFonts={availableFonts}
                 background={document.background}
-                canSaveTemplate={selectedNodeIds.length > 0}
                 fonts={document.fonts}
                 items={document.items}
                 layerRows={layerRows}
@@ -175,7 +176,6 @@ export default function App() {
                 onInsertTemplate={insertTemplate}
                 onSelectNode={selectSingleItem}
                 onReorder={reorderSelectedItem}
-                onSaveTemplate={saveSelectionAsTemplate}
                 templates={templates}
               />
             </div>

@@ -9,7 +9,6 @@ import {
 import {
   buildDefaultTemplateName,
   instantiateTemplateNodes,
-  summarizeTemplateNodes,
   uniquifyTemplateName,
 } from './templateLibrary';
 
@@ -18,8 +17,13 @@ describe('template library helpers', () => {
     const rectangle = createRectangleItem();
     const first = createRectangleItem({ id: 'first' });
     const second = createTextItem({ id: 'second' });
+    const text = createTextItem({
+      id: 'text-single',
+      text: 'Headline   with\nspacing',
+    });
 
     expect(buildDefaultTemplateName([rectangle])).toBe('Rectangle template');
+    expect(buildDefaultTemplateName([text])).toBe('Text:Headline with spacing');
     expect(buildDefaultTemplateName([first, second])).toBe('2 items template');
   });
 
@@ -48,19 +52,5 @@ describe('template library helpers', () => {
     }
     expect(clones[0].children[0]?.id).not.toBe(child.id);
     expect(clones[1]?.kind === 'group' ? null : clones[1]?.x).toBe(sibling.x + 48);
-  });
-
-  it('summarizes saved template contents for lightweight cards', () => {
-    const first = createRectangleItem({ id: 'first' });
-    const second = createTextItem({ id: 'second' });
-    const group = createGroupNode([first, second], 'Template Group');
-
-    expect(summarizeTemplateNodes([group])).toEqual({
-      itemCount: 2,
-      kindCounts: new Map([
-        ['rectangle', 1],
-        ['text', 1],
-      ]),
-    });
   });
 });

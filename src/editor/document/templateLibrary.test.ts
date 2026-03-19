@@ -5,7 +5,11 @@ import {
   createRectangleItem,
   createTextItem,
 } from './documentDefaults';
-import { buildTemplateSelectionPayload, getTemplateSelectionRoots } from './templateLibrary';
+import {
+  buildTemplateSelectionPayload,
+  getTemplateSelectionRoots,
+  summarizeTemplateNodes,
+} from './templateLibrary';
 
 describe('template library document helpers', () => {
   it('keeps only the highest selected ancestor while preserving traversal order', () => {
@@ -64,6 +68,54 @@ describe('template library document helpers', () => {
         sourceName: 'PosterSans-Regular.ttf',
         kind: 'uploaded',
       },
+    ]);
+  });
+
+  it('summarizes saved template colors and kinds for lightweight cards', () => {
+    const first = createRectangleItem({
+      id: 'first',
+      fill: '#123456',
+      stroke: '#abcdef',
+      strokeWidth: 2,
+    });
+    const second = createTextItem({
+      id: 'second',
+      fill: '#fedcba',
+    });
+    const third = createRectangleItem({
+      id: 'third',
+      fill: '#654321',
+      stroke: '#123456',
+    });
+    const group = createGroupNode([first, second, third], 'Template Group');
+
+    expect(summarizeTemplateNodes([group])).toEqual({
+      itemCount: 3,
+      kindCounts: new Map([
+        ['rectangle', 2],
+        ['text', 1],
+      ]),
+      previewColors: ['#123456', '#abcdef', '#fedcba', '#654321'],
+    });
+  });
+
+  it('ignores invisible zero-width shape strokes when building preview colors', () => {
+    const orangeRect = createRectangleItem({
+      id: 'orange-rect',
+      fill: '#f97316',
+      stroke: '#c2410c',
+      strokeWidth: 0,
+    });
+    const secondOrangeRect = createRectangleItem({
+      id: 'second-orange-rect',
+      fill: '#f97316',
+      stroke: '#7c2d12',
+      strokeWidth: 0,
+      x: 320,
+    });
+
+    expect(summarizeTemplateNodes([orangeRect, secondOrangeRect]).previewColors).toEqual([
+      '#f97316',
     ]);
   });
 });

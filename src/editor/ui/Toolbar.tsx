@@ -6,6 +6,7 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   canGroup: boolean;
+  canSaveTemplate: boolean;
   canUngroup: boolean;
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
@@ -17,6 +18,7 @@ interface ToolbarProps {
   onNewProject: () => void;
   onRedo: () => void;
   onSave: () => void;
+  onSaveTemplate: () => void;
   onUndo: () => void;
   onUngroup: () => void;
 }
@@ -26,6 +28,7 @@ export function Toolbar({
   canUndo,
   canRedo,
   canGroup,
+  canSaveTemplate,
   canUngroup,
   onCanvasSizeChange,
   onDelete,
@@ -37,6 +40,7 @@ export function Toolbar({
   onNewProject,
   onRedo,
   onSave,
+  onSaveTemplate,
   onUndo,
   onUngroup,
 }: ToolbarProps) {
@@ -101,6 +105,9 @@ export function Toolbar({
         <div className="toolbar-group toolbar-group-history">
           <button type="button" onClick={onGroup} disabled={!canGroup}>Group</button>
           <button type="button" onClick={onUngroup} disabled={!canUngroup}>Ungroup</button>
+          {canSaveTemplate ? (
+            <button type="button" onClick={onSaveTemplate}>Save as template</button>
+          ) : null}
           <button type="button" onClick={onUndo} disabled={!canUndo}>Undo</button>
           <button type="button" onClick={onRedo} disabled={!canRedo}>Redo</button>
           <button type="button" className="danger" onClick={onDelete}>Delete</button>
