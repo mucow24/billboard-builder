@@ -122,7 +122,11 @@ export function PropertiesPanel({
         </div>
 
         {activeTab === 'layers' ? (
-          <div ref={layersScrollRef}>
+          <div
+            ref={layersScrollRef}
+            className="rail-tab-body rail-tab-body-layers"
+            data-testid="layers-tab-body"
+          >
             <LayersInspectorTab
               background={background}
               canReorder={selectedNodeIds.length > 0}
@@ -138,7 +142,11 @@ export function PropertiesPanel({
             />
           </div>
         ) : (
-          <div ref={propertiesScrollRef}>
+          <div
+            ref={propertiesScrollRef}
+            className="rail-tab-body rail-tab-body-properties"
+            data-testid="properties-tab-body"
+          >
             <SelectionInspector
               availableFonts={availableFonts}
               fonts={fonts}

@@ -105,7 +105,7 @@ export function getNodeIds(nodes: CanvasNode[]): string[] {
 export function flattenVisibleLeafNodes(
   nodes: CanvasNode[],
   parentOpacity = 1,
-  nearestGroupId?: string,
+  selectableGroupId?: string,
   groupPath: string[] = []
 ): FlattenedLeafNode[] {
   const flattened: FlattenedLeafNode[] = [];
@@ -116,7 +116,7 @@ export function flattenVisibleLeafNodes(
         ...flattenVisibleLeafNodes(
           node.children,
           parentOpacity * node.opacity,
-          node.id,
+          selectableGroupId ?? node.id,
           [...groupPath, node.id]
         )
       );
@@ -128,7 +128,7 @@ export function flattenVisibleLeafNodes(
     flattened.push({
       item: node,
       effectiveOpacity: parentOpacity * node.opacity,
-      selectableNodeId: nearestGroupId ?? node.id,
+      selectableNodeId: selectableGroupId ?? node.id,
       groupPath,
     });
   }

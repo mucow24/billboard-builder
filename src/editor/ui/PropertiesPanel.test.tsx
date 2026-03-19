@@ -34,8 +34,10 @@ describe('PropertiesPanel', () => {
     );
 
     expect(screen.getByText('Ghost Sans')).toBeInTheDocument();
+    expect(screen.getByTestId('properties-tab-body')).toHaveClass('rail-tab-body');
 
     await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    expect(screen.getByTestId('layers-tab-body')).toHaveClass('rail-tab-body');
     expect(screen.getByRole('button', { name: 'Canvas background' })).toBeInTheDocument();
   });
 
@@ -155,5 +157,51 @@ describe('PropertiesPanel', () => {
 
     await user.click(screen.getByRole('tab', { name: /Layers/i }));
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument();
+  });
+
+  it('preserves per-tab scroll positions on the shell-owned tab bodies', async () => {
+    const user = userEvent.setup();
+    const item = createTextItem({ zIndex: 1 });
+
+    render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+        missingFontFamilies={[]}
+        selectedItem={item}
+        onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={vi.fn()}
+        onSelectNode={vi.fn()}
+        onReorder={vi.fn()}
+        selectedNodeIds={[item.id]}
+      />,
+    );
+
+    const propertiesBody = screen.getByTestId('properties-tab-body');
+    Object.defineProperty(propertiesBody, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 140,
+    });
+
+    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+
+    const layersBody = screen.getByTestId('layers-tab-body');
+    Object.defineProperty(layersBody, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 84,
+    });
+
+    await user.click(screen.getByRole('tab', { name: /Properties/i }));
+    expect(screen.getByTestId('properties-tab-body').scrollTop).toBe(140);
+
+    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    expect(screen.getByTestId('layers-tab-body').scrollTop).toBe(84);
   });
 });

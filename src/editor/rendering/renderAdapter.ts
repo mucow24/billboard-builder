@@ -28,8 +28,12 @@ export function buildRenderableCanvasItems(
     groupPath: entry.groupPath,
     opacity: entry.effectiveOpacity,
     selectableNodeId:
-      editableGroupId && entry.groupPath.at(-1) === editableGroupId
-        ? entry.item.id
+      editableGroupId && entry.groupPath.includes(editableGroupId)
+        ? (() => {
+            const editableGroupIndex = entry.groupPath.indexOf(editableGroupId);
+            const nextGroupId = entry.groupPath[editableGroupIndex + 1];
+            return nextGroupId ?? entry.item.id;
+          })()
         : entry.selectableNodeId,
   }));
 }

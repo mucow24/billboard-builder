@@ -79,6 +79,7 @@ export function CanvasStage({
     selectedRenderedItem,
     selectedItemId,
     session,
+    subgroupOutlineFrames = [],
   } = useCanvasInteractionSession({
     activeTool,
     document,
@@ -198,6 +199,7 @@ export function CanvasStage({
         stageCursor={viewport.getStageCursor(Boolean(session))}
         stageRef={stageRef}
         startPanDrag={viewport.startPanDrag}
+        subgroupOutlineFrames={subgroupOutlineFrames}
         toCanvasPointer={viewport.toCanvasPointer}
         viewportPan={viewport.pan}
         zoom={viewport.zoom}

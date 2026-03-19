@@ -28,7 +28,7 @@ export function LayersInspectorTab({
   );
 
   return (
-    <div className="rail-tab-body rail-tab-body-layers">
+    <>
       <div className="layer-list layer-list-tabbed">
         {visibleRows.map((row) => {
           const isGroup = row.node.kind === 'group';
@@ -154,6 +154,6 @@ export function LayersInspectorTab({
           />
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -58,6 +58,28 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('single-selection-handles.png');
   });
 
+  test('captures a rectangle snapped flush to the right canvas edge without checkerboard bleed', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createRectangleFixture({
+          id: 'edge-flush-rect',
+          x: 784,
+          y: 240,
+          width: 240,
+          height: 180,
+          fill: '#f97316',
+          stroke: '#ea580cff',
+        }),
+      ]),
+      'edge-flush-rect.json'
+    );
+
+    await clickCanvas(page, { x: 904, y: 330 });
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('right-edge-snap-shell.png');
+  });
+
   test('captures live single-item drag, resize, and rotate previews', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(

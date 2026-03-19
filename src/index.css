@@ -1598,14 +1598,16 @@ button {
 }
 
 .rail-tab-body {
-  min-height: 0;
+  display: flex;
   flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  min-height: 0;
   overflow: auto;
 }
 
 .rail-tab-body-layers {
-  display: flex;
-  flex-direction: column;
   gap: 0.4rem;
 }
 

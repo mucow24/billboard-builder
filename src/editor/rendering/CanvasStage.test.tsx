@@ -28,6 +28,7 @@ const { mockInteractionSession } = vi.hoisted(() => ({
     selectedRenderedItem: null,
     selectedItemId: undefined,
     session: null,
+    subgroupOutlineFrames: [],
   },
 }));
 
@@ -166,6 +167,7 @@ describe('CanvasStage viewport controls', () => {
       selectedRenderedItem: null,
       selectedItemId: undefined,
       session: null,
+      subgroupOutlineFrames: [],
     });
     class TestResizeObserver {
       private callback: ResizeObserverCallback;
@@ -208,7 +210,7 @@ describe('CanvasStage viewport controls', () => {
 
 
 
-  it('renders a square canvas edge with a subtle glow treatment', () => {
+  it('renders an exact canvas edge treatment and clips the checkerboard to canvas bounds', () => {
     const { container } = render(
       <CanvasStage
         activeTool="select"
@@ -226,9 +228,22 @@ describe('CanvasStage viewport controls', () => {
 
     const glowRect = container.querySelector('[data-konva-node="Rect"][data-prop-name="export-exclude"]');
     expect(glowRect).not.toBeNull();
+    expect(glowRect).toHaveAttribute('data-prop-x', '0');
+    expect(glowRect).toHaveAttribute('data-prop-y', '0');
+    expect(glowRect).toHaveAttribute('data-prop-width', '1024');
+    expect(glowRect).toHaveAttribute('data-prop-height', '1024');
     expect(glowRect).toHaveAttribute('data-prop-cornerradius', '0');
     expect(glowRect).toHaveAttribute('data-prop-stroke', 'rgba(128, 176, 255, 0.18)');
     expect(glowRect).toHaveAttribute('data-prop-shadowcolor', 'rgba(110, 160, 255, 0.14)');
+
+    const checkerboardGroup = container.querySelector(
+      '[data-konva-node="Group"][data-prop-name="checkerboard export-exclude"]',
+    );
+    expect(checkerboardGroup).not.toBeNull();
+    expect(checkerboardGroup).toHaveAttribute('data-prop-clipx', '0');
+    expect(checkerboardGroup).toHaveAttribute('data-prop-clipy', '0');
+    expect(checkerboardGroup).toHaveAttribute('data-prop-clipwidth', '1024');
+    expect(checkerboardGroup).toHaveAttribute('data-prop-clipheight', '1024');
 
     const canvasRect = container.querySelector(
       '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
@@ -862,6 +877,43 @@ describe('CanvasStage viewport controls', () => {
     fireEvent.dblClick(shapeGroup!, { button: 0, clientX: 240, clientY: 160 });
 
     expect(mockInteractionSession.handleItemDoubleClick).toHaveBeenCalledWith(rectangle);
+  });
+
+  it('renders unobtrusive subgroup outlines for grouped selections', () => {
+    const document = createDefaultProjectDocument();
+    Object.assign(mockInteractionSession, {
+      subgroupOutlineFrames: [
+        {
+          nodeId: 'group-a',
+          bounds: { x: 100, y: 90, width: 120, height: 80 },
+        },
+        {
+          nodeId: 'group-b',
+          bounds: { x: 280, y: 120, width: 140, height: 90 },
+        },
+      ],
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const subgroupOutlines = container.querySelectorAll(
+      '[data-konva-node="Rect"][data-prop-name="subgroup-selection-outline"]',
+    );
+
+    expect(subgroupOutlines).toHaveLength(2);
   });
 
   it('renders marquee and text-create previews plus active guide lines', () => {

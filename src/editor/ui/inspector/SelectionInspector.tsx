@@ -41,7 +41,7 @@ export function SelectionInspector({
 
   if (selectedGroup && !isMultiNodeSelection) {
     return (
-      <div className="rail-tab-body rail-tab-body-properties">
+      <>
         <SectionBlock title="Group">
           <NumberInput
             label="Group Opacity"
@@ -54,26 +54,26 @@ export function SelectionInspector({
             onChange={onGroupOpacityChange}
           />
         </SectionBlock>
-      </div>
+      </>
     );
   }
 
   if (isMultiNodeSelection || selectionSummary.isMultiSelection) {
     return (
-      <div className="rail-tab-body rail-tab-body-properties">
+      <>
         <MultiSelectionSection
           allSelectedOpacityEqual={selectionSummary.allSelectedOpacityEqual}
           onItemChange={onItemChange}
           opacityValue={selectionSummary.opacityValue}
           selectedCount={selectedItems.length}
         />
-      </div>
+      </>
     );
   }
 
   if (!selectedItem) {
     return (
-      <div className="rail-tab-body rail-tab-body-properties">
+      <>
         <section className="empty-panel-inner">
           <span className="eyebrow">Nothing selected</span>
           <p>Select an item to edit it, or choose a tool and drag a new item onto the canvas.</p>
@@ -81,12 +81,12 @@ export function SelectionInspector({
             <p>{availableFonts.length} uploaded font(s) ready in this session.</p>
           ) : null}
         </section>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="rail-tab-body rail-tab-body-properties">
+    <>
       <SelectionHeading item={selectedItem} />
 
       {'fill' in selectedItem || 'stroke' in selectedItem ? (
@@ -130,6 +130,6 @@ export function SelectionInspector({
       ) : null}
 
       <ShadowSection item={selectedItem} onItemChange={onItemChange} />
-    </div>
+    </>
   );
 }

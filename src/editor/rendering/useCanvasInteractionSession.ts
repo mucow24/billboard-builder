@@ -32,8 +32,10 @@ import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderA
 import {
   collectLeafItems,
   getNextDrilldownNodeId,
+  getNodeEntry,
   getNodeById,
   isCanvasItemNode,
+  isGroupNode,
 } from '../document/sceneGraph';
 import type {
   CanvasItem,
@@ -150,6 +152,32 @@ export function useCanvasInteractionSession({
   );
   const selectedItemId = selectedDocumentItem?.id;
   const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId) ?? null;
+  const subgroupOutlineFrames = useMemo(() => {
+    const outlineGroupIds = new Set<string>();
+
+    if (selectedNodes.length === 1 && isCanvasItemNode(selectedNodes[0])) {
+      const parentGroupId =
+        getNodeEntry(document.nodes, selectedNodes[0].id)?.parent?.id ?? null;
+      if (parentGroupId) {
+        outlineGroupIds.add(parentGroupId);
+      }
+    } else if (selectedNodes.length > 1) {
+      selectedNodes.filter(isGroupNode).forEach((node) => {
+        outlineGroupIds.add(node.id);
+      });
+    }
+
+    return Array.from(outlineGroupIds)
+      .map((groupId) => {
+        const outlineItems = renderedItems.filter((item) => item.groupPath.includes(groupId));
+        const bounds = getSelectionRenderBounds(outlineItems);
+        return bounds ? { nodeId: groupId, bounds } : null;
+      })
+      .filter(
+        (frame): frame is { nodeId: string; bounds: { x: number; y: number; width: number; height: number } } =>
+          Boolean(frame),
+      );
+  }, [document.nodes, renderedItems, selectedNodes]);
 
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
     sessionRef.current = nextSession;
@@ -316,6 +344,31 @@ export function useCanvasInteractionSession({
     }
   }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
+  const beginGroupDragForNode = useCallback((nodeId: string, pointer: Point) => {
+    const selectedNode = getNodeById(document.nodes, nodeId);
+    if (!selectedNode) {
+      return false;
+    }
+    const groupItems = collectLeafItems(selectedNode)
+      .slice()
+      .sort((left, right) => left.zIndex - right.zIndex);
+    const groupBounds = getSelectionRenderBounds(groupItems);
+    if (!groupBounds) {
+      return false;
+    }
+    const groupLeafIdSet = new Set(groupItems.map((item) => item.id));
+    const nextSession = createGroupDragSession(pointer, {
+      selectedItems: groupItems,
+      siblingItems: orderedItems.filter((entry) => !groupLeafIdSet.has(entry.id)),
+      activeSelectionFrame: { bounds: groupBounds, rotation: 0 },
+    });
+    if (!nextSession) {
+      return false;
+    }
+    updateSession(nextSession);
+    return true;
+  }, [document.nodes, orderedItems, updateSession]);
+
   const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
     updateSession(
       createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id))
@@ -386,10 +439,14 @@ export function useCanvasInteractionSession({
       return;
     }
     onSelectItem(selectionNodeId);
+    if (selectionNodeId !== item.id) {
+      beginGroupDragForNode(selectionNodeId, pointer);
+      return;
+    }
     if (selectionNodeId === item.id) {
       beginDrag(item, pointer);
     }
-  }, [beginDrag, beginGroupDrag, onSelectItem, onToggleSelectItem, selectedIdSet, selectedItems.length]);
+  }, [beginDrag, beginGroupDrag, beginGroupDragForNode, onSelectItem, onToggleSelectItem, selectedIdSet, selectedItems.length]);
 
   const handleItemDoubleClick = useCallback((item: CanvasItem) => {
     if (selectedItemIds.length !== 1) {
@@ -454,5 +511,6 @@ export function useCanvasInteractionSession({
     selectedRenderedItem,
     selectedItemId,
     session,
+    subgroupOutlineFrames,
   };
 }

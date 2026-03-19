@@ -878,6 +878,48 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session?.kind).toBe('group-drag');
   });
 
+  it('starts dragging a group immediately when clicking grouped content that is not already selected', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+    const params = createHookParams({
+      document: createDocument([group]),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(first, group.id, { x: 120, y: 120 }, false);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(group.id);
+    expect(result.current.session?.kind).toBe('group-drag');
+  });
+
+  it('uses the outermost group as the selectable target before drill-in for nested groups', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createRectangleItem({ id: 'second' });
+    const third = createRectangleItem({ id: 'third' });
+    const fourth = createRectangleItem({ id: 'fourth' });
+    const leftGroup = createGroupNode([first, second], 'Left');
+    leftGroup.id = 'left-group';
+    const rightGroup = createGroupNode([third, fourth], 'Right');
+    rightGroup.id = 'right-group';
+    const parentGroup = createGroupNode([leftGroup, rightGroup], 'Parent');
+    parentGroup.id = 'parent-group';
+    const params = createHookParams({
+      document: createDocument([parentGroup]),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    const selectableById = new Map(
+      result.current.renderedItems.map((item) => [item.id, item.selectableNodeId]),
+    );
+
+    expect(selectableById.get(first.id)).toBe(parentGroup.id);
+    expect(selectableById.get(fourth.id)).toBe(parentGroup.id);
+  });
+
   it('makes sibling leaves directly selectable when editing a child inside a group', () => {
     const first = createRectangleItem({ id: 'first' });
     const second = createRectangleItem({ id: 'second' });
@@ -899,6 +941,49 @@ describe('useCanvasInteractionSession', () => {
     expect(selectableById.get(first.id)).toBe(first.id);
     expect(selectableById.get(second.id)).toBe(second.id);
     expect(selectableById.get(nestedLeaf.id)).toBe(nestedGroup.id);
+  });
+
+  it('computes rendered bounds for multi-group selections and drilled-in child editing', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 40, height: 30 });
+    const second = createRectangleItem({ id: 'second', x: 180, y: 100, width: 40, height: 30 });
+    const third = createRectangleItem({ id: 'third', x: 320, y: 140, width: 50, height: 30 });
+    const fourth = createRectangleItem({ id: 'fourth', x: 420, y: 140, width: 50, height: 30 });
+    const leftGroup = createGroupNode([first, second], 'Left');
+    leftGroup.id = 'left-group';
+    const rightGroup = createGroupNode([third, fourth], 'Right');
+    rightGroup.id = 'right-group';
+    const document = createDocument([leftGroup, rightGroup]);
+
+    const { result, rerender } = renderHook(
+      (hookParams) => useCanvasInteractionSession(hookParams),
+      {
+        initialProps: createHookParams({
+          document,
+          selectedItemIds: [leftGroup.id, rightGroup.id],
+        }),
+      },
+    );
+
+    expect(result.current.renderedGroupBounds).toEqual({
+      x: 100,
+      y: 100,
+      width: 370,
+      height: 70,
+    });
+
+    rerender(
+      createHookParams({
+        document,
+        selectedItemIds: [first.id],
+      }),
+    );
+
+    expect(result.current.renderedGroupBounds).toEqual({
+      x: 100,
+      y: 100,
+      width: 40,
+      height: 30,
+    });
   });
 
   it('drills into the next descendant on item double-click when a group is selected', () => {

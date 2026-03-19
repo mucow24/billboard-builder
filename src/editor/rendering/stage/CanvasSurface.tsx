@@ -46,10 +46,10 @@ export function CanvasSurface({ document }: CanvasSurfaceProps) {
       />
       <Rect
         name="export-exclude"
-        x={-2}
-        y={-2}
-        width={document.canvas.width + 4}
-        height={document.canvas.height + 4}
+        x={0}
+        y={0}
+        width={document.canvas.width}
+        height={document.canvas.height}
         cornerRadius={0}
         fill="rgba(0,0,0,0)"
         stroke="rgba(128, 176, 255, 0.18)"
@@ -73,6 +73,10 @@ export function CanvasSurface({ document }: CanvasSurfaceProps) {
       />
       <Group
         name="checkerboard export-exclude"
+        clipX={0}
+        clipY={0}
+        clipWidth={document.canvas.width}
+        clipHeight={document.canvas.height}
       >
         {checkerboard.tiles.map((tile) => (
           <Rect
