@@ -99,8 +99,8 @@ For any interaction-heavy patch, use this matrix to decide what must be tested, 
 | GD-06 | Keyboard | Drilled into child | Press Escape repeatedly | Selection affordance climbs visibly | Child -> parent group -> outer group -> clear | user-flow | Chromium + cross-browser subset | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GD-07 | Canvas | Drilled into child | Click blank canvas | Selection clears | No selected nodes | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GD-08 | Canvas | Group contains text child | Click into text child | Text selected, no DOM text selection, no toolbar focus theft | Child selected | user-flow | Chromium + cross-browser subset | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
-| GD-09 | Canvas | Selected group, click resolves to real item hit | Click child content | Correct drill-in | Correct descendant selected | user-flow | Chromium | Missing explicit browser proof |
-| GD-10 | Canvas | Selected group, click resolves to stage-surface fallback | Click child content through surface path | Correct drill-in | Correct descendant selected | user-flow | Chromium | Missing explicit browser proof |
+| GD-09 | Canvas | Selected group, click resolves to real item hit | Click child content | Correct drill-in | Correct descendant selected | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GD-10 | Canvas | Selected group, click resolves to stage-surface fallback | Click child content through surface path | Correct drill-in | Correct descendant selected | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GD-11 | Canvas + Keyboard | Mixed-parent selection | Try Group button or shortcut | Group remains disabled or no-op | No grouping | user-flow | Chromium | Covered in [e2e/editor.groups.layers.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.layers.spec.ts) |
 | GD-12 | Canvas + Keyboard | Single node selected | Try Group button or shortcut | Group remains disabled or no-op | No grouping | user-flow | Chromium | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | GD-13 | Canvas + Keyboard | Non-group selection | Try Ungroup button or shortcut | Ungroup disabled or no-op | No ungrouping | user-flow | Chromium | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
@@ -140,8 +140,8 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | ST-10 | Canvas | Line selected | Drag body | Line selection affordance follows | Line moves | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-11 | Canvas | Line selected | Drag start endpoint | Line start handle follows | Start endpoint changes only | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-12 | Canvas | Line selected | Drag end endpoint | Line end handle follows | End endpoint changes only | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
-| ST-13 | Canvas | Selected item, snap candidate exists | Ctrl-drag | No snapping guides | Snapping disabled | user-flow | Chromium | Deferred: snapping-disable semantics are still only proven in hook and geometry tests |
-| ST-14 | Canvas | Selected item | Shift-drag | Constrained preview visible | Axis-constrained drag where implemented | user-flow | Chromium | Deferred: browser `Shift` drag overlaps with `VP-05` pan on blank canvas and lacks separate user-flow proof |
+| ST-13 | Canvas | Selected item, snap candidate exists | Ctrl-drag | No snapping guides | Snapping disabled | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
+| ST-14 | Canvas | Selected item | Shift-drag | Constrained preview visible | Axis-constrained drag where implemented | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 
 ## 5. Group and Multi-Selection Transform Flows
 
@@ -155,7 +155,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | GT-06 | Canvas | Real group node selected | Rotate group | Group rotate preview visible | Group descendants rotate as a unit | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-07 | Canvas | Group already rotated | Drag again | Overlay stays coherent | Rotated group drags correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-08 | Canvas | Group already rotated | Resize again | Overlay and items stay coherent | Rotated group resizes correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
-| GT-09 | Canvas | Group with line + shape | Transform group | Handles, preview, and result stay coherent | Mixed descendants transform correctly | user-flow | Chromium | Partial: rotated group suites cover overlay case |
+| GT-09 | Canvas | Group with line + shape | Transform group | Handles, preview, and result stay coherent | Mixed descendants transform correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 
 ## 6. Viewport and Navigation Flows
 
@@ -257,7 +257,7 @@ These are state snapshots and affordance checks, not just behavior checks.
 | --- | --- | --- | --- |
 | UI-01 | Top-level group selected | Group border visible, group handles visible, rotater visible, no child-only handles | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
 | UI-02 | Drilled-in child selected | Child manipulator visible, parent group border or subgroup outline visible if intended, group handles inactive | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
-| UI-03 | Nested group selected | Correct nested group affordance visible | Missing |
+| UI-03 | Nested group selected | Correct nested group affordance visible | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
 | UI-04 | Nested drilled-in child selected | Correct child manipulator plus ancestor outline state | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
 | UI-05 | Temporary multi-selection selected | Shared overlay visible, correct group handles/rotater visible | Covered in grouped regression and visual suites |
 | UI-06 | Line selected | Line handles visible, no shape handles | Covered in [e2e/editor.visual.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.visual.spec.ts) |
@@ -267,15 +267,9 @@ These are state snapshots and affordance checks, not just behavior checks.
 
 ## Current Critical Gaps
 
-These are the highest-priority gaps until proven by browser `user-flow` tests:
+No current critical matrix gaps remain in the planned rollout.
 
-- explicit browser proof for both drill-in hit paths:
-  - direct item-hit path
-  - stage-surface fallback path
-- nested-group selected UI state (`UI-03`)
-- mixed true grouped line-and-shape transform coverage (`GT-09`)
-- true grouped-node UI states distinguished from temporary multi-selection overlay states
-- browser proof for snapping-disable and axis-constrained drag semantics (`ST-13`, `ST-14`)
+Non-critical deferred scenarios can still exist elsewhere in the matrix when the browser entrypoint conflicts with current product semantics, such as `CS-10`.
 
 ## Patch Closeout Template
 

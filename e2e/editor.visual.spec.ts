@@ -222,6 +222,27 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('group-child-selected.png');
   });
 
+  test('UI-03 captures a nested group selection state with the ancestor outline intact', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createNestedGroupFixture(), 'visual-nested-group.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 400, y: 210 });
+    await clickCanvas(page, { x: 400, y: 210 });
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.groupFrame).not.toBeNull();
+    expect(stageDebug.groupHandleViewportPoints).not.toBeNull();
+    expect(stageDebug.groupRotaterViewportPoint).not.toBeNull();
+    expect(stageDebug.hasShapeHandles).toBe(false);
+    expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(0);
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('nested-group-selected.png');
+  });
+
   test('UI-04 captures a nested drilled-in child selection state with ancestor outline', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, createNestedGroupFixture(), 'visual-nested-child.json');

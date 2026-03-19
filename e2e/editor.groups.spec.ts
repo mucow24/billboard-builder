@@ -7,8 +7,10 @@ import {
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createLineFixture,
+  createMixedShapeLineGroupFixture,
   createProjectDocument,
   createRectangleFixture,
+  createSimpleGroupFixture,
   createTextFixture,
   dragCanvas,
   dragCanvasHookToPoint,
@@ -330,6 +332,96 @@ test.describe('editor groups', () => {
     expect(stageDebug.hasGroupOverlay).toBe(false);
     expect(stageDebug.hasShapeHandles).toBe(true);
     expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+  });
+
+  test('GD-09 drills into a grouped child through the direct item-hit path', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Explicit drill-in route proof stays Chromium-only.');
+
+    await openFreshEditor(page);
+    await uploadProject(page, createSimpleGroupFixture(), 'group-drill-item-hit.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 210, y: 200 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Simple Group');
+
+    await clickCanvas(page, { x: 210, y: 200 });
+    const stageDebug = await readStageDebug(page);
+
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+  });
+
+  test('GD-10 drills into a grouped child through the stage-surface fallback path', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Explicit drill-in route proof stays Chromium-only.');
+
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'fallback-rect',
+            name: 'Fallback Rect',
+            x: 140,
+            y: 160,
+            width: 120,
+            height: 60,
+            zIndex: 0,
+          }),
+          createLineFixture({
+            id: 'fallback-line',
+            name: 'Fallback Line',
+            x: 180,
+            y: 220,
+            startX: 180,
+            startY: 220,
+            endX: 440,
+            endY: 280,
+            width: 260,
+            height: 60,
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'fallback-group',
+          name: 'Fallback Group',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'group-drill-stage-surface.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 220, y: 210 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Fallback Group');
+
+    // This point misses the rendered stroke but remains inside the line's
+    // descendant-resolvable bounds, so the stage-surface drill-in path owns it.
+    await clickCanvas(page, { x: 320, y: 228 });
+    const stageDebug = await readStageDebug(page);
+
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Line');
+    await openPropertiesTab(page);
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+    expect(stageDebug.hasLineHandles).toBe(true);
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
   });
 
@@ -892,6 +984,58 @@ test.describe('editor groups', () => {
     expect(Number(expectSavedNode(savedProject, 'transform-group-left').x)).toBeGreaterThan(250);
     expect(Math.abs(Number(expectSavedNode(savedProject, 'transform-group-left').rotation))).toBeGreaterThan(10);
     expect(Number(expectSavedNode(savedProject, 'transform-group-right').width)).toBeGreaterThan(180);
+  });
+
+  test('GT-09 transforms a true mixed line-and-shape group through the real group overlay', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Mixed grouped transform coverage stays Chromium-only.');
+
+    await openFreshEditor(page);
+    await uploadProject(page, createMixedShapeLineGroupFixture(), 'mixed-line-shape-group.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 220, y: 210 });
+
+    const stageDebug = await readStageDebug(page);
+    const initialFrame = stageDebug.groupFrame;
+    expect(initialFrame).not.toBeNull();
+    if (!initialFrame) {
+      throw new Error('Expected an initial true group frame for the mixed line-and-shape group.');
+    }
+
+    const resizeStart = groupHandlePoint(initialFrame, 'middle-right');
+    await dragCanvas(page, resizeStart, { x: resizeStart.x + 90, y: resizeStart.y });
+
+    const savedProject = await saveAndReadProject(page);
+    const savedRectangle = expectSavedNode(savedProject, 'line-group-rect');
+    const savedLine = expectSavedNode(savedProject, 'line-group-line');
+
+    expect(savedRectangle).toEqual(
+      expect.objectContaining({
+        x: expect.any(Number),
+        y: expect.any(Number),
+        width: expect.any(Number),
+      }),
+    );
+    expect(Number(savedRectangle.x)).toBeCloseTo(140, 0);
+    expect(Number(savedRectangle.width)).toBeGreaterThan(220);
+    expect(Number(savedRectangle.height)).toBeCloseTo(100, 0);
+
+    expect(savedLine).toEqual(
+      expect.objectContaining({
+        startX: expect.any(Number),
+        startY: expect.any(Number),
+        endX: expect.any(Number),
+        endY: expect.any(Number),
+      }),
+    );
+    expect(Number(savedLine.startX)).toBeGreaterThanOrEqual(180);
+    expect(Number(savedLine.startY)).toBeCloseTo(220, 0);
+    expect(Number(savedLine.endX)).toBeGreaterThan(520);
+    expect(Number(savedLine.endY)).toBeCloseTo(280, 0);
+    expect(Number(savedLine.endX) - Number(savedLine.startX)).toBeGreaterThan(290);
   });
 
 });

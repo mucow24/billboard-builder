@@ -9,11 +9,13 @@ import {
   createRectangleFixture,
   createTextFixture,
   dragCanvas,
+  dragCanvasWithModifier,
   dragCanvasHookToPoint,
   openFreshEditor,
   openLayersTab,
   readStageDebug,
   readDownloadedJson,
+  saveAndReadProject,
   uploadProject,
 } from './support/editor';
 
@@ -202,6 +204,83 @@ test.describe('editor transforms', () => {
     expect(Number(savedImage?.x)).toBeGreaterThan(620);
     expect(Number(savedImage?.width)).toBeGreaterThan(240);
     expect(Math.abs(Number(savedImage?.rotation))).toBeGreaterThan(10);
+  });
+
+  test('ST-13 disables snapping during a control-modified item drag', async ({ page }) => {
+    const movable = createRectangleFixture({
+      id: 'snap-movable',
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+      zIndex: 0,
+    });
+    const sibling = createRectangleFixture({
+      id: 'snap-sibling',
+      x: 480,
+      y: 120,
+      width: 240,
+      height: 120,
+      fill: '#0ea5e9',
+      stroke: '#0369a1ff',
+      zIndex: 1,
+    });
+
+    const document = createProjectDocument([movable, sibling]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'snap-enabled.json');
+    await clickCanvas(page, { x: 300, y: 180 });
+    await dragCanvas(page, { x: 300, y: 180 }, { x: 584, y: 180 });
+    const snappedProject = await saveAndReadProject(page);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'snap-disabled.json');
+    await clickCanvas(page, { x: 300, y: 180 });
+    await dragCanvasWithModifier(page, 'Control', { x: 300, y: 180 }, { x: 584, y: 180 });
+    const unsnappedProject = await saveAndReadProject(page);
+
+    const snappedItem = collectLeafNodes(snappedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'snap-movable',
+    );
+    const unsnappedItem = collectLeafNodes(unsnappedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'snap-movable',
+    );
+
+    expect(snappedItem).toBeDefined();
+    expect(unsnappedItem).toBeDefined();
+    expect(Number(snappedItem?.x)).toBeCloseTo(480, 0);
+    expect(Number(unsnappedItem?.x)).toBeCloseTo(484, 0);
+    expect(Number(unsnappedItem?.x)).toBeGreaterThan(Number(snappedItem?.x));
+    expect(Number(snappedItem?.y)).toBe(120);
+    expect(Number(unsnappedItem?.y)).toBe(120);
+  });
+
+  test('ST-14 constrains selected-item drag movement to a single axis when shift is held', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'shift-drag-rect',
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'shift-drag-rect.json');
+
+    await clickCanvas(page, { x: 220, y: 140 });
+    await dragCanvasWithModifier(page, 'Shift', { x: 220, y: 140 }, { x: 320, y: 200 });
+
+    const savedProject = await saveAndReadProject(page);
+    const savedRectangle = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'shift-drag-rect',
+    );
+
+    expect(savedRectangle).toBeDefined();
+    expect(Number(savedRectangle?.x)).toBeCloseTo(300, 0);
+    expect(Number(savedRectangle?.y)).toBeCloseTo(120, 0);
   });
 
   test('keeps rotated group resizing aligned to the rotated frame across repeated transforms', async ({ page }) => {

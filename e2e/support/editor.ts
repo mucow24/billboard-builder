@@ -558,6 +558,26 @@ export async function dragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint,
   await page.mouse.up();
 }
 
+export async function dragCanvasWithModifier(
+  page: Page,
+  modifierKey: 'Shift' | 'Control' | 'Alt' | 'Meta',
+  from: CanvasPoint,
+  to: CanvasPoint,
+  steps = 18,
+) {
+  const start = await canvasPointToPage(page, from);
+  const end = await canvasPointToPage(page, to);
+  await page.keyboard.down(modifierKey);
+  try {
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y, { steps });
+    await page.mouse.up();
+  } finally {
+    await page.keyboard.up(modifierKey);
+  }
+}
+
 export async function setCanvasTestHooksEnabled(page: Page, enabled: boolean) {
   await page.evaluate((nextEnabled) => {
     const hooks = document.querySelector<HTMLElement>('[data-testid="canvas-test-hooks"]');
