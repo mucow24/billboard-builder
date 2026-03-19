@@ -28,6 +28,19 @@ interface CanvasSurfaceProps {
   document: ProjectDocument;
 }
 
+export function CanvasWorkspaceBackdrop() {
+  return (
+    <Rect
+      name="canvas-backdrop canvas-surface export-exclude"
+      x={-BACKDROP_SIZE / 2}
+      y={-BACKDROP_SIZE / 2}
+      width={BACKDROP_SIZE}
+      height={BACKDROP_SIZE}
+      fill="rgba(0,0,0,0)"
+    />
+  );
+}
+
 export function CanvasSurface({ document }: CanvasSurfaceProps) {
   const checkerboard = buildCheckerboardTiles(
     document.canvas.width,
@@ -36,14 +49,6 @@ export function CanvasSurface({ document }: CanvasSurfaceProps) {
 
   return (
     <>
-      <Rect
-        name="canvas-backdrop canvas-surface export-exclude"
-        x={-BACKDROP_SIZE / 2}
-        y={-BACKDROP_SIZE / 2}
-        width={BACKDROP_SIZE}
-        height={BACKDROP_SIZE}
-        fill="rgba(0,0,0,0)"
-      />
       <Rect
         name="export-exclude"
         x={0}

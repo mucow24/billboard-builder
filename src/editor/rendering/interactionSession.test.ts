@@ -15,6 +15,8 @@ import {
 } from '../document/documentDefaults';
 
 describe('interactionSession', () => {
+  const canvasBounds = { x: 0, y: 0, width: 1024, height: 1024 };
+
   it('builds rendered items by overlaying previews and appending create previews', () => {
     const first = createRectangleItem({ id: 'first' });
     const second = createRectangleItem({ id: 'second' });
@@ -65,6 +67,7 @@ describe('interactionSession', () => {
     const commit = buildInteractionCommit(session, {
       orderedItems: [],
       pointer: { x: 180, y: 200 },
+      canvasBounds,
     });
 
     expect(commit).toEqual({
@@ -94,6 +97,7 @@ describe('interactionSession', () => {
       {
         orderedItems: [visible, hidden],
         pointer: { x: 180, y: 160 },
+        canvasBounds,
       }
     );
 
@@ -101,6 +105,75 @@ describe('interactionSession', () => {
       kind: 'marquee',
       hitIds: ['visible'],
       toggleMode: true,
+    });
+  });
+
+  it('returns no marquee hits when the drag stays fully outside the canvas', () => {
+    const offCanvas = createRectangleItem({
+      id: 'off-canvas',
+      x: -180,
+      y: 120,
+      width: 140,
+      height: 120,
+    });
+
+    const commit = buildInteractionCommit(
+      {
+        kind: 'marquee',
+        pointerStart: { x: -260, y: 80 },
+        currentPointer: { x: -40, y: 280 },
+        toggleMode: false,
+        guides: [],
+      },
+      {
+        orderedItems: [offCanvas],
+        pointer: { x: -40, y: 280 },
+        canvasBounds,
+      }
+    );
+
+    expect(commit).toEqual({
+      kind: 'marquee',
+      hitIds: [],
+      toggleMode: false,
+    });
+  });
+
+  it('limits marquee selection to the portion of the drag that overlaps the canvas', () => {
+    const partlyVisible = createRectangleItem({
+      id: 'partly-visible',
+      x: -80,
+      y: 140,
+      width: 180,
+      height: 120,
+    });
+    const fullyOutside = createRectangleItem({
+      id: 'fully-outside',
+      x: -260,
+      y: 140,
+      width: 120,
+      height: 120,
+    });
+
+    const commit = buildInteractionCommit(
+      {
+        kind: 'marquee',
+        pointerStart: { x: -300, y: 100 },
+        currentPointer: { x: 90, y: 300 },
+        toggleMode: false,
+        guides: [],
+      },
+      {
+        orderedItems: [partlyVisible, fullyOutside],
+        pointer: { x: 90, y: 300 },
+        canvasBounds,
+      }
+    );
+
+    expect(commit).toEqual({
+      kind: 'marquee',
+      hitIds: ['partly-visible'],
+      toggleMode: false,
     });
   });
 
@@ -127,6 +200,7 @@ describe('interactionSession', () => {
     const commit = buildInteractionCommit(resolved, {
       orderedItems: [first, second],
       pointer: { x: 360, y: 120 },
+      canvasBounds,
     });
 
     expect(commit.kind).toBe('group');

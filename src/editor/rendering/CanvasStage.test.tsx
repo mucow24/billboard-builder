@@ -256,6 +256,71 @@ describe('CanvasStage viewport controls', () => {
     expect(canvasRect).toHaveAttribute('data-prop-stroke', 'rgba(0, 0, 0, 0.14)');
   });
 
+  it('renders a non-interactive overflow preview layer below the canvas surface while keeping the main content clipped', () => {
+    const document = createDefaultProjectDocument();
+    document.background = '#11223344';
+    const overflowRectangle = createRectangleItem({
+      id: 'overflow-rectangle',
+      x: -48,
+      y: 180,
+      width: 220,
+      height: 140,
+      fill: '#f97316',
+    });
+    Object.assign(mockInteractionSession, {
+      renderedItems: [overflowRectangle],
+    });
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const overflowLayer = container.querySelector(
+      '[data-konva-node="Group"][data-prop-name="overflow-preview-layer export-exclude"]',
+    );
+    const overflowClip = container.querySelector(
+      '[data-konva-node="Group"][data-prop-name="overflow-preview-clip export-exclude"]',
+    );
+    const canvasRect = container.querySelector(
+      '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
+    );
+    const contentLayer = container.querySelector(
+      '[data-konva-node="Group"][data-prop-name="export-content"]',
+    );
+
+    expect(overflowLayer).not.toBeNull();
+    expect(overflowLayer).toHaveAttribute('data-prop-listening', 'false');
+    expect(overflowClip).not.toBeNull();
+    expect(overflowClip).toHaveAttribute('data-prop-listening', 'false');
+    expect(
+      container.querySelector(
+        '[data-konva-node="Rect"][data-prop-name="overflow-preview-veil export-exclude"]',
+      ),
+    ).toBeNull();
+    expect(contentLayer).not.toBeNull();
+    expect(contentLayer).toHaveAttribute('data-prop-clipx', '0');
+    expect(contentLayer).toHaveAttribute('data-prop-clipy', '0');
+    expect(contentLayer).toHaveAttribute('data-prop-clipwidth', '1024');
+    expect(contentLayer).toHaveAttribute('data-prop-clipheight', '1024');
+    expect(canvasRect).not.toBeNull();
+    const overflowLayerElement = overflowLayer as Element;
+    expect(
+      overflowLayerElement.compareDocumentPosition(canvasRect as Element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+  });
+
 
   it('renders subtle outlines for each item in a multi-selection and rotates the shared overlay during group rotation', () => {
     const document = createDefaultProjectDocument();

@@ -8,6 +8,8 @@ import {
 import { buildStageDerivedState } from './stageDerived';
 
 describe('stageDerived', () => {
+  const canvasBounds = { x: 0, y: 0, width: 1024, height: 1024 };
+
   it('derives viewport overlays for single selection and marquee sessions', () => {
     const rectangle = createRectangleItem({
       x: 20,
@@ -17,6 +19,7 @@ describe('stageDerived', () => {
     });
 
     const derived = buildStageDerivedState({
+      canvasBounds,
       renderedGroupBounds: null,
       renderedSelectedItems: [rectangle],
       renderedSelectionFrame: null,
@@ -59,6 +62,7 @@ describe('stageDerived', () => {
     const line = createLineItem({ id: 'line', startX: 10, startY: 20, endX: 100, endY: 50 });
 
     const grouped = buildStageDerivedState({
+      canvasBounds,
       renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
       renderedSelectedItems: [first, second],
       renderedSelectionFrame: { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 0 },
@@ -89,6 +93,7 @@ describe('stageDerived', () => {
     expect(grouped.showGroupInteractionHooks).toBe(true);
 
     const lineDerived = buildStageDerivedState({
+      canvasBounds,
       renderedGroupBounds: null,
       renderedSelectedItems: [line],
       renderedSelectionFrame: null,
@@ -107,5 +112,36 @@ describe('stageDerived', () => {
 
     expect(lineDerived.selectedLineHandleRects).not.toBeNull();
     expect(lineDerived.selectedShapeHandleRects).toBeNull();
+  });
+
+  it('clips marquee preview geometry to the real canvas bounds', () => {
+    const derived = buildStageDerivedState({
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: null,
+      session: {
+        kind: 'marquee',
+        pointerStart: { x: -160, y: 120 },
+        currentPointer: { x: 120, y: 260 },
+      },
+      viewport: {
+        toViewportPoint: (point) => point,
+        toViewportRect: (rect) => ({
+          left: rect.x,
+          top: rect.y,
+          width: rect.width,
+          height: rect.height,
+        }),
+      },
+    });
+
+    expect(derived.marqueeViewportRect).toEqual({
+      left: 0,
+      top: 120,
+      width: 120,
+      height: 140,
+    });
   });
 });

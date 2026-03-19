@@ -39,6 +39,21 @@ describe('overflowRendering', () => {
     ]);
   });
 
+  it('omits zero-sized clip rects when the workspace matches the canvas edge', () => {
+    expect(getOverflowClipRects(canvasBox, canvasBox)).toEqual([]);
+    expect(
+      getOverflowClipRects(canvasBox, {
+        x: 0,
+        y: -100,
+        width: 1024,
+        height: 1224,
+      }),
+    ).toEqual([
+      { x: 0, y: -100, width: 1024, height: 100 },
+      { x: 0, y: 1024, width: 1024, height: 100 },
+    ]);
+  });
+
   it('matches the default document canvas bounds cleanly', () => {
     const document = createDefaultProjectDocument();
     expect(canvasBox).toEqual({

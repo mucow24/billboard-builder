@@ -196,6 +196,35 @@ export function normalizeRectFromPoints(start: Point, current: Point): RenderBox
   };
 }
 
+export function intersectRenderBoxes(first: RenderBox, second: RenderBox): RenderBox | null {
+  const left = Math.max(first.x, second.x);
+  const top = Math.max(first.y, second.y);
+  const right = Math.min(first.x + first.width, second.x + second.width);
+  const bottom = Math.min(first.y + first.height, second.y + second.height);
+
+  if (right <= left || bottom <= top) {
+    return null;
+  }
+
+  return {
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+export function getCanvasConstrainedMarqueeRect(
+  pointerStart: Point,
+  currentPointer: Point,
+  canvasBounds: RenderBox
+): RenderBox | null {
+  return intersectRenderBoxes(
+    normalizeRectFromPoints(pointerStart, currentPointer),
+    canvasBounds
+  );
+}
+
 export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
   if (item.kind === 'line') {
     return {
@@ -602,9 +631,9 @@ export function resolveInteractionSession(
 
 export function buildInteractionCommit(
   resolved: InteractionSession,
-  context: { orderedItems: CanvasItem[]; pointer: Point }
+  context: { orderedItems: CanvasItem[]; pointer: Point; canvasBounds: RenderBox }
 ): InteractionCommit {
-  const { orderedItems, pointer } = context;
+  const { canvasBounds, orderedItems, pointer } = context;
 
   if (resolved.kind === 'create') {
     return {
@@ -615,10 +644,16 @@ export function buildInteractionCommit(
   }
 
   if (resolved.kind === 'marquee') {
-    const rect = normalizeRectFromPoints(resolved.pointerStart, resolved.currentPointer);
-    const hitIds = orderedItems
-      .filter((item) => !item.hidden && itemIntersectsSelectionRect(item, rect))
-      .map((item) => item.id);
+    const rect = getCanvasConstrainedMarqueeRect(
+      resolved.pointerStart,
+      resolved.currentPointer,
+      canvasBounds
+    );
+    const hitIds = rect
+      ? orderedItems
+          .filter((item) => !item.hidden && itemIntersectsSelectionRect(item, rect))
+          .map((item) => item.id)
+      : [];
     return {
       kind: 'marquee',
       hitIds,

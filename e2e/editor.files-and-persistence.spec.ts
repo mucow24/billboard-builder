@@ -57,7 +57,7 @@ test.describe('editor file and persistence flows', () => {
     await uploadProject(page, document, 'roundtrip.json');
 
     const projectDownload = await captureDownload(page, async () => {
-      await page.getByRole('button', { name: 'Save' }).click();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
     });
     const savedDocument = await readDownloadedJson(projectDownload);
 
@@ -101,7 +101,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect(savedProject.nodes).toEqual([]);
@@ -163,7 +163,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedGroupedDocument = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
 

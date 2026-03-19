@@ -711,7 +711,7 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await page.getByRole('button', { name: 'Save' }).click();
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
     }),
   );
 }

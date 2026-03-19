@@ -86,6 +86,71 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('right-edge-snap-shell.png');
   });
 
+  test('captures under-background overflow preview outside the canvas bounds', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createRectangleFixture({
+          id: 'overflow-preview-rect',
+          x: -72,
+          y: 180,
+          width: 280,
+          height: 180,
+          fill: '#f97316',
+          stroke: '#ea580cff',
+        }),
+        createRectangleFixture({
+          id: 'inside-rect',
+          x: 340,
+          y: 220,
+          width: 220,
+          height: 140,
+          fill: '#22c55e',
+          stroke: '#15803dff',
+          zIndex: 1,
+        }),
+      ]),
+      'overflow-preview.json',
+    );
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('overflow-preview-outside-canvas.png');
+  });
+
+  test('captures overflow preview with a translucent canvas background without contaminating the canvas interior', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+    const document = createProjectDocument([
+      createRectangleFixture({
+        id: 'overflow-preview-rect',
+        x: -72,
+        y: 180,
+        width: 280,
+        height: 180,
+        fill: '#eab308',
+        stroke: '#ca8a04ff',
+      }),
+      createRectangleFixture({
+        id: 'inside-rect',
+        x: 320,
+        y: 220,
+        width: 260,
+        height: 180,
+        fill: '#0ea5e9',
+        stroke: '#0369a1ff',
+        zIndex: 1,
+      }),
+    ]);
+    document.background = '#11223344';
+
+    await uploadProject(page, document, 'overflow-preview-translucent.json');
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot(
+      'overflow-preview-translucent-background.png',
+    );
+  });
+
   test('captures live single-item drag, resize, and rotate previews', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(

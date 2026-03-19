@@ -85,7 +85,7 @@ test.describe('editor shortcuts', () => {
 
     const nudgedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       })
     );
 
@@ -188,7 +188,7 @@ test.describe('editor shortcuts', () => {
 
     const nudgedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     const nudgedGroup = expectSavedGroup(nudgedProject, 'shortcut-group');
@@ -213,7 +213,7 @@ test.describe('editor shortcuts', () => {
 
     const duplicatedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     const duplicatedGroups = (duplicatedProject.nodes as SavedNode[]).filter(
@@ -289,7 +289,7 @@ test.describe('editor shortcuts', () => {
 
     let reorderedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
@@ -300,7 +300,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press(`${modifier}+ArrowDown`);
     reorderedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
@@ -311,7 +311,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press(`Shift+${modifier}+ArrowUp`);
     reorderedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
@@ -322,7 +322,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press(`Shift+${modifier}+ArrowDown`);
     reorderedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
@@ -395,7 +395,7 @@ test.describe('editor shortcuts', () => {
 
     let clipboardProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     let groupedNodes = (clipboardProject.nodes as SavedNode[]).filter((node) => node.kind === 'group');
@@ -413,7 +413,7 @@ test.describe('editor shortcuts', () => {
 
     clipboardProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     groupedNodes = (clipboardProject.nodes as SavedNode[]).filter((node) => node.kind === 'group');
@@ -440,7 +440,7 @@ test.describe('editor shortcuts', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
 
@@ -476,7 +476,7 @@ test.describe('editor shortcuts', () => {
 
     let savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect((savedProject.nodes as SavedNode[])).toHaveLength(2);
@@ -490,7 +490,7 @@ test.describe('editor shortcuts', () => {
 
     savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
     expect(savedProject.nodes).toEqual([expect.objectContaining({ kind: 'image' })]);

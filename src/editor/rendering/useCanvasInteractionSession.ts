@@ -337,7 +337,11 @@ export function useCanvasInteractionSession({
   const finishSession = useCallback((current: InteractionSession, pointer: Point) => {
     const resolved = resolveSession(current, pointer);
     onGuidesChange([]);
-    const commit = buildInteractionCommit(resolved, { orderedItems, pointer });
+    const commit = buildInteractionCommit(resolved, {
+      orderedItems,
+      pointer,
+      canvasBounds: stageBounds,
+    });
 
     switch (commit.kind) {
       case 'create':
@@ -370,7 +374,7 @@ export function useCanvasInteractionSession({
         onUpdateItem(commit.itemId, commit.changes);
         return;
     }
-  }, [onAddItem, onGuidesChange, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession]);
+  }, [onAddItem, onGuidesChange, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;

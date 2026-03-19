@@ -12,12 +12,12 @@ import type { Point, ResizeHandle } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { CanvasGuidesLayer } from './CanvasGuidesLayer';
+import { CanvasItemLayer } from './CanvasItemLayer';
+import { CanvasOverflowPreviewLayer } from './CanvasOverflowPreviewLayer';
 import { CanvasPreviewLayer } from './CanvasPreviewLayer';
-import { CanvasSurface } from './CanvasSurface';
+import { CanvasSurface, CanvasWorkspaceBackdrop } from './CanvasSurface';
 import { GroupSelectionOverlay } from './GroupSelectionOverlay';
-import { LineItemView } from './LineItemView';
 import { SELECTION_STROKE } from './renderConstants';
-import { ShapeItemView } from './ShapeItemView';
 import { SingleSelectionOverlay } from './SingleSelectionOverlay';
 
 interface CanvasSceneProps {
@@ -145,6 +145,12 @@ export function CanvasScene({
           width={document.canvas.width}
           height={document.canvas.height}
         >
+          <CanvasWorkspaceBackdrop />
+          <CanvasOverflowPreviewLayer
+            canvasHeight={document.canvas.height}
+            canvasWidth={document.canvas.width}
+            renderedItems={renderedItems}
+          />
           <CanvasSurface document={document} />
           <Group
             name="export-content"
@@ -153,38 +159,18 @@ export function CanvasScene({
             clipWidth={document.canvas.width}
             clipHeight={document.canvas.height}
           >
-            {renderedItems.map((item) =>
-              item.kind === 'line' ? (
-                <LineItemView
-                  key={item.id}
-                  activeTool={activeTool}
-                  isSelected={item.id === selectedItemId}
-                  item={item}
-                  selectableNodeId={item.selectableNodeId}
-                  onItemDoubleClick={handleItemDoubleClick}
-                  onBeginLineHandle={beginLineHandle}
-                  onItemPointerDown={handleItemPointerDown}
-                  renderSelection={false}
-                  shapeRef={(node) => registerShapeRef(item.id, node)}
-                  toCanvasPointer={toCanvasPointer}
-                />
-              ) : (
-                <ShapeItemView
-                  key={item.id}
-                  activeTool={activeTool}
-                  isSelected={item.id === selectedItemId}
-                  item={item}
-                  selectableNodeId={item.selectableNodeId}
-                  onItemDoubleClick={handleItemDoubleClick}
-                  onBeginResize={beginResize}
-                  onBeginRotate={beginRotate}
-                  onItemPointerDown={handleItemPointerDown}
-                  renderSelection={false}
-                  shapeRef={(node) => registerShapeRef(item.id, node)}
-                  toCanvasPointer={toCanvasPointer}
-                />
-              ),
-            )}
+            <CanvasItemLayer
+              activeTool={activeTool}
+              items={renderedItems}
+              onBeginLineHandle={beginLineHandle}
+              onBeginResize={beginResize}
+              onBeginRotate={beginRotate}
+              onItemDoubleClick={handleItemDoubleClick}
+              onItemPointerDown={handleItemPointerDown}
+              registerShapeRef={registerShapeRef}
+              selectedItemId={selectedItemId}
+              toCanvasPointer={toCanvasPointer}
+            />
             <CanvasPreviewLayer session={session} />
             <CanvasGuidesLayer document={document} guides={guides} />
           </Group>

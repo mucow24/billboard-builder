@@ -5,6 +5,7 @@ import {
   localToStage,
   RESIZE_HANDLE_NAMES,
 } from '../interactionGeometry';
+import { getCanvasConstrainedMarqueeRect } from '../interactionSession';
 import {
   getGroupResizeFrame,
   getRenderBox,
@@ -104,6 +105,7 @@ function getGroupOverlayFrame(params: {
 }
 
 export function buildStageDerivedState(params: {
+  canvasBounds: { x: number; y: number; width: number; height: number };
   renderedGroupBounds: { x: number; y: number; width: number; height: number } | null;
   renderedSelectedItems: CanvasItem[];
   renderedSelectionFrame: {
@@ -152,24 +154,14 @@ export function buildStageDerivedState(params: {
     params.session?.kind === 'marquee' &&
     params.session.pointerStart &&
     params.session.currentPointer
-      ? params.viewport.toViewportRect({
-          x: Math.min(
-            params.session.pointerStart.x,
-            params.session.currentPointer.x,
-          ),
-          y: Math.min(
-            params.session.pointerStart.y,
-            params.session.currentPointer.y,
-          ),
-          width: Math.max(
-            1,
-            Math.abs(params.session.currentPointer.x - params.session.pointerStart.x),
-          ),
-          height: Math.max(
-            1,
-            Math.abs(params.session.currentPointer.y - params.session.pointerStart.y),
-          ),
-        })
+      ? (() => {
+          const rect = getCanvasConstrainedMarqueeRect(
+            params.session.pointerStart,
+            params.session.currentPointer,
+            params.canvasBounds
+          );
+          return rect ? params.viewport.toViewportRect(rect) : null;
+        })()
       : null;
   const groupOverlayViewportRect = groupOverlayFrame
     ? params.viewport.toViewportRect(groupOverlayFrame.bounds)

@@ -92,7 +92,7 @@ test.describe('editor transforms', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       })
     );
 
@@ -150,7 +150,7 @@ test.describe('editor transforms', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
 
@@ -193,7 +193,7 @@ test.describe('editor transforms', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       }),
     );
 
@@ -343,7 +343,7 @@ test.describe('editor transforms', () => {
 
     const resizedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       })
     );
     const resizedItems = collectLeafNodes(resizedProject.nodes as Array<Record<string, number | string>>);
@@ -375,7 +375,7 @@ test.describe('editor transforms', () => {
 
     const finalProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save' }).click();
+        await page.getByRole('button', { name: 'Save', exact: true }).click();
       })
     );
 

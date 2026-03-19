@@ -280,6 +280,75 @@ test.describe('editor canvas entrypoints', () => {
     await expectNoActiveSelection(page);
   });
 
+  test('CS-15 keeps a fully out-of-bounds marquee from selecting overflow preview content', async ({
+    page,
+  }) => {
+    const offCanvas = createRectangleFixture({
+      id: 'outside-marquee-rect',
+      name: 'Outside Marquee Rectangle',
+      x: -220,
+      y: 140,
+      width: 120,
+      height: 120,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([offCanvas]), 'marquee-outside-canvas.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await beginCanvasDrag(page, { x: 40, y: 100 });
+    await movePointerToCanvasPoint(page, { x: -160, y: 300 });
+    await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('marquee');
+    await releasePointer(page);
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems ?? []).toHaveLength(0);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+  });
+
+  test('CS-16 limits edge-crossing marquee selection to the canvas-overlapping portion', async ({
+    page,
+  }) => {
+    const partlyVisible = createRectangleFixture({
+      id: 'edge-marquee-partial',
+      name: 'Edge Partial Rectangle',
+      x: -80,
+      y: 140,
+      width: 180,
+      height: 120,
+      zIndex: 0,
+    });
+    const fullyOutside = createRectangleFixture({
+      id: 'edge-marquee-outside',
+      name: 'Edge Outside Rectangle',
+      x: -260,
+      y: 140,
+      width: 120,
+      height: 120,
+      fill: '#0ea5e9',
+      stroke: '#0369a1ff',
+      zIndex: 1,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([partlyVisible, fullyOutside]),
+      'marquee-edge-crossing.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await beginCanvasDrag(page, { x: 120, y: 100 });
+    await movePointerToCanvasPoint(page, { x: -160, y: 300 });
+    await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('marquee');
+    await releasePointer(page);
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['edge-marquee-partial']);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+  });
+
   test('VP-01 VP-02 VP-03 VP-04 VP-06 VP-08 VP-09 VP-10 updates zoom, pan, HUD controls, and cursor through real browser entrypoints', async ({
     page,
   }) => {

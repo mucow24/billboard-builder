@@ -112,6 +112,7 @@ export function CanvasStage({
     selectedShapeHandleRects,
     showGroupInteractionHooks,
   } = buildStageDerivedState({
+    canvasBounds: { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height },
     renderedGroupBounds,
     renderedSelectedItems,
     renderedSelectionFrame,
