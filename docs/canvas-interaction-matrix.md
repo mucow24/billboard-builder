@@ -209,7 +209,16 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | PI-10 | Properties | Any item selected | Edit geometry fields | Values update | Item geometry updates | user-flow | Chromium | Covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
 | PI-11 | Properties | Any item selected | Edit shadow fields | Values update | Item shadow updates | user-flow | Chromium | Covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
 
-## 9. Keyboard Flows
+## 9. Template Library Flows
+
+| ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| TL-01 | Properties | Any node selected | Click Save as template | Template card appears in Templates | Template stored in local library | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
+| TL-02 | Templates | Saved template exists | Open Templates tab | Saved template card visible | No document mutation | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
+| TL-03 | Templates | Saved template exists | Click template card | New content appears on canvas and in Layers | Template nodes inserted and selected | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
+| TL-04 | Templates + Browser reload | Saved template exists | Reload, delete template, reload | Template persists across reload and then disappears after deletion | Local template library round-trips | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
+
+## 10. Keyboard Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -226,7 +235,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | KB-11 | Keyboard | Selection or drill-in state exists | Press Escape | Selection climbs or clears visibly | Parent selected or selection cleared | user-flow | Cross-browser subset | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts), [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | KB-12 | Keyboard | History exists | Press undo/redo shortcuts | Visible state rewinds or reapplies | History changes applied | user-flow | Cross-browser subset | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 
-## 10. Clipboard Flows
+## 11. Clipboard Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -239,7 +248,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | CB-07 | Clipboard | Image file in clipboard | Paste | New image item appears | Image inserted | user-flow | Cross-browser subset | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | CB-08 | Clipboard | Editable target focused | Copy/cut/paste | Editor does not hijack editable interaction | No editor mutation | user-flow | Chromium | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 
-## 11. File, Media, and Font Flows
+## 12. File, Media, and Font Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -253,7 +262,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | FL-08 | IndexedDB | Persisted state exists | Reload app | Visible state restores | Persisted state loaded | user-flow | Chromium | Covered in [e2e/editor.files-and-persistence.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.files-and-persistence.spec.ts) |
 | FL-09 | IndexedDB | Corrupt persisted state exists | Reload app | Safe empty state loads | Corrupt persistence cleared | user-flow | Chromium | Covered in [e2e/editor.files-and-persistence.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.files-and-persistence.spec.ts) |
 
-## 12. UI Regression Matrix
+## 13. UI Regression Matrix
 
 These are state snapshots and affordance checks, not just behavior checks.
 

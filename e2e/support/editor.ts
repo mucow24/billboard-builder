@@ -666,6 +666,10 @@ export async function openPropertiesTab(page: Page) {
   await page.getByRole('tab', { name: 'Properties' }).click();
 }
 
+export async function openTemplatesTab(page: Page) {
+  await page.getByRole('tab', { name: /Templates/ }).click();
+}
+
 export async function clickLayerRow(page: Page, name: string) {
   await page.getByRole('button', { name, exact: true }).click();
 }
@@ -954,6 +958,7 @@ export async function primePersistenceBeforeLoad(page: Page, payload: string | R
 
 export async function clearPersistence(page: Page) {
   await page.evaluate(async () => {
+    window.localStorage.removeItem('billboard-builder:templates:v1');
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase('billboard-builder');
       request.onerror = () => reject(request.error);

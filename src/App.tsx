@@ -21,6 +21,7 @@ export default function App() {
   const {
     actions: {
       deleteItem,
+      deleteTemplate,
       deleteSelectedItems,
       dispatch,
       groupSelectedNodes,
@@ -32,9 +33,11 @@ export default function App() {
       handleSave,
       redo,
       reorderSelectedItem,
+      saveSelectionAsTemplate,
       selectSingleItem,
       setActiveTool,
       setCanvasSize,
+      insertTemplate,
       toggleSelectedItem,
       toggleSelectedItems,
       undo,
@@ -58,6 +61,7 @@ export default function App() {
       selectedItems,
       selectedNode,
       selectedNodeIds,
+      templates,
     },
   } = useEditorController();
 
@@ -148,10 +152,12 @@ export default function App() {
               <PropertiesPanel
                 availableFonts={availableFonts}
                 background={document.background}
+                canSaveTemplate={selectedNodeIds.length > 0}
                 fonts={document.fonts}
                 items={document.items}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
+                onDeleteTemplate={deleteTemplate}
                 selectedGroup={selectedGroup ?? undefined}
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
@@ -166,8 +172,11 @@ export default function App() {
                   }
                   updateSelectedItem(changes);
                 }}
+                onInsertTemplate={insertTemplate}
                 onSelectNode={selectSingleItem}
                 onReorder={reorderSelectedItem}
+                onSaveTemplate={saveSelectionAsTemplate}
+                templates={templates}
               />
             </div>
           </div>

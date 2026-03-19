@@ -12,6 +12,9 @@ const {
   mockPersistenceSave,
   mockReadProjectFile,
   mockRegisterFontFile,
+  mockTemplateLibraryClear,
+  mockTemplateLibraryLoad,
+  mockTemplateLibrarySave,
 } = vi.hoisted(() => ({
   mockDownloadProject: vi.fn(),
   mockDownloadStageAsPng: vi.fn(),
@@ -22,6 +25,9 @@ const {
   mockPersistenceSave: vi.fn(),
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
+  mockTemplateLibraryClear: vi.fn(),
+  mockTemplateLibraryLoad: vi.fn(),
+  mockTemplateLibrarySave: vi.fn(),
 }));
 
 vi.mock('konva', () => ({
@@ -121,6 +127,14 @@ vi.mock('./editor/persistence/canvasPersistenceService', () => ({
   },
 }));
 
+vi.mock('./editor/persistence/templateLibraryService', () => ({
+  defaultTemplateLibraryService: {
+    clear: (...args: unknown[]) => mockTemplateLibraryClear(...args),
+    load: (...args: unknown[]) => mockTemplateLibraryLoad(...args),
+    save: (...args: unknown[]) => mockTemplateLibrarySave(...args),
+  },
+}));
+
 vi.mock('./editor/fonts', async () => {
   const actual = await vi.importActual<typeof import('./editor/fonts')>('./editor/fonts');
   return {
@@ -149,6 +163,9 @@ describe('App integration', () => {
     mockPersistenceClear.mockResolvedValue(undefined);
     mockPersistenceLoad.mockResolvedValue(null);
     mockPersistenceSave.mockResolvedValue(undefined);
+    mockTemplateLibraryClear.mockReset();
+    mockTemplateLibraryLoad.mockReturnValue([]);
+    mockTemplateLibrarySave.mockReset();
   });
 
   afterEach(() => {

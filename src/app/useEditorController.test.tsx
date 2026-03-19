@@ -5,7 +5,9 @@ import { useEditorController } from './useEditorController';
 import {
   createDefaultProjectDocument,
   createRectangleItem,
+  createTextItem,
 } from '../editor/document/documentDefaults';
+import { useEditorStore } from '../editor/state/store';
 import { resetEditorStore } from '../test/editorStore';
 
 const {
@@ -15,6 +17,7 @@ const {
   mockImportImageFile,
   mockReadProjectFile,
   mockRegisterFontFile,
+  mockTemplateLibraryService,
 } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
     load: vi.fn().mockResolvedValue(null),
@@ -26,10 +29,19 @@ const {
   mockImportImageFile: vi.fn(),
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
+  mockTemplateLibraryService: {
+    load: vi.fn(() => []),
+    save: vi.fn(),
+    clear: vi.fn(),
+  },
 }));
 
 vi.mock('../editor/persistence/canvasPersistenceService', () => ({
   defaultCanvasPersistenceService: mockCanvasPersistenceService,
+}));
+
+vi.mock('../editor/persistence/templateLibraryService', () => ({
+  defaultTemplateLibraryService: mockTemplateLibraryService,
 }));
 
 vi.mock('../editor/io/exportPng', () => ({
@@ -88,6 +100,9 @@ describe('useEditorController', () => {
     mockImportImageFile.mockReset();
     mockReadProjectFile.mockReset();
     mockRegisterFontFile.mockReset();
+    mockTemplateLibraryService.clear.mockReset();
+    mockTemplateLibraryService.load.mockReturnValue([]);
+    mockTemplateLibraryService.save.mockReset();
     resetEditorStore();
   });
 
@@ -242,5 +257,149 @@ describe('useEditorController', () => {
     expect(mockDownloadStageAsPng).toHaveBeenCalledOnce();
     expect(mockDownloadStageAsPng).toHaveBeenCalledWith(stage, 1);
     expect(mockDownloadProject).toHaveBeenCalledOnce();
+  });
+
+  it('saves a selected node as a template and inserts it with cumulative offsets', async () => {
+    const rectangle = createRectangleItem({
+      id: 'template-rectangle',
+      x: 180,
+      y: 240,
+    });
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [rectangle],
+      },
+      session: {
+        selectedNodeIds: [rectangle.id],
+      },
+    });
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    act(() => {
+      result.current.actions.saveSelectionAsTemplate();
+    });
+
+    expect(mockTemplateLibraryService.save).toHaveBeenCalledOnce();
+    expect(result.current.state.templates).toHaveLength(1);
+    expect(result.current.state.templates[0]).toMatchObject({
+      name: 'Rectangle template',
+      nodes: [expect.objectContaining({ id: rectangle.id })],
+    });
+
+    const savedTemplateId = result.current.state.templates[0]!.id;
+
+    act(() => {
+      result.current.actions.insertTemplate(savedTemplateId);
+      result.current.actions.insertTemplate(savedTemplateId);
+    });
+
+    const insertedRectangles = result.current.state.document.items.filter(
+      (item) => item.kind === 'rectangle',
+    );
+    expect(insertedRectangles).toHaveLength(3);
+    expect(insertedRectangles.map((item) => item.x)).toEqual([180, 204, 228]);
+  });
+
+  it('merges stored font references when inserting a text template into a reset document', async () => {
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        fonts: [
+          {
+            family: 'Poster Sans',
+            sourceName: 'PosterSans-Regular.ttf',
+            kind: 'uploaded',
+          },
+        ],
+        items: [
+          createRectangleItem({ id: 'placeholder' }),
+          createRectangleItem({ id: 'placeholder-2', x: 300 }),
+        ],
+      },
+    });
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    act(() => {
+      useEditorStore.getState().loadDocument({
+        ...createDefaultProjectDocument(),
+        fonts: [
+          {
+            family: 'Poster Sans',
+            sourceName: 'PosterSans-Regular.ttf',
+            kind: 'uploaded',
+          },
+        ],
+        items: [
+          createTextItem({
+            id: 'template-text',
+            fontFamily: 'Poster Sans',
+          }),
+        ],
+      });
+      useEditorStore.getState().selectSingleNode('template-text');
+    });
+
+    act(() => {
+      result.current.actions.saveSelectionAsTemplate();
+      result.current.actions.handleNewProject();
+    });
+
+    const savedTemplateId = result.current.state.templates[0]!.id;
+
+    act(() => {
+      result.current.actions.insertTemplate(savedTemplateId);
+    });
+
+    expect(result.current.state.document.fonts).toContainEqual({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      kind: 'uploaded',
+    });
+    expect(
+      result.current.state.document.items.some(
+        (item) => item.kind === 'text' && item.fontFamily === 'Poster Sans',
+      ),
+    ).toBe(true);
+  });
+
+  it('surfaces template library persistence errors', async () => {
+    const rectangle = createRectangleItem({ id: 'template-error-rectangle' });
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [rectangle],
+      },
+      session: {
+        selectedNodeIds: [rectangle.id],
+      },
+    });
+    mockTemplateLibraryService.save.mockImplementation(() => {
+      throw new Error('quota nope');
+    });
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    act(() => {
+      result.current.actions.saveSelectionAsTemplate();
+    });
+
+    expect(result.current.state.errorMessage).toBe(
+      'Failed to save template: quota nope',
+    );
   });
 });

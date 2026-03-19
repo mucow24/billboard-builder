@@ -35,6 +35,30 @@ describe('SelectionInspector', () => {
 
     expect(screen.getByText('Nothing selected')).toBeInTheDocument();
     expect(screen.getByText('1 uploaded font(s) ready in this session.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save as template' })).not.toBeInTheDocument();
+  });
+
+  it('shows save as template for non-empty selections and wires the callback', async () => {
+    const user = userEvent.setup();
+    const onSaveTemplate = vi.fn();
+    const item = createRectangleItem();
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        canSaveTemplate
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        onSaveTemplate={onSaveTemplate}
+        selectedItem={item}
+        selectedNodeCount={1}
+        selectedItems={[item]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save as template' }));
+    expect(onSaveTemplate).toHaveBeenCalledOnce();
   });
 
   it('renders multi-selection controls and marks mixed opacity values', () => {

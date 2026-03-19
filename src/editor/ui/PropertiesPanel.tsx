@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { LayersInspectorTab } from './inspector/LayersInspectorTab';
 import { SelectionInspector } from './inspector/SelectionInspector';
+import { TemplatesInspectorTab } from './inspector/TemplatesInspectorTab';
 import type { PropertiesPanelProps } from './inspector/types';
 
 export type { PropertiesPanelProps } from './inspector/types';
@@ -9,10 +10,12 @@ export type { PropertiesPanelProps } from './inspector/types';
 export function PropertiesPanel({
   availableFonts,
   background,
+  canSaveTemplate = false,
   fonts,
   items,
   layerRows,
   missingFontFamilies,
+  onDeleteTemplate = () => {},
   selectedGroup,
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
@@ -21,19 +24,23 @@ export function PropertiesPanel({
   onGroupOpacityChange,
   onDeleteItem,
   onItemChange,
+  onInsertTemplate = () => {},
   onReorder,
+  onSaveTemplate = () => {},
   onSelectNode,
+  templates = [],
 }: PropertiesPanelProps) {
-  const [activeTab, setActiveTab] = useState<'properties' | 'layers'>('properties');
+  const [activeTab, setActiveTab] = useState<'properties' | 'layers' | 'templates'>('properties');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const layersScrollRef = useRef<HTMLDivElement | null>(null);
   const propertiesScrollRef = useRef<HTMLDivElement | null>(null);
-  const scrollPositionsRef = useRef({ layers: 0, properties: 0 });
+  const templatesScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollPositionsRef = useRef({ layers: 0, properties: 0, templates: 0 });
   const isMultiSelection = selectedItems.length > 1;
 
   useEffect(() => {
     const nextTab = selectedItem || selectedGroup || isMultiSelection ? 'properties' : activeTab;
-    setActiveTab((current) => (current === 'layers' ? current : nextTab));
+    setActiveTab((current) => (current === 'layers' || current === 'templates' ? current : nextTab));
   }, [activeTab, isMultiSelection, selectedGroup, selectedItem]);
 
   useEffect(() => {
@@ -62,18 +69,25 @@ export function PropertiesPanel({
 
   useEffect(() => {
     const target =
-      activeTab === 'layers' ? layersScrollRef.current : propertiesScrollRef.current;
+      activeTab === 'layers'
+        ? layersScrollRef.current
+        : activeTab === 'templates'
+          ? templatesScrollRef.current
+          : propertiesScrollRef.current;
     if (target) {
       target.scrollTop = scrollPositionsRef.current[activeTab];
     }
   }, [activeTab]);
 
-  function handleTabChange(nextTab: 'properties' | 'layers') {
+  function handleTabChange(nextTab: 'properties' | 'layers' | 'templates') {
     scrollPositionsRef.current.layers =
       layersScrollRef.current?.scrollTop ?? scrollPositionsRef.current.layers;
     scrollPositionsRef.current.properties =
       propertiesScrollRef.current?.scrollTop ??
       scrollPositionsRef.current.properties;
+    scrollPositionsRef.current.templates =
+      templatesScrollRef.current?.scrollTop ??
+      scrollPositionsRef.current.templates;
     setActiveTab(nextTab);
   }
 
@@ -119,6 +133,16 @@ export function PropertiesPanel({
             Layers
             <span className="panel-badge">{items.length}</span>
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'templates'}
+            className={activeTab === 'templates' ? 'rail-tab active' : 'rail-tab'}
+            onClick={() => handleTabChange('templates')}
+          >
+            Templates
+            <span className="panel-badge">{templates.length}</span>
+          </button>
         </div>
 
         {activeTab === 'layers' ? (
@@ -141,6 +165,18 @@ export function PropertiesPanel({
               selectedNodeIds={selectedNodeIds}
             />
           </div>
+        ) : activeTab === 'templates' ? (
+          <div
+            ref={templatesScrollRef}
+            className="rail-tab-body rail-tab-body-templates"
+            data-testid="templates-tab-body"
+          >
+            <TemplatesInspectorTab
+              onDeleteTemplate={onDeleteTemplate}
+              onInsertTemplate={onInsertTemplate}
+              templates={templates}
+            />
+          </div>
         ) : (
           <div
             ref={propertiesScrollRef}
@@ -149,9 +185,11 @@ export function PropertiesPanel({
           >
             <SelectionInspector
               availableFonts={availableFonts}
+              canSaveTemplate={canSaveTemplate}
               fonts={fonts}
               onGroupOpacityChange={onGroupOpacityChange}
               onItemChange={onItemChange}
+              onSaveTemplate={onSaveTemplate}
               selectedGroup={selectedGroup}
               selectedItem={selectedItem}
               selectedNodeCount={selectedNodeIds.length}

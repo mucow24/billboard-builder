@@ -39,6 +39,10 @@ describe('PropertiesPanel', () => {
     await user.click(screen.getByRole('tab', { name: /Layers/i }));
     expect(screen.getByTestId('layers-tab-body')).toHaveClass('rail-tab-body');
     expect(screen.getByRole('button', { name: 'Canvas background' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /Templates/i }));
+    expect(screen.getByTestId('templates-tab-body')).toHaveClass('rail-tab-body');
+    expect(screen.getByText('No templates yet')).toBeInTheDocument();
   });
 
   it('routes a layer double-click back to the properties tab', async () => {
@@ -198,10 +202,87 @@ describe('PropertiesPanel', () => {
       value: 84,
     });
 
+    await user.click(screen.getByRole('tab', { name: /Templates/i }));
+
+    const templatesBody = screen.getByTestId('templates-tab-body');
+    Object.defineProperty(templatesBody, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 32,
+    });
+
     await user.click(screen.getByRole('tab', { name: /Properties/i }));
     expect(screen.getByTestId('properties-tab-body').scrollTop).toBe(140);
 
     await user.click(screen.getByRole('tab', { name: /Layers/i }));
     expect(screen.getByTestId('layers-tab-body').scrollTop).toBe(84);
+
+    await user.click(screen.getByRole('tab', { name: /Templates/i }));
+    expect(screen.getByTestId('templates-tab-body').scrollTop).toBe(32);
+  });
+
+  it('keeps the templates tab active after template insertion-style rerenders', async () => {
+    const user = userEvent.setup();
+    const item = createTextItem({ zIndex: 1 });
+    const template = {
+      id: 'template-1',
+      name: 'Text template',
+      nodes: [item],
+      fonts: [],
+      createdAt: '2026-03-19T12:00:00.000Z',
+      updatedAt: '2026-03-19T12:00:00.000Z',
+    };
+    const { rerender } = render(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+        missingFontFamilies={[]}
+        selectedItem={item}
+        selectedNodeIds={[item.id]}
+        templates={[template]}
+        onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={vi.fn()}
+        onInsertTemplate={vi.fn()}
+        onSelectNode={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('tab', { name: /Templates/i }));
+    expect(screen.getByRole('tab', { name: /Templates/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    rerender(
+      <PropertiesPanel
+        availableFonts={[]}
+        background="#ffffff00"
+        fonts={[]}
+        items={[item, createRectangleItem({ id: 'new-rectangle', x: 220 })]}
+        layerRows={flattenLayerRows([item])}
+        missingFontFamilies={[]}
+        selectedItem={item}
+        selectedNodeIds={[item.id]}
+        templates={[template]}
+        onBackgroundChange={vi.fn()}
+        onGroupOpacityChange={vi.fn()}
+        onDeleteItem={vi.fn()}
+        onItemChange={vi.fn()}
+        onInsertTemplate={vi.fn()}
+        onSelectNode={vi.fn()}
+        onReorder={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('tab', { name: /Templates/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 });

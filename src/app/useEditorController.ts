@@ -1,13 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
+import {
+  buildDefaultTemplateName,
+  instantiateTemplateNodes,
+  uniquifyTemplateName,
+} from './templateLibrary';
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
+import { buildTemplateSelectionPayload } from '../editor/document/templateLibrary';
 import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
+import { defaultTemplateLibraryService, type StoredTemplate } from '../editor/persistence/templateLibraryService';
 import {
   selectCanRedo,
   selectCanUndo,
@@ -34,6 +41,8 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<StoredTemplate[]>([]);
+  const templateInsertCountsRef = useRef<Record<string, number>>({});
 
   const {
     editor,
@@ -86,6 +95,16 @@ export function useEditorController() {
     loadDocument,
     registerAvailableFont,
   });
+
+  useEffect(() => {
+    try {
+      setTemplates(defaultTemplateLibraryService.load());
+    } catch (error) {
+      setErrorMessage(
+        `Failed to load template library: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }, []);
 
   useEffect(() => {
     setMissingFontFamilies(findMissingFonts(document.fonts, availableFonts));
@@ -186,10 +205,93 @@ export function useEditorController() {
     downloadProject(document);
   }
 
+  function persistTemplates(nextTemplates: StoredTemplate[]) {
+    defaultTemplateLibraryService.save(nextTemplates);
+    setTemplates(nextTemplates);
+  }
+
+  function saveSelectionAsTemplate() {
+    const payload = buildTemplateSelectionPayload(document, selectedNodeIds);
+    if (payload.nodes.length === 0) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const name = uniquifyTemplateName(
+      buildDefaultTemplateName(payload.nodes),
+      templates,
+    );
+    const nextTemplate: StoredTemplate = {
+      id: crypto.randomUUID(),
+      name,
+      nodes: payload.nodes,
+      fonts: payload.fonts,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      persistTemplates([...templates, nextTemplate]);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        `Failed to save template: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }
+
+  function insertTemplate(templateId: string) {
+    const template = templates.find((entry) => entry.id === templateId);
+    if (!template) {
+      return;
+    }
+
+    const nextInsertCount = (templateInsertCountsRef.current[templateId] ?? 0) + 1;
+    templateInsertCountsRef.current[templateId] = nextInsertCount;
+    const insertedNodes = instantiateTemplateNodes(template.nodes, nextInsertCount);
+
+    applyTransaction([
+      ...template.fonts.map((font) => ({
+        family: 'document' as const,
+        command: { type: 'register_font' as const, font },
+      })),
+      {
+        family: 'document' as const,
+        command: { type: 'insert_nodes' as const, nodes: insertedNodes },
+      },
+      {
+        family: 'selection' as const,
+        command: {
+          type: 'select_nodes' as const,
+          nodeIds: insertedNodes.map((node) => node.id),
+        },
+      },
+    ]);
+    setErrorMessage(null);
+  }
+
+  function deleteTemplate(templateId: string) {
+    const nextTemplates = templates.filter((template) => template.id !== templateId);
+    if (nextTemplates.length === templates.length) {
+      return;
+    }
+
+    try {
+      persistTemplates(nextTemplates);
+      delete templateInsertCountsRef.current[templateId];
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        `Failed to delete template: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }
+
   return {
     actions: {
       applyTransaction,
       deleteItem: deleteNode,
+      deleteTemplate,
       deleteNode,
       deleteSelectedItems: deleteSelectedNodes,
       deleteSelectedNodes,
@@ -208,6 +310,7 @@ export function useEditorController() {
       redo,
       reorderSelectedItem: reorderSelectedNode,
       reorderSelectedNode,
+      saveSelectionAsTemplate,
       selectAllItems: selectAllNodes,
       selectParentNode,
       selectAllNodes,
@@ -215,6 +318,7 @@ export function useEditorController() {
       selectSingleNode,
       setActiveTool,
       setCanvasSize,
+      insertTemplate,
       toggleSelectedItem: toggleSelectedNode,
       toggleSelectedNode,
       toggleSelectedItems: toggleSelectedNodes,
@@ -241,6 +345,7 @@ export function useEditorController() {
       selectedNode,
       selectedNodeIds,
       selectedNodes,
+      templates,
     },
   };
 }

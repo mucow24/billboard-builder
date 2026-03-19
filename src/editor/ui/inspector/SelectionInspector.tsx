@@ -21,9 +21,11 @@ import { NumberInput, SectionBlock } from './inspectorControls';
 
 export function SelectionInspector({
   availableFonts,
+  canSaveTemplate = false,
   fonts,
   onGroupOpacityChange,
   onItemChange,
+  onSaveTemplate = () => {},
   selectedGroup,
   selectedItem,
   selectedNodeCount,
@@ -39,9 +41,22 @@ export function SelectionInspector({
     availableFonts,
   );
 
+  const templateSaveAction = canSaveTemplate ? (
+    <div className="panel-action-row">
+      <button
+        type="button"
+        className="panel-action-button"
+        onClick={onSaveTemplate}
+      >
+        Save as template
+      </button>
+    </div>
+  ) : null;
+
   if (selectedGroup && !isMultiNodeSelection) {
     return (
       <>
+        {templateSaveAction}
         <SectionBlock title="Group">
           <NumberInput
             label="Group Opacity"
@@ -61,6 +76,7 @@ export function SelectionInspector({
   if (isMultiNodeSelection || selectionSummary.isMultiSelection) {
     return (
       <>
+        {templateSaveAction}
         <MultiSelectionSection
           allSelectedOpacityEqual={selectionSummary.allSelectedOpacityEqual}
           onItemChange={onItemChange}
@@ -87,6 +103,7 @@ export function SelectionInspector({
 
   return (
     <>
+      {templateSaveAction}
       <SelectionHeading item={selectedItem} />
 
       {'fill' in selectedItem || 'stroke' in selectedItem ? (

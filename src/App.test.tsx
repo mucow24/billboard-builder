@@ -14,13 +14,22 @@ import {
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
 
-const { mockCanvasPersistenceService, mockImportImageFile } = vi.hoisted(() => ({
+const {
+  mockCanvasPersistenceService,
+  mockImportImageFile,
+  mockTemplateLibraryService,
+} = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
     load: vi.fn().mockResolvedValue(null),
     save: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn().mockResolvedValue(undefined),
   },
   mockImportImageFile: vi.fn(),
+  mockTemplateLibraryService: {
+    load: vi.fn(() => []),
+    save: vi.fn(),
+    clear: vi.fn(),
+  },
 }));
 
 vi.mock('./editor/fonts', async () => {
@@ -37,6 +46,10 @@ vi.mock('./editor/fonts', async () => {
 
 vi.mock('./editor/persistence/canvasPersistenceService', () => ({
   defaultCanvasPersistenceService: mockCanvasPersistenceService,
+}));
+
+vi.mock('./editor/persistence/templateLibraryService', () => ({
+  defaultTemplateLibraryService: mockTemplateLibraryService,
 }));
 
 vi.mock('./editor/io/images', async () => {
@@ -109,6 +122,9 @@ describe('App shell', () => {
     mockCanvasPersistenceService.save.mockResolvedValue(undefined);
     mockCanvasPersistenceService.clear.mockResolvedValue(undefined);
     mockImportImageFile.mockReset();
+    mockTemplateLibraryService.clear.mockReset();
+    mockTemplateLibraryService.load.mockReturnValue([]);
+    mockTemplateLibraryService.save.mockReset();
     resetEditorStore();
   });
 
