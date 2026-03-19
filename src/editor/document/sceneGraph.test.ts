@@ -41,9 +41,10 @@ describe('scene graph helpers', () => {
     });
   });
 
-  it('builds layer rows with ancestor metadata and selectable child rows', () => {
-    const child = createRectangleItem({ id: 'child-1' });
-    const group = createGroupNode([child]);
+  it('builds layer rows in front-to-back display order with ancestor metadata', () => {
+    const backChild = createRectangleItem({ id: 'child-back', zIndex: 0 });
+    const frontChild = createTextItem({ id: 'child-front', zIndex: 1 });
+    const group = createGroupNode([backChild, frontChild]);
     group.id = 'group-1';
 
     expect(flattenLayerRows([group])).toEqual([
@@ -52,13 +53,21 @@ describe('scene graph helpers', () => {
         isSelectable: true,
         selectableNodeId: 'group-1',
         ancestorGroupIds: [],
-        childCount: 1,
+        childCount: 2,
         hasChildren: true,
       }),
       expect.objectContaining({
         depth: 1,
         isSelectable: true,
-        selectableNodeId: 'child-1',
+        selectableNodeId: 'child-front',
+        ancestorGroupIds: ['group-1'],
+        childCount: 0,
+        hasChildren: false,
+      }),
+      expect.objectContaining({
+        depth: 1,
+        isSelectable: true,
+        selectableNodeId: 'child-back',
         ancestorGroupIds: ['group-1'],
         childCount: 0,
         hasChildren: false,

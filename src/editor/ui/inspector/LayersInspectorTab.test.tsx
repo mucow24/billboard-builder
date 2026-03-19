@@ -23,7 +23,7 @@ describe('LayersInspectorTab', () => {
       <LayersInspectorTab
         background="#ffffff00"
         canReorder
-        rows={flattenLayerRows([frontItem, backItem])}
+        rows={flattenLayerRows([backItem, frontItem])}
         onBackgroundChange={vi.fn()}
         onDeleteItem={onDeleteItem}
         onOpenProperties={vi.fn()}

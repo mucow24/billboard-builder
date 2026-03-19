@@ -143,7 +143,8 @@ export function flattenLayerRows(
 ): LayerRow[] {
   const rows: LayerRow[] = [];
 
-  for (const node of nodes) {
+  // Layers UI shows the top-most sibling first, even though document order is back-to-front.
+  for (const node of nodes.slice().reverse()) {
     rows.push({
       ancestorGroupIds,
       childCount: isGroupNode(node) ? collectLeafItems(node).length : 0,

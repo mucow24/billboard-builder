@@ -19,6 +19,33 @@ import {
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
 
 test.describe('editor group layers and inspector flows', () => {
+  test('renders top-level layers from front to back in the Layers tab', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createGroupNodeFixture([], {
+        id: 'layers-order-back',
+        name: 'Back Layer',
+      }),
+      createGroupNodeFixture([], {
+        id: 'layers-order-middle',
+        name: 'Middle Layer',
+      }),
+      createGroupNodeFixture([], {
+        id: 'layers-order-front',
+        name: 'Front Layer',
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'layers-front-to-back.json');
+
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row-select strong')).toHaveText([
+      'Front Layer',
+      'Middle Layer',
+      'Back Layer',
+    ]);
+  });
+
   test('selects a top-level item from Layers and surfaces its Properties state', async ({ page }) => {
     const document = createGroupedProjectDocument([
       createRectangleFixture({
