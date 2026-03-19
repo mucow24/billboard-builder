@@ -4,6 +4,8 @@ import path from 'node:path';
 
 import { expect, type Download, type Locator, type Page } from '@playwright/test';
 
+export const APP_CLIPBOARD_MIME_TYPE = 'application/x-billboard-builder-selection+json';
+
 export interface CanvasPoint {
   x: number;
   y: number;
@@ -126,6 +128,11 @@ export interface RenderSnapshot {
   hasGroupOverlay?: boolean;
   hasShapeHandles?: boolean;
   hasLineHandles?: boolean;
+}
+
+export interface BrowserClipboardEventResult {
+  defaultPrevented: boolean;
+  payload: Record<string, string>;
 }
 
 interface CanvasFixtureBase {
@@ -619,6 +626,47 @@ export async function saveAndReadProject(page: Page) {
       await page.getByRole('button', { name: 'Save' }).click();
     }),
   );
+}
+
+async function dispatchBrowserClipboardEvent(
+  page: Page,
+  type: 'copy' | 'cut' | 'paste',
+  payload: Record<string, string> = {}
+): Promise<BrowserClipboardEventResult> {
+  return page.evaluate(({ nextType, nextPayload }) => {
+    const dataTransfer = new DataTransfer();
+    for (const [mimeType, value] of Object.entries(nextPayload)) {
+      dataTransfer.setData(mimeType, value);
+    }
+
+    const event = new ClipboardEvent(nextType, {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+    document.dispatchEvent(event);
+
+    const serializedPayload = Object.fromEntries(
+      Array.from(dataTransfer.types, (mimeType) => [mimeType, dataTransfer.getData(mimeType)])
+    );
+
+    return {
+      defaultPrevented: event.defaultPrevented,
+      payload: serializedPayload,
+    };
+  }, { nextType: type, nextPayload: payload });
+}
+
+export async function copySelectionToClipboardPayload(page: Page) {
+  return dispatchBrowserClipboardEvent(page, 'copy');
+}
+
+export async function cutSelectionToClipboardPayload(page: Page) {
+  return dispatchBrowserClipboardEvent(page, 'cut');
+}
+
+export async function pasteClipboardPayload(page: Page, payload: Record<string, string>) {
+  return dispatchBrowserClipboardEvent(page, 'paste', payload);
 }
 
 async function materializeDownload(download: Download) {
