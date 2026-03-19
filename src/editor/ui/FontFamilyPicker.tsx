@@ -18,6 +18,11 @@ function getFontPreviewFamily(family: string) {
   return `${JSON.stringify(family)}, "Trebuchet MS", sans-serif`;
 }
 
+function getSelectedFontIndex(fonts: readonly FontOption[], value: string) {
+  const selectedIndex = fonts.findIndex((font) => font.family === value);
+  return selectedIndex >= 0 ? selectedIndex : 0;
+}
+
 export function FontFamilyPicker({
   fonts,
   labelId,
@@ -30,19 +35,14 @@ export function FontFamilyPicker({
   const optionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const listboxId = useId();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(() => {
-    const selectedIndex = fonts.findIndex((font) => font.family === value);
-    return selectedIndex >= 0 ? selectedIndex : 0;
-  });
-
-  const selectedIndex = Math.max(
-    0,
-    fonts.findIndex((font) => font.family === value)
+  const [activeIndex, setActiveIndex] = useState(() =>
+    getSelectedFontIndex(fonts, value),
   );
 
+  const selectedIndex = getSelectedFontIndex(fonts, value);
+
   useEffect(() => {
-    const nextSelectedIndex = fonts.findIndex((font) => font.family === value);
-    setActiveIndex(nextSelectedIndex >= 0 ? nextSelectedIndex : 0);
+    setActiveIndex(getSelectedFontIndex(fonts, value));
   }, [fonts, value]);
 
   useEffect(() => {
@@ -96,6 +96,20 @@ export function FontFamilyPicker({
     }
     onChange(selectedFont.family);
     closePicker(true);
+  }
+
+  function cycleSelection(step: -1 | 1) {
+    if (fonts.length === 0) {
+      return;
+    }
+
+    const nextIndex = (selectedIndex + step + fonts.length) % fonts.length;
+    const nextFont = fonts[nextIndex];
+    if (!nextFont) {
+      return;
+    }
+
+    onChange(nextFont.family);
   }
 
   function handleTriggerClick() {
@@ -162,6 +176,14 @@ export function FontFamilyPicker({
       data-editor-interactive="true"
     >
       <button
+        aria-label="Previous font"
+        className="font-family-picker-cycle-button"
+        type="button"
+        onClick={() => cycleSelection(-1)}
+      >
+        ↑
+      </button>
+      <button
         ref={triggerRef}
         aria-controls={listboxId}
         aria-expanded={isOpen}
@@ -181,6 +203,14 @@ export function FontFamilyPicker({
         <span className="font-family-picker-trigger-text">
           {value}
         </span>
+      </button>
+      <button
+        aria-label="Next font"
+        className="font-family-picker-cycle-button"
+        type="button"
+        onClick={() => cycleSelection(1)}
+      >
+        ↓
       </button>
 
       {isOpen ? (
@@ -218,6 +248,7 @@ export function FontFamilyPicker({
                   role="option"
                   style={{
                     fontFamily: getFontPreviewFamily(font.family),
+                    fontSize: '1.3em',
                     fontStyle: 'normal',
                     fontWeight: '400',
                   }}

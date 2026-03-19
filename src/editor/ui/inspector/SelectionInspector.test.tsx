@@ -122,6 +122,45 @@ describe('SelectionInspector', () => {
     expect(onItemChange).toHaveBeenCalledWith({ verticalAlign: 'middle' });
   });
 
+  it('cycles fonts from the text inspector using sorted wraparound controls', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const textItem = createTextItem({
+      fontFamily: 'Verdana',
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[
+          {
+            family: 'Zulu Display',
+            sourceName: 'ZuluDisplay.ttf',
+            weight: '400',
+            style: 'normal',
+            kind: 'uploaded',
+          },
+          {
+            family: 'Alpha Sans',
+            sourceName: 'AlphaSans.ttf',
+            weight: '400',
+            style: 'normal',
+            kind: 'uploaded',
+          },
+        ]}
+        fonts={[]}
+        onItemChange={onItemChange}
+        selectedItem={textItem}
+        selectedItems={[textItem]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next font' }));
+    await user.click(screen.getByRole('button', { name: 'Previous font' }));
+
+    expect(onItemChange).toHaveBeenNthCalledWith(1, { fontFamily: 'Zulu Display' });
+    expect(onItemChange).toHaveBeenNthCalledWith(2, { fontFamily: 'Trebuchet MS' });
+  });
+
   it('renders line and image controls, clamps ranges, and keeps image opacity out of geometry', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();

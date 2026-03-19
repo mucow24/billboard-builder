@@ -41,12 +41,19 @@ describe('inspectorModel', () => {
     expect(getGeometrySummary(line)).toBe('X1 1.2 · Y1 5.7 · X2 9.9 · Y2 4.3');
   });
 
-  it('deduplicates system, session, and document fonts by family and kind', () => {
+  it('deduplicates system, session, and document fonts by family and kind, then sorts by family', () => {
     const options = buildFontOptions(
       [
         {
-          family: 'Session Sans',
-          sourceName: 'SessionSans.ttf',
+          family: 'Zulu Display',
+          sourceName: 'ZuluDisplay.ttf',
+          weight: '400',
+          style: 'normal',
+          kind: 'uploaded',
+        },
+        {
+          family: 'Alpha Sans',
+          sourceName: 'AlphaSans.ttf',
           weight: '400',
           style: 'normal',
           kind: 'uploaded',
@@ -54,8 +61,8 @@ describe('inspectorModel', () => {
       ],
       [
         {
-          family: 'Session Sans',
-          sourceName: 'SessionSans.ttf',
+          family: 'Zulu Display',
+          sourceName: 'ZuluDisplay.ttf',
           kind: 'uploaded',
         },
         {
@@ -66,8 +73,20 @@ describe('inspectorModel', () => {
       ],
     );
 
-    expect(options.filter((font) => font.family === 'Session Sans')).toHaveLength(1);
+    expect(options.filter((font) => font.family === 'Zulu Display')).toHaveLength(1);
     expect(options.some((font) => font.family === 'Arial')).toBe(true);
+    expect(options.map((font) => font.family)).toEqual([
+      'Alpha Sans',
+      'Arial',
+      'Georgia',
+      'Helvetica',
+      'Impact',
+      'Tahoma',
+      'Times New Roman',
+      'Trebuchet MS',
+      'Verdana',
+      'Zulu Display',
+    ]);
   });
 
   it('computes text style capability rules for system and uploaded fonts', () => {

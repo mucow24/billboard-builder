@@ -125,4 +125,62 @@ describe('FontFamilyPicker', () => {
     const listbox = screen.getByRole('listbox', { name: 'Font family' });
     expect(listbox.getAttribute('aria-activedescendant')).toContain('option-0');
   });
+
+  it('renders previous and next controls that cycle with wraparound', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    renderFontFamilyPicker(onChange, 'Georgia');
+
+    await user.click(screen.getByRole('button', { name: 'Previous font' }));
+    await user.click(screen.getByRole('button', { name: 'Next font' }));
+
+    expect(onChange).toHaveBeenNthCalledWith(1, 'Arial');
+    expect(onChange).toHaveBeenNthCalledWith(2, 'Verdana');
+  });
+
+  it('wraps the cycling controls and falls back to the first option when the current value is missing', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <div>
+        <span id="font-family-label">Font family</span>
+        <FontFamilyPicker
+          fonts={FONT_OPTIONS}
+          labelId="font-family-label"
+          onChange={onChange}
+          value="Arial"
+        />
+      </div>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Previous font' }));
+    expect(onChange).toHaveBeenLastCalledWith('Verdana');
+
+    rerender(
+      <div>
+        <span id="font-family-label">Font family</span>
+        <FontFamilyPicker
+          fonts={FONT_OPTIONS}
+          labelId="font-family-label"
+          onChange={onChange}
+          value="Missing Family"
+        />
+      </div>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next font' }));
+    expect(onChange).toHaveBeenLastCalledWith('Georgia');
+  });
+
+  it('renders open-menu previews with a larger font size', async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderFontFamilyPicker();
+
+    await user.click(trigger);
+
+    expect(screen.getByRole('option', { name: 'Georgia' })).toHaveStyle({
+      fontSize: '1.3em',
+    });
+  });
 });

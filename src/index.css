@@ -635,6 +635,24 @@ button {
 
 .font-family-picker {
   position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.3rem;
+  align-items: stretch;
+}
+
+.font-family-picker-cycle-button {
+  min-width: 2rem;
+  padding: 0.36rem 0.4rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  background: rgba(12, 18, 32, 0.84);
+  color: #f8fbff;
+  cursor: pointer;
+}
+
+.font-family-picker-cycle-button:hover {
+  background: rgba(30, 41, 59, 0.95);
 }
 
 .font-family-picker-trigger {
@@ -687,6 +705,7 @@ button {
 
 .font-family-picker-option-text {
   display: block;
+  font-size: 1.3em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -48,6 +48,10 @@ export function buildFontOptions(
       list.findIndex(
         (entry) => entry.family === font.family && entry.kind === font.kind,
       ) === index,
+  ).sort((left, right) =>
+    left.family.localeCompare(right.family, undefined, {
+      sensitivity: 'base',
+    }),
   );
 }
 
