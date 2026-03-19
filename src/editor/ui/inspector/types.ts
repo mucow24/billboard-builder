@@ -47,5 +47,6 @@ export interface SelectionInspectorProps {
   onItemChange: (changes: Partial<CanvasItem>) => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
+  selectedNodeCount: number;
   selectedItems: CanvasItem[];
 }

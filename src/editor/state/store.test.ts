@@ -362,6 +362,145 @@ describe('editor store history', () => {
     expect(getEditorState().session.selectedNodeIds).toEqual([group.id]);
   });
 
+  it('groups sibling nodes and ungroups them again through the store helpers', () => {
+    const firstItem = createRectangleItem({ id: 'first' });
+    const secondItem = createTextItem({ id: 'second' });
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [firstItem, secondItem],
+        items: [firstItem, secondItem],
+      },
+      session: {
+        selectedNodeIds: [firstItem.id, secondItem.id],
+      },
+    });
+
+    useEditorStore.getState().groupSelectedNodes();
+
+    const groupedNode = getEditorState().document.nodes[0];
+    expect(groupedNode?.kind).toBe('group');
+    expect(getEditorState().session.selectedNodeIds).toEqual([groupedNode!.id]);
+
+    useEditorStore.getState().ungroupSelectedNode();
+
+    expect(getEditorState().document.nodes.map((node) => node.id)).toEqual([
+      firstItem.id,
+      secondItem.id,
+    ]);
+    expect(getEditorState().session.selectedNodeIds).toEqual([
+      firstItem.id,
+      secondItem.id,
+    ]);
+  });
+
+  it('duplicates selected recursive groups and selects the cloned subtree root', () => {
+    const child = createRectangleItem({ id: 'child', x: 32, y: 44 });
+    const group = createGroupNode([child], 'Poster Group');
+    group.id = 'group-1';
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [group],
+        items: [child],
+      },
+      session: {
+        selectedNodeIds: [group.id],
+      },
+    });
+
+    useEditorStore.getState().duplicateSelectedNodes();
+
+    expect(getEditorState().document.nodes).toHaveLength(2);
+    const clonedGroup = getEditorState().document.nodes[1];
+    expect(clonedGroup?.kind).toBe('group');
+    expect(clonedGroup?.id).not.toBe(group.id);
+    if (!clonedGroup || clonedGroup.kind !== 'group') {
+      throw new Error('Expected duplicated group.');
+    }
+    expect(clonedGroup.children).toHaveLength(1);
+    expect(clonedGroup.children[0]?.id).not.toBe(child.id);
+    expect(getEditorState().session.selectedNodeIds).toEqual([clonedGroup.id]);
+  });
+
+  it('nudges selected group descendants while leaving locked items in place', () => {
+    const movable = createRectangleItem({ id: 'movable', x: 20, y: 30 });
+    const locked = createRectangleItem({ id: 'locked', x: 80, y: 90, locked: true });
+    const line = createLineItem({
+      id: 'line',
+      x: 10,
+      y: 15,
+      startX: 10,
+      startY: 15,
+      endX: 110,
+      endY: 45,
+    });
+    const group = createGroupNode([movable, locked, line], 'Nudge Group');
+    group.id = 'group-1';
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [group],
+        items: [movable, locked, line],
+      },
+      session: {
+        selectedNodeIds: [group.id],
+      },
+    });
+
+    useEditorStore.getState().nudgeSelectedNodes(5, -3);
+
+    const nextItems = getEditorState().document.items;
+    expect(nextItems.find((item) => item.id === movable.id)).toMatchObject({
+      x: 25,
+      y: 27,
+    });
+    expect(nextItems.find((item) => item.id === locked.id)).toMatchObject({
+      x: 80,
+      y: 90,
+    });
+    expect(nextItems.find((item) => item.id === line.id)).toMatchObject({
+      startX: 15,
+      startY: 12,
+      endX: 115,
+      endY: 42,
+    });
+  });
+
+  it('treats parent selection and structural convenience helpers as no-ops when invalid', () => {
+    const firstChild = createRectangleItem({ id: 'first-child' });
+    const secondChild = createRectangleItem({ id: 'second-child' });
+    const firstGroup = createGroupNode([firstChild], 'First');
+    firstGroup.id = 'first-group';
+    const secondGroup = createGroupNode([secondChild], 'Second');
+    secondGroup.id = 'second-group';
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [firstGroup, secondGroup],
+        items: [firstChild, secondChild],
+      },
+      session: {
+        selectedNodeIds: [],
+      },
+    });
+
+    expect(useEditorStore.getState().selectParentNode()).toBe(false);
+
+    useEditorStore.getState().duplicateSelectedNodes();
+    useEditorStore.getState().reorderSelectedNode('front');
+    useEditorStore.getState().ungroupSelectedNode();
+
+    expect(getEditorState().document.nodes.map((node) => node.id)).toEqual([
+      firstGroup.id,
+      secondGroup.id,
+    ]);
+  });
+
   it('deletes a specific item by id while preserving unrelated selection and undo history', () => {
     const firstItem = createRectangleItem({ zIndex: 0 });
     const secondItem = createTextItem({ zIndex: 1 });

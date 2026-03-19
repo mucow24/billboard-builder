@@ -146,6 +146,7 @@ export function PropertiesPanel({
               onItemChange={onItemChange}
               selectedGroup={selectedGroup}
               selectedItem={selectedItem}
+              selectedNodeCount={selectedNodeIds.length}
               selectedItems={selectedItems}
             />
           </div>

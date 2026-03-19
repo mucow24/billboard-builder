@@ -26,9 +26,11 @@ export function SelectionInspector({
   onItemChange,
   selectedGroup,
   selectedItem,
+  selectedNodeCount,
   selectedItems,
 }: SelectionInspectorProps) {
   const selectionSummary = getSelectionSummary(selectedItems);
+  const isMultiNodeSelection = selectedNodeCount > 1;
   const selectedTextItem =
     selectedItem?.kind === 'text' ? (selectedItem as TextCanvasItem) : undefined;
   const fontOptions = buildFontOptions(availableFonts, fonts);
@@ -37,20 +39,7 @@ export function SelectionInspector({
     availableFonts,
   );
 
-  if (selectionSummary.isMultiSelection) {
-    return (
-      <div className="rail-tab-body rail-tab-body-properties">
-        <MultiSelectionSection
-          allSelectedOpacityEqual={selectionSummary.allSelectedOpacityEqual}
-          onItemChange={onItemChange}
-          opacityValue={selectionSummary.opacityValue}
-          selectedCount={selectedItems.length}
-        />
-      </div>
-    );
-  }
-
-  if (selectedGroup) {
+  if (selectedGroup && !isMultiNodeSelection) {
     return (
       <div className="rail-tab-body rail-tab-body-properties">
         <SectionBlock title="Group">
@@ -65,6 +54,19 @@ export function SelectionInspector({
             onChange={onGroupOpacityChange}
           />
         </SectionBlock>
+      </div>
+    );
+  }
+
+  if (isMultiNodeSelection || selectionSummary.isMultiSelection) {
+    return (
+      <div className="rail-tab-body rail-tab-body-properties">
+        <MultiSelectionSection
+          allSelectedOpacityEqual={selectionSummary.allSelectedOpacityEqual}
+          onItemChange={onItemChange}
+          opacityValue={selectionSummary.opacityValue}
+          selectedCount={selectedItems.length}
+        />
       </div>
     );
   }

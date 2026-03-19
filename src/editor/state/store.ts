@@ -237,8 +237,11 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         get().editor.session.selectedNodeIds,
         get().editor.document.nodes
       );
+      if (selectedIds.length === 0) {
+        return;
+      }
       const parentInfo = getSelectionParentInfo(get().editor.document.nodes, selectedIds);
-      if (!parentInfo || selectedIds.length === 0) {
+      if (!parentInfo) {
         return;
       }
       const sortedEntries = parentInfo.entries.slice().sort((left, right) => left.index - right.index);

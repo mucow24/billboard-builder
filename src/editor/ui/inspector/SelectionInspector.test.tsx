@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  createGroupNode,
   createImageItem,
   createLineItem,
   createRectangleItem,
@@ -27,6 +28,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={vi.fn()}
+        selectedNodeCount={0}
         selectedItems={[]}
       />,
     );
@@ -46,6 +48,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={2}
         selectedItems={[first, second]}
       />,
     );
@@ -101,6 +104,7 @@ describe('SelectionInspector', () => {
         ]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={textItem}
         selectedItems={[textItem]}
       />,
@@ -153,6 +157,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={textItem}
         selectedItems={[textItem]}
       />,
@@ -193,6 +198,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={lineItem}
         selectedItems={[lineItem]}
       />,
@@ -220,6 +226,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={imageItem}
         selectedItems={[imageItem]}
       />,
@@ -256,6 +263,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={imageItem}
         selectedItems={[imageItem]}
       />,
@@ -289,6 +297,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={lineItem}
         selectedItems={[lineItem]}
       />,
@@ -306,6 +315,7 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
+        selectedNodeCount={1}
         selectedItem={textItem}
         selectedItems={[textItem]}
       />,
@@ -325,5 +335,47 @@ describe('SelectionInspector', () => {
     expect(onItemChange).toHaveBeenCalledWith({
       padding: { top: 0, right: 0, bottom: 0, left: 24 },
     });
+  });
+
+  it('shows group controls for a single selected group even when it contains multiple items', () => {
+    const first = createRectangleItem();
+    const second = createRectangleItem();
+    const group = createGroupNode([first, second], 'Hero Group');
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedGroup={group}
+        selectedNodeCount={1}
+        selectedItems={[first, second]}
+      />,
+    );
+
+    expect(screen.getByLabelText('Group Opacity')).toBeInTheDocument();
+    expect(screen.queryByText('2 items selected')).not.toBeInTheDocument();
+  });
+
+  it('keeps multi-selection controls when multiple nodes are selected, even if the primary node is a group', () => {
+    const first = createRectangleItem({ opacity: 0.5 });
+    const second = createRectangleItem({ opacity: 0.7 });
+    const group = createGroupNode([first], 'Hero Group');
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedGroup={group}
+        selectedNodeCount={2}
+        selectedItems={[first, second]}
+      />,
+    );
+
+    expect(screen.getByText('2 items selected')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Group Opacity')).not.toBeInTheDocument();
   });
 });
