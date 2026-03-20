@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Group, Rect } from 'react-konva';
 
 import type { CanvasItem, CanvasTool, LineCanvasItem } from '../../document/documentTypes';
@@ -58,15 +59,27 @@ export function CanvasOverflowPreviewLayer({
   startPanDrag,
   toCanvasPointer,
 }: CanvasOverflowPreviewLayerProps) {
-  const canvasBox = { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
-  const workspaceBox = {
-    x: -BACKDROP_SIZE / 2,
-    y: -BACKDROP_SIZE / 2,
-    width: BACKDROP_SIZE,
-    height: BACKDROP_SIZE,
-  };
-  const overflowItems = getOverflowRenderableItems(renderedItems, canvasBox);
-  const overflowClipRects = getOverflowClipRects(canvasBox, workspaceBox);
+  const canvasBox = useMemo(
+    () => ({ x: 0, y: 0, width: canvasWidth, height: canvasHeight }),
+    [canvasHeight, canvasWidth],
+  );
+  const workspaceBox = useMemo(
+    () => ({
+      x: -BACKDROP_SIZE / 2,
+      y: -BACKDROP_SIZE / 2,
+      width: BACKDROP_SIZE,
+      height: BACKDROP_SIZE,
+    }),
+    [],
+  );
+  const overflowItems = useMemo(
+    () => getOverflowRenderableItems(renderedItems, canvasBox),
+    [canvasBox, renderedItems],
+  );
+  const overflowClipRects = useMemo(
+    () => getOverflowClipRects(canvasBox, workspaceBox),
+    [canvasBox, workspaceBox],
+  );
 
   if (overflowItems.length === 0 || overflowClipRects.length === 0) {
     return null;

@@ -83,7 +83,7 @@ export function CanvasItemLayer({
               nativeEvent?: MouseEvent,
             ) => void}
             renderSelection={false}
-            shapeRef={(node) => registerShapeRef(item.id, node)}
+            registerShapeRef={registerShapeRef}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />
@@ -105,7 +105,7 @@ export function CanvasItemLayer({
               nativeEvent?: MouseEvent,
             ) => void}
             renderSelection={false}
-            shapeRef={(node) => registerShapeRef(item.id, node)}
+            registerShapeRef={registerShapeRef}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />

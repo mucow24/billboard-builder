@@ -14,7 +14,7 @@ import {
 } from './transformGeometry';
 import {
   buildInteractionCommit,
-  buildRenderedItems,
+  buildRenderedRenderables,
   createCreateSession,
   createDragSession,
   createGroupDragSession,
@@ -173,16 +173,8 @@ export function useCanvasInteractionSession({
   const stageBounds = useMemo(() => ({ x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }), [document.canvas.height, document.canvas.width]);
 
   const renderedItems = useMemo(
-    () =>
-      buildRenderedItems(orderedItems, session).map((item) => {
-        const renderable = renderableByLeafId.get(item.id);
-        return {
-          ...item,
-          opacity: renderable?.opacity ?? item.opacity,
-          selectableNodeId: renderable?.selectableNodeId ?? item.id,
-        } as RenderableCanvasItem;
-      }),
-    [orderedItems, renderableByLeafId, session]
+    () => buildRenderedRenderables(renderables, session),
+    [renderables, session]
   );
 
   const renderedSelectedItems = useMemo(() => renderedItems.filter((item) => selectedLeafIdSet.has(item.id)), [renderedItems, selectedLeafIdSet]);

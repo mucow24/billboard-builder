@@ -19,6 +19,7 @@ import {
   type RenderBox,
 } from './transformGeometry';
 import { getResizeSnappedRect, getSnappedRect } from './snapping';
+import type { RenderableCanvasItem } from './renderAdapter';
 import type {
   CanvasItem,
   CanvasTool,
@@ -185,6 +186,61 @@ export function buildRenderedItems(
   return session?.kind === 'create' && session.previewItem
     ? [...baseItems, session.previewItem]
     : baseItems;
+}
+
+function buildPreviewRenderable(
+  previewItem: CanvasItem,
+  baseRenderable: RenderableCanvasItem | null
+): RenderableCanvasItem {
+  if (!baseRenderable) {
+    return {
+      ...previewItem,
+      groupPath: [],
+      selectableNodeId: previewItem.id,
+      opacity: previewItem.opacity,
+    };
+  }
+
+  return {
+    ...previewItem,
+    groupPath: baseRenderable.groupPath,
+    selectableNodeId: baseRenderable.selectableNodeId,
+    opacity: baseRenderable.opacity,
+  };
+}
+
+export function buildRenderedRenderables(
+  baseRenderables: RenderableCanvasItem[],
+  session: InteractionSession | null
+): RenderableCanvasItem[] {
+  const previewItem = session && 'previewItem' in session ? session.previewItem : null;
+  const previewItems = session && 'previewItems' in session ? session.previewItems : null;
+  const previewMap = new Map(previewItems?.map((item) => [item.id, item] as const) ?? []);
+  let didChange = false;
+
+  const nextRenderables = baseRenderables.map((renderable) => {
+    const groupPreview = previewMap.get(renderable.id);
+    if (groupPreview) {
+      didChange = true;
+      return buildPreviewRenderable(groupPreview, renderable);
+    }
+    if (
+      previewItem &&
+      session &&
+      'itemId' in session &&
+      renderable.id === session.itemId
+    ) {
+      didChange = true;
+      return buildPreviewRenderable(previewItem, renderable);
+    }
+    return renderable;
+  });
+
+  if (session?.kind === 'create' && session.previewItem) {
+    return [...(didChange ? nextRenderables : baseRenderables), buildPreviewRenderable(session.previewItem, null)];
+  }
+
+  return didChange ? nextRenderables : baseRenderables;
 }
 
 export function normalizeRectFromPoints(start: Point, current: Point): RenderBox {

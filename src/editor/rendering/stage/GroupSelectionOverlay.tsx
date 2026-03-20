@@ -77,7 +77,6 @@ export function GroupSelectionOverlay({
             onItemPointerDown={handleItemPointerDown}
             renderContent={false}
             renderHandles={false}
-            shapeRef={() => {}}
             toCanvasPointer={toCanvasPointer}
           />
         ) : (
@@ -92,7 +91,6 @@ export function GroupSelectionOverlay({
             onItemPointerDown={handleItemPointerDown}
             renderContent={false}
             renderHandles={false}
-            shapeRef={() => {}}
             toCanvasPointer={toCanvasPointer}
           />
         ),

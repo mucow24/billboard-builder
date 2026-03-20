@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { Circle, Line } from 'react-konva';
 import type Konva from 'konva';
 
@@ -31,12 +32,14 @@ interface LineItemViewProps {
   renderContent?: boolean;
   renderHandles?: boolean;
   renderSelection?: boolean;
-  shapeRef: (node: Konva.Node | null) => void;
+  registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
-export function LineItemView({
+const NOOP_REGISTER_SHAPE_REF = () => {};
+
+export const LineItemView = memo(function LineItemView({
   activeTool,
   isSelected,
   item,
@@ -47,18 +50,24 @@ export function LineItemView({
   renderContent = true,
   renderHandles = true,
   renderSelection = true,
-  shapeRef,
+  registerShapeRef = NOOP_REGISTER_SHAPE_REF,
   startPanDrag,
   toCanvasPointer,
 }: LineItemViewProps) {
   const lineHandleRects = getLineHandleRects(item);
   const interactionEnabled = activeTool === 'select';
+  const handleShapeRef = useCallback(
+    (node: Konva.Node | null) => {
+      registerShapeRef(item.id, node);
+    },
+    [item.id, registerShapeRef],
+  );
 
   return (
     <>
       {renderContent ? (
         <Line
-          ref={shapeRef}
+          ref={handleShapeRef}
           id={`render-item-${item.id}`}
           name="render-item render-item-line"
           itemId={item.id}
@@ -185,4 +194,6 @@ export function LineItemView({
       ) : null}
     </>
   );
-}
+});
+
+LineItemView.displayName = 'LineItemView';

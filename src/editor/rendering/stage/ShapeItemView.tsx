@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import { Circle, Ellipse, Group, Line, Rect, Text } from 'react-konva';
 import type Konva from 'konva';
 
@@ -41,12 +42,14 @@ interface ShapeItemViewProps {
   renderContent?: boolean;
   renderHandles?: boolean;
   renderSelection?: boolean;
-  shapeRef: (node: Konva.Node | null) => void;
+  registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
-export function ShapeItemView({
+const NOOP_REGISTER_SHAPE_REF = () => {};
+
+export const ShapeItemView = memo(function ShapeItemView({
   activeTool,
   isSelected,
   item,
@@ -58,7 +61,7 @@ export function ShapeItemView({
   renderContent = true,
   renderHandles = true,
   renderSelection = true,
-  shapeRef,
+  registerShapeRef = NOOP_REGISTER_SHAPE_REF,
   startPanDrag,
   toCanvasPointer,
 }: ShapeItemViewProps) {
@@ -67,12 +70,18 @@ export function ShapeItemView({
   const handlePoints = getShapeHandlePoints(item);
   const outlinePoints = getSelectionOutlinePoints(item);
   const interactionEnabled = activeTool === 'select';
+  const handleShapeRef = useCallback(
+    (node: Konva.Node | null) => {
+      registerShapeRef(item.id, node);
+    },
+    [item.id, registerShapeRef],
+  );
 
   return (
     <>
       {renderContent ? (
         <Group
-          ref={shapeRef}
+          ref={handleShapeRef}
           id={`render-item-${item.id}`}
           name={`render-item render-item-${item.kind}`}
           itemId={item.id}
@@ -322,4 +331,6 @@ export function ShapeItemView({
       ) : null}
     </>
   );
-}
+});
+
+ShapeItemView.displayName = 'ShapeItemView';

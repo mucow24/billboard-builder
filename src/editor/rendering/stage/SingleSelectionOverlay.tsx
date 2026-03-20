@@ -55,7 +55,6 @@ export function SingleSelectionOverlay({
       onBeginLineHandle={beginLineHandle}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
-      shapeRef={() => {}}
       startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
     />
@@ -70,7 +69,6 @@ export function SingleSelectionOverlay({
       onBeginRotate={beginRotate}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
-      shapeRef={() => {}}
       startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
     />

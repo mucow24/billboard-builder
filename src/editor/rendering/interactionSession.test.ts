@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildInteractionCommit,
   buildRenderedItems,
+  buildRenderedRenderables,
   createCreateSession,
   createGroupDragSession,
   createGroupResizeSession,
@@ -10,9 +11,28 @@ import {
   type SelectionFrame,
 } from './interactionSession';
 import {
+  createGroupNode,
   createLineItem,
   createRectangleItem,
 } from '../document/documentDefaults';
+import { buildRenderableCanvasItems } from './renderAdapter';
+import { collectLeafItems } from '../document/sceneGraph';
+import type { ProjectDocument } from '../document/documentTypes';
+
+function createDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
+  return {
+    version: 2,
+    canvas: {
+      width: 1024,
+      height: 1024,
+      presetId: 'square-lg',
+    },
+    background: '#ffffff00',
+    nodes,
+    items: nodes.flatMap(collectLeafItems),
+    fonts: [],
+  };
+}
 
 describe('interactionSession', () => {
   const canvasBounds = { x: 0, y: 0, width: 1024, height: 1024 };
@@ -45,6 +65,71 @@ describe('interactionSession', () => {
 
     expect(rendered).toEqual([first, second, createPreview]);
     expect(renderedWithOverlay).toEqual([first, preview]);
+  });
+
+  it('keeps unchanged renderables by reference while overlaying previews', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createRectangleItem({ id: 'second', x: 220 });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+    const renderables = buildRenderableCanvasItems(createDocument([group]), [group.id]);
+    const [firstRenderable, secondRenderable] = renderables;
+    const preview = createRectangleItem({ id: 'second', x: 999, y: 888 });
+
+    const rendered = buildRenderedRenderables(renderables, {
+      kind: 'drag',
+      itemId: second.id,
+      originalItem: second,
+      previewItem: preview,
+      siblingItems: [first],
+      pointerStart: { x: 0, y: 0 },
+      guides: [],
+      snapDisabled: false,
+      axisLock: undefined,
+    });
+
+    expect(rendered[0]).toBe(firstRenderable);
+    expect(rendered[1]).not.toBe(secondRenderable);
+    expect(rendered[1]).toMatchObject({
+      id: second.id,
+      x: 999,
+      y: 888,
+      groupPath: secondRenderable.groupPath,
+      selectableNodeId: secondRenderable.selectableNodeId,
+      opacity: secondRenderable.opacity,
+    });
+  });
+
+  it('returns the original renderables array when no preview is active', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createRectangleItem({ id: 'second' });
+    const renderables = buildRenderableCanvasItems(createDocument([first, second]));
+
+    expect(buildRenderedRenderables(renderables, null)).toBe(renderables);
+  });
+
+  it('synthesizes create previews with default render metadata', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const renderables = buildRenderableCanvasItems(createDocument([first]));
+    const createPreview = createRectangleItem({ id: 'created', x: 320, y: 240, opacity: 0.6 });
+
+    const rendered = buildRenderedRenderables(renderables, {
+      kind: 'create',
+      tool: 'rectangle',
+      pointerStart: { x: 10, y: 20 },
+      previewItem: createPreview,
+      guides: [],
+      snapDisabled: false,
+    });
+
+    expect(rendered).toHaveLength(2);
+    expect(rendered[0]).toBe(renderables[0]);
+    expect(rendered[1]).toMatchObject({
+      id: 'created',
+      groupPath: [],
+      selectableNodeId: 'created',
+      opacity: 0.6,
+    });
   });
 
   it('returns null for group sessions without a frame or enough items', () => {

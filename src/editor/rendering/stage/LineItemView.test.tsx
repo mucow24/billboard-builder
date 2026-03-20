@@ -72,7 +72,7 @@ describe('LineItemView', () => {
         item={line}
         onBeginLineHandle={onBeginLineHandle}
         onItemPointerDown={onItemPointerDown}
-        shapeRef={vi.fn()}
+        registerShapeRef={vi.fn()}
         toCanvasPointer={(pointer) => pointer}
       />,
     );
@@ -106,7 +106,7 @@ describe('LineItemView', () => {
         onBeginLineHandle={vi.fn()}
         onItemPointerDown={vi.fn()}
         renderContent={false}
-        shapeRef={vi.fn()}
+        registerShapeRef={vi.fn()}
         toCanvasPointer={(pointer) => pointer}
       />,
     );
