@@ -27,6 +27,7 @@ import {
 import { createImageItem } from '../editor/document/documentDefaults';
 import { flattenLayerRows } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
+import type { CanvasItem } from '../editor/document/documentTypes';
 
 function getPointerCenteredPosition(x: number, y: number) {
   return {
@@ -164,13 +165,48 @@ export function useEditorController() {
     try {
       const uploadedFont = await registerFontFile(file);
       registerAvailableFont(uploadedFont);
-      dispatch({
-        type: 'register_font',
-        font: toFontReference(uploadedFont),
-      });
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(`Failed to register font: ${getErrorMessage(error, 'Unknown error.')}`);
+    }
+  }
+
+  function registerDocumentFontForFamily(fontFamily: string | undefined) {
+    if (typeof fontFamily !== 'string') {
+      return;
+    }
+
+    const matchingFont = availableFonts.find((font) => font.family === fontFamily);
+    if (!matchingFont) {
+      return;
+    }
+
+    dispatch({
+      type: 'register_font',
+      font: toFontReference(matchingFont),
+    });
+  }
+
+  function handleSelectedItemUpdate(changes: Partial<CanvasItem>) {
+    updateSelectedItem(changes);
+    registerDocumentFontForFamily('fontFamily' in changes ? changes.fontFamily : undefined);
+  }
+
+  function handleSelectedItemsUpdate(
+    changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>,
+  ) {
+    const fontFamilies = new Set(
+      changesById.flatMap(({ changes }) =>
+        'fontFamily' in changes && typeof changes.fontFamily === 'string'
+          ? [changes.fontFamily]
+          : [],
+      ),
+    );
+
+    updateSelectedItems(changesById);
+
+    for (const fontFamily of fontFamilies) {
+      registerDocumentFontForFamily(fontFamily);
     }
   }
 
@@ -251,14 +287,14 @@ export function useEditorController() {
     const insertedNodes = instantiateTemplateNodes(template.nodes, nextInsertCount);
 
     applyTransaction([
-      ...template.fonts.map((font) => ({
-        family: 'document' as const,
-        command: { type: 'register_font' as const, font },
-      })),
       {
         family: 'document' as const,
         command: { type: 'insert_nodes' as const, nodes: insertedNodes },
       },
+      ...template.fonts.map((font) => ({
+        family: 'document' as const,
+        command: { type: 'register_font' as const, font },
+      })),
       {
         family: 'selection' as const,
         command: {
@@ -326,8 +362,8 @@ export function useEditorController() {
       undo,
       ungroupSelectedNode,
       updateSelectedGroup,
-      updateSelectedItem,
-      updateSelectedItems,
+      updateSelectedItem: handleSelectedItemUpdate,
+      updateSelectedItems: handleSelectedItemsUpdate,
     },
     state: {
       activeTool,

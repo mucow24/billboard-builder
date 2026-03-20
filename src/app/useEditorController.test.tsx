@@ -204,6 +204,7 @@ describe('useEditorController', () => {
 
   it('registers uploaded fonts, opens projects, and delegates save/export actions', async () => {
     const fontFile = new File(['font'], 'PosterSans.ttf', { type: 'font/ttf' });
+    const textItem = createTextItem({ id: 'font-target' });
     const projectDocument = {
       ...createDefaultProjectDocument(),
       background: '#112233',
@@ -218,6 +219,16 @@ describe('useEditorController', () => {
     });
     mockReadProjectFile.mockResolvedValue(projectDocument);
 
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        items: [textItem],
+      },
+      session: {
+        selectedNodeIds: [textItem.id],
+      },
+    });
+
     const { result } = renderHook(() => useEditorController());
 
     await waitFor(() => {
@@ -227,6 +238,21 @@ describe('useEditorController', () => {
     await act(async () => {
       await result.current.actions.handleFontUpload(makeFileList(fontFile));
     });
+    await waitFor(() => {
+      expect(result.current.state.availableFonts).toContainEqual({
+        family: 'Poster Sans',
+        sourceName: 'PosterSans.ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'uploaded',
+      });
+    });
+    expect(result.current.state.document.fonts).toEqual([]);
+
+    act(() => {
+      result.current.actions.updateSelectedItem({ fontFamily: 'Poster Sans' });
+    });
+
     await waitFor(() => {
       expect(result.current.state.document.fonts).toContainEqual({
         family: 'Poster Sans',
@@ -257,6 +283,36 @@ describe('useEditorController', () => {
     expect(mockDownloadStageAsPng).toHaveBeenCalledOnce();
     expect(mockDownloadStageAsPng).toHaveBeenCalledWith(stage, 1);
     expect(mockDownloadProject).toHaveBeenCalledOnce();
+  });
+
+  it('ignores stale missing-font references that are no longer used by any text node', async () => {
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        fonts: [
+          {
+            family: 'Ghost Font',
+            sourceName: 'GhostFont-Regular.ttf',
+            kind: 'bundled',
+          },
+        ],
+        items: [
+          createTextItem({
+            id: 'body-text',
+            fontFamily: 'Arial',
+          }),
+        ],
+      },
+    });
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    expect(result.current.state.document.fonts).toEqual([]);
+    expect(result.current.state.missingFontFamilies).toEqual([]);
   });
 
   it('saves a selected node as a template and inserts it with cumulative offsets', async () => {

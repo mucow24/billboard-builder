@@ -50,7 +50,9 @@ describe('editor command reducer', () => {
   });
 
   it('updates canvas settings, selection state, and registered fonts', () => {
-    const item = createRectangleItem();
+    const item = createTextItem({
+      fontFamily: 'Test Sans',
+    });
     const documentWithItem = applyEditorCommand(createDefaultProjectDocument(), {
       type: 'add_item',
       item,
@@ -534,7 +536,9 @@ describe('editor store history', () => {
 
   it('clears the redo stack after a new mutation and deduplicates document fonts', () => {
     const firstItem = createRectangleItem();
-    const secondItem = createTextItem();
+    const secondItem = createTextItem({
+      fontFamily: 'Poster Sans',
+    });
 
     useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
     useEditorStore.getState().undo();

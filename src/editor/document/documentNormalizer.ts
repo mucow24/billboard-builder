@@ -192,6 +192,20 @@ function normalizeCanvasNodes(nodes: CanvasNode[]): CanvasNode[] {
   return normalizeLeafZIndices(nodes.map(normalizeCanvasNode));
 }
 
+function normalizeDocumentFonts(
+  nodes: CanvasNode[],
+  fonts: ProjectDocument['fonts'],
+): ProjectDocument['fonts'] {
+  const referencedFamilies = new Set(
+    nodes
+      .flatMap(collectLeafItems)
+      .filter((item) => item.kind === 'text')
+      .map((item) => item.fontFamily),
+  );
+
+  return fonts.filter((font) => referencedFamilies.has(font.family));
+}
+
 type ProjectInput = Partial<ProjectDocument> | Partial<LegacyProjectDocumentV1> | undefined;
 
 export function normalizeProjectDocument(
@@ -205,6 +219,16 @@ export function normalizeProjectDocument(
   const legacyItems = (projectInput as Partial<ProjectDocument> & Partial<LegacyProjectDocumentV1>).items ?? [];
   const rawNodes = projectNodes && projectNodes.length > 0 ? projectNodes : legacyItems;
   const normalizedNodes = normalizeCanvasNodes(rawNodes);
+  const normalizedFonts = normalizeDocumentFonts(
+    normalizedNodes,
+    (input?.fonts ?? []).filter((font): font is ProjectDocument['fonts'][number] => {
+      return (
+        typeof font?.family === 'string' &&
+        typeof font?.sourceName === 'string' &&
+        (font?.kind === 'system' || font?.kind === 'bundled' || font?.kind === 'uploaded')
+      );
+    }),
+  );
 
   return {
     version: 2,
@@ -217,13 +241,7 @@ export function normalizeProjectDocument(
     background: input?.background ?? baseDocument.background,
     nodes: normalizedNodes,
     items: normalizedNodes.flatMap(collectLeafItems),
-    fonts: (input?.fonts ?? []).filter((font): font is ProjectDocument['fonts'][number] => {
-      return (
-        typeof font?.family === 'string' &&
-        typeof font?.sourceName === 'string' &&
-        (font?.kind === 'system' || font?.kind === 'bundled' || font?.kind === 'uploaded')
-      );
-    }),
+    fonts: normalizedFonts,
   };
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { defaultCanvasPersistenceService } from '../editor/persistence/canvasPersistenceService';
-import { loadBundledFonts, toFontReference } from '../editor/fonts';
+import { loadBundledFonts } from '../editor/fonts';
 import type { EditorStoreState } from '../editor/state/store';
 
 interface UseCanvasBootstrapArgs {
@@ -48,10 +48,6 @@ export function useCanvasBootstrap({
       }
       for (const font of fonts) {
         registerAvailableFont(font);
-        dispatch({
-          type: 'register_font',
-          font: toFontReference(font),
-        });
       }
     });
 

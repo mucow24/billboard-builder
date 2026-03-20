@@ -28,7 +28,10 @@ describe('document normalizer', () => {
       tintStrength: 999,
     };
 
-    const textItem = createTextItem({ zIndex: 1 });
+    const textItem = createTextItem({
+      zIndex: 1,
+      fontFamily: 'System Sans',
+    });
     textItem.padding = { top: -4, right: Number.POSITIVE_INFINITY, bottom: 12, left: -2 };
 
     const group = createGroupNode([
@@ -91,6 +94,33 @@ describe('document normalizer', () => {
     });
     expect(normalized.fonts).toEqual([
       { family: 'System Sans', sourceName: 'system', kind: 'system' },
+    ]);
+  });
+
+  it('keeps only font references that are still used by text nodes', () => {
+    const posterText = createTextItem({
+      id: 'poster-text',
+      fontFamily: 'Poster Sans',
+    });
+    const systemText = createTextItem({
+      id: 'system-text',
+      fontFamily: 'Arial',
+      x: 360,
+    });
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [posterText, systemText],
+      fonts: [
+        { family: 'Poster Sans', sourceName: 'PosterSans-Regular.ttf', kind: 'uploaded' },
+        { family: 'Ghost Font', sourceName: 'GhostFont-Regular.ttf', kind: 'bundled' },
+        { family: 'Arial', sourceName: 'Arial', kind: 'system' },
+      ],
+    });
+
+    expect(normalized.fonts).toEqual([
+      { family: 'Poster Sans', sourceName: 'PosterSans-Regular.ttf', kind: 'uploaded' },
+      { family: 'Arial', sourceName: 'Arial', kind: 'system' },
     ]);
   });
 
