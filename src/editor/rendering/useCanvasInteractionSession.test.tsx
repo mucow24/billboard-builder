@@ -63,11 +63,27 @@ function mapPointBetweenFrames(
 
 function makeStageRef() {
   let pointer: { x: number; y: number } | null = null;
+  let bounds = {
+    left: 0,
+    top: 0,
+    right: 100,
+    bottom: 100,
+    width: 100,
+    height: 100,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  } satisfies DOMRect;
   const stage = {
     setPointersPositions(event: MouseEvent) {
       pointer = {
         x: event.clientX,
         y: event.clientY,
+      };
+    },
+    container() {
+      return {
+        getBoundingClientRect: () => bounds,
       };
     },
     getPointerPosition() {
@@ -79,6 +95,12 @@ function makeStageRef() {
     ref: {
       current: stage,
     } as React.RefObject<Konva.Stage | null>,
+    setBounds(nextBounds: Partial<DOMRect>) {
+      bounds = {
+        ...bounds,
+        ...nextBounds,
+      };
+    },
   };
 }
 
@@ -686,6 +708,53 @@ describe('useCanvasInteractionSession', () => {
     );
   });
 
+  it('ignores window mousemove while the pointer remains inside the stage bounds', () => {
+    const stageRef = makeStageRef();
+    stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const sibling = createRectangleItem({
+      x: 480,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const params = createHookParams({
+      document: createDocument([item, sibling]),
+      stageRef: stageRef.ref,
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginDrag(item, { x: 300, y: 180 });
+    });
+
+    params.onGuidesChange.mockClear();
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 584,
+          clientY: 180,
+        }),
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('drag');
+    if (result.current.session?.kind !== 'drag') {
+      throw new Error('Expected drag session.');
+    }
+    expect(result.current.session.previewItem).toMatchObject({
+      x: 200,
+      y: 120,
+    });
+    expect(params.onGuidesChange).not.toHaveBeenCalled();
+  });
+
   it('cancels a create session when the active tool changes back to select', () => {
     const initialParams = createHookParams({
       activeTool: 'rectangle',
@@ -763,6 +832,25 @@ describe('useCanvasInteractionSession', () => {
           clientY: 10,
         })
       );
+    });
+
+    expect(result.current.session).toBeNull();
+    expect(params.onGuidesChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it('clears a pending marquee on stage mouseup when the release stays inside the stage', () => {
+    const stageRef = makeStageRef();
+    stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
+    const params = createHookParams({
+      stageRef: stageRef.ref,
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleStageMouseDown(makeStageEvent({ x: 10, y: 10 }));
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: 10, y: 10 }));
     });
 
     expect(result.current.session).toBeNull();

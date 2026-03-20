@@ -139,7 +139,95 @@ describe('useCanvasViewport', () => {
     });
 
     expect(result.current.pan).toEqual({ x: 356, y: 96 });
-    expect(result.current.handleStagePointerUp()).toBe(true);
+    let handledPointerUp = false;
+    act(() => {
+      handledPointerUp = result.current.handleStagePointerUp();
+    });
+    expect(handledPointerUp).toBe(true);
     expect(result.current.handleStagePointerUp()).toBe(false);
+  });
+
+  it('ignores window mousemove while the pointer remains inside the viewport bounds', () => {
+    const { result } = renderHook(() =>
+      useCanvasViewport({
+        activeTool: 'select',
+        canvasHeight: 1024,
+        canvasWidth: 1024,
+      }),
+    );
+
+    const viewportElement = document.createElement('div');
+    viewportElement.getBoundingClientRect = () =>
+      ({
+        width: 1280,
+        height: 720,
+        left: 0,
+        top: 0,
+        right: 1280,
+        bottom: 720,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    act(() => {
+      result.current.viewportRef.current = viewportElement;
+    });
+
+    act(() => {
+      result.current.startPanDrag({ x: 100, y: 100 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 140,
+          clientY: 160,
+        }),
+      );
+    });
+
+    expect(result.current.pan).toEqual({ x: 316, y: 36 });
+  });
+
+  it('continues pan dragging through window events only after the pointer leaves the viewport', () => {
+    const { result } = renderHook(() =>
+      useCanvasViewport({
+        activeTool: 'select',
+        canvasHeight: 1024,
+        canvasWidth: 1024,
+      }),
+    );
+
+    const viewportElement = document.createElement('div');
+    viewportElement.getBoundingClientRect = () =>
+      ({
+        width: 1280,
+        height: 720,
+        left: 0,
+        top: 0,
+        right: 1280,
+        bottom: 720,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    act(() => {
+      result.current.viewportRef.current = viewportElement;
+    });
+
+    act(() => {
+      result.current.startPanDrag({ x: 100, y: 100 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 1400,
+          clientY: 860,
+        }),
+      );
+    });
+
+    expect(result.current.pan).toEqual({ x: 1616, y: 796 });
   });
 });

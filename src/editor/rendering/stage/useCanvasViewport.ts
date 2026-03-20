@@ -30,6 +30,7 @@ export function useCanvasViewport({
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
   const [isShiftPanActive, setIsShiftPanActive] = useState(false);
   const [isAltZoomActive, setIsAltZoomActive] = useState(false);
+  const [isPanDragging, setIsPanDragging] = useState(false);
   const panDragRef = useRef<{ startPointer: Point; startPan: Point } | null>(null);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
@@ -143,6 +144,7 @@ export function useCanvasViewport({
       return;
     }
     panDragRef.current = null;
+    setIsPanDragging(false);
     window.document.body.style.cursor = '';
   }, []);
 
@@ -151,13 +153,34 @@ export function useCanvasViewport({
       startPointer,
       startPan: { ...panRef.current },
     };
+    setIsPanDragging(true);
     window.document.body.style.cursor = 'grabbing';
   }, []);
 
+  const isClientPointInsideViewport = useCallback((clientX: number, clientY: number) => {
+    const bounds = viewportRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return false;
+    }
+    return (
+      clientX >= bounds.left &&
+      clientX <= bounds.right &&
+      clientY >= bounds.top &&
+      clientY <= bounds.bottom
+    );
+  }, []);
+
   useEffect(() => {
+    if (!isPanDragging) {
+      return;
+    }
+
     function handleWindowMouseMove(event: MouseEvent) {
       const current = panDragRef.current;
       if (!current) {
+        return;
+      }
+      if (isClientPointInsideViewport(event.clientX, event.clientY)) {
         return;
       }
       const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
@@ -173,7 +196,10 @@ export function useCanvasViewport({
       });
     }
 
-    function handleWindowMouseUp() {
+    function handleWindowMouseUp(event: MouseEvent) {
+      if (panDragRef.current && isClientPointInsideViewport(event.clientX, event.clientY)) {
+        return;
+      }
       stopPanDrag();
     }
 
@@ -184,7 +210,7 @@ export function useCanvasViewport({
       window.removeEventListener('mouseup', handleWindowMouseUp);
       window.document.body.style.cursor = '';
     };
-  }, [getViewportPointerFromClient, stopPanDrag]);
+  }, [getViewportPointerFromClient, isClientPointInsideViewport, isPanDragging, stopPanDrag]);
 
   const viewport = useMemo(
     () => ({ zoom, panX: pan.x, panY: pan.y }),
