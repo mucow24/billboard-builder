@@ -256,7 +256,7 @@ describe('CanvasStage viewport controls', () => {
     expect(canvasRect).toHaveAttribute('data-prop-stroke', 'rgba(0, 0, 0, 0.14)');
   });
 
-  it('renders a non-interactive overflow preview layer below the canvas surface while keeping the main content clipped', () => {
+  it('renders an interactive overflow preview layer below the canvas surface while keeping the main content clipped', () => {
     const document = createDefaultProjectDocument();
     document.background = '#11223344';
     const overflowRectangle = createRectangleItem({
@@ -292,6 +292,12 @@ describe('CanvasStage viewport controls', () => {
     const overflowClip = container.querySelector(
       '[data-konva-node="Group"][data-prop-name="overflow-preview-clip export-exclude"]',
     );
+    const overflowContent = container.querySelector(
+      '[data-konva-node="Group"][data-prop-opacity="0.15"]',
+    );
+    const overflowVeil = container.querySelector(
+      '[data-konva-node="Rect"][data-prop-name="overflow-preview-veil export-exclude"]',
+    );
     const canvasRect = container.querySelector(
       '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
     );
@@ -300,14 +306,13 @@ describe('CanvasStage viewport controls', () => {
     );
 
     expect(overflowLayer).not.toBeNull();
-    expect(overflowLayer).toHaveAttribute('data-prop-listening', 'false');
     expect(overflowClip).not.toBeNull();
-    expect(overflowClip).toHaveAttribute('data-prop-listening', 'false');
-    expect(
-      container.querySelector(
-        '[data-konva-node="Rect"][data-prop-name="overflow-preview-veil export-exclude"]',
-      ),
-    ).toBeNull();
+    expect(overflowContent).not.toBeNull();
+    expect(overflowVeil).not.toBeNull();
+    expect(overflowVeil).toHaveAttribute('data-prop-fill', '#0b1220');
+    expect(overflowVeil).toHaveAttribute('data-prop-opacity', '0.5');
+    expect(overflowVeil).toHaveAttribute('data-prop-globalcompositeoperation', 'source-atop');
+    expect(overflowVeil).toHaveAttribute('data-prop-listening', 'false');
     expect(contentLayer).not.toBeNull();
     expect(contentLayer).toHaveAttribute('data-prop-clipx', '0');
     expect(contentLayer).toHaveAttribute('data-prop-clipy', '0');
@@ -319,6 +324,31 @@ describe('CanvasStage viewport controls', () => {
       overflowLayerElement.compareDocumentPosition(canvasRect as Element) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);
+
+    const overflowShapeGroup = overflowLayerElement.querySelector(
+      `[data-konva-node="Group"][data-prop-x="${overflowRectangle.x}"][data-prop-y="${overflowRectangle.y}"]`,
+    );
+    expect(overflowShapeGroup).not.toBeNull();
+
+    fireEvent.mouseDown(overflowShapeGroup!, {
+      button: 0,
+      clientX: 300,
+      clientY: 240,
+    });
+    fireEvent.dblClick(overflowShapeGroup!, {
+      button: 0,
+      clientX: 300,
+      clientY: 240,
+    });
+
+    expect(mockInteractionSession.handleItemPointerDown).toHaveBeenCalledWith(
+      overflowRectangle,
+      overflowRectangle.id,
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      false,
+      expect.anything(),
+    );
+    expect(mockInteractionSession.handleItemDoubleClick).toHaveBeenCalledWith(overflowRectangle);
   });
 
 

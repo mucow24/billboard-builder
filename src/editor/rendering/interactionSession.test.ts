@@ -108,7 +108,7 @@ describe('interactionSession', () => {
     });
   });
 
-  it('returns no marquee hits when the drag stays fully outside the canvas', () => {
+  it('selects fully off-canvas items when the marquee stays outside the canvas', () => {
     const offCanvas = createRectangleItem({
       id: 'off-canvas',
       x: -180,
@@ -134,12 +134,12 @@ describe('interactionSession', () => {
 
     expect(commit).toEqual({
       kind: 'marquee',
-      hitIds: [],
+      hitIds: ['off-canvas'],
       toggleMode: false,
     });
   });
 
-  it('limits marquee selection to the portion of the drag that overlaps the canvas', () => {
+  it('includes edge-crossing and fully off-canvas items when the marquee crosses the canvas edge', () => {
     const partlyVisible = createRectangleItem({
       id: 'partly-visible',
       x: -80,
@@ -172,7 +172,7 @@ describe('interactionSession', () => {
 
     expect(commit).toEqual({
       kind: 'marquee',
-      hitIds: ['partly-visible'],
+      hitIds: ['partly-visible', 'fully-outside'],
       toggleMode: false,
     });
   });

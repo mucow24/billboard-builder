@@ -5,7 +5,7 @@ import {
   localToStage,
   RESIZE_HANDLE_NAMES,
 } from '../interactionGeometry';
-import { getCanvasConstrainedMarqueeRect } from '../interactionSession';
+import { normalizeRectFromPoints } from '../interactionSession';
 import {
   getGroupResizeFrame,
   getRenderBox,
@@ -155,12 +155,11 @@ export function buildStageDerivedState(params: {
     params.session.pointerStart &&
     params.session.currentPointer
       ? (() => {
-          const rect = getCanvasConstrainedMarqueeRect(
+          const rect = normalizeRectFromPoints(
             params.session.pointerStart,
             params.session.currentPointer,
-            params.canvasBounds
           );
-          return rect ? params.viewport.toViewportRect(rect) : null;
+          return params.viewport.toViewportRect(rect);
         })()
       : null;
   const groupOverlayViewportRect = groupOverlayFrame

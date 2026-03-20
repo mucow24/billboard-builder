@@ -386,6 +386,65 @@ test.describe('editor groups', () => {
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
   });
 
+  test('GD-14 drills into a grouped child through the direct item-hit path when the child hit is fully off-canvas', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'Explicit drill-in route proof stays Chromium-only.');
+
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'off-canvas-group-child',
+            name: 'Off Canvas Child',
+            x: -220,
+            y: 180,
+            width: 120,
+            height: 80,
+            zIndex: 0,
+          }),
+          createRectangleFixture({
+            id: 'visible-group-child',
+            name: 'Visible Group Child',
+            x: 180,
+            y: 220,
+            width: 140,
+            height: 90,
+            fill: '#0ea5e9',
+            stroke: '#0369a1ff',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'off-canvas-group',
+          name: 'Off Canvas Group',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'group-drill-off-canvas.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: -160, y: 220 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Off Canvas Group');
+
+    await clickCanvas(page, { x: -160, y: 220 });
+    const stageDebug = await readStageDebug(page);
+
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['off-canvas-group-child']);
+    expect(stageDebug.lastDrilldownSource).toBe('item-hit');
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    expect(stageDebug.hasLineHandles).toBe(false);
+    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+  });
+
   test('GD-10 drills into a grouped child through the stage-surface fallback path', async ({
     page,
     browserName,

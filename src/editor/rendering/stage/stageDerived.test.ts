@@ -114,7 +114,7 @@ describe('stageDerived', () => {
     expect(lineDerived.selectedShapeHandleRects).toBeNull();
   });
 
-  it('clips marquee preview geometry to the real canvas bounds', () => {
+  it('derives marquee preview geometry from the full drag rect outside the canvas bounds', () => {
     const derived = buildStageDerivedState({
       canvasBounds,
       renderedGroupBounds: null,
@@ -138,9 +138,9 @@ describe('stageDerived', () => {
     });
 
     expect(derived.marqueeViewportRect).toEqual({
-      left: 0,
+      left: -160,
       top: 120,
-      width: 120,
+      width: 280,
       height: 140,
     });
   });

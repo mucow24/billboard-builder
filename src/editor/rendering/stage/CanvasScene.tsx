@@ -147,9 +147,16 @@ export function CanvasScene({
         >
           <CanvasWorkspaceBackdrop />
           <CanvasOverflowPreviewLayer
+            activeTool={activeTool}
             canvasHeight={document.canvas.height}
             canvasWidth={document.canvas.width}
+            onBeginLineHandle={beginLineHandle}
+            onBeginResize={beginResize}
+            onBeginRotate={beginRotate}
+            onItemDoubleClick={handleItemDoubleClick}
+            onItemPointerDown={handleItemPointerDown}
             renderedItems={renderedItems}
+            toCanvasPointer={toCanvasPointer}
           />
           <CanvasSurface document={document} />
           <Group

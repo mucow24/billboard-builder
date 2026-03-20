@@ -1,31 +1,60 @@
-import { Group } from 'react-konva';
+import { Group, Rect } from 'react-konva';
 
-import type { Point } from '../interactionGeometry';
+import type { CanvasItem, CanvasTool, LineCanvasItem } from '../../document/documentTypes';
+import type { Point, ResizeHandle } from '../interactionGeometry';
 import {
   getOverflowClipRects,
   getOverflowRenderableItems,
 } from '../overflowRendering';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
-import { BACKDROP_SIZE } from './renderConstants';
+import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 import { CanvasItemLayer } from './CanvasItemLayer';
 
-const OVERFLOW_PREVIEW_CONTENT_OPACITY = 0.38;
+const OVERFLOW_PREVIEW_CONTENT_OPACITY = 0.15;
+const OVERFLOW_PREVIEW_VEIL_OPACITY = 0.5;
 
 interface CanvasOverflowPreviewLayerProps {
+  activeTool: CanvasTool;
   canvasHeight: number;
   canvasWidth: number;
+  onBeginLineHandle: (
+    item: Extract<CanvasItem, { kind: 'line' }>,
+    handle: 'start' | 'end',
+    pointer: Point,
+  ) => void;
+  onBeginResize: (
+    item: Exclude<CanvasItem, LineCanvasItem>,
+    handle: ResizeHandle,
+    pointer: Point,
+  ) => void;
+  onBeginRotate: (
+    item: Exclude<CanvasItem, LineCanvasItem>,
+    pointer: Point,
+  ) => void;
+  onItemDoubleClick: (item: CanvasItem) => void;
+  onItemPointerDown: (
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
+  ) => void;
   renderedItems: RenderableCanvasItem[];
-}
-
-function identityCanvasPointer(pointer: Point) {
-  return pointer;
+  toCanvasPointer: (pointer: Point) => Point;
 }
 
 export function CanvasOverflowPreviewLayer({
+  activeTool,
   canvasHeight,
   canvasWidth,
+  onBeginLineHandle,
+  onBeginResize,
+  onBeginRotate,
+  onItemDoubleClick,
+  onItemPointerDown,
   renderedItems,
+  toCanvasPointer,
 }: CanvasOverflowPreviewLayerProps) {
   const canvasBox = { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
   const workspaceBox = {
@@ -42,7 +71,7 @@ export function CanvasOverflowPreviewLayer({
   }
 
   return (
-    <Group name="overflow-preview-layer export-exclude" listening={false}>
+    <Group name="overflow-preview-layer export-exclude">
       {overflowClipRects.map((clipRect) => (
         <Group
           key={`overflow-preview-clip-${clipRect.x}-${clipRect.y}-${clipRect.width}-${clipRect.height}`}
@@ -51,16 +80,30 @@ export function CanvasOverflowPreviewLayer({
           clipY={clipRect.y}
           clipWidth={clipRect.width}
           clipHeight={clipRect.height}
-          listening={false}
         >
-          <Group opacity={OVERFLOW_PREVIEW_CONTENT_OPACITY} listening={false}>
+          <Group opacity={OVERFLOW_PREVIEW_CONTENT_OPACITY}>
             <CanvasItemLayer
-              activeTool="pan"
-              interactive={false}
+              activeTool={activeTool}
               items={overflowItems}
-              toCanvasPointer={identityCanvasPointer}
+              onBeginLineHandle={onBeginLineHandle}
+              onBeginResize={onBeginResize}
+              onBeginRotate={onBeginRotate}
+              onItemDoubleClick={onItemDoubleClick}
+              onItemPointerDown={onItemPointerDown}
+              toCanvasPointer={toCanvasPointer}
             />
           </Group>
+          <Rect
+            name="overflow-preview-veil export-exclude"
+            x={clipRect.x}
+            y={clipRect.y}
+            width={clipRect.width}
+            height={clipRect.height}
+            fill={CANVAS_SURFACE_FILL}
+            opacity={OVERFLOW_PREVIEW_VEIL_OPACITY}
+            globalCompositeOperation="source-atop"
+            listening={false}
+          />
         </Group>
       ))}
     </Group>

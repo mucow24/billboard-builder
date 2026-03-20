@@ -280,51 +280,24 @@ test.describe('editor canvas entrypoints', () => {
     await expectNoActiveSelection(page);
   });
 
-  test('CS-15 keeps a fully out-of-bounds marquee from selecting overflow preview content', async ({
+  test('CS-15 selects fully off-canvas and edge-overflow items through the overflow preview layer', async ({
     page,
   }) => {
-    const offCanvas = createRectangleFixture({
-      id: 'outside-marquee-rect',
-      name: 'Outside Marquee Rectangle',
+    const fullyOutside = createRectangleFixture({
+      id: 'outside-click-rect',
+      name: 'Outside Click Rectangle',
       x: -220,
       y: 140,
       width: 120,
       height: 120,
       zIndex: 0,
     });
-
-    await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([offCanvas]), 'marquee-outside-canvas.json');
-    await setCanvasTestHooksEnabled(page, false);
-
-    await beginCanvasDrag(page, { x: 40, y: 100 });
-    await movePointerToCanvasPoint(page, { x: -160, y: 300 });
-    await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('marquee');
-    await releasePointer(page);
-
-    const stageDebug = await readStageDebug(page);
-    expect(stageDebug.selectedItems ?? []).toHaveLength(0);
-    expect(stageDebug.hasShapeHandles).toBe(false);
-  });
-
-  test('CS-16 limits edge-crossing marquee selection to the canvas-overlapping portion', async ({
-    page,
-  }) => {
-    const partlyVisible = createRectangleFixture({
-      id: 'edge-marquee-partial',
-      name: 'Edge Partial Rectangle',
+    const edgeOverflow = createRectangleFixture({
+      id: 'edge-click-rect',
+      name: 'Edge Click Rectangle',
       x: -80,
-      y: 140,
+      y: 360,
       width: 180,
-      height: 120,
-      zIndex: 0,
-    });
-    const fullyOutside = createRectangleFixture({
-      id: 'edge-marquee-outside',
-      name: 'Edge Outside Rectangle',
-      x: -260,
-      y: 140,
-      width: 120,
       height: 120,
       fill: '#0ea5e9',
       stroke: '#0369a1ff',
@@ -334,19 +307,121 @@ test.describe('editor canvas entrypoints', () => {
     await openFreshEditor(page);
     await uploadProject(
       page,
-      createProjectDocument([partlyVisible, fullyOutside]),
-      'marquee-edge-crossing.json',
+      createProjectDocument([fullyOutside, edgeOverflow]),
+      'off-canvas-click-entrypoints.json',
     );
     await setCanvasTestHooksEnabled(page, false);
 
-    await beginCanvasDrag(page, { x: 120, y: 100 });
-    await movePointerToCanvasPoint(page, { x: -160, y: 300 });
+    await clickCanvas(page, { x: -160, y: 200 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['outside-click-rect']);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+
+    await clickCanvas(page, { x: -40, y: 420 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['edge-click-rect']);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+  });
+
+  test('CS-16 CS-17 marquee-selects fully off-canvas and edge-crossing overflow content', async ({
+    page,
+  }) => {
+    const fullyOutside = createRectangleFixture({
+      id: 'outside-marquee-rect',
+      name: 'Outside Marquee Rectangle',
+      x: -220,
+      y: 140,
+      width: 120,
+      height: 120,
+      zIndex: 0,
+    });
+    const partlyVisible = createRectangleFixture({
+      id: 'edge-marquee-partial',
+      name: 'Edge Partial Rectangle',
+      x: -80,
+      y: 360,
+      width: 180,
+      height: 120,
+      zIndex: 1,
+    });
+    const edgeOutside = createRectangleFixture({
+      id: 'edge-marquee-outside',
+      name: 'Edge Outside Rectangle',
+      x: -260,
+      y: 360,
+      width: 120,
+      height: 120,
+      fill: '#0ea5e9',
+      stroke: '#0369a1ff',
+      zIndex: 2,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([fullyOutside, partlyVisible, edgeOutside]),
+      'off-canvas-marquee-entrypoints.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await beginCanvasDrag(page, { x: -300, y: 100 });
+    await movePointerToCanvasPoint(page, { x: -80, y: 300 });
     await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('marquee');
     await releasePointer(page);
 
-    const stageDebug = await readStageDebug(page);
-    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['edge-marquee-partial']);
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['outside-marquee-rect']);
     expect(stageDebug.hasShapeHandles).toBe(true);
+
+    await clickCanvas(page, { x: 920, y: 920 });
+    await expectNoActiveSelection(page);
+
+    await beginCanvasDrag(page, { x: 120, y: 320 });
+    await movePointerToCanvasPoint(page, { x: -180, y: 520 });
+    await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('marquee');
+    await releasePointer(page);
+
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual([
+      'edge-marquee-partial',
+      'edge-marquee-outside',
+    ]);
+  });
+
+  test('CS-18 starts a one-gesture pickup drag from fully off-canvas overflow content', async ({
+    page,
+  }) => {
+    const offCanvas = createRectangleFixture({
+      id: 'off-canvas-pickup',
+      name: 'Off Canvas Pickup',
+      x: -220,
+      y: 180,
+      width: 120,
+      height: 120,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([offCanvas]), 'off-canvas-pickup.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await dragCanvas(page, { x: -160, y: 220 }, { x: -20, y: 320 });
+
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['off-canvas-pickup']);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = (savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'off-canvas-pickup',
+    );
+    expect(savedItem).toEqual(expect.objectContaining({ id: 'off-canvas-pickup' }));
+    expect(Number(savedItem?.x)).toBeGreaterThan(-220);
+    expect(Number(savedItem?.y)).toBeGreaterThan(180);
   });
 
   test('VP-01 VP-02 VP-03 VP-04 VP-06 VP-08 VP-09 VP-10 updates zoom, pan, HUD controls, and cursor through real browser entrypoints', async ({

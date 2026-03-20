@@ -256,6 +256,39 @@ test.describe('editor transforms', () => {
     expect(Number(unsnappedItem?.y)).toBe(120);
   });
 
+  test('ST-15 supports off-canvas rectangle resize through the real overflow preview surface', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'off-canvas-transform-rect',
+      x: -180,
+      y: 160,
+      width: 140,
+      height: 100,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'off-canvas-transform-rect.json');
+
+    await clickCanvas(page, { x: -120, y: 210 });
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+
+    await dragCanvas(page, { x: -180, y: 210 }, { x: -260, y: 210 });
+
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'off-canvas-transform-rect',
+    );
+    expect(savedItem).toEqual(expect.objectContaining({ id: 'off-canvas-transform-rect' }));
+    expect(Number(savedItem?.x)).toBeLessThan(-180);
+    expect(Number(savedItem?.width)).toBeGreaterThan(140);
+  });
+
   test('ST-14 constrains selected-item drag movement to a single axis when shift is held', async ({
     page,
   }) => {

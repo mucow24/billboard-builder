@@ -633,7 +633,7 @@ export function buildInteractionCommit(
   resolved: InteractionSession,
   context: { orderedItems: CanvasItem[]; pointer: Point; canvasBounds: RenderBox }
 ): InteractionCommit {
-  const { canvasBounds, orderedItems, pointer } = context;
+  const { orderedItems, pointer } = context;
 
   if (resolved.kind === 'create') {
     return {
@@ -644,16 +644,10 @@ export function buildInteractionCommit(
   }
 
   if (resolved.kind === 'marquee') {
-    const rect = getCanvasConstrainedMarqueeRect(
-      resolved.pointerStart,
-      resolved.currentPointer,
-      canvasBounds
-    );
-    const hitIds = rect
-      ? orderedItems
-          .filter((item) => !item.hidden && itemIntersectsSelectionRect(item, rect))
-          .map((item) => item.id)
-      : [];
+    const rect = normalizeRectFromPoints(resolved.pointerStart, resolved.currentPointer);
+    const hitIds = orderedItems
+      .filter((item) => !item.hidden && itemIntersectsSelectionRect(item, rect))
+      .map((item) => item.id);
     return {
       kind: 'marquee',
       hitIds,
