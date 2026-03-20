@@ -156,6 +156,7 @@ export function CanvasScene({
             onItemDoubleClick={handleItemDoubleClick}
             onItemPointerDown={handleItemPointerDown}
             renderedItems={renderedItems}
+            startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />
           <CanvasSurface document={document} />
@@ -176,6 +177,7 @@ export function CanvasScene({
               onItemPointerDown={handleItemPointerDown}
               registerShapeRef={registerShapeRef}
               selectedItemId={selectedItemId}
+              startPanDrag={startPanDrag}
               toCanvasPointer={toCanvasPointer}
             />
             <CanvasPreviewLayer session={session} />
@@ -222,6 +224,7 @@ export function CanvasScene({
                 handleItemPointerDown={handleItemPointerDown}
                 selectedItemId={selectedItemId}
                 selectedRenderedItem={selectedRenderedItem}
+                startPanDrag={startPanDrag}
                 toCanvasPointer={toCanvasPointer}
               />
             ) : null}

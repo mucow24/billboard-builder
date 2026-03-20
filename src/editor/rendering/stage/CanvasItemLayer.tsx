@@ -35,6 +35,7 @@ interface CanvasItemLayerProps {
   ) => void;
   registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
   selectedItemId?: string;
+  startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
@@ -44,6 +45,7 @@ const NOOP_BEGIN_RESIZE = () => {};
 const NOOP_BEGIN_ROTATE = () => {};
 const NOOP_ITEM_DOUBLE_CLICK = () => {};
 const NOOP_ITEM_POINTER_DOWN = () => {};
+const NOOP_START_PAN_DRAG = () => {};
 
 export function CanvasItemLayer({
   activeTool,
@@ -56,6 +58,7 @@ export function CanvasItemLayer({
   onItemPointerDown = NOOP_ITEM_POINTER_DOWN,
   registerShapeRef = NOOP_REGISTER_SHAPE_REF,
   selectedItemId,
+  startPanDrag = NOOP_START_PAN_DRAG,
   toCanvasPointer,
 }: CanvasItemLayerProps) {
   const effectiveTool: CanvasTool = interactive ? activeTool : 'pan';
@@ -81,6 +84,7 @@ export function CanvasItemLayer({
             ) => void}
             renderSelection={false}
             shapeRef={(node) => registerShapeRef(item.id, node)}
+            startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />
         ) : (
@@ -102,6 +106,7 @@ export function CanvasItemLayer({
             ) => void}
             renderSelection={false}
             shapeRef={(node) => registerShapeRef(item.id, node)}
+            startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />
         ),

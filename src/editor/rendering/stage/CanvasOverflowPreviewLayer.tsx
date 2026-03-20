@@ -41,6 +41,7 @@ interface CanvasOverflowPreviewLayerProps {
     nativeEvent?: MouseEvent,
   ) => void;
   renderedItems: RenderableCanvasItem[];
+  startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
@@ -54,6 +55,7 @@ export function CanvasOverflowPreviewLayer({
   onItemDoubleClick,
   onItemPointerDown,
   renderedItems,
+  startPanDrag,
   toCanvasPointer,
 }: CanvasOverflowPreviewLayerProps) {
   const canvasBox = { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
@@ -90,6 +92,7 @@ export function CanvasOverflowPreviewLayer({
               onBeginRotate={onBeginRotate}
               onItemDoubleClick={onItemDoubleClick}
               onItemPointerDown={onItemPointerDown}
+              startPanDrag={startPanDrag}
               toCanvasPointer={toCanvasPointer}
             />
           </Group>

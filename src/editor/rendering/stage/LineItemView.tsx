@@ -32,6 +32,7 @@ interface LineItemViewProps {
   renderHandles?: boolean;
   renderSelection?: boolean;
   shapeRef: (node: Konva.Node | null) => void;
+  startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
@@ -47,6 +48,7 @@ export function LineItemView({
   renderHandles = true,
   renderSelection = true,
   shapeRef,
+  startPanDrag,
   toCanvasPointer,
 }: LineItemViewProps) {
   const lineHandleRects = getLineHandleRects(item);
@@ -74,11 +76,19 @@ export function LineItemView({
           hitStrokeWidth={Math.max(item.strokeWidth + 12, 20)}
           listening={interactionEnabled}
           onMouseDown={(event) => {
-            if (!interactionEnabled || item.locked || event.evt.button === 1) {
+            if (!interactionEnabled || item.locked) {
               return;
             }
             const pointer = event.target.getStage()?.getPointerPosition();
             if (!pointer) {
+              return;
+            }
+            if (event.evt.button === 1) {
+              if (!startPanDrag) {
+                return;
+              }
+              event.cancelBubble = true;
+              startPanDrag(pointer);
               return;
             }
             event.cancelBubble = true;
@@ -111,11 +121,19 @@ export function LineItemView({
             strokeWidth={Math.max(item.strokeWidth, 18)}
             hitStrokeWidth={Math.max(item.strokeWidth + 18, 24)}
             onMouseDown={(event) => {
-              if (item.locked || event.evt.button === 1) {
+              if (item.locked) {
                 return;
               }
               const pointer = event.target.getStage()?.getPointerPosition();
               if (!pointer) {
+                return;
+              }
+              if (event.evt.button === 1) {
+                if (!startPanDrag) {
+                  return;
+                }
+                event.cancelBubble = true;
+                startPanDrag(pointer);
                 return;
               }
               event.cancelBubble = true;
@@ -141,11 +159,19 @@ export function LineItemView({
                     stroke={HANDLE_STROKE}
                     strokeWidth={2}
                     onMouseDown={(event) => {
-                      if (item.locked || event.evt.button === 1) {
+                      if (item.locked) {
                         return;
                       }
                       const pointer = event.target.getStage()?.getPointerPosition();
                       if (!pointer) {
+                        return;
+                      }
+                      if (event.evt.button === 1) {
+                        if (!startPanDrag) {
+                          return;
+                        }
+                        event.cancelBubble = true;
+                        startPanDrag(pointer);
                         return;
                       }
                       event.cancelBubble = true;

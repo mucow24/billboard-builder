@@ -569,6 +569,84 @@ describe('CanvasStage viewport controls', () => {
     expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
   });
 
+  it('starts a pan drag instead of item drag when middle-clicking the selected item overlay hook', () => {
+    const document = createDefaultProjectDocument();
+    const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
+    document.items = [rectangle];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [rectangle],
+      renderedSelectedItems: [rectangle],
+      selectedItemId: rectangle.id,
+      selectedRenderedItem: rectangle,
+    });
+
+    render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[rectangle.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const overlayHook = screen.getByTestId('canvas-selected-item-overlay');
+    const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+
+    fireEvent.mouseDown(overlayHook, { button: 1, clientX: 240, clientY: 160 });
+    fireEvent.mouseMove(window, { clientX: 300, clientY: 220 });
+
+    const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(mockInteractionSession.handleItemPointerDown).not.toHaveBeenCalled();
+    expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
+    expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
+  });
+
+  it('starts a pan drag instead of item resize when middle-clicking a selected item handle hook', () => {
+    const document = createDefaultProjectDocument();
+    const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
+    document.items = [rectangle];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [rectangle],
+      renderedSelectedItems: [rectangle],
+      selectedItemId: rectangle.id,
+      selectedRenderedItem: rectangle,
+    });
+
+    render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[rectangle.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    const handleHook = screen.getByTestId('canvas-shape-handle-middle-right');
+    const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+
+    fireEvent.mouseDown(handleHook, { button: 1, clientX: 300, clientY: 130 });
+    fireEvent.mouseMove(window, { clientX: 350, clientY: 180 });
+
+    const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(mockInteractionSession.beginResize).not.toHaveBeenCalled();
+    expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
+    expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
+  });
+
   it('uses preview group bounds during rotated drag and resize sessions', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });

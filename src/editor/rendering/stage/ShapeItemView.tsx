@@ -42,6 +42,7 @@ interface ShapeItemViewProps {
   renderHandles?: boolean;
   renderSelection?: boolean;
   shapeRef: (node: Konva.Node | null) => void;
+  startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
@@ -58,6 +59,7 @@ export function ShapeItemView({
   renderHandles = true,
   renderSelection = true,
   shapeRef,
+  startPanDrag,
   toCanvasPointer,
 }: ShapeItemViewProps) {
   const imageElement = useImageElement(item.kind === 'image' ? item.src : '');
@@ -84,11 +86,19 @@ export function ShapeItemView({
           visible={!item.hidden}
           listening={interactionEnabled}
           onMouseDown={(event) => {
-            if (!interactionEnabled || item.locked || event.evt.button === 1) {
+            if (!interactionEnabled || item.locked) {
               return;
             }
             const pointer = event.target.getStage()?.getPointerPosition();
             if (!pointer) {
+              return;
+            }
+            if (event.evt.button === 1) {
+              if (!startPanDrag) {
+                return;
+              }
+              event.cancelBubble = true;
+              startPanDrag(pointer);
               return;
             }
             event.cancelBubble = true;
@@ -192,11 +202,19 @@ export function ShapeItemView({
             y={renderBox.y}
             rotation={item.rotation}
             onMouseDown={(event) => {
-              if (item.locked || event.evt.button === 1) {
+              if (item.locked) {
                 return;
               }
               const pointer = event.target.getStage()?.getPointerPosition();
               if (!pointer) {
+                return;
+              }
+              if (event.evt.button === 1) {
+                if (!startPanDrag) {
+                  return;
+                }
+                event.cancelBubble = true;
+                startPanDrag(pointer);
                 return;
               }
               event.cancelBubble = true;
@@ -250,11 +268,19 @@ export function ShapeItemView({
                     stroke={HANDLE_STROKE}
                     strokeWidth={2}
                     onMouseDown={(event) => {
-                      if (item.locked || event.evt.button === 1) {
+                      if (item.locked) {
                         return;
                       }
                       const pointer = event.target.getStage()?.getPointerPosition();
                       if (!pointer) {
+                        return;
+                      }
+                      if (event.evt.button === 1) {
+                        if (!startPanDrag) {
+                          return;
+                        }
+                        event.cancelBubble = true;
+                        startPanDrag(pointer);
                         return;
                       }
                       event.cancelBubble = true;
@@ -276,6 +302,14 @@ export function ShapeItemView({
                   }
                   const pointer = event.target.getStage()?.getPointerPosition();
                   if (!pointer) {
+                    return;
+                  }
+                  if (event.evt.button === 1) {
+                    if (!startPanDrag) {
+                      return;
+                    }
+                    event.cancelBubble = true;
+                    startPanDrag(pointer);
                     return;
                   }
                   event.cancelBubble = true;

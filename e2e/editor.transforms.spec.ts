@@ -11,6 +11,7 @@ import {
   dragCanvas,
   dragCanvasWithModifier,
   dragCanvasHookToPoint,
+  middleDragCanvas,
   openFreshEditor,
   openLayersTab,
   readStageDebug,
@@ -287,6 +288,50 @@ test.describe('editor transforms', () => {
     expect(savedItem).toEqual(expect.objectContaining({ id: 'off-canvas-transform-rect' }));
     expect(Number(savedItem?.x)).toBeLessThan(-180);
     expect(Number(savedItem?.width)).toBeGreaterThan(140);
+  });
+
+  test('VP-06 pans instead of transforming when middle-dragging a selected item body or handle', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'middle-pan-selected-rect',
+      x: 140,
+      y: 140,
+      width: 200,
+      height: 120,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'middle-pan-selected-rect.json');
+
+    await clickCanvas(page, { x: 240, y: 200 });
+    const initialDebug = await readStageDebug(page);
+    expect(initialDebug.hasShapeHandles).toBe(true);
+
+    await middleDragCanvas(page, { x: 240, y: 200 }, { x: 320, y: 280 });
+    const afterBodyPan = await readStageDebug(page);
+    expect(afterBodyPan.viewport.panX).not.toBe(initialDebug.viewport.panX);
+    expect(afterBodyPan.viewport.panY).not.toBe(initialDebug.viewport.panY);
+    expect(afterBodyPan.sessionKind).toBeNull();
+    expect(afterBodyPan.hasShapeHandles).toBe(true);
+
+    await middleDragCanvas(page, { x: 340, y: 200 }, { x: 420, y: 260 });
+    const afterHandlePan = await readStageDebug(page);
+    expect(afterHandlePan.viewport.panX).not.toBe(afterBodyPan.viewport.panX);
+    expect(afterHandlePan.viewport.panY).not.toBe(afterBodyPan.viewport.panY);
+    expect(afterHandlePan.sessionKind).toBeNull();
+    expect(afterHandlePan.hasShapeHandles).toBe(true);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'middle-pan-selected-rect',
+    );
+    expect(savedItem).toEqual(expect.objectContaining({ id: 'middle-pan-selected-rect' }));
+    expect(Number(savedItem?.x)).toBe(140);
+    expect(Number(savedItem?.y)).toBe(140);
+    expect(Number(savedItem?.width)).toBe(200);
+    expect(Number(savedItem?.height)).toBe(120);
   });
 
   test('ST-14 constrains selected-item drag movement to a single axis when shift is held', async ({

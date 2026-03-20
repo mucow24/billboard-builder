@@ -142,6 +142,10 @@ export function CanvasTestHooks({
             data-testid="canvas-selected-item-overlay"
             onMouseDown={(event) => {
               if (event.button === 1) {
+                const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                if (pointer) {
+                  startPanDrag(pointer);
+                }
                 return;
               }
               onTestEvent('selected-item-overlay');
@@ -175,9 +179,15 @@ export function CanvasTestHooks({
                 onMouseDown={(event) => {
                   if (
                     !selectedRenderedItem ||
-                    selectedRenderedItem.kind === 'line' ||
-                    event.button === 1
+                    selectedRenderedItem.kind === 'line'
                   ) {
+                    return;
+                  }
+                  if (event.button === 1) {
+                    const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                    if (pointer) {
+                      startPanDrag(pointer);
+                    }
                     return;
                   }
                   onTestEvent(`shape-handle-${handle}`);
@@ -212,9 +222,15 @@ export function CanvasTestHooks({
                 onMouseDown={(event) => {
                   if (
                     !selectedRenderedItem ||
-                    selectedRenderedItem.kind !== 'line' ||
-                    event.button === 1
+                    selectedRenderedItem.kind !== 'line'
                   ) {
+                    return;
+                  }
+                  if (event.button === 1) {
+                    const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                    if (pointer) {
+                      startPanDrag(pointer);
+                    }
                     return;
                   }
                   onTestEvent(`line-handle-${handle}`);

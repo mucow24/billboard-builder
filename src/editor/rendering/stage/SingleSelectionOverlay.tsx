@@ -30,6 +30,7 @@ interface SingleSelectionOverlayProps {
   ) => void;
   selectedItemId?: string;
   selectedRenderedItem: RenderableCanvasItem;
+  startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
@@ -41,6 +42,7 @@ export function SingleSelectionOverlay({
   handleItemPointerDown,
   selectedItemId,
   selectedRenderedItem,
+  startPanDrag,
   toCanvasPointer,
 }: SingleSelectionOverlayProps) {
   return selectedRenderedItem.kind === 'line' ? (
@@ -54,6 +56,7 @@ export function SingleSelectionOverlay({
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
       shapeRef={() => {}}
+      startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
     />
   ) : (
@@ -68,6 +71,7 @@ export function SingleSelectionOverlay({
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
       shapeRef={() => {}}
+      startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
     />
   );
