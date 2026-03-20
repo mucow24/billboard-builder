@@ -12,6 +12,7 @@ import {
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
+  gotoEditor,
   openFreshEditor,
   primePersistenceBeforeLoad,
   openLayersTab,
@@ -116,7 +117,7 @@ test.describe('editor file and persistence flows', () => {
     ]);
 
     await primePersistenceBeforeLoad(page, persistedDocument);
-    await page.goto('/');
+    await gotoEditor(page);
     await waitForEditor(page);
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(1);
@@ -202,7 +203,7 @@ test.describe('editor file and persistence flows', () => {
     await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
 
     await primePersistenceBeforeLoad(page, savedGroupedDocument);
-    await page.goto('/');
+    await gotoEditor(page);
     await waitForEditor(page);
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Persisted Group', exact: true })).toBeVisible();

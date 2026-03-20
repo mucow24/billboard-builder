@@ -5,6 +5,7 @@ import path from 'node:path';
 import { expect, type Download, type FileChooser, type Locator, type Page } from '@playwright/test';
 
 export const APP_CLIPBOARD_MIME_TYPE = 'application/x-billboard-builder-selection+json';
+const EDITOR_TEST_URL = '/?bb-test=1';
 
 export interface CanvasPoint {
   x: number;
@@ -490,11 +491,15 @@ export async function waitForEditor(page: Page) {
 }
 
 export async function openFreshEditor(page: Page) {
-  await page.goto('/');
+  await page.goto(EDITOR_TEST_URL);
   await waitForEditor(page);
   await clearPersistence(page);
   await page.reload();
   await waitForEditor(page);
+}
+
+export async function gotoEditor(page: Page) {
+  await page.goto(EDITOR_TEST_URL);
 }
 
 export async function readStageDebug(page: Page): Promise<StageDebugInfo> {

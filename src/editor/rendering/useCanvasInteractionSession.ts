@@ -527,9 +527,6 @@ export function useCanvasInteractionSession({
   );
 
   const handleWindowMouseUp = useEffectEvent((event: MouseEvent) => {
-    if (isClientPointInsideStage(event.clientX, event.clientY)) {
-      return;
-    }
     if (pendingPickupDragRef.current) {
       const pointer = getCurrentPointer(event);
       if (commitPendingPickupDrag(pointer)) {

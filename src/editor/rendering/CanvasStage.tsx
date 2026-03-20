@@ -18,8 +18,12 @@ import { buildStageSceneHandlers } from './stage/stageHandlers';
 import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
 import { useCanvasViewport } from './stage/useCanvasViewport';
 
+const NOOP_TEST_EVENT = () => {};
+
 export interface CanvasStageProps {
   activeTool: CanvasTool;
+  debugMode?: boolean;
+  showCanvasTestHooks?: boolean;
   document: ProjectDocument;
   selectedItemIds: string[];
   guides: GuideLine[];
@@ -36,6 +40,8 @@ export interface CanvasStageProps {
 
 export function CanvasStage({
   activeTool,
+  debugMode = false,
+  showCanvasTestHooks = false,
   document,
   selectedItemIds,
   guides,
@@ -135,35 +141,6 @@ export function CanvasStage({
     zoomInFromWheel: viewport.zoomInFromWheel,
   });
 
-  const debugInfo = useCanvasDebugSnapshot({
-    groupHandleViewportPoints,
-    groupOverlayFrame,
-    groupOverlayViewportRect,
-    groupRotaterViewportPoint,
-    lastTestHookEvent,
-    marqueeViewportRect,
-    nodeClientRect,
-    pan: viewport.pan,
-    previewItem,
-    renderedItems,
-    renderedSelectedItems,
-    selectedDocumentItem,
-    lastDrilldownSource,
-    selectedItemIds,
-    selectedItemViewportRect,
-    selectedLineHandleRects,
-    selectedNode,
-    selectedRenderedItem,
-    selectedShapeHandleRects,
-    session,
-    showGroupInteractionHooks,
-    stageRef,
-    subgroupOutlineFrames,
-    viewportRef: viewport.viewportRef,
-    viewportSize: viewport.viewportSize,
-    zoom: viewport.zoom,
-  });
-
   return (
     <div
       className="canvas-stage-screen"
@@ -212,35 +189,128 @@ export function CanvasStage({
         viewportPan={viewport.pan}
         zoom={viewport.zoom}
       />
-      <div className="canvas-debug" aria-hidden="true">
-        <pre data-testid="stage-debug">{JSON.stringify(debugInfo)}</pre>
-        <pre data-testid="selected-item-debug">{JSON.stringify(debugInfo)}</pre>
-      </div>
-      <CanvasTestHooks
-        beginGroupDrag={beginGroupDrag}
-        beginGroupResize={beginGroupResize}
-        beginGroupRotate={beginGroupRotate}
-        beginLineHandle={beginLineHandle}
-        beginResize={beginResize}
-        beginRotate={beginRotate}
-        getViewportPointerFromClient={viewport.getViewportPointerFromClient}
-        groupHandleViewportPoints={groupHandleViewportPoints}
-        groupOverlayFrame={groupOverlayFrame}
-        groupOverlayViewportRect={groupOverlayViewportRect}
-        groupRotaterViewportPoint={groupRotaterViewportPoint}
-        handleItemPointerDown={handleItemPointerDown}
-        marqueeViewportRect={marqueeViewportRect}
-        onTestEvent={setLastTestHookEvent}
-        selectedItemViewportRect={selectedItemViewportRect}
-        selectedLineHandleRects={selectedLineHandleRects}
-        selectedRenderedItem={selectedRenderedItem}
-        selectedShapeHandleRects={selectedShapeHandleRects}
-        session={session as never}
-        showGroupInteractionHooks={showGroupInteractionHooks}
-        startPanDrag={viewport.startPanDrag}
-        toCanvasPointer={viewport.toCanvasPointer}
-        toViewportRect={viewport.toViewportRect}
-      />
+      {debugMode ? (
+        <CanvasStageDebug
+          groupHandleViewportPoints={groupHandleViewportPoints}
+          groupOverlayFrame={groupOverlayFrame}
+          groupOverlayViewportRect={groupOverlayViewportRect}
+          groupRotaterViewportPoint={groupRotaterViewportPoint}
+          lastTestHookEvent={lastTestHookEvent}
+          lastDrilldownSource={lastDrilldownSource}
+          marqueeViewportRect={marqueeViewportRect}
+          nodeClientRect={nodeClientRect}
+          pan={viewport.pan}
+          previewItem={previewItem}
+          renderedItems={renderedItems}
+          renderedSelectedItems={renderedSelectedItems}
+          selectedDocumentItem={selectedDocumentItem}
+          selectedItemIds={selectedItemIds}
+          selectedItemViewportRect={selectedItemViewportRect}
+          selectedLineHandleRects={selectedLineHandleRects}
+          selectedNode={selectedNode}
+          selectedRenderedItem={selectedRenderedItem}
+          selectedShapeHandleRects={selectedShapeHandleRects}
+          session={session as never}
+          showGroupInteractionHooks={showGroupInteractionHooks}
+          stageRef={stageRef}
+          subgroupOutlineFrames={subgroupOutlineFrames}
+          viewportRef={viewport.viewportRef}
+          viewportSize={viewport.viewportSize}
+          zoom={viewport.zoom}
+        />
+      ) : null}
+      {showCanvasTestHooks ? (
+        <CanvasTestHooks
+          beginGroupDrag={beginGroupDrag}
+          beginGroupResize={beginGroupResize}
+          beginGroupRotate={beginGroupRotate}
+          beginLineHandle={beginLineHandle}
+          beginResize={beginResize}
+          beginRotate={beginRotate}
+          getViewportPointerFromClient={viewport.getViewportPointerFromClient}
+          groupHandleViewportPoints={groupHandleViewportPoints}
+          groupOverlayFrame={groupOverlayFrame}
+          groupOverlayViewportRect={groupOverlayViewportRect}
+          groupRotaterViewportPoint={groupRotaterViewportPoint}
+          handleItemPointerDown={handleItemPointerDown}
+          marqueeViewportRect={marqueeViewportRect}
+          onTestEvent={debugMode ? setLastTestHookEvent : NOOP_TEST_EVENT}
+          selectedItemViewportRect={selectedItemViewportRect}
+          selectedLineHandleRects={selectedLineHandleRects}
+          selectedRenderedItem={selectedRenderedItem}
+          selectedShapeHandleRects={selectedShapeHandleRects}
+          session={session as never}
+          showGroupInteractionHooks={showGroupInteractionHooks}
+          startPanDrag={viewport.startPanDrag}
+          toCanvasPointer={viewport.toCanvasPointer}
+          toViewportRect={viewport.toViewportRect}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CanvasStageDebug({
+  groupHandleViewportPoints,
+  groupOverlayFrame,
+  groupOverlayViewportRect,
+  groupRotaterViewportPoint,
+  lastTestHookEvent,
+  lastDrilldownSource,
+  marqueeViewportRect,
+  nodeClientRect,
+  pan,
+  previewItem,
+  renderedItems,
+  renderedSelectedItems,
+  selectedDocumentItem,
+  selectedItemIds,
+  selectedItemViewportRect,
+  selectedLineHandleRects,
+  selectedNode,
+  selectedRenderedItem,
+  selectedShapeHandleRects,
+  session,
+  showGroupInteractionHooks,
+  stageRef,
+  subgroupOutlineFrames,
+  viewportRef,
+  viewportSize,
+  zoom,
+}: Parameters<typeof useCanvasDebugSnapshot>[0]) {
+  const debugInfo = useCanvasDebugSnapshot({
+    groupHandleViewportPoints,
+    groupOverlayFrame,
+    groupOverlayViewportRect,
+    groupRotaterViewportPoint,
+    lastTestHookEvent,
+    marqueeViewportRect,
+    nodeClientRect,
+    pan,
+    previewItem,
+    renderedItems,
+    renderedSelectedItems,
+    selectedDocumentItem,
+    lastDrilldownSource,
+    selectedItemIds,
+    selectedItemViewportRect,
+    selectedLineHandleRects,
+    selectedNode,
+    selectedRenderedItem,
+    selectedShapeHandleRects,
+    session,
+    showGroupInteractionHooks,
+    stageRef,
+    subgroupOutlineFrames,
+    viewportRef,
+    viewportSize,
+    zoom,
+  });
+
+  return (
+    <div className="canvas-debug" aria-hidden="true">
+      <pre data-testid="stage-debug">{JSON.stringify(debugInfo)}</pre>
+      <pre data-testid="selected-item-debug">{JSON.stringify(debugInfo)}</pre>
     </div>
   );
 }

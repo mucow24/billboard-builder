@@ -255,6 +255,43 @@ describe('useCanvasInteractionSession', () => {
     );
   });
 
+  it('commits an active drag on window mouseup even when the release stays inside the stage', () => {
+    const stageRef = makeStageRef();
+    stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const params = createHookParams({
+      document: createDocument([item]),
+      stageRef: stageRef.ref,
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginDrag(item, { x: 300, y: 180 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 420,
+          clientY: 210,
+        }),
+      );
+    });
+
+    expect(params.onUpdateItem).toHaveBeenCalledWith(
+      item.id,
+      expect.objectContaining({
+        x: 320,
+        y: 150,
+      }),
+    );
+    expect(result.current.session).toBeNull();
+  });
+
   it('commits resize geometry using the solver output', () => {
     const item = createRectangleItem({
       x: 200,

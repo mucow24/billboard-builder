@@ -327,6 +327,54 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.hasShapeHandles).toBe(true);
   });
 
+  test('CS-07 drags an already-selected item and commits on mouseup', async ({ page }) => {
+    const rectangle = createRectangleFixture({
+      id: 'selected-drag-rect',
+      name: 'Selected Drag Rectangle',
+      x: 140,
+      y: 160,
+      width: 180,
+      height: 110,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([rectangle]),
+      'selected-drag-rect.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 220, y: 220 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual([rectangle.id]);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+
+    await beginCanvasDrag(page, { x: 220, y: 220 });
+    await movePointerToCanvasPoint(page, { x: 340, y: 300 });
+    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
+
+    await releasePointer(page);
+
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.sessionKind).toBeNull();
+    expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual([rectangle.id]);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = (savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === rectangle.id,
+    );
+    expect(savedItem).toEqual(expect.objectContaining({ id: rectangle.id }));
+    expect(Number(savedItem?.x)).toBeGreaterThan(220);
+    expect(Number(savedItem?.y)).toBeGreaterThan(220);
+  });
+
   test('CS-16 CS-17 marquee-selects fully off-canvas and edge-crossing overflow content', async ({
     page,
   }) => {

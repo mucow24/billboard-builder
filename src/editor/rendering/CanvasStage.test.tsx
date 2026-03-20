@@ -43,7 +43,7 @@ vi.mock('konva', () => ({
   },
 }));
 
-import { CanvasStage } from './CanvasStage';
+import { CanvasStage as ActualCanvasStage } from './CanvasStage';
 import {
   createDefaultProjectDocument,
   createLineItem,
@@ -143,8 +143,13 @@ vi.mock('./useImageElement', () => ({
   useImageElement: () => null,
 }));
 
+function CanvasStage(props: React.ComponentProps<typeof ActualCanvasStage>) {
+  return <ActualCanvasStage debugMode showCanvasTestHooks {...props} />;
+}
+
 describe('CanvasStage viewport controls', () => {
   beforeEach(() => {
+    delete window.__BB_TEST__;
     Object.assign(mockInteractionSession, {
       beginDrag: vi.fn(),
       beginGroupDrag: vi.fn(),
@@ -208,6 +213,30 @@ describe('CanvasStage viewport controls', () => {
     }
 
     vi.stubGlobal('ResizeObserver', TestResizeObserver);
+  });
+
+  it('omits debug snapshot helpers when debug mode is disabled', () => {
+    render(
+      <ActualCanvasStage
+        activeTool="select"
+        debugMode={false}
+        showCanvasTestHooks={false}
+        document={createDefaultProjectDocument()}
+        selectedItemIds={[]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    expect(screen.queryByTestId('stage-debug')).toBeNull();
+    expect(screen.queryByTestId('selected-item-debug')).toBeNull();
+    expect(screen.queryByTestId('canvas-test-hooks')).toBeNull();
+    expect(window.__BB_TEST__?.captureRenderSnapshot).toBeUndefined();
   });
 
 
@@ -522,7 +551,7 @@ describe('CanvasStage viewport controls', () => {
     expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
     expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
 
-    fireEvent.mouseUp(window);
+    fireEvent.mouseUp(window, { clientX: 1400, clientY: 900 });
     expect(window.document.body.style.cursor).toBe('');
     expect(container.querySelector('[data-testid="canvas-group-overlay"]')).not.toBeNull();
   });

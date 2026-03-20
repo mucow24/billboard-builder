@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
+import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
 import { useEditorController } from './app/useEditorController';
 import { CanvasStage } from './editor/rendering/CanvasStage';
 import { ToolPalette } from './editor/ui/ToolPalette';
@@ -10,6 +11,7 @@ import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode } from './editor/document/sceneGraph';
 
 export default function App() {
+  const runtimeFlags = readEditorRuntimeFlags();
   const stageRef = useRef<Konva.Stage | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const fontInputRef = useRef<HTMLInputElement | null>(null);
@@ -91,6 +93,8 @@ export default function App() {
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
           activeTool={activeTool}
+          debugMode={runtimeFlags.debugMode}
+          showCanvasTestHooks={runtimeFlags.enableCanvasTestHooks}
           document={document}
           selectedItemIds={selectedItemIds}
           guides={guides}

@@ -230,4 +230,46 @@ describe('useCanvasViewport', () => {
 
     expect(result.current.pan).toEqual({ x: 1616, y: 796 });
   });
+
+  it('stops pan dragging on window mouseup even when the release stays inside the viewport', () => {
+    const { result } = renderHook(() =>
+      useCanvasViewport({
+        activeTool: 'select',
+        canvasHeight: 1024,
+        canvasWidth: 1024,
+      }),
+    );
+
+    const viewportElement = document.createElement('div');
+    viewportElement.getBoundingClientRect = () =>
+      ({
+        width: 1280,
+        height: 720,
+        left: 0,
+        top: 0,
+        right: 1280,
+        bottom: 720,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    act(() => {
+      result.current.viewportRef.current = viewportElement;
+    });
+
+    act(() => {
+      result.current.startPanDrag({ x: 100, y: 100 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 140,
+          clientY: 160,
+        }),
+      );
+    });
+
+    expect(result.current.handleStagePointerUp()).toBe(false);
+  });
 });

@@ -197,9 +197,7 @@ export function useCanvasViewport({
     }
 
     function handleWindowMouseUp(event: MouseEvent) {
-      if (panDragRef.current && isClientPointInsideViewport(event.clientX, event.clientY)) {
-        return;
-      }
+      void event;
       stopPanDrag();
     }
 
