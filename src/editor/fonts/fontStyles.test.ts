@@ -8,19 +8,45 @@ import {
 } from './fontStyles';
 import { createTextItem } from '../document/documentDefaults';
 
+interface FontSetMock {
+  addEventListener: ReturnType<typeof vi.fn>;
+  check?: ReturnType<typeof vi.fn>;
+  dispatch: (eventName: string) => void;
+}
+
+function createFontSetMock(mockCheck?: ReturnType<typeof vi.fn>): FontSetMock {
+  const listeners = new Map<string, Set<() => void>>();
+
+  return {
+    addEventListener: vi.fn((eventName: string, listener: () => void) => {
+      const current = listeners.get(eventName) ?? new Set<() => void>();
+      current.add(listener);
+      listeners.set(eventName, current);
+    }),
+    check: mockCheck,
+    dispatch(eventName: string) {
+      listeners.get(eventName)?.forEach((listener) => listener());
+    },
+  };
+}
+
 function setFontCheck(mockCheck?: ReturnType<typeof vi.fn>) {
   if (!mockCheck) {
     Object.defineProperty(document, 'fonts', {
       configurable: true,
       value: {},
     });
-    return;
+    return null;
   }
+
+  const fontSet = createFontSetMock(mockCheck);
 
   Object.defineProperty(document, 'fonts', {
     configurable: true,
-    value: { check: mockCheck },
+    value: fontSet,
   });
+
+  return fontSet;
 }
 
 describe('fontStyles', () => {
@@ -97,5 +123,38 @@ describe('fontStyles', () => {
 
     expect(getCanvasFontDeclaration(item)).toBe('italic bold 72px "Poster Sans"');
     expect(getRenderableCanvasFontDeclaration(item)).toBe('italic bold 72px "Poster Sans"');
+  });
+
+  it('caches repeated font variant checks for the same family, weight, and style', () => {
+    const check = vi.fn().mockReturnValue(true);
+    setFontCheck(check);
+    const item = createTextItem({
+      fontFamily: 'Poster Sans',
+      fontStyle: 'italic',
+      fontWeight: 'bold',
+    });
+
+    expect(getRenderableCombinedFontStyle(item)).toBe('bold italic');
+    expect(getRenderableCombinedFontStyle(item)).toBe('bold italic');
+    expect(check).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears cached font variant checks when the font set finishes loading', () => {
+    const check = vi.fn().mockReturnValue(true);
+    const fontSet = setFontCheck(check);
+    const item = createTextItem({
+      fontFamily: 'Poster Sans',
+      fontStyle: 'italic',
+      fontWeight: 'bold',
+    });
+
+    expect(getRenderableCombinedFontStyle(item)).toBe('bold italic');
+    expect(getRenderableCombinedFontStyle(item)).toBe('bold italic');
+    expect(check).toHaveBeenCalledTimes(1);
+
+    fontSet?.dispatch('loadingdone');
+
+    expect(getRenderableCombinedFontStyle(item)).toBe('bold italic');
+    expect(check).toHaveBeenCalledTimes(2);
   });
 });
