@@ -280,7 +280,7 @@ test.describe('editor canvas entrypoints', () => {
     await expectNoActiveSelection(page);
   });
 
-  test('CS-15 selects fully off-canvas and edge-overflow items through the overflow preview layer', async ({
+  test('CS-15 selects fully off-canvas and edge-overflow items directly in the unclipped scene', async ({
     page,
   }) => {
     const fullyOutside = createRectangleFixture({
@@ -375,7 +375,7 @@ test.describe('editor canvas entrypoints', () => {
     expect(Number(savedItem?.y)).toBeGreaterThan(220);
   });
 
-  test('CS-16 CS-17 marquee-selects fully off-canvas and edge-crossing overflow content', async ({
+  test('CS-16 CS-17 marquee-selects fully off-canvas and edge-crossing content directly in the unclipped scene', async ({
     page,
   }) => {
     const fullyOutside = createRectangleFixture({
@@ -440,7 +440,7 @@ test.describe('editor canvas entrypoints', () => {
     ]);
   });
 
-  test('CS-18 starts a one-gesture pickup drag from fully off-canvas overflow content', async ({
+  test('CS-18 starts a one-gesture pickup drag from fully off-canvas content in the unclipped scene', async ({
     page,
   }) => {
     const offCanvas = createRectangleFixture({

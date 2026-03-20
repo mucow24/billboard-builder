@@ -24,6 +24,7 @@ export interface CanvasStageProps {
   activeTool: CanvasTool;
   debugMode?: boolean;
   showCanvasTestHooks?: boolean;
+  showExportBoundsCue?: boolean;
   document: ProjectDocument;
   selectedItemIds: string[];
   guides: GuideLine[];
@@ -42,6 +43,7 @@ export function CanvasStage({
   activeTool,
   debugMode = false,
   showCanvasTestHooks = false,
+  showExportBoundsCue = false,
   document,
   selectedItemIds,
   guides,
@@ -141,12 +143,36 @@ export function CanvasStage({
     zoomInFromWheel: viewport.zoomInFromWheel,
   });
 
+  const exportCuePanels = buildExportCuePanels(
+    viewport.toViewportRect({
+      x: 0,
+      y: 0,
+      width: document.canvas.width,
+      height: document.canvas.height,
+    }),
+    viewport.viewportSize,
+  );
+
   return (
     <div
       className="canvas-stage-screen"
       ref={viewport.viewportRef}
       data-testid="canvas-stage-root"
     >
+      <div
+        className={showExportBoundsCue ? 'canvas-export-bounds-cue active' : 'canvas-export-bounds-cue'}
+        data-testid="export-bounds-cue"
+        aria-hidden="true"
+      >
+        {exportCuePanels.map((panel) => (
+          <div
+            key={panel.side}
+            className={`canvas-export-bounds-panel canvas-export-bounds-panel-${panel.side}`}
+            data-testid={`export-bounds-cue-${panel.side}`}
+            style={toBoundsCueStyle(panel.rect)}
+          />
+        ))}
+      </div>
       <CanvasViewportHud
         canvasHeight={document.canvas.height}
         canvasWidth={document.canvas.width}
@@ -248,6 +274,79 @@ export function CanvasStage({
       ) : null}
     </div>
   );
+}
+
+type ExportCuePanel = {
+  side: 'top' | 'right' | 'bottom' | 'left';
+  rect: { left: number; top: number; width: number; height: number };
+};
+
+function buildExportCuePanels(
+  canvasRect: { left: number; top: number; width: number; height: number },
+  viewportSize: { width: number; height: number },
+): ExportCuePanel[] {
+  const viewportWidth = Math.max(0, viewportSize.width);
+  const viewportHeight = Math.max(0, viewportSize.height);
+  const canvasLeft = clampNumber(canvasRect.left, 0, viewportWidth);
+  const canvasTop = clampNumber(canvasRect.top, 0, viewportHeight);
+  const canvasRight = clampNumber(canvasRect.left + canvasRect.width, 0, viewportWidth);
+  const canvasBottom = clampNumber(canvasRect.top + canvasRect.height, 0, viewportHeight);
+  const visibleCanvasWidth = canvasRight - canvasLeft;
+  const visibleCanvasHeight = canvasBottom - canvasTop;
+
+  if (visibleCanvasWidth <= 0 || visibleCanvasHeight <= 0) {
+    return [
+      {
+        side: 'top',
+        rect: { left: 0, top: 0, width: viewportWidth, height: viewportHeight },
+      },
+      { side: 'right', rect: { left: viewportWidth, top: 0, width: 0, height: 0 } },
+      { side: 'bottom', rect: { left: 0, top: viewportHeight, width: 0, height: 0 } },
+      { side: 'left', rect: { left: 0, top: 0, width: 0, height: 0 } },
+    ];
+  }
+
+  return [
+    {
+      side: 'top',
+      rect: { left: 0, top: 0, width: viewportWidth, height: canvasTop },
+    },
+    {
+      side: 'right',
+      rect: {
+        left: canvasRight,
+        top: canvasTop,
+        width: viewportWidth - canvasRight,
+        height: visibleCanvasHeight,
+      },
+    },
+    {
+      side: 'bottom',
+      rect: {
+        left: 0,
+        top: canvasBottom,
+        width: viewportWidth,
+        height: viewportHeight - canvasBottom,
+      },
+    },
+    {
+      side: 'left',
+      rect: { left: 0, top: canvasTop, width: canvasLeft, height: visibleCanvasHeight },
+    },
+  ];
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function toBoundsCueStyle(rect: { left: number; top: number; width: number; height: number }) {
+  return {
+    left: `${Math.max(0, rect.left)}px`,
+    top: `${Math.max(0, rect.top)}px`,
+    width: `${Math.max(0, rect.width)}px`,
+    height: `${Math.max(0, rect.height)}px`,
+  };
 }
 
 function CanvasStageDebug({

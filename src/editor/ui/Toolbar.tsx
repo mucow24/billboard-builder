@@ -20,6 +20,7 @@ interface ToolbarProps {
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
+  onExportIntentChange?: (active: boolean) => void;
   onFontUpload: () => void;
   onGroup: () => void;
   onImageUpload: () => void;
@@ -112,6 +113,7 @@ export function Toolbar({
   onCanvasSizeChange,
   onDelete,
   onExport,
+  onExportIntentChange,
   onFontUpload,
   onGroup,
   onImageUpload,
@@ -128,9 +130,17 @@ export function Toolbar({
   const sizeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const uploadTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [openMenu, setOpenMenu] = useState<ToolbarMenuName | null>(null);
+  const [isExportHovered, setIsExportHovered] = useState(false);
+  const [isExportFocused, setIsExportFocused] = useState(false);
   const canvasMenuId = useId();
   const sizeMenuId = useId();
   const uploadMenuId = useId();
+
+  useEffect(() => {
+    onExportIntentChange?.(isExportHovered || isExportFocused);
+  }, [isExportFocused, isExportHovered, onExportIntentChange]);
+
+  useEffect(() => () => onExportIntentChange?.(false), [onExportIntentChange]);
 
   useEffect(() => {
     if (!openMenu) {
@@ -248,6 +258,10 @@ export function Toolbar({
           type="button"
           className="top-toolbar-button top-toolbar-control top-toolbar-button-export"
           onClick={onExport}
+          onMouseEnter={() => setIsExportHovered(true)}
+          onMouseLeave={() => setIsExportHovered(false)}
+          onFocus={() => setIsExportFocused(true)}
+          onBlur={() => setIsExportFocused(false)}
         >
           <ToolbarIcon>
             <path d="M10 3v9" />

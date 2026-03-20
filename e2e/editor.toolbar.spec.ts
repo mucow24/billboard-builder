@@ -3,6 +3,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import {
+  canvasPointToPage,
   chooseCanvasPreset,
   clickCanvas,
   clickToolbarPopoverItem,
@@ -70,6 +71,56 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: '512 x 512', exact: true })).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByLabel('Canvas width')).toHaveValue('640');
     await expect(page.getByLabel('Canvas height')).toHaveValue('480');
+  });
+
+  test('shows the export-bounds cue on hover and focus without covering the canvas interior', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createRectangleFixture({
+          id: 'toolbar-export-off-canvas',
+          x: -180,
+          y: 180,
+          width: 180,
+          height: 140,
+          fill: '#f97316',
+          stroke: '#ea580cff',
+        }),
+      ]),
+      'toolbar-export-cue.json',
+    );
+
+    const exportButton = page.getByRole('button', { name: 'Export PNG' });
+    const canvasButton = page.getByRole('button', { name: 'Canvas', exact: true });
+    const exportCue = page.getByTestId('export-bounds-cue');
+    const cuePanels = [
+      page.getByTestId('export-bounds-cue-top'),
+      page.getByTestId('export-bounds-cue-right'),
+      page.getByTestId('export-bounds-cue-bottom'),
+      page.getByTestId('export-bounds-cue-left'),
+    ];
+    const canvasCenter = await canvasPointToPage(page, { x: 512, y: 512 });
+
+    await expect(exportCue).not.toHaveClass(/active/);
+
+    await exportButton.hover();
+    await expect(exportCue).toHaveClass(/active/);
+
+    for (const panel of cuePanels) {
+      const bounds = await panel.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(isPointInsideRect(canvasCenter, bounds!)).toBe(false);
+    }
+
+    await canvasButton.hover();
+    await expect(exportCue).not.toHaveClass(/active/);
+
+    await exportButton.focus();
+    await expect(exportCue).toHaveClass(/active/);
+
+    await canvasButton.focus();
+    await expect(exportCue).not.toHaveClass(/active/);
   });
 
   test('keeps action icons visible and updates enabled states through real selection and history flows', async ({ page }) => {
@@ -201,3 +252,15 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
   });
 });
+
+function isPointInsideRect(
+  point: { x: number; y: number },
+  rect: { x: number; y: number; width: number; height: number },
+) {
+  return (
+    point.x >= rect.x &&
+    point.x <= rect.x + rect.width &&
+    point.y >= rect.y &&
+    point.y <= rect.y + rect.height
+  );
+}

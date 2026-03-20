@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
 import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
@@ -17,6 +17,7 @@ export default function App() {
   const fontInputRef = useRef<HTMLInputElement | null>(null);
   const openInputRef = useRef<HTMLInputElement | null>(null);
   const [guides, setGuides] = useState<GuideLine[]>([]);
+  const [showExportBoundsCue, setShowExportBoundsCue] = useState(false);
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -88,6 +89,10 @@ export default function App() {
     };
   }, []);
 
+  const handleExportIntentChange = useCallback((active: boolean) => {
+    setShowExportBoundsCue(active);
+  }, []);
+
   return (
     <div className="app-shell">
       <main className="editor-layout editor-layout-overlay">
@@ -95,6 +100,7 @@ export default function App() {
           activeTool={activeTool}
           debugMode={runtimeFlags.debugMode}
           showCanvasTestHooks={runtimeFlags.enableCanvasTestHooks}
+          showExportBoundsCue={showExportBoundsCue}
           document={document}
           selectedItemIds={selectedItemIds}
           guides={guides}
@@ -127,6 +133,7 @@ export default function App() {
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedItems}
               onExport={() => handleExport(stageRef.current)}
+              onExportIntentChange={handleExportIntentChange}
               onFontUpload={() => fontInputRef.current?.click()}
               onGroup={groupSelectedNodes}
               onImageUpload={() => imageInputRef.current?.click()}

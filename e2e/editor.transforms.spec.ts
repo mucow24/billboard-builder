@@ -243,7 +243,7 @@ test.describe('editor transforms', () => {
     expect(Number(unsnappedItem?.y)).toBe(120);
   });
 
-  test('ST-15 supports off-canvas rectangle resize through the real overflow preview surface', async ({
+  test('ST-15 supports off-canvas rectangle resize directly through the unclipped scene', async ({
     page,
   }) => {
     const rectangle = createRectangleFixture({

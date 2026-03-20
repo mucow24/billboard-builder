@@ -285,7 +285,7 @@ describe('CanvasStage viewport controls', () => {
     expect(canvasRect).toHaveAttribute('data-prop-stroke', 'rgba(0, 0, 0, 0.14)');
   });
 
-  it('renders an interactive overflow preview layer below the canvas surface while keeping the main content clipped', () => {
+  it('renders the main scene unclipped without the overflow preview layer and frames the canvas with the export cue', () => {
     const document = createDefaultProjectDocument();
     document.background = '#11223344';
     const overflowRectangle = createRectangleItem({
@@ -303,6 +303,7 @@ describe('CanvasStage viewport controls', () => {
     const { container } = render(
       <CanvasStage
         activeTool="select"
+        showExportBoundsCue
         document={document}
         selectedItemIds={[]}
         guides={[]}
@@ -318,66 +319,30 @@ describe('CanvasStage viewport controls', () => {
     const overflowLayer = container.querySelector(
       '[data-konva-node="Group"][data-prop-name="overflow-preview-layer export-exclude"]',
     );
-    const overflowClip = container.querySelector(
-      '[data-konva-node="Group"][data-prop-name="overflow-preview-clip export-exclude"]',
-    );
-    const overflowContent = container.querySelector(
-      '[data-konva-node="Group"][data-prop-opacity="0.15"]',
-    );
-    const overflowVeil = container.querySelector(
-      '[data-konva-node="Rect"][data-prop-name="overflow-preview-veil export-exclude"]',
-    );
     const canvasRect = container.querySelector(
       '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
     );
     const contentLayer = container.querySelector(
       '[data-konva-node="Group"][data-prop-name="export-content"]',
     );
+    const exportCue = screen.getByTestId('export-bounds-cue');
+    const topPanel = screen.getByTestId('export-bounds-cue-top');
+    const rightPanel = screen.getByTestId('export-bounds-cue-right');
+    const bottomPanel = screen.getByTestId('export-bounds-cue-bottom');
+    const leftPanel = screen.getByTestId('export-bounds-cue-left');
 
-    expect(overflowLayer).not.toBeNull();
-    expect(overflowClip).not.toBeNull();
-    expect(overflowContent).not.toBeNull();
-    expect(overflowVeil).not.toBeNull();
-    expect(overflowVeil).toHaveAttribute('data-prop-fill', '#0b1220');
-    expect(overflowVeil).toHaveAttribute('data-prop-opacity', '0.5');
-    expect(overflowVeil).toHaveAttribute('data-prop-globalcompositeoperation', 'source-atop');
-    expect(overflowVeil).toHaveAttribute('data-prop-listening', 'false');
+    expect(overflowLayer).toBeNull();
     expect(contentLayer).not.toBeNull();
-    expect(contentLayer).toHaveAttribute('data-prop-clipx', '0');
-    expect(contentLayer).toHaveAttribute('data-prop-clipy', '0');
-    expect(contentLayer).toHaveAttribute('data-prop-clipwidth', '1024');
-    expect(contentLayer).toHaveAttribute('data-prop-clipheight', '1024');
+    expect(contentLayer).not.toHaveAttribute('data-prop-clipx');
+    expect(contentLayer).not.toHaveAttribute('data-prop-clipy');
+    expect(contentLayer).not.toHaveAttribute('data-prop-clipwidth');
+    expect(contentLayer).not.toHaveAttribute('data-prop-clipheight');
     expect(canvasRect).not.toBeNull();
-    const overflowLayerElement = overflowLayer as Element;
-    expect(
-      overflowLayerElement.compareDocumentPosition(canvasRect as Element) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).not.toBe(0);
-
-    const overflowShapeGroup = overflowLayerElement.querySelector(
-      `[data-konva-node="Group"][data-prop-x="${overflowRectangle.x}"][data-prop-y="${overflowRectangle.y}"]`,
-    );
-    expect(overflowShapeGroup).not.toBeNull();
-
-    fireEvent.mouseDown(overflowShapeGroup!, {
-      button: 0,
-      clientX: 300,
-      clientY: 240,
-    });
-    fireEvent.dblClick(overflowShapeGroup!, {
-      button: 0,
-      clientX: 300,
-      clientY: 240,
-    });
-
-    expect(mockInteractionSession.handleItemPointerDown).toHaveBeenCalledWith(
-      overflowRectangle,
-      overflowRectangle.id,
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-      false,
-      expect.anything(),
-    );
-    expect(mockInteractionSession.handleItemDoubleClick).toHaveBeenCalledWith(overflowRectangle);
+    expect(exportCue).toHaveClass('canvas-export-bounds-cue', 'active');
+    expect(topPanel).toHaveStyle({ left: '0px', top: '0px', width: '1280px', height: '36px' });
+    expect(rightPanel).toHaveStyle({ left: '964px', top: '36px', width: '316px', height: '648px' });
+    expect(bottomPanel).toHaveStyle({ left: '0px', top: '684px', width: '1280px', height: '36px' });
+    expect(leftPanel).toHaveStyle({ left: '0px', top: '36px', width: '316px', height: '648px' });
   });
 
 

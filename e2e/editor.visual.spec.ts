@@ -86,13 +86,13 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('right-edge-snap-shell.png');
   });
 
-  test('captures under-background overflow preview outside the canvas bounds', async ({ page }) => {
+  test('captures unclipped off-canvas content outside the canvas bounds', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(
       page,
       createProjectDocument([
         createRectangleFixture({
-          id: 'overflow-preview-rect',
+          id: 'off-canvas-visible-rect',
           x: -72,
           y: 180,
           width: 280,
@@ -111,19 +111,19 @@ test.describe('editor visual regression', () => {
           zIndex: 1,
         }),
       ]),
-      'overflow-preview.json',
+      'off-canvas-visible.json',
     );
 
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('overflow-preview-outside-canvas.png');
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('off-canvas-visible.png');
   });
 
-  test('captures overflow preview with a translucent canvas background without contaminating the canvas interior', async ({
+  test('captures the export-bounds cue with a translucent canvas background without contaminating the canvas interior', async ({
     page,
   }) => {
     await openFreshEditor(page);
     const document = createProjectDocument([
       createRectangleFixture({
-        id: 'overflow-preview-rect',
+        id: 'off-canvas-visible-rect',
         x: -72,
         y: 180,
         width: 280,
@@ -144,10 +144,11 @@ test.describe('editor visual regression', () => {
     ]);
     document.background = '#11223344';
 
-    await uploadProject(page, document, 'overflow-preview-translucent.json');
+    await uploadProject(page, document, 'export-bounds-cue-translucent.json');
+    await page.getByRole('button', { name: 'Export PNG' }).hover();
 
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot(
-      'overflow-preview-translucent-background.png',
+      'export-bounds-cue-translucent-background.png',
     );
   });
 

@@ -90,6 +90,27 @@ describe('Toolbar', () => {
     expect(onFontUpload).toHaveBeenCalledOnce();
   });
 
+  it('publishes export-intent activity on hover and focus for the export button', async () => {
+    const user = userEvent.setup();
+    const onExportIntentChange = vi.fn();
+
+    renderToolbar({ onExportIntentChange });
+
+    const exportButton = screen.getByRole('button', { name: 'Export PNG' });
+
+    await user.hover(exportButton);
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(true);
+
+    await user.unhover(exportButton);
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(false);
+
+    fireEvent.focus(exportButton);
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.blur(exportButton);
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(false);
+  });
+
   it('updates preset and custom canvas dimensions through the size menu callbacks', async () => {
     const user = userEvent.setup();
     const onCanvasSizeChange = vi.fn();

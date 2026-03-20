@@ -13,7 +13,6 @@ import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { CanvasGuidesLayer } from './CanvasGuidesLayer';
 import { CanvasItemLayer } from './CanvasItemLayer';
-import { CanvasOverflowPreviewLayer } from './CanvasOverflowPreviewLayer';
 import { CanvasPreviewLayer } from './CanvasPreviewLayer';
 import { CanvasSurface, CanvasWorkspaceBackdrop } from './CanvasSurface';
 import { GroupSelectionOverlay } from './GroupSelectionOverlay';
@@ -146,27 +145,8 @@ export function CanvasScene({
           height={document.canvas.height}
         >
           <CanvasWorkspaceBackdrop />
-          <CanvasOverflowPreviewLayer
-            activeTool={activeTool}
-            canvasHeight={document.canvas.height}
-            canvasWidth={document.canvas.width}
-            onBeginLineHandle={beginLineHandle}
-            onBeginResize={beginResize}
-            onBeginRotate={beginRotate}
-            onItemDoubleClick={handleItemDoubleClick}
-            onItemPointerDown={handleItemPointerDown}
-            renderedItems={renderedItems}
-            startPanDrag={startPanDrag}
-            toCanvasPointer={toCanvasPointer}
-          />
           <CanvasSurface document={document} />
-          <Group
-            name="export-content"
-            clipX={0}
-            clipY={0}
-            clipWidth={document.canvas.width}
-            clipHeight={document.canvas.height}
-          >
+          <Group name="export-content">
             <CanvasItemLayer
               activeTool={activeTool}
               items={renderedItems}
