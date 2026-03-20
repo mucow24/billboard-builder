@@ -17,13 +17,15 @@ import {
   selectTool,
   createRectangleFixture,
   createTextFixture,
+  uploadProject,
 } from './support/editor';
 
 test.describe('editor smoke flows', () => {
   test('boots and creates rectangle, text, and line items from the canvas', async ({ page }) => {
     await openFreshEditor(page);
 
-    await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();
 
@@ -100,11 +102,7 @@ test.describe('editor smoke flows', () => {
     await page.evaluate(() => {
       (document.activeElement as HTMLElement | null)?.blur?.();
     });
-    await page.getByTestId('project-open-input').setInputFiles({
-      name: 'grouped-infrastructure.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(groupedDocument), 'utf8'),
-    });
+    await uploadProject(page, groupedDocument, 'grouped-infrastructure.json');
 
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Infrastructure Group', exact: true })).toBeVisible();

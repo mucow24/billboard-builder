@@ -1,74 +1,118 @@
+import type { ComponentProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Toolbar } from './Toolbar';
 
+function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) {
+  const props: ComponentProps<typeof Toolbar> = {
+    canvas: { width: 1024, height: 512, presetId: 'landscape' },
+    canDelete: false,
+    canGroup: false,
+    canRedo: false,
+    canSaveTemplate: false,
+    canUndo: false,
+    canUngroup: false,
+    onCanvasSizeChange: vi.fn(),
+    onDelete: vi.fn(),
+    onExport: vi.fn(),
+    onFontUpload: vi.fn(),
+    onGroup: vi.fn(),
+    onImageUpload: vi.fn(),
+    onLoad: vi.fn(),
+    onNewProject: vi.fn(),
+    onRedo: vi.fn(),
+    onSave: vi.fn(),
+    onSaveTemplate: vi.fn(),
+    onUndo: vi.fn(),
+    onUngroup: vi.fn(),
+    ...overrides,
+  };
+
+  return {
+    ...render(<Toolbar {...props} />),
+    props,
+  };
+}
+
 describe('Toolbar', () => {
-  it('renders undo and redo as disabled when history is unavailable', () => {
-    render(
-      <Toolbar
-        canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
-        canGroup={false}
-        canUngroup={false}
-        canUndo={false}
-        canRedo={false}
-        canSaveTemplate={false}
-        onCanvasSizeChange={vi.fn()}
-        onDelete={vi.fn()}
-        onExport={vi.fn()}
-        onFontUpload={vi.fn()}
-        onGroup={vi.fn()}
-        onImageUpload={vi.fn()}
-        onLoad={vi.fn()}
-        onNewProject={vi.fn()}
-        onRedo={vi.fn()}
-        onSave={vi.fn()}
-        onSaveTemplate={vi.fn()}
-        onUndo={vi.fn()}
-        onUngroup={vi.fn()}
-      />
-    );
+  it('renders the redesigned toolbar controls and always-visible action icons', () => {
+    renderToolbar();
+
+    expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Size' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Group' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save as template' })).toBeDisabled();
   });
 
-  it('updates preset and custom canvas dimensions through callbacks', async () => {
+  it('routes canvas and upload popover actions through the existing callbacks', async () => {
+    const user = userEvent.setup();
+    const onLoad = vi.fn();
+    const onSave = vi.fn();
+    const onNewProject = vi.fn();
+    const onImageUpload = vi.fn();
+    const onFontUpload = vi.fn();
+
+    renderToolbar({
+      onFontUpload,
+      onImageUpload,
+      onLoad,
+      onNewProject,
+      onSave,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Load...' }));
+    expect(onLoad).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(onNewProject).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Upload' }));
+    await user.click(screen.getByRole('button', { name: 'Image...' }));
+    expect(onImageUpload).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Upload' }));
+    await user.click(screen.getByRole('button', { name: 'Font...' }));
+    expect(onFontUpload).toHaveBeenCalledOnce();
+  });
+
+  it('updates preset and custom canvas dimensions through the size menu callbacks', async () => {
     const user = userEvent.setup();
     const onCanvasSizeChange = vi.fn();
 
-    render(
-      <Toolbar
-        canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
-        canGroup={false}
-        canUngroup={false}
-        canUndo
-        canRedo
-        canSaveTemplate={false}
-        onCanvasSizeChange={onCanvasSizeChange}
-        onDelete={vi.fn()}
-        onExport={vi.fn()}
-        onFontUpload={vi.fn()}
-        onGroup={vi.fn()}
-        onImageUpload={vi.fn()}
-        onLoad={vi.fn()}
-        onNewProject={vi.fn()}
-        onRedo={vi.fn()}
-        onSave={vi.fn()}
-        onSaveTemplate={vi.fn()}
-        onUndo={vi.fn()}
-        onUngroup={vi.fn()}
-      />
-    );
+    renderToolbar({
+      canDelete: true,
+      canRedo: true,
+      canSaveTemplate: true,
+      canUndo: true,
+      onCanvasSizeChange,
+    });
 
-    await user.selectOptions(screen.getByLabelText('Canvas preset'), 'square-sm');
+    await user.click(screen.getByRole('button', { name: 'Size' }));
+    await user.click(screen.getByRole('button', { name: '512 x 512' }));
+
+    await user.click(screen.getByRole('button', { name: 'Size' }));
     fireEvent.change(screen.getByLabelText('Canvas width'), {
       target: { value: '640' },
     });
     fireEvent.change(screen.getByLabelText('Canvas height'), {
       target: { value: '480' },
     });
+
     expect(onCanvasSizeChange).toHaveBeenCalledWith({
       width: 512,
       height: 512,
@@ -86,61 +130,36 @@ describe('Toolbar', () => {
     });
   });
 
-  it('shows save as template in the top bar only when a selection exists', async () => {
+  it('keeps the size menu open while editing custom fields and closes popovers on outside click, escape, and tab', async () => {
     const user = userEvent.setup();
-    const onSaveTemplate = vi.fn();
+    renderToolbar();
 
-    const { rerender } = render(
-      <Toolbar
-        canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
-        canGroup={false}
-        canRedo
-        canSaveTemplate={false}
-        canUndo
-        canUngroup={false}
-        onCanvasSizeChange={vi.fn()}
-        onDelete={vi.fn()}
-        onExport={vi.fn()}
-        onFontUpload={vi.fn()}
-        onGroup={vi.fn()}
-        onImageUpload={vi.fn()}
-        onLoad={vi.fn()}
-        onNewProject={vi.fn()}
-        onRedo={vi.fn()}
-        onSave={vi.fn()}
-        onSaveTemplate={onSaveTemplate}
-        onUndo={vi.fn()}
-        onUngroup={vi.fn()}
-      />
-    );
+    const canvasTrigger = screen.getByRole('button', { name: 'Canvas' });
 
-    expect(screen.queryByRole('button', { name: 'Save as template' })).not.toBeInTheDocument();
+    await user.click(canvasTrigger);
+    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
 
-    rerender(
-      <Toolbar
-        canvas={{ width: 1024, height: 512, presetId: 'landscape' }}
-        canGroup={false}
-        canRedo
-        canSaveTemplate
-        canUndo
-        canUngroup={false}
-        onCanvasSizeChange={vi.fn()}
-        onDelete={vi.fn()}
-        onExport={vi.fn()}
-        onFontUpload={vi.fn()}
-        onGroup={vi.fn()}
-        onImageUpload={vi.fn()}
-        onLoad={vi.fn()}
-        onNewProject={vi.fn()}
-        onRedo={vi.fn()}
-        onSave={vi.fn()}
-        onSaveTemplate={onSaveTemplate}
-        onUndo={vi.fn()}
-        onUngroup={vi.fn()}
-      />
-    );
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Save as template' }));
-    expect(onSaveTemplate).toHaveBeenCalledOnce();
+    await user.click(canvasTrigger);
+    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
+    expect(canvasTrigger).toHaveFocus();
+
+    await user.click(canvasTrigger);
+    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+
+    await user.tab();
+    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
+
+    const sizeTrigger = screen.getByRole('button', { name: 'Size' });
+    await user.click(sizeTrigger);
+    const widthField = screen.getByLabelText('Canvas width');
+    await user.click(widthField);
+    expect(widthField).toHaveFocus();
+    expect(screen.getByRole('button', { name: '512 x 512' })).toBeVisible();
   });
 });

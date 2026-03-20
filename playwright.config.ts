@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const previewPort = 4173;
+const playwrightEnv = { ...process.env };
+
+// Playwright child processes set FORCE_COLOR, which makes Node warn if NO_COLOR is inherited too.
+delete playwrightEnv.NO_COLOR;
+delete process.env.NO_COLOR;
 
 export default defineConfig({
   testDir: './e2e',
@@ -28,6 +33,7 @@ export default defineConfig({
   },
   webServer: {
     command: `npm run build && vite preview --host 127.0.0.1 --port ${previewPort}`,
+    env: playwrightEnv,
     port: previewPort,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

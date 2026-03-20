@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { expect, type Download, type Locator, type Page } from '@playwright/test';
+import { expect, type Download, type FileChooser, type Locator, type Page } from '@playwright/test';
 
 export const APP_CLIPBOARD_MIME_TYPE = 'application/x-billboard-builder-selection+json';
 
@@ -678,8 +678,31 @@ export async function doubleClickLayerRow(page: Page, name: string) {
   await page.getByRole('button', { name, exact: true }).dblclick();
 }
 
+export async function openToolbarPopover(page: Page, triggerName: string) {
+  await page.getByRole('button', { name: triggerName, exact: true }).click();
+}
+
+export async function clickToolbarPopoverItem(page: Page, triggerName: string, itemName: string) {
+  await openToolbarPopover(page, triggerName);
+  await page.getByRole('button', { name: itemName, exact: true }).click();
+}
+
+export async function chooseCanvasPreset(page: Page, presetName: string) {
+  await page.getByRole('button', { name: 'Size', exact: true }).click();
+  await page.getByRole('button', { name: presetName, exact: true }).click();
+}
+
+export async function startToolbarFileChooser(page: Page, triggerName: string, itemName: string): Promise<FileChooser> {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    clickToolbarPopoverItem(page, triggerName, itemName),
+  ]);
+  return chooser;
+}
+
 export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
-  await page.getByTestId('project-open-input').setInputFiles({
+  const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+  await chooser.setFiles({
     name: fileName,
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(document), 'utf8'),
@@ -689,7 +712,8 @@ export async function uploadProject(page: Page, document: Record<string, unknown
 export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
   const svg = buildSvgFixture();
 
-  await page.getByTestId('image-upload-input').setInputFiles({
+  const chooser = await startToolbarFileChooser(page, 'Upload', 'Image...');
+  await chooser.setFiles({
     name,
     mimeType: 'image/svg+xml',
     buffer: Buffer.from(svg, 'utf8'),
@@ -697,7 +721,8 @@ export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
 }
 
 export async function uploadFont(page: Page, filePath: string) {
-  await page.getByTestId('font-upload-input').setInputFiles(filePath);
+  const chooser = await startToolbarFileChooser(page, 'Upload', 'Font...');
+  await chooser.setFiles(filePath);
 }
 
 export async function captureDownload(page: Page, action: () => Promise<void>) {
@@ -711,7 +736,7 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await page.getByRole('button', { name: 'Save', exact: true }).click();
+      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
     }),
   );
 }

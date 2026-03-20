@@ -6,6 +6,7 @@ import {
   captureDownload,
   clearPersistence,
   clickCanvas,
+  clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createProjectDocument,
@@ -19,6 +20,7 @@ import {
   readDownloadedPngSize,
   setCanvasTestHooksEnabled,
   seedPersistence,
+  startToolbarFileChooser,
   uploadFont,
   uploadProject,
   uploadSvgImage,
@@ -57,7 +59,7 @@ test.describe('editor file and persistence flows', () => {
     await uploadProject(page, document, 'roundtrip.json');
 
     const projectDownload = await captureDownload(page, async () => {
-      await page.getByRole('button', { name: 'Save', exact: true }).click();
+      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
     });
     const savedDocument = await readDownloadedJson(projectDownload);
 
@@ -65,7 +67,7 @@ test.describe('editor file and persistence flows', () => {
     expect((savedDocument.nodes as Array<unknown>).length).toBe(2);
     expect(savedDocument.canvas).toEqual(document.canvas);
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(0);
 
@@ -73,7 +75,8 @@ test.describe('editor file and persistence flows', () => {
     if (!savedPath) {
       throw new Error('Saved project download did not produce a local file.');
     }
-    await page.getByTestId('project-open-input').setInputFiles(savedPath);
+    const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+    await chooser.setFiles(savedPath);
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(2);
 
@@ -93,7 +96,7 @@ test.describe('editor file and persistence flows', () => {
     await openFreshEditor(page);
     await uploadProject(page, document, 'new-project-fixture.json');
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(0);
     await openPropertiesTab(page);
@@ -101,7 +104,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
+        await clickToolbarPopoverItem(page, 'Canvas', 'Save');
       }),
     );
     expect(savedProject.nodes).toEqual([]);
@@ -163,7 +166,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedGroupedDocument = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
+        await clickToolbarPopoverItem(page, 'Canvas', 'Save');
       }),
     );
 
@@ -180,7 +183,7 @@ test.describe('editor file and persistence flows', () => {
       }),
     ]);
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await uploadProject(page, savedGroupedDocument, 'persisted-group-roundtrip.json');
 
     await openLayersTab(page);

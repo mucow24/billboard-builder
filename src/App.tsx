@@ -114,6 +114,7 @@ export default function App() {
           <div ref={topbarRef} className="overlay-topbar">
             <Toolbar
               canvas={document.canvas}
+              canDelete={selectedNodeIds.length > 0}
               canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
               canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
               canUndo={canUndo}

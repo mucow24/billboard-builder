@@ -4,6 +4,7 @@ import {
   assertFocusNotInToolbarOrInputs,
   assertNoDocumentTextSelection,
   clickCanvas,
+  clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createLineFixture,
@@ -162,7 +163,7 @@ test.describe('editor groups', () => {
       }),
     ]);
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await uploadProject(page, groupedDocument, 'grouped.json');
 
     await openLayersTab(page);

@@ -135,13 +135,10 @@ describe('App shell', () => {
   it('renders the top toolbar controls', async () => {
     await renderApp();
 
-    expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload font' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Canvas preset')).toBeInTheDocument();
-    expect(screen.getByLabelText('Canvas width')).toBeInTheDocument();
-    expect(screen.getByLabelText('Canvas height')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Size' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
   });
 
   it('switches into rectangle creation mode from the tool palette', async () => {
@@ -457,8 +454,11 @@ describe('App shell', () => {
     expect(useEditorStore.getState().editor.document.items[0].y).toBe(65);
   });
 
-  it('updates canvas size controls from the top toolbar', async () => {
+  it('updates canvas size controls from the size menu', async () => {
+    const user = userEvent.setup();
     await renderApp();
+
+    await user.click(screen.getByRole('button', { name: 'Size' }));
 
     fireEvent.change(screen.getByLabelText('Canvas width'), {
       target: { value: '900' },
@@ -472,7 +472,11 @@ describe('App shell', () => {
   });
 
   it('shows a visible error when opening an invalid project file', async () => {
+    const user = userEvent.setup();
     render(<App />);
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Load...' }));
 
     const openInput = screen.getByTestId('project-open-input');
     const invalidFile = new File(['not valid json'], 'broken-project.json', {

@@ -2,9 +2,9 @@ import { expect, test } from '@playwright/test';
 
 import {
   APP_CLIPBOARD_MIME_TYPE,
-  captureDownload,
   clickCanvas,
   clickLayerRow,
+  clickToolbarPopoverItem,
   copySelectionToClipboardPayload,
   createGroupNodeFixture,
   createGroupedProjectDocument,
@@ -20,7 +20,7 @@ import {
   pasteClipboardPayloadWithImageFile,
   pasteClipboardPayload,
   pasteImageClipboardFile,
-  readDownloadedJson,
+  saveAndReadProject,
   uploadProject,
 } from './support/editor';
 
@@ -83,11 +83,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Shift+ArrowDown');
 
-    const nudgedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      })
-    );
+    const nudgedProject = await saveAndReadProject(page);
 
     const nudgedItem = (nudgedProject.nodes as Array<Record<string, number | string>>)[0];
     expect(Number(nudgedItem.x)).toBe(181);
@@ -186,11 +182,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Shift+ArrowDown');
 
-    const nudgedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    const nudgedProject = await saveAndReadProject(page);
     const nudgedGroup = expectSavedGroup(nudgedProject, 'shortcut-group');
     expect(nudgedGroup.children).toEqual([
       expect.objectContaining({
@@ -211,11 +203,7 @@ test.describe('editor shortcuts', () => {
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Shortcut Group', exact: true })).toHaveCount(2);
 
-    const duplicatedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    const duplicatedProject = await saveAndReadProject(page);
     const duplicatedGroups = (duplicatedProject.nodes as SavedNode[]).filter(
       (node) => node.kind === 'group',
     );
@@ -287,44 +275,28 @@ test.describe('editor shortcuts', () => {
     await clickLayerRow(page, 'Reorder Group');
     await page.keyboard.press(`${modifier}+ArrowUp`);
 
-    let reorderedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    let reorderedProject = await saveAndReadProject(page);
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
       'reorder-sibling',
       'reorder-group',
     ]);
 
     await page.keyboard.press(`${modifier}+ArrowDown`);
-    reorderedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    reorderedProject = await saveAndReadProject(page);
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
       'reorder-group',
       'reorder-sibling',
     ]);
 
     await page.keyboard.press(`Shift+${modifier}+ArrowUp`);
-    reorderedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    reorderedProject = await saveAndReadProject(page);
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
       'reorder-sibling',
       'reorder-group',
     ]);
 
     await page.keyboard.press(`Shift+${modifier}+ArrowDown`);
-    reorderedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    reorderedProject = await saveAndReadProject(page);
     expect((reorderedProject.nodes as SavedNode[]).map((node) => node.id)).toEqual([
       'reorder-group',
       'reorder-sibling',
@@ -334,10 +306,8 @@ test.describe('editor shortcuts', () => {
     await openLayersTab(page);
     await expect(page.locator('.layer-row.active')).toHaveCount(2);
     await expect(page.locator('.layer-row.active').filter({ hasText: 'Reorder Group' })).toHaveCount(1);
-    await expect(page.locator('.layer-row.active .layer-row-select')).toContainText([
-      'Reorder Group',
-      'Rectangle',
-    ]);
+    await expect(page.locator('.layer-row.active').filter({ hasText: 'Reorder Group' })).toContainText('Reorder Group');
+    await expect(page.locator('.layer-row.active').filter({ hasText: 'Rectangle' })).toContainText('Rectangle');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
     await expect(page.getByRole('spinbutton', { name: 'Opacity' })).toBeVisible();
@@ -393,11 +363,7 @@ test.describe('editor shortcuts', () => {
     expect(pasted.defaultPrevented).toBe(true);
     await expect(page.getByRole('button', { name: 'Clipboard Group', exact: true })).toHaveCount(2);
 
-    let clipboardProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    let clipboardProject = await saveAndReadProject(page);
     let groupedNodes = (clipboardProject.nodes as SavedNode[]).filter((node) => node.kind === 'group');
     expect(groupedNodes).toHaveLength(2);
     expect(groupedNodes[1].id).not.toBe('clipboard-group');
@@ -411,11 +377,7 @@ test.describe('editor shortcuts', () => {
     expect(rePasted.defaultPrevented).toBe(true);
     await expect(page.getByRole('button', { name: 'Clipboard Group', exact: true })).toHaveCount(2);
 
-    clipboardProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    clipboardProject = await saveAndReadProject(page);
     groupedNodes = (clipboardProject.nodes as SavedNode[]).filter((node) => node.kind === 'group');
     expect(groupedNodes).toHaveLength(2);
   });
@@ -438,11 +400,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press(`${modifier}+G`);
     await page.keyboard.press(`Shift+${modifier}+G`);
 
-    const savedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    const savedProject = await saveAndReadProject(page);
 
     expect(savedProject.version).toBe(2);
     expect(savedProject.nodes).toEqual([
@@ -474,25 +432,17 @@ test.describe('editor shortcuts', () => {
     const prioritizedPaste = await pasteClipboardPayloadWithImageFile(page, copied.payload);
     expect(prioritizedPaste.defaultPrevented).toBe(true);
 
-    let savedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    let savedProject = await saveAndReadProject(page);
     expect((savedProject.nodes as SavedNode[])).toHaveLength(2);
     expect((savedProject.nodes as SavedNode[]).every((node) => node.kind === 'rectangle')).toBe(true);
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     const pastedImage = await pasteImageClipboardFile(page);
     expect(pastedImage.defaultPrevented).toBe(true);
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible();
 
-    savedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([expect.objectContaining({ kind: 'image' })]);
 
     await page.evaluate(() => {
@@ -504,7 +454,7 @@ test.describe('editor shortcuts', () => {
     const ignoredPaste = await pasteClipboardPayloadOnActiveElement(page, copied.payload);
     expect(ignoredPaste.defaultPrevented).toBe(false);
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(0);
   });

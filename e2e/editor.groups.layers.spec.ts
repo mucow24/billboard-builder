@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import {
   clickLayerRow,
   clickCanvas,
+  clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createRectangleFixture,
@@ -138,7 +139,7 @@ test.describe('editor group layers and inspector flows', () => {
       }),
     ]);
 
-    await page.getByRole('button', { name: 'New' }).click();
+    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await uploadProject(page, savedProject, 'layers-group-roundtrip.json');
     await openLayersTab(page);
     await clickLayerRow(page, 'Layer Group');

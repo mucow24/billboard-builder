@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  captureDownload,
   clickCanvas,
   createImageFixture,
   createLineFixture,
@@ -15,7 +14,6 @@ import {
   openFreshEditor,
   openLayersTab,
   readStageDebug,
-  readDownloadedJson,
   saveAndReadProject,
   uploadProject,
 } from './support/editor';
@@ -91,11 +89,7 @@ test.describe('editor transforms', () => {
     await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 520, y: 300 });
     await dragCanvasHookToPoint(page, 'canvas-shape-handle-rotater', { x: 520, y: 420 });
 
-    const savedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      })
-    );
+    const savedProject = await saveAndReadProject(page);
 
     const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'shape-under-test'
@@ -149,11 +143,7 @@ test.describe('editor transforms', () => {
     await dragCanvasHookToPoint(page, 'canvas-line-handle-start', { x: 260, y: 600 });
     await dragCanvasHookToPoint(page, 'canvas-line-handle-end', { x: 520, y: 660 });
 
-    const savedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    const savedProject = await saveAndReadProject(page);
 
     const savedItems = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>);
     const savedText = savedItems.find((item) => item.id === 'transform-text');
@@ -192,11 +182,7 @@ test.describe('editor transforms', () => {
     await dragCanvas(page, { x: 800, y: 405 }, { x: 940, y: 405 });
     await dragCanvas(page, { x: 790, y: 310 }, { x: 930, y: 450 });
 
-    const savedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      }),
-    );
+    const savedProject = await saveAndReadProject(page);
 
     const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'transform-image',
@@ -419,11 +405,7 @@ test.describe('editor transforms', () => {
       throw new Error('Expected selected group debug geometry after the rotated resize.');
     }
 
-    const resizedProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      })
-    );
+    const resizedProject = await saveAndReadProject(page);
     const resizedItems = collectLeafNodes(resizedProject.nodes as Array<Record<string, number | string>>);
     for (const rotatedItem of rotatedSelection) {
       const resizedItem = resizedSelection.find((candidate) => candidate.id === rotatedItem.id);
@@ -451,11 +433,7 @@ test.describe('editor transforms', () => {
     });
     await dragCanvasHookToPoint(page, 'canvas-group-handle-bottom-right', { x: 360, y: 380 });
 
-    const finalProject = await readDownloadedJson(
-      await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-      })
-    );
+    const finalProject = await saveAndReadProject(page);
 
     expect(JSON.stringify(finalProject.nodes)).not.toBe(JSON.stringify(resizedProject.nodes));
   });
