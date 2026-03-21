@@ -8,6 +8,10 @@ import type {
 import type { LayerRow } from '../../document/sceneGraph';
 import type { StoredTemplate } from '../../persistence/templateLibraryService';
 
+export type SelectionItemChange =
+  | Partial<CanvasItem>
+  | ((item: CanvasItem) => Partial<CanvasItem>);
+
 export interface PropertiesPanelProps {
   availableFonts: UploadedFont[];
   background: string;
@@ -22,7 +26,7 @@ export interface PropertiesPanelProps {
   selectedNodeIds: string[];
   onBackgroundChange: (background: string) => void;
   onGroupOpacityChange: (opacity: number) => void;
-  onItemChange: (changes: Partial<CanvasItem>) => void;
+  onItemChange: (changes: SelectionItemChange) => void;
   onInsertTemplate?: (templateId: string) => void;
   onDeleteSelection: () => void;
   onSelectNode: (nodeId: string) => void;
@@ -48,7 +52,7 @@ export interface SelectionInspectorProps {
   availableFonts: UploadedFont[];
   fonts: DocumentFontReference[];
   onGroupOpacityChange: (opacity: number) => void;
-  onItemChange: (changes: Partial<CanvasItem>) => void;
+  onItemChange: (changes: SelectionItemChange) => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedNodeCount: number;

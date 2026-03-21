@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { Wheel, type ColorResult } from '@uiw/react-color';
 
@@ -12,7 +12,9 @@ import {
 } from '../ui/colors';
 
 interface ColorPickerControlProps {
+  disabled?: boolean;
   label: string;
+  mixed?: boolean;
   value: string;
   onChange: (value: string) => void;
   variant?: 'default' | 'compact';
@@ -23,12 +25,15 @@ function clampSliderValue(value: number, min: number, max: number): number {
 }
 
 export function ColorPickerControl({
+  disabled = false,
   label,
+  mixed = false,
   value,
   onChange,
   variant = 'default',
 }: ColorPickerControlProps) {
   const panelId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const storedValue = toStoredHexColor(value);
   const hsva = hexColorToHsva(storedValue);
   const hsla = hexColorToHsla(storedValue);
@@ -39,15 +44,37 @@ export function ColorPickerControl({
     setDraftHex(storedValue);
   }, [storedValue]);
 
-  function commitDraftHex() {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!(event.target instanceof Node) || rootRef.current?.contains(event.target)) {
+        return;
+      }
+      setIsOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [isOpen]);
+
+  function commitDraftHex(closeAfterCommit = false) {
     const committedValue = commitHexColorInput(draftHex, hsva.a);
     if (!committedValue) {
       setDraftHex(storedValue);
+      if (closeAfterCommit) {
+        setIsOpen(false);
+      }
       return;
     }
     setDraftHex(committedValue);
     if (committedValue !== storedValue) {
       onChange(committedValue);
+    }
+    if (closeAfterCommit) {
+      setIsOpen(false);
     }
   }
 
@@ -74,11 +101,15 @@ export function ColorPickerControl({
 
   return (
     <div
-      className={
+      ref={rootRef}
+      className={[
         variant === 'compact'
           ? 'color-picker-control color-picker-control-compact'
-          : 'color-picker-control'
-      }
+          : 'color-picker-control',
+        mixed ? 'color-picker-control-mixed' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <button
         aria-controls={panelId}
@@ -86,16 +117,21 @@ export function ColorPickerControl({
         aria-label={label}
         className={
           variant === 'compact'
-            ? 'color-picker-trigger color-picker-trigger-compact'
-            : 'color-picker-trigger'
+          ? 'color-picker-trigger color-picker-trigger-compact'
+          : 'color-picker-trigger'
         }
         type="button"
+        disabled={disabled}
         onClick={() => setIsOpen((open) => !open)}
       >
         <span className="color-picker-swatch" aria-hidden="true">
           <span
             className="color-picker-swatch-fill"
-            style={{ backgroundColor: storedValue }}
+            style={{
+              background: mixed
+                ? 'linear-gradient(135deg, rgba(110, 126, 153, 0.28), rgba(12, 18, 32, 0.96))'
+                : storedValue,
+            }}
           />
         </span>
         {variant === 'compact' ? (
@@ -103,12 +139,14 @@ export function ColorPickerControl({
         ) : (
           <span className="color-picker-trigger-copy">
             <span className="color-picker-trigger-label">{label}</span>
-            <span className="color-picker-trigger-value">{storedValue}</span>
+            <span className="color-picker-trigger-value">
+              {mixed ? 'Mixed' : storedValue}
+            </span>
           </span>
         )}
       </button>
 
-      {isOpen ? (
+      {isOpen && !disabled ? (
         <div
           className={
             variant === 'compact'
@@ -116,6 +154,11 @@ export function ColorPickerControl({
               : 'color-picker-panel'
           }
           id={panelId}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
         >
           <div className="color-picker-wheel">
             <Wheel
@@ -133,16 +176,17 @@ export function ColorPickerControl({
               spellCheck={false}
               type="text"
               value={draftHex}
-              onBlur={commitDraftHex}
+              onBlur={() => commitDraftHex(true)}
               onChange={(event) => setDraftHex(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  commitDraftHex();
+                  commitDraftHex(true);
                 }
                 if (event.key === 'Escape') {
                   event.preventDefault();
                   setDraftHex(storedValue);
+                  setIsOpen(false);
                 }
               }}
             />

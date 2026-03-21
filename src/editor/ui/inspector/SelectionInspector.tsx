@@ -1,23 +1,134 @@
-import type { TextCanvasItem } from '../../document/documentTypes';
 import { ColorPickerControl } from '../ColorPickerControl';
 
 import {
-  AdvancedTextSection,
-  GeometrySection,
-  ImageSection,
-  MultiSelectionSection,
-  SelectionHeading,
-  ShadowSection,
-  ShapeMainSection,
-  TextSection,
-} from './SelectionInspectorSections';
-import {
-  buildFontOptions,
-  getSelectionSummary,
-  getTextStyleCapabilities,
+  getItemGlyph,
+  getLayerPrimaryLabel,
 } from './inspectorModel';
+import {
+  buildInspectorEnvironment,
+  buildSelectionInspectorSections,
+  type ResolvedInspectorField,
+} from './selectionInspectorModel';
 import type { SelectionInspectorProps } from './types';
-import { NumberInput, SectionBlock } from './inspectorControls';
+import {
+  CheckboxInput,
+  FieldShell,
+  NumberInput,
+  SectionBlock,
+  SelectInput,
+  TextInput,
+} from './inspectorControls';
+
+function SelectionHeading({
+  kind,
+  subtitle,
+  title,
+}: {
+  kind: string;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <div className="panel-heading-row compact-heading-row compact-item-header slim-item-header">
+      <span className="slim-item-header-glyph" aria-hidden="true">
+        {kind}
+      </span>
+      <div className="panel-heading-stack compact slim-item-heading-stack">
+        <h2>{title}</h2>
+        <span className="slim-item-subtitle">{subtitle}</span>
+      </div>
+    </div>
+  );
+}
+
+function FieldRenderer({
+  field,
+  onItemChange,
+}: {
+  field: ResolvedInspectorField;
+  onItemChange: SelectionInspectorProps['onItemChange'];
+}) {
+  function commitValue(nextValue: boolean | number | string | unknown) {
+    onItemChange((item) =>
+      field.descriptor.buildChange({ item }, nextValue as never)
+    );
+  }
+
+  switch (field.descriptor.controlKind) {
+    case 'number':
+      return (
+        <NumberInput
+          disabled={field.disabled}
+          digits={field.descriptor.digits}
+          label={field.descriptor.label}
+          max={field.descriptor.max}
+          mixed={field.state.isMixed}
+          min={field.descriptor.min}
+          slider={field.descriptor.slider}
+          sliderDetentThreshold={field.descriptor.sliderDetentThreshold}
+          sliderDetentValue={field.descriptor.sliderDetentValue}
+          step={field.descriptor.step}
+          value={typeof field.state.value === 'number' ? field.state.value : null}
+          onChange={commitValue}
+        />
+      );
+    case 'text':
+      return (
+        <TextInput
+          disabled={field.disabled}
+          label={field.descriptor.label}
+          mixed={field.state.isMixed}
+          multiline={field.descriptor.multiline}
+          value={typeof field.state.value === 'string' ? field.state.value : null}
+          onChange={commitValue}
+        />
+      );
+    case 'boolean':
+      return (
+        <CheckboxInput
+          checked={typeof field.state.value === 'boolean' ? field.state.value : null}
+          disabled={field.disabled}
+          label={field.descriptor.label}
+          mixed={field.state.isMixed}
+          onChange={commitValue}
+        />
+      );
+    case 'color':
+      return (
+        <FieldShell
+          hint={field.state.isMixed ? 'Mixed' : undefined}
+          label={field.descriptor.label}
+        >
+          <ColorPickerControl
+            disabled={field.disabled}
+            label={field.descriptor.label}
+            mixed={field.state.isMixed}
+            value={String(field.state.firstValue ?? '#000000')}
+            variant="compact"
+            onChange={commitValue}
+          />
+        </FieldShell>
+      );
+    case 'select':
+      return (
+        <SelectInput
+          disabled={field.disabled}
+          label={field.descriptor.label}
+          mixed={field.state.isMixed}
+          options={field.options}
+          value={typeof field.state.value === 'string' ? field.state.value : null}
+          onChange={commitValue}
+        />
+      );
+    case 'custom':
+      return field.descriptor.render({
+        field,
+        onCommit: commitValue,
+      });
+    default:
+      return null;
+  }
+}
 
 export function SelectionInspector({
   availableFonts,
@@ -29,19 +140,13 @@ export function SelectionInspector({
   selectedNodeCount,
   selectedItems,
 }: SelectionInspectorProps) {
-  const selectionSummary = getSelectionSummary(selectedItems);
   const isMultiNodeSelection = selectedNodeCount > 1;
-  const selectedTextItem =
-    selectedItem?.kind === 'text' ? (selectedItem as TextCanvasItem) : undefined;
-  const fontOptions = buildFontOptions(availableFonts, fonts);
-  const textStyleCapabilities = getTextStyleCapabilities(
-    selectedTextItem,
-    availableFonts,
-  );
+  const environment = buildInspectorEnvironment(availableFonts, fonts);
+  const sections = buildSelectionInspectorSections(selectedItems, environment);
 
   if (selectedGroup && !isMultiNodeSelection) {
     return (
-      <>
+      <div className="selection-inspector">
         <SectionBlock title="Group">
           <NumberInput
             label="Group Opacity"
@@ -54,26 +159,13 @@ export function SelectionInspector({
             onChange={onGroupOpacityChange}
           />
         </SectionBlock>
-      </>
+      </div>
     );
   }
 
-  if (isMultiNodeSelection || selectionSummary.isMultiSelection) {
+  if (!selectedItem && selectedItems.length === 0) {
     return (
-      <>
-        <MultiSelectionSection
-          allSelectedOpacityEqual={selectionSummary.allSelectedOpacityEqual}
-          onItemChange={onItemChange}
-          opacityValue={selectionSummary.opacityValue}
-          selectedCount={selectedItems.length}
-        />
-      </>
-    );
-  }
-
-  if (!selectedItem) {
-    return (
-      <>
+      <div className="selection-inspector">
         <section className="empty-panel-inner">
           <span className="eyebrow">Nothing selected</span>
           <p>Select an item to edit it, or choose a tool and drag a new item onto the canvas.</p>
@@ -81,55 +173,63 @@ export function SelectionInspector({
             <p>{availableFonts.length} uploaded font(s) ready in this session.</p>
           ) : null}
         </section>
-      </>
+      </div>
     );
   }
 
+  const isMultiSelection = isMultiNodeSelection || selectedItems.length > 1;
+  const primaryItem = selectedItem ?? selectedItems[0];
+
   return (
-    <>
-      <SelectionHeading item={selectedItem} />
-
-      {'fill' in selectedItem || 'stroke' in selectedItem ? (
-        <SectionBlock title="Color">
-          {'fill' in selectedItem ? (
-            <ColorPickerControl
-              label="Fill"
-              value={selectedItem.fill}
-              onChange={(value) => onItemChange({ fill: value })}
-            />
-          ) : null}
-          {'stroke' in selectedItem ? (
-            <ColorPickerControl
-              label="Stroke"
-              value={selectedItem.stroke}
-              onChange={(value) => onItemChange({ stroke: value })}
-            />
-          ) : null}
-        </SectionBlock>
+    <div className="selection-inspector">
+      {isMultiSelection ? (
+        <div className="selection-inspector-header">
+          <SelectionHeading
+            kind="◎"
+            subtitle="Multi-selection"
+            title={`${selectedItems.length} items selected`}
+          />
+        </div>
+      ) : primaryItem ? (
+        <div className="selection-inspector-header">
+          <SelectionHeading
+            kind={getItemGlyph(primaryItem.kind)}
+            subtitle={primaryItem.name || primaryItem.kind}
+            title={getLayerPrimaryLabel(primaryItem)}
+          />
+        </div>
       ) : null}
 
-      {selectedTextItem ? (
-        <TextSection
-          canToggleBold={textStyleCapabilities.canToggleBold}
-          canToggleItalic={textStyleCapabilities.canToggleItalic}
-          fonts={fontOptions}
-          item={selectedTextItem}
-          onItemChange={onItemChange}
-        />
+      {sections.length === 0 && isMultiSelection ? (
+        <section className="empty-panel-inner">
+          <p>No shared editable properties.</p>
+        </section>
       ) : null}
 
-      {selectedItem.kind === 'image' ? (
-        <ImageSection item={selectedItem} onItemChange={onItemChange} />
-      ) : null}
-
-      <ShapeMainSection item={selectedItem} onItemChange={onItemChange} />
-      <GeometrySection item={selectedItem} onItemChange={onItemChange} />
-
-      {selectedTextItem ? (
-        <AdvancedTextSection item={selectedTextItem} onItemChange={onItemChange} />
-      ) : null}
-
-      <ShadowSection item={selectedItem} onItemChange={onItemChange} />
-    </>
+      <div className="selection-inspector-sections">
+        {sections.map((section) => (
+          <SectionBlock
+            key={section.key}
+            defaultExpanded={
+              section.key !== 'advancedText' &&
+              section.key !== 'geometry' &&
+              section.key !== 'shadow'
+            }
+            title={section.label}
+          >
+            <div className="inspector-section-fields">
+              {section.fields.map((field) => (
+                <div
+                  key={field.key}
+                  className={field.disabled ? 'inspector-field-shell disabled' : 'inspector-field-shell'}
+                >
+                  <FieldRenderer field={field} onItemChange={onItemChange} />
+                </div>
+              ))}
+            </div>
+          </SectionBlock>
+        ))}
+      </div>
+    </div>
   );
 }

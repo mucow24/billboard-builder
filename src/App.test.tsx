@@ -1,5 +1,5 @@
 // These tests intentionally mock the canvas surface and only cover App shell wiring.
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -325,13 +325,66 @@ describe('App shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Mixed')).toBeInTheDocument();
-    const opacityInput = await screen.findByLabelText('Opacity');
-    fireEvent.change(opacityInput, { target: { value: '0.5' } });
+    expect((await screen.findAllByText('Mixed')).length).toBeGreaterThan(0);
+    const opacityInputs = await screen.findAllByLabelText('Opacity', { selector: 'input' });
+    const opacityInput = opacityInputs.find((input) => !input.closest('[hidden]'));
+    expect(opacityInput).toBeDefined();
+    fireEvent.change(opacityInput as HTMLInputElement, { target: { value: '0.5' } });
 
     const updatedItems = useEditorStore.getState().editor.document.items;
     expect(updatedItems.find((item) => item.id === first.id)?.opacity).toBe(0.5);
     expect(updatedItems.find((item) => item.id === second.id)?.opacity).toBe(0.5);
+  });
+
+  it('applies multi-selection nested shadow changes per item without copying sibling state', async () => {
+    const first = createRectangleItem({
+      id: 'shadow-first',
+      shadow: {
+        color: '#111111',
+        blur: 2,
+        offsetX: 3,
+        offsetY: 4,
+        opacity: 0.2,
+      },
+    });
+    const second = createRectangleItem({
+      id: 'shadow-second',
+      x: 200,
+      shadow: {
+        color: '#222222',
+        blur: 6,
+        offsetX: 9,
+        offsetY: 10,
+        opacity: 0.8,
+      },
+    });
+
+    resetEditorStore({
+      document: { ...createDefaultProjectDocument(), items: [first, second] },
+      session: {
+        selectedItemIds: [first.id, second.id],
+      },
+    });
+
+    await renderApp();
+
+    const shadowSection = screen.getByRole('button', { name: 'Shadow' }).closest('section');
+    expect(shadowSection).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Shadow' }));
+
+    fireEvent.change(within(shadowSection!).getByLabelText('Blur'), {
+      target: { value: '12' },
+    });
+
+    const updatedItems = useEditorStore.getState().editor.document.items;
+    expect(updatedItems.find((item) => item.id === first.id)?.shadow).toEqual({
+      ...first.shadow,
+      blur: 12,
+    });
+    expect(updatedItems.find((item) => item.id === second.id)?.shadow).toEqual({
+      ...second.shadow,
+      blur: 12,
+    });
   });
 
   it('supports global tool hotkeys', async () => {

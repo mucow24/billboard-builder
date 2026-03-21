@@ -8,8 +8,10 @@ export interface FontOption {
 }
 
 interface FontFamilyPickerProps {
+  disabled?: boolean;
   fonts: readonly FontOption[];
   labelId: string;
+  mixed?: boolean;
   onChange: (family: string) => void;
   value: string;
 }
@@ -24,8 +26,10 @@ function getSelectedFontIndex(fonts: readonly FontOption[], value: string) {
 }
 
 export function FontFamilyPicker({
+  disabled = false,
   fonts,
   labelId,
+  mixed = false,
   onChange,
   value,
 }: FontFamilyPickerProps) {
@@ -85,6 +89,9 @@ export function FontFamilyPicker({
   }
 
   function openPicker() {
+    if (disabled) {
+      return;
+    }
     setActiveIndex(selectedIndex);
     setIsOpen(true);
   }
@@ -113,6 +120,9 @@ export function FontFamilyPicker({
   }
 
   function handleTriggerClick() {
+    if (disabled) {
+      return;
+    }
     if (isOpen) {
       closePicker(false);
       return;
@@ -122,6 +132,9 @@ export function FontFamilyPicker({
 
   function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (disabled) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       openPicker();
@@ -172,12 +185,13 @@ export function FontFamilyPicker({
   return (
     <div
       ref={rootRef}
-      className="font-family-picker"
+      className={isOpen ? 'font-family-picker open' : 'font-family-picker'}
       data-editor-interactive="true"
     >
       <button
         aria-label="Previous font"
         className="font-family-picker-cycle-button"
+        disabled={disabled}
         type="button"
         onClick={() => cycleSelection(-1)}
       >
@@ -189,10 +203,17 @@ export function FontFamilyPicker({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-labelledby={labelId}
-        className="font-family-picker-trigger"
+        className={[
+          'font-family-picker-trigger',
+          mixed ? 'font-family-picker-trigger-mixed' : '',
+          isOpen ? 'font-family-picker-trigger-open' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        disabled={disabled}
         data-testid="font-family-picker-trigger"
         style={{
-          fontFamily: getFontPreviewFamily(value),
+          fontFamily: mixed ? '"Trebuchet MS", sans-serif' : getFontPreviewFamily(value),
           fontStyle: 'normal',
           fontWeight: '400',
         }}
@@ -201,12 +222,13 @@ export function FontFamilyPicker({
         onKeyDown={handleTriggerKeyDown}
       >
         <span className="font-family-picker-trigger-text">
-          {value}
+          {mixed ? 'Mixed fonts' : value}
         </span>
       </button>
       <button
         aria-label="Next font"
         className="font-family-picker-cycle-button"
+        disabled={disabled}
         type="button"
         onClick={() => cycleSelection(1)}
       >
@@ -227,7 +249,7 @@ export function FontFamilyPicker({
             onKeyDown={handleListboxKeyDown}
           >
             {fonts.map((font, index) => {
-              const isSelected = font.family === value;
+              const isSelected = !mixed && font.family === value;
               const isActive = index === activeIndex;
 
               return (
