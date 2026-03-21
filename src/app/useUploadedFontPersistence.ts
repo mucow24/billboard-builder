@@ -25,6 +25,9 @@ export function useUploadedFontPersistence({
       return;
     }
 
+    // Prune persisted uploaded fonts once after bootstrap/template hydration settles.
+    // During the active session, explicit uploads must remain usable even if the user
+    // temporarily removes all canvas references before closing the window.
     hasPrunedOnBootstrapRef.current = true;
     void defaultUploadedFontPersistenceService.pruneUnreferenced(
       collectRetainedUploadedFontReferences(documentFonts, templates),

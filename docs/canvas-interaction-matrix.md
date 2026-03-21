@@ -223,6 +223,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | TL-02 | Templates | Saved template exists | Open Templates tab | Saved template card visible | No document mutation | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
 | TL-03 | Templates | Saved template exists | Click template card | New content appears on canvas and in Layers | Template nodes inserted and selected | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
 | TL-04 | Templates + Browser reload | Saved template exists | Reload, delete template, reload | Template persists across reload and then disappears after deletion | Local template library round-trips | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
+| TL-05 | Templates + Browser reload | Saved template references an uploaded font but current canvas no longer does | Reload, verify current canvas font menu, then insert template | Uploaded family is absent before insertion, then inserted text shows the uploaded family with no missing-font warning | Template insertion lazily rehydrates the retained uploaded font from local storage | user-flow | Cross-browser subset | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
 
 ## 10. Keyboard Flows
 
