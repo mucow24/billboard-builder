@@ -5,9 +5,13 @@ export interface LayerTreeOverlayMetric {
   bottomY: number;
   centerY: number;
   entryX: number;
+  nodeId: string;
 }
 
 export interface LayerTreeOverlaySegment {
+  childNodeId?: string;
+  kind: 'branch' | 'trunk';
+  parentNodeId: string;
   x1: number;
   y1: number;
   x2: number;
@@ -43,6 +47,8 @@ export function buildLayerTreeOverlaySegments(
 
     const lastChildMetric = childMetrics[childMetrics.length - 1];
     segments.push({
+      kind: 'trunk',
+      parentNodeId: row.node.id,
       x1: parentMetric.anchorX,
       y1: parentMetric.bottomY,
       x2: parentMetric.anchorX,
@@ -51,6 +57,9 @@ export function buildLayerTreeOverlaySegments(
 
     for (const childMetric of childMetrics) {
       segments.push({
+        childNodeId: childMetric.nodeId,
+        kind: 'branch',
+        parentNodeId: row.node.id,
         x1: parentMetric.anchorX,
         y1: childMetric.centerY,
         x2: Math.max(parentMetric.anchorX, childMetric.entryX),

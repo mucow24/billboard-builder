@@ -41,7 +41,7 @@ export function LayersInspectorTab({
     containerRef,
     overlayHeight,
     overlaySegments,
-    registerToggle,
+    registerToggle: registerPreviewAnchor,
   } = useLayerTreeOverlay(visibleRows);
   const deleteSelectionLabel =
     selectedNodeIds.length > 0
@@ -165,6 +165,13 @@ export function LayersInspectorTab({
               {overlaySegments.map((segment, index) => (
                 <line
                   key={`${segment.x1}:${segment.y1}:${segment.x2}:${segment.y2}:${index}`}
+                  data-child-node-id={segment.childNodeId}
+                  data-parent-node-id={segment.parentNodeId}
+                  data-testid={
+                    segment.kind === 'trunk'
+                      ? `layers-tree-trunk-${segment.parentNodeId}`
+                      : `layers-tree-branch-${segment.parentNodeId}-${segment.childNodeId}`
+                  }
                   x1={segment.x1}
                   x2={segment.x2}
                   y1={segment.y1}
@@ -227,6 +234,7 @@ export function LayersInspectorTab({
                   <div
                     aria-label={rowLabel}
                     className="layer-row-select"
+                    data-testid={`layers-row-${row.node.id}`}
                     role="button"
                     tabIndex={0}
                     aria-pressed={rowVisualState === 'active'}
@@ -241,10 +249,11 @@ export function LayersInspectorTab({
                   >
                     {isGroup ? (
                       <button
-                        ref={registerToggle(row.node.id)}
+                        ref={registerPreviewAnchor(row.node.id)}
                         type="button"
                         aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`}
                         className="layer-row-type layer-row-type-group layer-row-type-toggle"
+                        data-testid={`layers-preview-anchor-${row.node.id}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           onToggleGroupCollapse(row.node.id);
@@ -254,17 +263,30 @@ export function LayersInspectorTab({
                       </button>
                     ) : (
                       <span
-                        ref={registerToggle(row.node.id)}
+                        ref={registerPreviewAnchor(row.node.id)}
                         className={`layer-row-type layer-row-type-${row.node.kind}`}
+                        data-testid={`layers-preview-anchor-${row.node.id}`}
                         aria-hidden="true"
                         style={rowPreviewStyle}
                       >
                         {rowGlyph}
                       </span>
                     )}
-                    <span className="layer-row-copy compact richer">
-                      <strong className="layer-row-label">{rowLabel}</strong>
-                      {secondary ? <small>{secondary}</small> : null}
+                    <span
+                      className="layer-row-copy compact richer"
+                      data-testid={`layers-row-copy-${row.node.id}`}
+                    >
+                      <strong
+                        className="layer-row-label"
+                        data-testid={`layers-primary-label-${row.node.id}`}
+                      >
+                        {rowLabel}
+                      </strong>
+                      {secondary ? (
+                        <small data-testid={`layers-secondary-label-${row.node.id}`}>
+                          {secondary}
+                        </small>
+                      ) : null}
                     </span>
                   </div>
                 </div>

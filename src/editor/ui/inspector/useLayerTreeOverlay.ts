@@ -43,6 +43,7 @@ export function useLayerTreeOverlay(rows: LayerRow[]) {
         bottomY: Math.round(top + toggleRect.height),
         centerY: Math.round(top + toggleRect.height / 2),
         entryX: Math.round(left),
+        nodeId: row.node.id,
       };
     }
 

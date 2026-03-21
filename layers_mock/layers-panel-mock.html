@@ -747,7 +747,7 @@
                 </div>
               </div>
 
-              <div id="layer-list" class="layer-list layer-list-tabbed">
+              <div id="layer-list" class="layer-list layer-list-tabbed" data-testid="layers-layer-list">
                 <svg id="tree-overlay" class="tree-overlay" aria-hidden="true" viewBox="0 0 301 673" width="301" height="673"><line x1="12" y1="46" x2="12" y2="180" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="12" y1="63" x2="25" y2="63" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="12" y1="86" x2="25" y2="86" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="12" y1="110" x2="25" y2="110" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="12" y1="180" x2="25" y2="180" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="32" y1="117" x2="32" y2="157" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="32" y1="134" x2="45" y2="134" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line><line x1="32" y1="157" x2="45" y2="157" stroke="#34507a" stroke-width="1" shape-rendering="crispEdges"></line></svg>
                 <div id="layer-list-rows" class="layer-list-rows"><div class="layer-row" style="--depth: 0;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Rectangle" aria-pressed="false"><span class="layer-row-type layer-row-type-rectangle" aria-hidden="true" style="background: rgb(255, 77, 77); border-color: rgba(147, 168, 201, 0.26); color: rgb(255, 77, 77);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Rectangle</strong></span></div></div><div class="layer-row active layer-row-group layer-row-group-expanded" style="--depth: 0;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Hero Group" aria-pressed="true"><button type="button" class="layer-row-type layer-row-type-group layer-row-type-toggle" aria-label="Collapse Hero Group">-</button><span class="layer-row-copy compact richer"><strong class="layer-row-label">Hero Group</strong><small>4 items</small></span></div></div><div class="layer-row in-selected-group" style="--depth: 1;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Text" aria-pressed="false"><span class="layer-row-type layer-row-type-text" aria-hidden="true" style="background: rgb(243, 246, 252); border-color: rgb(243, 246, 252); color: rgb(243, 246, 252);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Text</strong><small>“Spring drop now live”</small></span></div></div><div class="layer-row in-selected-group" style="--depth: 1;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Ellipse" aria-pressed="false"><span class="layer-row-type layer-row-type-ellipse" aria-hidden="true" style="background: rgb(59, 130, 246); border-color: rgba(147, 168, 201, 0.26); color: rgb(59, 130, 246);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Ellipse</strong></span></div></div><div class="layer-row in-selected-group layer-row-group layer-row-group-expanded" style="--depth: 1;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Details Cluster" aria-pressed="false"><button type="button" class="layer-row-type layer-row-type-group layer-row-type-toggle" aria-label="Collapse Details Cluster">-</button><span class="layer-row-copy compact richer"><strong class="layer-row-label">Details Cluster</strong><small>2 items</small></span></div></div><div class="layer-row in-selected-group" style="--depth: 2;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Text" aria-pressed="false"><span class="layer-row-type layer-row-type-text" aria-hidden="true" style="background: rgb(23, 222, 239); border-color: rgb(23, 222, 239); color: rgb(23, 222, 239);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Text</strong><small>“Free shipping over $75”</small></span></div></div><div class="layer-row in-selected-group" style="--depth: 2;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Ellipse" aria-pressed="false"><span class="layer-row-type layer-row-type-ellipse" aria-hidden="true" style="background: transparent; border-color: rgb(168, 85, 247); color: rgb(168, 85, 247);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Ellipse</strong></span></div></div><div class="layer-row in-selected-group" style="--depth: 1;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Line" aria-pressed="false"><span class="layer-row-type layer-row-type-line" aria-hidden="true" style="background: rgba(12, 19, 32, 0.92); border-color: rgba(147, 168, 201, 0.26); color: rgb(214, 226, 245);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Line</strong></span></div></div><div class="layer-row" style="--depth: 0;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Rectangle" aria-pressed="false"><span class="layer-row-type layer-row-type-rectangle" aria-hidden="true" style="background: rgb(37, 99, 235); border-color: rgb(34, 197, 94); color: rgb(34, 197, 94);"></span><span class="layer-row-copy compact richer"><strong class="layer-row-label">Rectangle</strong></span></div></div><div class="layer-row layer-row-group" style="--depth: 0;"><div class="layer-row-select" role="button" tabindex="0" aria-label="Legal" aria-pressed="false"><button type="button" class="layer-row-type layer-row-type-group layer-row-type-toggle" aria-label="Expand Legal">+</button><span class="layer-row-copy compact richer"><strong class="layer-row-label">Legal</strong><small>1 item</small></span></div></div></div>
               </div>
@@ -841,9 +841,9 @@
             childCount: 0,
             depth: 2,
             hasChildren: false,
-            selectableNodeId: 'detail-callout',
+            selectableNodeId: 'details-text',
             node: {
-              id: 'detail-callout',
+              id: 'details-text',
               kind: 'text',
               name: 'Text',
               text: 'Free shipping over $75',
@@ -855,9 +855,9 @@
             childCount: 0,
             depth: 2,
             hasChildren: false,
-            selectableNodeId: 'detail-pill',
+            selectableNodeId: 'details-ellipse',
             node: {
-              id: 'detail-pill',
+              id: 'details-ellipse',
               kind: 'ellipse',
               name: 'Pill',
               fill: 'transparent',
@@ -1135,7 +1135,7 @@
         };
       }
 
-      function appendTreeLine(x1, y1, x2, y2) {
+      function appendTreeLine(x1, y1, x2, y2, attributes = {}) {
         const line = document.createElementNS(SVG_NS, 'line');
         line.setAttribute('x1', String(x1));
         line.setAttribute('y1', String(y1));
@@ -1144,6 +1144,11 @@
         line.setAttribute('stroke', getComputedStyle(document.documentElement).getPropertyValue('--tree-accent').trim());
         line.setAttribute('stroke-width', '1');
         line.setAttribute('shape-rendering', 'crispEdges');
+        for (const [name, value] of Object.entries(attributes)) {
+          if (value !== undefined && value !== null) {
+            line.setAttribute(name, String(value));
+          }
+        }
         treeOverlay.append(line);
       }
 
@@ -1184,7 +1189,10 @@
 
           const lastChildPreview = getElementPositionWithinScrollContent(lastChildElements.previewElement);
           const branchBottom = Math.round(lastChildPreview.top + lastChildPreview.height / 2);
-          appendTreeLine(branchX, branchTop, branchX, branchBottom);
+          appendTreeLine(branchX, branchTop, branchX, branchBottom, {
+            'data-parent-node-id': row.node.id,
+            'data-testid': `layers-tree-trunk-${row.node.id}`,
+          });
 
           for (const childRow of immediateChildren) {
             const childElements = rowElementsById.get(childRow.node.id);
@@ -1194,7 +1202,11 @@
             const childPreview = getElementPositionWithinScrollContent(childElements.previewElement);
             const connectorY = Math.round(childPreview.top + childPreview.height / 2);
             const connectorEndX = Math.round(childPreview.left);
-            appendTreeLine(branchX, connectorY, connectorEndX, connectorY);
+            appendTreeLine(branchX, connectorY, connectorEndX, connectorY, {
+              'data-child-node-id': childRow.node.id,
+              'data-parent-node-id': row.node.id,
+              'data-testid': `layers-tree-branch-${row.node.id}-${childRow.node.id}`,
+            });
           }
         }
       }
@@ -1228,6 +1240,7 @@
 
         const rowButton = document.createElement('div');
         rowButton.className = 'layer-row-select';
+        rowButton.setAttribute('data-testid', `layers-row-${row.node.id}`);
         rowButton.setAttribute('role', 'button');
         rowButton.tabIndex = 0;
         rowButton.setAttribute('aria-label', rowLabel);
@@ -1241,6 +1254,7 @@
           const groupToggle = document.createElement('button');
           groupToggle.type = 'button';
           groupToggle.className = 'layer-row-type layer-row-type-group layer-row-type-toggle';
+          groupToggle.setAttribute('data-testid', `layers-preview-anchor-${row.node.id}`);
           groupToggle.setAttribute('aria-label', `${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`);
           groupToggle.textContent = isCollapsed ? '+' : '-';
           groupToggle.addEventListener('click', (event) => {
@@ -1250,6 +1264,7 @@
           rowButton.append(groupToggle);
         } else {
           glyph.className = `layer-row-type layer-row-type-${row.node.kind}`;
+          glyph.setAttribute('data-testid', `layers-preview-anchor-${row.node.id}`);
           glyph.setAttribute('aria-hidden', 'true');
           Object.assign(glyph.style, getLayerPreviewStyle(row.node));
           glyph.textContent = getItemGlyph(row.node.kind);
@@ -1258,14 +1273,17 @@
 
         const copy = document.createElement('span');
         copy.className = 'layer-row-copy compact richer';
+        copy.setAttribute('data-testid', `layers-row-copy-${row.node.id}`);
 
         const primary = document.createElement('strong');
         primary.className = 'layer-row-label';
+        primary.setAttribute('data-testid', `layers-primary-label-${row.node.id}`);
         primary.textContent = rowLabel;
         copy.append(primary);
 
         if (secondary) {
           const secondaryText = document.createElement('small');
+          secondaryText.setAttribute('data-testid', `layers-secondary-label-${row.node.id}`);
           secondaryText.textContent = secondary;
           copy.append(secondaryText);
         }

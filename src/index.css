@@ -2021,25 +2021,31 @@ button {
 }
 
 .layer-row-copy.compact.richer {
+  display: inline-flex;
   flex-direction: row;
   align-items: baseline;
   gap: 6px;
+  margin: 0;
+  padding: 0;
 }
 
 .layer-row-copy strong {
+  display: inline-block;
   color: #f8fbff;
   font-size: 10px;
-  line-height: 1.2;
+  line-height: 12px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
+  margin: 0;
+  padding: 0;
 }
 
 .layer-row-copy.compact.richer small {
-  display: block;
+  display: inline-block;
   color: #93a8c9;
   font-size: 9px;
-  line-height: 1.25;
+  line-height: 11px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -2047,6 +2053,7 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: none;
+  margin: 0;
   padding-bottom: 1px;
 }
 
@@ -2250,9 +2257,8 @@ button {
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
-  justify-content: flex-start;
   gap: 6px;
-  min-height: 23px;
+  min-height: 22px;
   padding: 1px 4px;
   border: 1px solid transparent;
   border-radius: 2px;
@@ -2263,7 +2269,7 @@ button {
 }
 
 .layer-row-group .layer-row-select {
-  min-height: 25px;
+  min-height: 24px;
   background: rgba(15, 23, 38, 0.44);
   border-color: rgba(45, 63, 97, 0.16);
 }
@@ -2308,27 +2314,67 @@ button {
   display: flex;
   min-width: 0;
   flex: 1 1 auto;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.layer-row-copy.compact.richer {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 14.4px;
+  font-family: Inter, 'Segoe UI', Arial, sans-serif;
+}
+
+.layer-row-copy.compact.richer strong {
+  display: inline-block;
+  color: #f8fbff;
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  margin: 0;
+  padding: 0;
+}
+
+.layer-row-copy.compact.richer small {
+  display: block;
+  color: #93a8c9;
+  font-size: 9px;
+  line-height: 11.25px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: none;
+  margin: 0;
   padding-bottom: 1px;
 }
 
-.layer-row-group .layer-row-copy strong {
+.layer-row-group .layer-row-copy strong,
+.layer-row-group .layer-row-copy.compact.richer strong {
   font-weight: 700;
   color: #f6f9ff;
 }
 
-.layer-row-group .layer-row-copy small {
+.layer-row-group .layer-row-copy small,
+.layer-row-group .layer-row-copy.compact.richer small {
   color: #9ab0d2;
 }
 
 .layer-row-label {
-  display: block;
+  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.32;
-  padding-bottom: 1px;
+  margin: 0;
+  padding: 0;
 }
 
 .color-picker-control-compact {

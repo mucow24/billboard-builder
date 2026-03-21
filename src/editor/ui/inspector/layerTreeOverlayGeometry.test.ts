@@ -19,18 +19,42 @@ describe('layerTreeOverlayGeometry', () => {
 
     const rows = flattenLayerRows([rootGroup]);
     const metrics: LayerTreeOverlayMetricMap = {
-      'root-group': { anchorX: 10, bottomY: 21, centerY: 14, entryX: 2 },
-      'sibling-leaf': { anchorX: 30, bottomY: 45, centerY: 38, entryX: 22 },
-      'nested-group': { anchorX: 30, bottomY: 69, centerY: 62, entryX: 22 },
-      'nested-leaf': { anchorX: 50, bottomY: 93, centerY: 86, entryX: 42 },
+      'root-group': { anchorX: 10, bottomY: 21, centerY: 14, entryX: 2, nodeId: 'root-group' },
+      'sibling-leaf': { anchorX: 30, bottomY: 45, centerY: 38, entryX: 22, nodeId: 'sibling-leaf' },
+      'nested-group': { anchorX: 30, bottomY: 69, centerY: 62, entryX: 22, nodeId: 'nested-group' },
+      'nested-leaf': { anchorX: 50, bottomY: 93, centerY: 86, entryX: 42, nodeId: 'nested-leaf' },
     };
 
     expect(buildLayerTreeOverlaySegments(rows, metrics)).toEqual([
-      { x1: 10, y1: 21, x2: 10, y2: 62 },
-      { x1: 10, y1: 38, x2: 22, y2: 38 },
-      { x1: 10, y1: 62, x2: 22, y2: 62 },
-      { x1: 30, y1: 69, x2: 30, y2: 86 },
-      { x1: 30, y1: 86, x2: 42, y2: 86 },
+      { kind: 'trunk', parentNodeId: 'root-group', x1: 10, y1: 21, x2: 10, y2: 62 },
+      {
+        childNodeId: 'sibling-leaf',
+        kind: 'branch',
+        parentNodeId: 'root-group',
+        x1: 10,
+        y1: 38,
+        x2: 22,
+        y2: 38,
+      },
+      {
+        childNodeId: 'nested-group',
+        kind: 'branch',
+        parentNodeId: 'root-group',
+        x1: 10,
+        y1: 62,
+        x2: 22,
+        y2: 62,
+      },
+      { kind: 'trunk', parentNodeId: 'nested-group', x1: 30, y1: 69, x2: 30, y2: 86 },
+      {
+        childNodeId: 'nested-leaf',
+        kind: 'branch',
+        parentNodeId: 'nested-group',
+        x1: 30,
+        y1: 86,
+        x2: 42,
+        y2: 86,
+      },
     ]);
   });
 
@@ -43,13 +67,21 @@ describe('layerTreeOverlayGeometry', () => {
 
     const rows = flattenLayerRows([rootGroup]).filter((row) => row.node.id !== nestedLeaf.id);
     const metrics: LayerTreeOverlayMetricMap = {
-      'root-group': { anchorX: 10, bottomY: 21, centerY: 14, entryX: 2 },
-      'nested-group': { anchorX: 30, bottomY: 45, centerY: 38, entryX: 22 },
+      'root-group': { anchorX: 10, bottomY: 21, centerY: 14, entryX: 2, nodeId: 'root-group' },
+      'nested-group': { anchorX: 30, bottomY: 45, centerY: 38, entryX: 22, nodeId: 'nested-group' },
     };
 
     expect(buildLayerTreeOverlaySegments(rows, metrics)).toEqual([
-      { x1: 10, y1: 21, x2: 10, y2: 38 },
-      { x1: 10, y1: 38, x2: 22, y2: 38 },
+      { kind: 'trunk', parentNodeId: 'root-group', x1: 10, y1: 21, x2: 10, y2: 38 },
+      {
+        childNodeId: 'nested-group',
+        kind: 'branch',
+        parentNodeId: 'root-group',
+        x1: 10,
+        y1: 38,
+        x2: 22,
+        y2: 38,
+      },
     ]);
   });
 });
