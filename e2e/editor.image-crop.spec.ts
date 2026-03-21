@@ -339,8 +339,8 @@ test.describe('editor image crop', () => {
       throw new Error('Expected a crop right handle.');
     }
 
-    await beginCanvasDrag(page, handle);
-    await movePointerToCanvasPoint(page, { x: 696, y: handle.y });
+    await beginCanvasDrag(page, { x: handle.x - 5, y: handle.y });
+    await movePointerToCanvasPoint(page, { x: 691, y: handle.y });
     await expect(page.getByTestId('guide-count')).not.toContainText('Guides: 0');
     await releasePointer(page);
 
@@ -366,7 +366,12 @@ test.describe('editor image crop', () => {
       throw new Error('Expected a crop right handle for ctrl test.');
     }
 
-    await dragCanvasWithModifier(page, 'Control', ctrlHandle, { x: 696, y: ctrlHandle.y });
+    await dragCanvasWithModifier(
+      page,
+      'Control',
+      { x: ctrlHandle.x - 5, y: ctrlHandle.y },
+      { x: 691, y: ctrlHandle.y },
+    );
     await expect(page.getByTestId('guide-count')).toContainText('Guides: 0');
 
     await clickCanvas(page, { x: 120, y: 120 });

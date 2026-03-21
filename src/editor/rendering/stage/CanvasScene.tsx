@@ -25,7 +25,7 @@ interface CanvasSceneProps {
   beginCropFullResize: (handle: ResizeHandle, pointer: Point) => void;
   beginCropFullRotate: (pointer: Point) => void;
   beginCropPan: (pointer: Point) => void;
-  beginCropResize: (handle: ResizeHandle) => void;
+  beginCropResize: (handle: ResizeHandle, pointer: Point) => void;
   commitCropSession: () => boolean;
   beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
   beginGroupRotate: (pointer: Point) => void;

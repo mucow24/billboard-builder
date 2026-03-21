@@ -16,7 +16,7 @@ interface ImageCropOverlayProps {
   beginCropFullResize: (handle: ResizeHandle, pointer: Point) => void;
   beginCropFullRotate: (pointer: Point) => void;
   beginCropPan: (pointer: Point) => void;
-  beginCropResize: (handle: ResizeHandle) => void;
+  beginCropResize: (handle: ResizeHandle, pointer: Point) => void;
   commitCropSession: () => boolean;
   fullImageItem: ImageCanvasItem;
   previewItem: ImageCanvasItem;
@@ -24,8 +24,56 @@ interface ImageCropOverlayProps {
   toCanvasPointer: (pointer: Point) => Point;
 }
 
-const BLACK_HANDLE_SIZE = 12;
+const BLACK_HANDLE_HIT_SIZE = 24;
 const BLUE_HANDLE_RADIUS = 8;
+const CROP_OUTLINE_UNDERLAY_WIDTH = 10;
+const CROP_OUTLINE_WIDTH = 6;
+const CROP_HANDLE_UNDERLAY_WIDTH = 13;
+const CROP_HANDLE_WIDTH = 8;
+const CROP_CORNER_LENGTH = 24;
+const CROP_SIDE_HANDLE_LENGTH = 28;
+
+function getCropHandleVisualPoints(
+  item: ImageCanvasItem,
+  handle: ResizeHandle,
+) {
+  const { width, height } = item;
+  switch (handle) {
+    case 'top-left':
+      return [0, CROP_CORNER_LENGTH, 0, 0, CROP_CORNER_LENGTH, 0];
+    case 'top-center':
+      return [width / 2 - CROP_SIDE_HANDLE_LENGTH / 2, 0, width / 2 + CROP_SIDE_HANDLE_LENGTH / 2, 0];
+    case 'top-right':
+      return [width - CROP_CORNER_LENGTH, 0, width, 0, width, CROP_CORNER_LENGTH];
+    case 'middle-left':
+      return [0, height / 2 - CROP_SIDE_HANDLE_LENGTH / 2, 0, height / 2 + CROP_SIDE_HANDLE_LENGTH / 2];
+    case 'middle-right':
+      return [
+        width,
+        height / 2 - CROP_SIDE_HANDLE_LENGTH / 2,
+        width,
+        height / 2 + CROP_SIDE_HANDLE_LENGTH / 2,
+      ];
+    case 'bottom-left':
+      return [0, height - CROP_CORNER_LENGTH, 0, height, CROP_CORNER_LENGTH, height];
+    case 'bottom-center':
+      return [
+        width / 2 - CROP_SIDE_HANDLE_LENGTH / 2,
+        height,
+        width / 2 + CROP_SIDE_HANDLE_LENGTH / 2,
+        height,
+      ];
+    case 'bottom-right':
+      return [
+        width - CROP_CORNER_LENGTH,
+        height,
+        width,
+        height,
+        width,
+        height - CROP_CORNER_LENGTH,
+      ];
+  }
+}
 
 export function ImageCropOverlay({
   beginCropFullResize,
@@ -38,7 +86,6 @@ export function ImageCropOverlay({
   registerShapeRef,
   toCanvasPointer,
 }: ImageCropOverlayProps) {
-  const cropOutlinePoints = getSelectionOutlinePoints(previewItem);
   const cropHandlePoints = getShapeHandlePoints(previewItem);
   const fullOutlinePoints = getSelectionOutlinePoints(fullImageItem);
   const fullHandlePoints = getShapeHandlePoints(fullImageItem);
@@ -140,29 +187,75 @@ export function ImageCropOverlay({
           beginCropFullRotate(toCanvasPointer(pointer));
         }}
       />
-      <Line
-        points={[...cropOutlinePoints, cropOutlinePoints[0], cropOutlinePoints[1]]}
-        stroke="#111111"
-        strokeWidth={2}
-      />
+      <Group
+        x={previewItem.x}
+        y={previewItem.y}
+        rotation={previewItem.rotation}
+        listening={false}
+      >
+        <Line
+          name="crop-selection-outline-underlay"
+          points={[0, 0, previewItem.width, 0, previewItem.width, previewItem.height, 0, previewItem.height, 0, 0]}
+          stroke="#ffffff"
+          strokeWidth={CROP_OUTLINE_UNDERLAY_WIDTH}
+          lineCap="square"
+          lineJoin="miter"
+        />
+        <Line
+          name="crop-selection-outline"
+          points={[0, 0, previewItem.width, 0, previewItem.width, previewItem.height, 0, previewItem.height, 0, 0]}
+          stroke="#111111"
+          strokeWidth={CROP_OUTLINE_WIDTH}
+          lineCap="square"
+          lineJoin="miter"
+        />
+        {RESIZE_HANDLE_NAMES.map((handle) => {
+          const points = getCropHandleVisualPoints(previewItem, handle);
+          return (
+            <Line
+              key={`crop-handle-underlay-${handle}`}
+              name={`crop-handle-visual-underlay ${handle}`}
+              points={points}
+              stroke="#ffffff"
+              strokeWidth={CROP_HANDLE_UNDERLAY_WIDTH}
+              lineCap="square"
+              lineJoin="miter"
+            />
+          );
+        })}
+        {RESIZE_HANDLE_NAMES.map((handle) => {
+          const points = getCropHandleVisualPoints(previewItem, handle);
+          return (
+            <Line
+              key={`crop-handle-visual-${handle}`}
+              name={`crop-handle-visual ${handle}`}
+              points={points}
+              stroke="#111111"
+              strokeWidth={CROP_HANDLE_WIDTH}
+              lineCap="square"
+              lineJoin="miter"
+            />
+          );
+        })}
+      </Group>
       {RESIZE_HANDLE_NAMES.map((handle) => {
         const point = cropHandlePoints[handle];
         return (
           <Rect
             key={`crop-handle-${handle}`}
-            x={point.x - BLACK_HANDLE_SIZE / 2}
-            y={point.y - BLACK_HANDLE_SIZE / 2}
-            width={BLACK_HANDLE_SIZE}
-            height={BLACK_HANDLE_SIZE}
-            fill="#ffffff"
-            stroke="#111111"
-            strokeWidth={2}
+            name={`crop-handle-hit ${handle}`}
+            x={point.x - BLACK_HANDLE_HIT_SIZE / 2}
+            y={point.y - BLACK_HANDLE_HIT_SIZE / 2}
+            width={BLACK_HANDLE_HIT_SIZE}
+            height={BLACK_HANDLE_HIT_SIZE}
+            fill="rgba(0,0,0,0.001)"
             onMouseDown={(event) => {
-              if (event.evt.button !== 0) {
+              const pointer = event.target.getStage()?.getPointerPosition();
+              if (!pointer || event.evt.button !== 0) {
                 return;
               }
               event.cancelBubble = true;
-              beginCropResize(handle);
+              beginCropResize(handle, toCanvasPointer(pointer));
             }}
           />
         );

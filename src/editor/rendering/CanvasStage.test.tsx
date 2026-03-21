@@ -10,9 +10,15 @@ const { mockInteractionSession } = vi.hoisted(() => ({
     beginGroupDrag: vi.fn(),
     beginGroupResize: vi.fn(),
     beginGroupRotate: vi.fn(),
+    beginCropFullResize: vi.fn(),
+    beginCropFullRotate: vi.fn(),
+    beginCropPan: vi.fn(),
+    beginCropResize: vi.fn(),
     beginLineHandle: vi.fn(),
     beginResize: vi.fn(),
     beginRotate: vi.fn(),
+    commitCropSession: vi.fn(),
+    cropSession: null,
     handleItemDoubleClick: vi.fn(),
     handleItemPointerDown: vi.fn(),
     handleStageMouseDown: vi.fn(),
@@ -46,6 +52,7 @@ vi.mock('konva', () => ({
 import { CanvasStage as ActualCanvasStage } from './CanvasStage';
 import {
   createDefaultProjectDocument,
+  createImageItem,
   createLineItem,
   createRectangleItem,
   createTextItem,
@@ -56,6 +63,7 @@ import { getGroupResizeFrame, getSelectionFrameForRotation } from './transformGe
 
 vi.mock('react-konva', () => {
   type MockKonvaProps = React.PropsWithChildren<Record<string, unknown>>;
+  const noop = () => {};
   function buildKonvaEvent(
     event: MouseEvent | WheelEvent,
     nodeRef: HTMLDivElement | null,
@@ -102,11 +110,23 @@ vi.mock('react-konva', () => {
         nodeRef = node;
         if (node) {
           Object.assign(node, {
+            alpha: noop,
+            blue: noop,
+            brightness: noop,
+            cache: noop,
+            clearCache: noop,
+            contrast: noop,
+            filters: noop,
             getStage: () => ({
               getPointerPosition: () => ({ x: 640, y: 360 }),
             }),
+            getLayer: () => ({
+              batchDraw: noop,
+            }),
+            green: noop,
             hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
             name: () => String(props.name ?? ''),
+            red: noop,
           });
         }
         if (typeof ref === 'function') {
@@ -155,9 +175,15 @@ describe('CanvasStage viewport controls', () => {
       beginGroupDrag: vi.fn(),
       beginGroupResize: vi.fn(),
       beginGroupRotate: vi.fn(),
+      beginCropFullResize: vi.fn(),
+      beginCropFullRotate: vi.fn(),
+      beginCropPan: vi.fn(),
+      beginCropResize: vi.fn(),
       beginLineHandle: vi.fn(),
       beginResize: vi.fn(),
       beginRotate: vi.fn(),
+      commitCropSession: vi.fn(),
+      cropSession: null,
       handleItemDoubleClick: vi.fn(),
       handleItemPointerDown: vi.fn(),
       handleStageMouseDown: vi.fn(),
@@ -390,6 +416,95 @@ describe('CanvasStage viewport controls', () => {
 
     const rotatedGroups = Array.from(container.querySelectorAll('[data-konva-node="Group"][data-prop-rotation]'));
     expect(rotatedGroups.some((node) => node.getAttribute('data-prop-rotation') !== '0')).toBe(true);
+  });
+
+  it('renders chonky crop outlines and handle hit targets while crop mode is active', () => {
+    const previewItem = createImageItem({
+      src: 'data:image/svg+xml;base64,AAA',
+      mimeType: 'image/svg+xml',
+      originalWidth: 160,
+      originalHeight: 100,
+      x: 140,
+      y: 110,
+      width: 120,
+      height: 80,
+    });
+    previewItem.id = 'crop-image';
+    previewItem.crop = {
+      x: 20,
+      y: 10,
+      width: 120,
+      height: 80,
+    };
+    const fullImageItem = {
+      ...previewItem,
+      x: 120,
+      y: 100,
+      width: 160,
+      height: 100,
+      crop: {
+        x: 0,
+        y: 0,
+        width: previewItem.originalWidth,
+        height: previewItem.originalHeight,
+      },
+    };
+
+    Object.assign(mockInteractionSession, {
+      cropSession: {
+        itemId: previewItem.id,
+        previewItem,
+        fullImageItem,
+      },
+      renderedItems: [previewItem],
+      renderedSelectedItems: [previewItem],
+      selectedDocumentItem: previewItem,
+      selectedRenderedItem: previewItem,
+      selectedItemId: previewItem.id,
+    });
+    const document = createDefaultProjectDocument();
+    document.items = [previewItem];
+
+    const { container } = render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[previewItem.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    expect(
+      container.querySelector(
+        '[data-konva-node="Line"][data-prop-name="crop-selection-outline-underlay"][data-prop-stroke="#ffffff"][data-prop-strokewidth="10"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        '[data-konva-node="Line"][data-prop-name="crop-selection-outline"][data-prop-stroke="#111111"][data-prop-strokewidth="6"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        '[data-konva-node="Line"][data-prop-name="crop-handle-visual-underlay top-center"][data-prop-stroke="#ffffff"][data-prop-strokewidth="13"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        '[data-konva-node="Line"][data-prop-name="crop-handle-visual top-left"][data-prop-stroke="#111111"][data-prop-strokewidth="8"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        '[data-konva-node="Rect"][data-prop-name="crop-handle-hit middle-right"][data-prop-width="24"][data-prop-height="24"]',
+      ),
+    ).not.toBeNull();
   });
 
   it('renders zoom controls and updates the readout', async () => {

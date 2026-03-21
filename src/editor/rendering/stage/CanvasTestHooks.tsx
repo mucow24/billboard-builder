@@ -1,5 +1,5 @@
 import type { CanvasItem } from '../../document/documentTypes';
-import { type ResizeHandle } from '../interactionGeometry';
+import { type Point, type ResizeHandle } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { toOverlayStyle } from './viewportMath';
@@ -7,21 +7,21 @@ import { toOverlayStyle } from './viewportMath';
 interface CanvasTestHooksProps {
   beginCropFullResize?: (
     handle: ResizeHandle,
-    pointer: { x: number; y: number },
+    pointer: Point,
   ) => void;
-  beginCropFullRotate?: (pointer: { x: number; y: number }) => void;
-  beginCropPan?: (pointer: { x: number; y: number }) => void;
-  beginCropResize?: (handle: ResizeHandle) => void;
-  beginGroupDrag: (pointer: { x: number; y: number }) => void;
+  beginCropFullRotate?: (pointer: Point) => void;
+  beginCropPan?: (pointer: Point) => void;
+  beginCropResize?: (handle: ResizeHandle, pointer: Point) => void;
+  beginGroupDrag: (pointer: Point) => void;
   beginGroupResize: (
     handle: ResizeHandle,
-    pointer: { x: number; y: number },
+    pointer: Point,
   ) => void;
-  beginGroupRotate: (pointer: { x: number; y: number }) => void;
+  beginGroupRotate: (pointer: Point) => void;
   beginLineHandle: (
     item: Extract<CanvasItem, { kind: 'line' }>,
     handle: 'start' | 'end',
-    pointer: { x: number; y: number },
+    pointer: Point,
   ) => void;
   beginResize: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
@@ -192,10 +192,11 @@ export function CanvasTestHooks({
                     key={`crop-handle-${handle}`}
                     data-testid={`canvas-crop-handle-${handle}`}
                     onMouseDown={(event) => {
-                      if (event.button !== 0) {
+                      const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                      if (!pointer || event.button !== 0) {
                         return;
                       }
-                      beginCropResize(handle as ResizeHandle);
+                      beginCropResize(handle as ResizeHandle, toCanvasPointer(pointer));
                     }}
                     style={{
                       position: 'absolute',

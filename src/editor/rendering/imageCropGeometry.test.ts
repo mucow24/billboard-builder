@@ -175,6 +175,48 @@ describe('image crop geometry', () => {
     expect(unsnapped.guides).toEqual([]);
   });
 
+  it('preserves the crop-handle pointer offset while snapping', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 50,
+      width: 100,
+      height: 50,
+    });
+    item.x = 20;
+    item.y = 10;
+    item.crop = {
+      x: 20,
+      y: 0,
+      width: 100,
+      height: 50,
+    };
+    const fullImageItem = buildFullImageTransformItem(item);
+    const sibling = createRectangleItem({
+      x: 132,
+      y: 0,
+      width: 40,
+      height: 80,
+    });
+
+    const snapped = resizeImageCrop({
+      baseItem: item,
+      fullImageItem,
+      crop: item.crop,
+      handle: 'middle-right',
+      pointer: { x: 123, y: 35 },
+      pointerOffset: { x: -5, y: 0 },
+      siblingItems: [sibling],
+      stageRect: { x: 0, y: 0, width: 300, height: 200 },
+    });
+
+    expect(snapped.crop.width).toBeCloseTo(112, 10);
+    expect(snapped.guides).toEqual([
+      { orientation: 'vertical', position: 132 },
+    ]);
+  });
+
   it('pans the source image under a fixed crop frame', () => {
     const item = createImageItem({
       src: 'data:image/png;base64,AAA',

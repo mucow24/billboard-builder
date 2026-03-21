@@ -2,6 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import type Konva from 'konva';
 
 import {
+  getShapeHandlePoints,
   isCreateTool,
   stageToLocal,
   type Point,
@@ -102,6 +103,7 @@ type CropInteraction =
   | {
       kind: 'crop-resize';
       handle: ResizeHandle;
+      pointerOffset: Point;
       initialPreviewItem: ImageCanvasItem;
       initialFullImageItem: ImageCanvasItem;
       initialCrop: ImageCropRect;
@@ -500,16 +502,21 @@ export function useCanvasInteractionSession({
     };
   }, [cancelCropSession, cropSession]);
 
-  const beginCropResize = useCallback((handle: ResizeHandle) => {
+  const beginCropResize = useCallback((handle: ResizeHandle, pointer: Point) => {
     const current = cropSessionRef.current;
     if (!current) {
       return;
     }
+    const handlePoint = getShapeHandlePoints(current.previewItem)[handle];
     updateCropSession({
       ...current,
       activeInteraction: {
         kind: 'crop-resize',
         handle,
+        pointerOffset: {
+          x: pointer.x - handlePoint.x,
+          y: pointer.y - handlePoint.y,
+        },
         initialPreviewItem: current.previewItem,
         initialFullImageItem: current.fullImageItem,
         initialCrop: current.crop,
@@ -700,6 +707,7 @@ export function useCanvasInteractionSession({
           crop: current.activeInteraction.initialCrop,
           handle: current.activeInteraction.handle,
           pointer,
+          pointerOffset: current.activeInteraction.pointerOffset,
           siblingItems: orderedItems.filter((entry) => entry.id !== current.itemId),
           snapEnabled: !modifiers.ctrlKey,
           stageRect: stageBounds,

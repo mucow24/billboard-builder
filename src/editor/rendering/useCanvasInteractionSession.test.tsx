@@ -1725,7 +1725,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemDoubleClick(image);
     });
     act(() => {
-      result.current.beginCropResize('middle-right');
+      result.current.beginCropResize('middle-right', { x: 120, y: 35 });
     });
     params.onGuidesChange.mockClear();
     act(() => {
@@ -1747,7 +1747,7 @@ describe('useCanvasInteractionSession', () => {
     });
 
     act(() => {
-      result.current.beginCropResize('middle-right');
+      result.current.beginCropResize('middle-right', { x: 132, y: 35 });
     });
     params.onGuidesChange.mockClear();
     act(() => {

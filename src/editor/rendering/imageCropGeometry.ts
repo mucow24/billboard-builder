@@ -76,6 +76,7 @@ export function resizeImageCrop(params: {
   crop: ImageCropRect;
   handle: ResizeHandle;
   pointer: Point;
+  pointerOffset?: Point;
   siblingItems: CanvasItem[];
   snapEnabled?: boolean;
   stageRect: SnapRect;
@@ -86,12 +87,17 @@ export function resizeImageCrop(params: {
     fullImageItem,
     handle,
     pointer,
+    pointerOffset = { x: 0, y: 0 },
     siblingItems,
     snapEnabled = true,
     stageRect,
   } = params;
+  const adjustedPointer = {
+    x: pointer.x - pointerOffset.x,
+    y: pointer.y - pointerOffset.y,
+  };
   const localPointer = stageToLocal(
-    pointer,
+    adjustedPointer,
     { x: fullImageItem.x, y: fullImageItem.y },
     fullImageItem.rotation,
   );
