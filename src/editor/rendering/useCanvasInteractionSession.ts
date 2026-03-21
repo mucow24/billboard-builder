@@ -76,9 +76,31 @@ interface HandledItemPointerEvent {
   clientX: number;
   clientY: number;
   button: number;
+  itemId: string;
+  selectionNodeId: string;
+}
+
+interface PointerClickSample {
+  itemId: string;
+  selectionNodeId: string;
+  recordedAtMs: number;
+  clientX: number;
+  clientY: number;
+  button: number;
+}
+
+interface StageDescendantClickSample {
+  groupId: string;
+  itemId: string;
+  recordedAtMs: number;
+  clientX: number;
+  clientY: number;
+  button: number;
 }
 
 const PICKUP_DRAG_THRESHOLD = 3;
+const GROUP_DRILL_DOUBLE_CLICK_MS = 500;
+const GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA = 6;
 
 function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point) {
   if (item.kind === 'line') {
@@ -131,6 +153,9 @@ export function useCanvasInteractionSession({
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
   const pendingPickupDragRef = useRef<PendingPickupDrag | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
+  const latestItemPointerClickRef = useRef<PointerClickSample | null>(null);
+  const previousItemPointerClickRef = useRef<PointerClickSample | null>(null);
+  const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
   const [lastDrilldownSource, setLastDrilldownSource] = useState<'item-hit' | 'stage-surface' | null>(null);
@@ -515,7 +540,13 @@ export function useCanvasInteractionSession({
       updateSession(null);
       return true;
     },
-    [clearPendingPickupDrag, createPendingPickupSession, finishSession, onGuidesChange, updateSession],
+    [
+      clearPendingPickupDrag,
+      createPendingPickupSession,
+      finishSession,
+      onGuidesChange,
+      updateSession,
+    ],
   );
 
   const handleWindowMouseUp = useEffectEvent((event: MouseEvent) => {
@@ -635,12 +666,24 @@ export function useCanvasInteractionSession({
     nativeEvent?: MouseEvent,
   ) => {
     if (nativeEvent) {
+      const recordedAtMs = Date.now();
+      previousItemPointerClickRef.current = latestItemPointerClickRef.current;
+      latestItemPointerClickRef.current = {
+        itemId: item.id,
+        selectionNodeId,
+        recordedAtMs,
+        clientX: nativeEvent.clientX,
+        clientY: nativeEvent.clientY,
+        button: nativeEvent.button,
+      };
       lastHandledItemPointerEventRef.current = {
         nativeEvent,
         timeStamp: nativeEvent.timeStamp,
         clientX: nativeEvent.clientX,
         clientY: nativeEvent.clientY,
         button: nativeEvent.button,
+        itemId: item.id,
+        selectionNodeId,
       };
     }
     if (shiftKey && onToggleSelectItem) {
@@ -649,18 +692,25 @@ export function useCanvasInteractionSession({
       onToggleSelectItem(selectionNodeId);
       return;
     }
-    if (selectedItemIds.length === 1) {
-      const selectedNodeId = selectedItemIds[0];
-      const selectedNode = getNodeById(document.nodes, selectedNodeId);
-      if (selectedNode && isGroupNode(selectedNode)) {
-        const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedNodeId, item.id);
-        if (nextNodeId && nextNodeId !== selectedNodeId) {
-          clearPendingPickupDrag();
-          setLastDrilldownSource('item-hit');
-          onSelectItem(nextNodeId);
-          return;
-        }
+    const selectedGroupNodeId =
+      selectedItemIds.length === 1 &&
+      (() => {
+        const selectedNode = getNodeById(document.nodes, selectedItemIds[0]);
+        return selectedNode && isGroupNode(selectedNode) ? selectedNode.id : null;
+      })();
+    const clickedRenderable = renderableByLeafId.get(item.id);
+    if (
+      selectedGroupNodeId &&
+      clickedRenderable?.groupPath.includes(selectedGroupNodeId)
+    ) {
+      clearPendingPickupDrag();
+      setLastDrilldownSource(null);
+      if (selectedItems.length > 1) {
+        beginGroupDrag(pointer);
+      } else {
+        beginDrag(item, pointer);
       }
+      return;
     }
     if (selectedIdSet.has(selectionNodeId)) {
       clearPendingPickupDrag();
@@ -697,14 +747,31 @@ export function useCanvasInteractionSession({
     onSelectItem,
     onToggleSelectItem,
     clearPendingPickupDrag,
+    renderableByLeafId,
     selectedIdSet,
-    selectedItemIds,
     selectedItems.length,
     setPendingPickupDrag,
+    selectedItemIds,
     updateSession,
   ]);
 
   const handleItemDoubleClick = useCallback((item: CanvasItem) => {
+    const latestClick = latestItemPointerClickRef.current;
+    const previousClick = previousItemPointerClickRef.current;
+    if (!latestClick || !previousClick) {
+      return;
+    }
+    const pointerDelta = Math.hypot(
+      latestClick.clientX - previousClick.clientX,
+      latestClick.clientY - previousClick.clientY,
+    );
+    const withinTimeWindow =
+      latestClick.recordedAtMs - previousClick.recordedAtMs <= GROUP_DRILL_DOUBLE_CLICK_MS;
+    const sameItem = latestClick.itemId === item.id && previousClick.itemId === item.id;
+    const isPrimaryButton = latestClick.button === 0 && previousClick.button === 0;
+    if (!(withinTimeWindow && sameItem && isPrimaryButton && pointerDelta <= GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA)) {
+      return;
+    }
     if (selectedItemIds.length !== 1) {
       return;
     }
@@ -712,6 +779,7 @@ export function useCanvasInteractionSession({
     if (!nextNodeId || nextNodeId === selectedItemIds[0]) {
       return;
     }
+    setLastDrilldownSource('item-hit');
     onSelectItem(nextNodeId);
   }, [document.nodes, onSelectItem, selectedItemIds]);
 
@@ -738,9 +806,18 @@ export function useCanvasInteractionSession({
     lastHandledItemPointerEventRef.current = null;
     const target = event.target;
     const stage = event.target.getStage();
+    const isCanvasSurface =
+      target === stage ||
+      target.hasName?.('canvas-surface') ||
+      target.hasName?.('canvas-background') ||
+      target.hasName?.('canvas-backdrop') ||
+      target.name() === 'canvas-surface' ||
+      target.name() === 'canvas-background' ||
+      target.name() === 'canvas-backdrop';
     const pointer = getCanvasPointerFromStageEvent(event);
     if (
       pointer &&
+      isCanvasSurface &&
       activeTool === 'select' &&
       event.evt?.button !== 1 &&
       selectedItemIds.length === 1
@@ -753,14 +830,43 @@ export function useCanvasInteractionSession({
           ? getNextDrilldownNodeId(document.nodes, selectedNodeId, drilledItem.id)
           : null;
         if (drilledItem && nextNodeId && nextNodeId !== selectedNodeId) {
-          setLastDrilldownSource('stage-surface');
+          clearPendingPickupDrag();
           onGuidesChange([]);
-          onSelectItem(nextNodeId);
+          const recordedAtMs = Date.now();
+          const lastDescendantClick = lastStageDescendantClickRef.current;
+          const pointerDelta = lastDescendantClick
+            ? Math.hypot(
+                event.evt.clientX - lastDescendantClick.clientX,
+                event.evt.clientY - lastDescendantClick.clientY,
+              )
+            : Number.POSITIVE_INFINITY;
+          const isStageSurfaceDoubleClick = Boolean(
+            lastDescendantClick &&
+              lastDescendantClick.groupId === selectedNodeId &&
+              lastDescendantClick.itemId === drilledItem.id &&
+              lastDescendantClick.button === 0 &&
+              event.evt.button === 0 &&
+              recordedAtMs - lastDescendantClick.recordedAtMs <= GROUP_DRILL_DOUBLE_CLICK_MS &&
+              pointerDelta <= GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA,
+          );
+          if (isStageSurfaceDoubleClick) {
+            lastStageDescendantClickRef.current = null;
+            setLastDrilldownSource('stage-surface');
+            onSelectItem(nextNodeId);
+          } else {
+            lastStageDescendantClickRef.current = {
+              groupId: selectedNodeId,
+              itemId: drilledItem.id,
+              recordedAtMs,
+              clientX: event.evt.clientX,
+              clientY: event.evt.clientY,
+              button: event.evt.button,
+            };
+          }
           return;
         }
       }
     }
-    const isCanvasSurface = target === stage || target.hasName?.('canvas-surface') || target.hasName?.('canvas-background') || target.hasName?.('canvas-backdrop') || target.name() === 'canvas-surface' || target.name() === 'canvas-background' || target.name() === 'canvas-backdrop';
     if (!pointer || !isCanvasSurface) return;
     clearPendingPickupDrag();
     if (isCreateTool(activeTool)) {

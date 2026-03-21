@@ -38,6 +38,7 @@ interface GroupSelectionOverlayProps {
     bounds: { x: number; y: number; width: number; height: number };
     rotation: number;
   } | null;
+  handleItemDoubleClick?: (item: CanvasItem) => void;
   handleItemPointerDown: (
     item: CanvasItem,
     selectionNodeId: string,
@@ -58,6 +59,7 @@ export function GroupSelectionOverlay({
   beginResize,
   beginRotate,
   groupOverlayFrame,
+  handleItemDoubleClick,
   handleItemPointerDown,
   renderedSelectedItems,
   startPanDrag,
@@ -73,6 +75,7 @@ export function GroupSelectionOverlay({
             isSelected
             item={selectedRenderedItem}
             selectableNodeId={selectedRenderedItem.selectableNodeId}
+            onItemDoubleClick={handleItemDoubleClick as (item: Extract<CanvasItem, { kind: 'line' }>) => void}
             onBeginLineHandle={beginLineHandle}
             onItemPointerDown={handleItemPointerDown}
             renderContent={false}
@@ -86,6 +89,7 @@ export function GroupSelectionOverlay({
             isSelected
             item={selectedRenderedItem}
             selectableNodeId={selectedRenderedItem.selectableNodeId}
+            onItemDoubleClick={handleItemDoubleClick as (item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>) => void}
             onBeginResize={beginResize}
             onBeginRotate={beginRotate}
             onItemPointerDown={handleItemPointerDown}

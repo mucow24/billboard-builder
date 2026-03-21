@@ -189,6 +189,7 @@ export function CanvasScene({
                 beginResize={beginResize}
                 beginRotate={beginRotate}
                 groupOverlayFrame={groupOverlayFrame}
+                handleItemDoubleClick={handleItemDoubleClick}
                 handleItemPointerDown={handleItemPointerDown}
                 renderedSelectedItems={renderedSelectedItems}
                 startPanDrag={startPanDrag}
@@ -201,6 +202,7 @@ export function CanvasScene({
                 beginLineHandle={beginLineHandle}
                 beginResize={beginResize}
                 beginRotate={beginRotate}
+                handleItemDoubleClick={handleItemDoubleClick}
                 handleItemPointerDown={handleItemPointerDown}
                 selectedItemId={selectedItemId}
                 selectedRenderedItem={selectedRenderedItem}

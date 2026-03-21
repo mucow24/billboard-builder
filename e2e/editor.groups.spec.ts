@@ -4,6 +4,7 @@ import {
   assertFocusNotInToolbarOrInputs,
   assertNoDocumentTextSelection,
   clickCanvas,
+  doubleClickCanvas,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
@@ -43,6 +44,10 @@ type SavedNode = {
 
 async function expectActiveLayerLabel(page: Page, label: string) {
   await expect(page.locator('.layer-row.active .layer-row-select')).toContainText(label);
+}
+
+async function waitForDoubleClickCadence(page: Page) {
+  await page.waitForTimeout(1200);
 }
 
 function expectSavedNode(project: Record<string, unknown>, nodeId: string): SavedNode {
@@ -204,6 +209,51 @@ test.describe('editor groups', () => {
     expect(Number(expectSavedNode(savedProject, 'group-rect-2').y)).toBeGreaterThan(280);
   });
 
+  test('GT-11 GD-15 keeps a selected group on single-click, drags it as a unit, and drills into a child on double-click', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createSimpleGroupFixture(), 'selected-group-click-drag-drill.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 150, y: 180 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Simple Group');
+
+    let stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+
+    await waitForDoubleClickCadence(page);
+    await clickCanvas(page, { x: 260, y: 230 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Simple Group');
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+
+    await dragCanvas(page, { x: 260, y: 230 }, { x: 380, y: 310 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Simple Group');
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+
+    const draggedProject = await saveAndReadProject(page);
+    expect(Number(expectSavedNode(draggedProject, 'group-rect-1').x)).toBeGreaterThan(240);
+    expect(Number(expectSavedNode(draggedProject, 'group-rect-1').y)).toBeGreaterThan(220);
+    expect(Number(expectSavedNode(draggedProject, 'group-rect-2').x)).toBeGreaterThan(430);
+    expect(Number(expectSavedNode(draggedProject, 'group-rect-2').y)).toBeGreaterThan(280);
+
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 340, y: 290 });
+    await openLayersTab(page);
+    await expectActiveLayerLabel(page, 'Rectangle');
+    stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasGroupOverlay).toBe(false);
+    expect(stageDebug.hasShapeHandles).toBe(true);
+  });
+
   test('GD-01 GD-02 GD-04 GD-05 GD-06 GD-07 CS-01 KB-11 selects from the canvas, drills into nested descendants, clears, and escapes back out', async ({
     page,
   }) => {
@@ -250,7 +300,7 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'nested-groups.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 400, y: 210 });
+    await clickCanvas(page, { x: 180, y: 180 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Outer Group');
     await openPropertiesTab(page);
@@ -259,7 +309,8 @@ test.describe('editor groups', () => {
     expect(stageDebug.groupFrame).not.toBeNull();
     expect(stageDebug.hasShapeHandles).toBe(false);
 
-    await clickCanvas(page, { x: 400, y: 210 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 400, y: 210 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Inner Group');
     await openPropertiesTab(page);
@@ -268,7 +319,8 @@ test.describe('editor groups', () => {
     expect(stageDebug.groupFrame).not.toBeNull();
     expect(stageDebug.hasShapeHandles).toBe(false);
 
-    await clickCanvas(page, { x: 400, y: 210 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 400, y: 210 });
     await assertNoDocumentTextSelection(page);
     await assertFocusNotInToolbarOrInputs(page);
     await openLayersTab(page);
@@ -286,8 +338,12 @@ test.describe('editor groups', () => {
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
 
-    await clickCanvas(page, { x: 400, y: 210 });
-    await clickCanvas(page, { x: 400, y: 210 });
+    await clickCanvas(page, { x: 180, y: 180 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 400, y: 210 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 400, y: 210 });
+    await waitForDoubleClickCadence(page);
     await clickCanvas(page, { x: 400, y: 210 });
 
     await page.keyboard.press('Escape');
@@ -341,8 +397,9 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'grouped-text.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 340, y: 245 });
-    await clickCanvas(page, { x: 340, y: 245 });
+    await clickCanvas(page, { x: 220, y: 220 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 340, y: 245 });
 
     await assertNoDocumentTextSelection(page);
     await assertFocusNotInToolbarOrInputs(page);
@@ -369,11 +426,12 @@ test.describe('editor groups', () => {
     await uploadProject(page, createSimpleGroupFixture(), 'group-drill-item-hit.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 210, y: 200 });
+    await clickCanvas(page, { x: 150, y: 180 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
 
-    await clickCanvas(page, { x: 210, y: 200 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 210, y: 200 });
     const stageDebug = await readStageDebug(page);
 
     await openLayersTab(page);
@@ -428,11 +486,12 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'group-drill-off-canvas.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: -160, y: 220 });
+    await clickCanvas(page, { x: 220, y: 260 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Off Canvas Group');
 
-    await clickCanvas(page, { x: -160, y: 220 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: -160, y: 220 });
     const stageDebug = await readStageDebug(page);
 
     await openPropertiesTab(page);
@@ -495,7 +554,8 @@ test.describe('editor groups', () => {
 
     // This point misses the rendered stroke but remains inside the line's
     // descendant-resolvable bounds, so the stage-surface drill-in path owns it.
-    await clickCanvas(page, { x: 320, y: 228 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 320, y: 228 });
     const stageDebug = await readStageDebug(page);
 
     await openLayersTab(page);
@@ -547,7 +607,8 @@ test.describe('editor groups', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     await clickCanvas(page, { x: 180, y: 210 });
-    await clickCanvas(page, { x: 180, y: 210 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 240, y: 230 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
@@ -629,8 +690,9 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'precision-group.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 220, y: 220 });
-    await clickCanvas(page, { x: 220, y: 220 });
+    await clickCanvas(page, { x: 180, y: 220 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 280, y: 220 });
 
     await openPropertiesTab(page);
     await expect(page.getByLabel('Fill')).toBeVisible();
@@ -639,6 +701,8 @@ test.describe('editor groups', () => {
     expect(stageDebug.hasGroupOverlay).toBe(false);
     expect(stageDebug.hasShapeHandles).toBe(true);
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
+    const preManipulationProject = await saveAndReadProject(page);
+    const siblingBefore = expectSavedNode(preManipulationProject, 'sibling-child');
 
     await setCanvasTestHooksEnabled(page, true);
     await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 420, y: 220 });
@@ -664,10 +728,10 @@ test.describe('editor groups', () => {
     expect(Math.abs(Number(expectSavedNode(savedProject, 'rotate-child').rotation))).toBeGreaterThan(10);
     expect(expectSavedNode(savedProject, 'sibling-child')).toEqual(
       expect.objectContaining({
-        x: 380,
-        y: 200,
-        width: 140,
-        rotation: 0,
+        x: siblingBefore.x,
+        y: siblingBefore.y,
+        width: siblingBefore.width,
+        rotation: siblingBefore.rotation,
       }),
     );
   });
@@ -732,8 +796,9 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'nested-precision-group.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 380, y: 240 });
-    await clickCanvas(page, { x: 380, y: 240 });
+    await clickCanvas(page, { x: 180, y: 180 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 380, y: 240 });
 
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Inner Group Node');
@@ -827,9 +892,10 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Line Child Group');
 
-    // This click lands inside the line bounding box but away from the visible stroke,
-    // so the stage-surface fallback path is the one that must resolve the drill-in.
-    await clickCanvas(page, { x: 320, y: 228 });
+    // This double-click lands inside the line bounding box but away from the visible
+    // stroke, so the stage-surface fallback path is the one that must resolve the drill-in.
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 320, y: 228 });
     await assertNoDocumentTextSelection(page);
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Line');
@@ -910,8 +976,9 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'undo-group-child.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 240, y: 240 });
-    await clickCanvas(page, { x: 240, y: 240 });
+    await clickCanvas(page, { x: 180, y: 220 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 240, y: 240 });
     await dragCanvas(page, { x: 240, y: 240 }, { x: 360, y: 340 });
 
     await openLayersTab(page);

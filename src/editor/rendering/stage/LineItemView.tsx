@@ -154,6 +154,12 @@ export const LineItemView = memo(function LineItemView({
                 event.evt,
               );
             }}
+            onDblClick={() => {
+              if (!interactionEnabled || item.locked) {
+                return;
+              }
+              onItemDoubleClick?.(item);
+            }}
           />
           {renderHandles
             ? (['start', 'end'] as const).map((handle) => {

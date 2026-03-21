@@ -106,8 +106,22 @@ function makeStageRef() {
 
 function makeStageEvent(
   pointer: { x: number; y: number } | null,
-  name = 'canvas-background'
+  name = 'canvas-background',
+  evtOverrides: Partial<MouseEvent> = {},
 ) {
+  const evt = {
+    button: 0,
+    buttons: 1,
+    clientX: pointer?.x ?? 0,
+    clientY: pointer?.y ?? 0,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    timeStamp: 0,
+    detail: 1,
+    ...evtOverrides,
+  } as MouseEvent;
   return {
     target: {
       name: () => name,
@@ -115,6 +129,7 @@ function makeStageEvent(
         getPointerPosition: () => pointer,
       }),
     },
+    evt,
   } as unknown as Konva.KonvaEventObject<MouseEvent>;
 }
 
@@ -1275,7 +1290,7 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
-  it('drills into the next descendant on item pointer down without starting an immediate drag', () => {
+  it('does not drill into the next descendant on single click when a group is selected', () => {
     const nestedLeaf = createRectangleItem({ id: 'nested-leaf' });
     const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
     nestedGroup.id = 'nested-group';
@@ -1285,36 +1300,20 @@ describe('useCanvasInteractionSession', () => {
       document: createDocument([outerGroup]),
       selectedItemIds: [outerGroup.id],
     });
-    const { result, rerender } = renderHook(
+    const { result } = renderHook(
       (hookParams) => useCanvasInteractionSession(hookParams),
       { initialProps: params },
     );
 
     act(() => {
-      result.current.handleItemPointerDown(nestedLeaf, outerGroup.id, { x: 120, y: 120 }, false);
-    });
-
-    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
-    expect(result.current.session).toBeNull();
-    expect(result.current.lastDrilldownSource).toBe('item-hit');
-
-    const innerParams = {
-      ...params,
-      onSelectItem: vi.fn(),
-      selectedItemIds: [nestedGroup.id],
-    };
-    rerender(innerParams);
-
-    act(() => {
       result.current.handleItemPointerDown(nestedLeaf, nestedGroup.id, { x: 120, y: 120 }, false);
     });
 
-    expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
-    expect(result.current.session).toBeNull();
-    expect(result.current.lastDrilldownSource).toBe('item-hit');
+    expect(params.onSelectItem).not.toHaveBeenCalled();
+    expect(result.current.lastDrilldownSource).toBeNull();
   });
 
-  it('drills into the next descendant from a stage mouse down when a selected group click resolves as canvas surface input', () => {
+  it('treats stage-surface descendant single-click as a no-op when a group is selected', () => {
     const nestedLeaf = createRectangleItem({
       id: 'nested-leaf',
       x: 340,
@@ -1338,8 +1337,63 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
-    expect(result.current.lastDrilldownSource).toBe('stage-surface');
+    expect(params.onSelectItem).not.toHaveBeenCalled();
+    expect(result.current.session).toBeNull();
+    expect(result.current.lastDrilldownSource).toBeNull();
+  });
+
+  it('treats selected-group descendant drag as group movement instead of drill-in', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+    const params = createHookParams({
+      document: createDocument([group]),
+      selectedItemIds: [group.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(first, first.id, { x: 120, y: 120 }, false);
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 160,
+          clientY: 150,
+        }),
+      );
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 160,
+          clientY: 150,
+        }),
+      );
+    });
+
+    expect(params.onSelectItem).not.toHaveBeenCalled();
+    expect(result.current.lastDrilldownSource).toBeNull();
+    expect(params.onUpdateItem).toHaveBeenCalledTimes(2);
+    expect(params.onUpdateItem).toHaveBeenNthCalledWith(
+      1,
+      first.id,
+      expect.objectContaining({
+        x: 140,
+        y: 130,
+      }),
+    );
+    expect(params.onUpdateItem).toHaveBeenNthCalledWith(
+      2,
+      second.id,
+      expect.objectContaining({
+        x: 260,
+        y: 130,
+      }),
+    );
   });
 
   it('drills into the next descendant on item double-click when a group is selected', () => {
@@ -1358,10 +1412,30 @@ describe('useCanvasInteractionSession', () => {
     );
 
     act(() => {
+      result.current.handleItemPointerDown(
+        nestedLeaf,
+        nestedGroup.id,
+        { x: 120, y: 120 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 120, clientY: 120 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemPointerDown(
+        nestedLeaf,
+        nestedGroup.id,
+        { x: 120, y: 120 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 120, clientY: 120 }),
+      );
+    });
+
+    act(() => {
       result.current.handleItemDoubleClick(nestedLeaf);
     });
 
     expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+    expect(result.current.lastDrilldownSource).toBe('item-hit');
 
     const innerParams = {
       ...params,
@@ -1371,10 +1445,64 @@ describe('useCanvasInteractionSession', () => {
     rerender(innerParams);
 
     act(() => {
+      result.current.handleItemPointerDown(
+        nestedLeaf,
+        nestedLeaf.id,
+        { x: 120, y: 120 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 120, clientY: 120 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemPointerDown(
+        nestedLeaf,
+        nestedLeaf.id,
+        { x: 120, y: 120 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 120, clientY: 120 }),
+      );
+    });
+
+    act(() => {
       result.current.handleItemDoubleClick(nestedLeaf);
     });
 
     expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
+    expect(result.current.lastDrilldownSource).toBe('item-hit');
+  });
+
+  it('drills into the next descendant on stage-surface fallback double-click when a group is selected', () => {
+    const nestedLeaf = createRectangleItem({
+      id: 'nested-leaf',
+      x: 340,
+      y: 180,
+      width: 130,
+      height: 76,
+    });
+    const nestedGroup = createGroupNode([nestedLeaf], 'Nested');
+    nestedGroup.id = 'nested-group';
+    const outerGroup = createGroupNode([nestedGroup], 'Outer');
+    outerGroup.id = 'outer-group';
+    const params = createHookParams({
+      document: createDocument([outerGroup]),
+      selectedItemIds: [outerGroup.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleStageMouseDown(
+        makeStageEvent({ x: 360, y: 200 }, 'canvas-background', { detail: 1, timeStamp: 10 }),
+      );
+    });
+
+    act(() => {
+      result.current.handleStageMouseDown(
+        makeStageEvent({ x: 360, y: 200 }, 'canvas-background', { detail: 2, timeStamp: 120 }),
+      );
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+    expect(result.current.lastDrilldownSource).toBe('stage-surface');
   });
 
   it('snaps group drag previews and emits guides', () => {

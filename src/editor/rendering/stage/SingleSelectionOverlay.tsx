@@ -21,6 +21,7 @@ interface SingleSelectionOverlayProps {
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: Point,
   ) => void;
+  handleItemDoubleClick?: (item: CanvasItem) => void;
   handleItemPointerDown: (
     item: CanvasItem,
     selectionNodeId: string,
@@ -39,6 +40,7 @@ export function SingleSelectionOverlay({
   beginLineHandle,
   beginResize,
   beginRotate,
+  handleItemDoubleClick,
   handleItemPointerDown,
   selectedItemId,
   selectedRenderedItem,
@@ -52,6 +54,7 @@ export function SingleSelectionOverlay({
       isSelected={selectedRenderedItem.id === selectedItemId}
       item={selectedRenderedItem}
       selectableNodeId={selectedRenderedItem.selectableNodeId}
+      onItemDoubleClick={handleItemDoubleClick as (item: Extract<CanvasItem, { kind: 'line' }>) => void}
       onBeginLineHandle={beginLineHandle}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
@@ -65,6 +68,7 @@ export function SingleSelectionOverlay({
       isSelected={selectedRenderedItem.id === selectedItemId}
       item={selectedRenderedItem}
       selectableNodeId={selectedRenderedItem.selectableNodeId}
+      onItemDoubleClick={handleItemDoubleClick as (item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>) => void}
       onBeginResize={beginResize}
       onBeginRotate={beginRotate}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}

@@ -235,6 +235,12 @@ export const ShapeItemView = memo(function ShapeItemView({
                 event.evt,
               );
             }}
+            onDblClick={() => {
+              if (!interactionEnabled || item.locked) {
+                return;
+              }
+              onItemDoubleClick?.(item);
+            }}
           >
             <Rect
               x={0}
