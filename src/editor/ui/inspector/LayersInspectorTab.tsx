@@ -41,7 +41,7 @@ export function LayersInspectorTab({
     containerRef,
     overlayHeight,
     overlaySegments,
-    registerToggle: registerPreviewAnchor,
+    registerJunction,
   } = useLayerTreeOverlay(visibleRows);
   const deleteSelectionLabel =
     selectedNodeIds.length > 0
@@ -249,7 +249,7 @@ export function LayersInspectorTab({
                   >
                     {isGroup ? (
                       <button
-                        ref={registerPreviewAnchor(row.node.id)}
+                        ref={registerJunction(row.node.id)}
                         type="button"
                         aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`}
                         className="layer-row-type layer-row-type-group layer-row-type-toggle"
@@ -263,7 +263,7 @@ export function LayersInspectorTab({
                       </button>
                     ) : (
                       <span
-                        ref={registerPreviewAnchor(row.node.id)}
+                        ref={registerJunction(row.node.id)}
                         className={`layer-row-type layer-row-type-${row.node.kind}`}
                         data-testid={`layers-preview-anchor-${row.node.id}`}
                         aria-hidden="true"

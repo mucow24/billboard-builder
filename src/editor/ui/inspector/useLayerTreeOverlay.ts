@@ -15,7 +15,7 @@ interface LayerTreeOverlayState {
 
 export function useLayerTreeOverlay(rows: LayerRow[]) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const toggleRefs = useRef(new Map<string, HTMLElement>());
+  const junctionRefs = useRef(new Map<string, HTMLElement>());
   const [overlayState, setOverlayState] = useState<LayerTreeOverlayState>({
     height: 0,
     segments: [],
@@ -31,20 +31,28 @@ export function useLayerTreeOverlay(rows: LayerRow[]) {
     const metricsByNodeId: LayerTreeOverlayMetricMap = {};
 
     for (const row of rows) {
-      const toggleElement = toggleRefs.current.get(row.node.id);
-      if (!toggleElement) {
+      const junctionElement = junctionRefs.current.get(row.node.id);
+      if (!junctionElement) {
         continue;
       }
-      const toggleRect = toggleElement.getBoundingClientRect();
-      const left = toggleRect.left - containerRect.left + container.scrollLeft;
-      const top = toggleRect.top - containerRect.top + container.scrollTop;
-      metricsByNodeId[row.node.id] = {
-        anchorX: Math.round(left + toggleRect.width / 2),
-        bottomY: Math.round(top + toggleRect.height),
-        centerY: Math.round(top + toggleRect.height / 2),
-        entryX: Math.round(left),
-        nodeId: row.node.id,
+      const junctionRect = junctionElement.getBoundingClientRect();
+      const junctionLeft = junctionRect.left - containerRect.left + container.scrollLeft;
+      const junctionTop = junctionRect.top - containerRect.top + container.scrollTop;
+      const nextMetric = {
+        junctionX: roundToNearestHalfPixel(junctionLeft + 0.5),
+        junctionY: roundToNearestHalfPixel(junctionTop + junctionRect.height / 2),
       };
+
+      if (row.node.kind === 'group') {
+        metricsByNodeId[row.node.id] = {
+          ...nextMetric,
+          groupOutflowX: roundToNearestHalfPixel(junctionLeft + junctionRect.width / 2),
+          groupOutflowY: roundToNearestHalfPixel(junctionTop + junctionRect.height - 0.5),
+        };
+        continue;
+      }
+
+      metricsByNodeId[row.node.id] = nextMetric;
     }
 
     const nextState = {
@@ -81,8 +89,8 @@ export function useLayerTreeOverlay(rows: LayerRow[]) {
       measureOverlay();
     });
     observer.observe(container);
-    for (const toggleElement of toggleRefs.current.values()) {
-      observer.observe(toggleElement);
+    for (const junctionElement of junctionRefs.current.values()) {
+      observer.observe(junctionElement);
     }
 
     return () => {
@@ -90,12 +98,12 @@ export function useLayerTreeOverlay(rows: LayerRow[]) {
     };
   }, [measureOverlay, rows]);
 
-  const registerToggle = useCallback(
+  const registerJunction = useCallback(
     (nodeId: string) => (element: HTMLElement | null) => {
       if (element) {
-        toggleRefs.current.set(nodeId, element);
+        junctionRefs.current.set(nodeId, element);
       } else {
-        toggleRefs.current.delete(nodeId);
+        junctionRefs.current.delete(nodeId);
       }
     },
     [],
@@ -105,8 +113,12 @@ export function useLayerTreeOverlay(rows: LayerRow[]) {
     containerRef,
     overlayHeight: overlayState.height,
     overlaySegments: overlayState.segments,
-    registerToggle,
+    registerJunction,
   };
+}
+
+function roundToNearestHalfPixel(value: number) {
+  return Math.round(value * 2) / 2;
 }
 
 function haveEqualSegments(

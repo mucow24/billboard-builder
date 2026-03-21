@@ -1,11 +1,10 @@
 import { isGroupNode, type LayerRow } from '../../document/sceneGraph';
 
 export interface LayerTreeOverlayMetric {
-  anchorX: number;
-  bottomY: number;
-  centerY: number;
-  entryX: number;
-  nodeId: string;
+  groupOutflowX?: number;
+  groupOutflowY?: number;
+  junctionX: number;
+  junctionY: number;
 }
 
 export interface LayerTreeOverlaySegment {
@@ -46,26 +45,30 @@ export function buildLayerTreeOverlaySegments(
     }
 
     const lastChildMetric = childMetrics[childMetrics.length - 1];
+    const trunkX =
+      row.depth > 0 ? parentMetric.junctionX : (parentMetric.groupOutflowX ?? parentMetric.junctionX);
+    const trunkY =
+      row.depth > 0 ? parentMetric.junctionY : (parentMetric.groupOutflowY ?? parentMetric.junctionY);
     segments.push({
       kind: 'trunk',
       parentNodeId: row.node.id,
-      x1: parentMetric.anchorX,
       // Nested group trunks should continue through the incoming parent
-      // branch junction rather than starting below it.
-      y1: row.depth > 0 ? parentMetric.centerY : parentMetric.bottomY,
-      x2: parentMetric.anchorX,
-      y2: lastChildMetric.centerY,
+      // branch junction rather than starting inside the disclosure toggle.
+      x1: trunkX,
+      y1: trunkY,
+      x2: trunkX,
+      y2: lastChildMetric.junctionY,
     });
 
-    for (const childMetric of childMetrics) {
+    for (const [childIndex, childMetric] of childMetrics.entries()) {
       segments.push({
-        childNodeId: childMetric.nodeId,
+        childNodeId: immediateChildren[childIndex].node.id,
         kind: 'branch',
         parentNodeId: row.node.id,
-        x1: parentMetric.anchorX,
-        y1: childMetric.centerY,
-        x2: Math.max(parentMetric.anchorX, childMetric.entryX),
-        y2: childMetric.centerY,
+        x1: trunkX,
+        y1: childMetric.junctionY,
+        x2: Math.max(trunkX, childMetric.junctionX),
+        y2: childMetric.junctionY,
       });
     }
   }

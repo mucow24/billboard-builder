@@ -73,20 +73,39 @@ async function getLayersPanelRailBounds(page: Page) {
 
 async function readLayersTreeGeometry(page: Page) {
   return page.evaluate(() => {
-    function readAnchorMetric(nodeId: string) {
-      const anchor = document.querySelector<HTMLElement>(`[data-testid="layers-preview-anchor-${nodeId}"]`);
+    function roundToNearestHalfPixel(value: number) {
+      return Math.round(value * 2) / 2;
+    }
+
+    function readJunctionMetric(nodeId: string) {
+      const junction = document.querySelector<HTMLElement>(`[data-testid="layers-preview-anchor-${nodeId}"]`);
       const list = document.querySelector<HTMLElement>('[data-testid="layers-layer-list"]');
-      if (!anchor || !list) {
-        throw new Error(`Expected anchor metric elements for ${nodeId}.`);
+      if (!junction || !list) {
+        throw new Error(`Expected junction metric elements for ${nodeId}.`);
       }
-      const anchorRect = anchor.getBoundingClientRect();
+      const junctionRect = junction.getBoundingClientRect();
       const listRect = list.getBoundingClientRect();
-      const left = Math.round(anchorRect.left - listRect.left + list.scrollLeft);
-      const top = Math.round(anchorRect.top - listRect.top + list.scrollTop);
+      const left = junctionRect.left - listRect.left + list.scrollLeft;
+      const top = junctionRect.top - listRect.top + list.scrollTop;
       return {
-        centerY: top + Math.round(anchorRect.height / 2),
-        bottomY: top + Math.round(anchorRect.height),
-        entryX: left,
+        junctionX: roundToNearestHalfPixel(left + 0.5),
+        junctionY: roundToNearestHalfPixel(top + junctionRect.height / 2),
+      };
+    }
+
+    function readToggleOutflowMetric(nodeId: string) {
+      const toggle = document.querySelector<HTMLElement>(`[data-testid="layers-preview-anchor-${nodeId}"]`);
+      const list = document.querySelector<HTMLElement>('[data-testid="layers-layer-list"]');
+      if (!toggle || !list) {
+        throw new Error(`Expected toggle metric elements for ${nodeId}.`);
+      }
+      const toggleRect = toggle.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      const left = toggleRect.left - listRect.left + list.scrollLeft;
+      const top = toggleRect.top - listRect.top + list.scrollTop;
+      return {
+        outflowX: roundToNearestHalfPixel(left + toggleRect.width / 2),
+        outflowY: roundToNearestHalfPixel(top + toggleRect.height - 0.5),
       };
     }
 
@@ -104,14 +123,17 @@ async function readLayersTreeGeometry(page: Page) {
     }
 
     return {
-      anchors: {
-        heroGroup: readAnchorMetric('hero-group'),
-        detailsCluster: readAnchorMetric('details-cluster'),
-        heroText: readAnchorMetric('hero-text'),
-        detailsText: readAnchorMetric('details-text'),
-        heroLine: readAnchorMetric('hero-line'),
+      junctions: {
+        detailsCluster: readJunctionMetric('details-cluster'),
+        detailsText: readJunctionMetric('details-text'),
+        heroLine: readJunctionMetric('hero-line'),
+        heroText: readJunctionMetric('hero-text'),
+      },
+      toggles: {
+        heroGroup: readToggleOutflowMetric('hero-group'),
       },
       lines: {
+        heroTrunk: readLineMetric('layers-tree-trunk-hero-group'),
         heroDetailsBranch: readLineMetric('layers-tree-branch-hero-group-details-cluster'),
         detailsTrunk: readLineMetric('layers-tree-trunk-details-cluster'),
         heroTextBranch: readLineMetric('layers-tree-branch-hero-group-hero-text'),
@@ -209,17 +231,29 @@ test.describe('editor visual regression', () => {
       expect(screenshot).toMatchSnapshot('layers-panel-mock-tree-parity.png');
     });
 
-    test('keeps nested group trunks continuous with the incoming branch junction', async ({
+    test('anchors layers tree lines to row edges and disclosure outflows', async ({
       page,
     }) => {
       await prepareLayersPanelMockParity(page);
       const geometry = await readLayersTreeGeometry(page);
 
-      expect(geometry.lines.heroTextBranch.y1).toBe(geometry.anchors.heroText.centerY);
-      expect(geometry.lines.heroDetailsBranch.y1).toBe(geometry.anchors.detailsCluster.centerY);
-      expect(geometry.lines.detailsTrunk.y1).toBe(geometry.lines.heroDetailsBranch.y1);
-      expect(geometry.lines.detailsTextBranch.y1).toBe(geometry.anchors.detailsText.centerY);
-      expect(geometry.lines.heroLineBranch.y1).toBe(geometry.anchors.heroLine.centerY);
+      expect(geometry.lines.heroTrunk.x1).toBe(geometry.toggles.heroGroup.outflowX);
+      expect(geometry.lines.heroTrunk.y1).toBe(geometry.toggles.heroGroup.outflowY);
+
+      expect(geometry.lines.heroTextBranch.x2).toBe(geometry.junctions.heroText.junctionX);
+      expect(geometry.lines.heroTextBranch.y1).toBe(geometry.junctions.heroText.junctionY);
+
+      expect(geometry.lines.heroDetailsBranch.x2).toBe(geometry.junctions.detailsCluster.junctionX);
+      expect(geometry.lines.heroDetailsBranch.y1).toBe(geometry.junctions.detailsCluster.junctionY);
+
+      expect(geometry.lines.detailsTrunk.x1).toBe(geometry.junctions.detailsCluster.junctionX);
+      expect(geometry.lines.detailsTrunk.y1).toBe(geometry.junctions.detailsCluster.junctionY);
+
+      expect(geometry.lines.detailsTextBranch.x2).toBe(geometry.junctions.detailsText.junctionX);
+      expect(geometry.lines.detailsTextBranch.y1).toBe(geometry.junctions.detailsText.junctionY);
+
+      expect(geometry.lines.heroLineBranch.x2).toBe(geometry.junctions.heroLine.junctionX);
+      expect(geometry.lines.heroLineBranch.y1).toBe(geometry.junctions.heroLine.junctionY);
     });
   });
 

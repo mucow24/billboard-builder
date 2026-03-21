@@ -2118,7 +2118,6 @@ button {
 .layer-tree-overlay line {
   stroke: #34507a;
   stroke-width: 1;
-  shape-rendering: crispEdges;
 }
 
 .layer-list-rows {
