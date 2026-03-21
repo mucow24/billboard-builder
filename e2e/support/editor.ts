@@ -16,6 +16,33 @@ export interface CanvasPoint {
 export interface StageDebugInfo {
   sessionKind?: string | null;
   sessionHandle?: string | null;
+  cropSession?: {
+    crop: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    previewItem: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation: number;
+    };
+    fullImageItem: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation: number;
+    };
+    cropHandlePoints?: Record<string, CanvasPoint> | null;
+    fullImageHandlePoints?: Record<string, CanvasPoint> | null;
+    cropHandleViewportPoints?: Record<string, CanvasPoint> | null;
+    fullImageHandleViewportPoints?: Record<string, CanvasPoint> | null;
+    fullImageRotaterViewportPoint?: CanvasPoint | null;
+  } | null;
   viewport: {
     zoom: number;
     panX: number;
@@ -308,6 +335,12 @@ export function createImageFixture(overrides: Record<string, unknown> = {}) {
     mimeType: 'image/svg+xml',
     originalWidth: 160,
     originalHeight: 90,
+    crop: {
+      x: 0,
+      y: 0,
+      width: 160,
+      height: 90,
+    },
     preserveAspectRatio: true,
     adjustments: {
       brightness: 100,
@@ -676,6 +709,10 @@ export async function clickCanvas(page: Page, point: CanvasPoint) {
 export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
   const target = await canvasPointToPage(page, point);
   await page.mouse.dblclick(target.x, target.y);
+}
+
+export async function waitForDoubleClickCadence(page: Page, ms = 550) {
+  await page.waitForTimeout(ms);
 }
 
 export async function dragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {

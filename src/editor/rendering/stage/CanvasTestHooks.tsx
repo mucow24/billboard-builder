@@ -5,6 +5,13 @@ import type { RenderableCanvasItem } from '../renderAdapter';
 import { toOverlayStyle } from './viewportMath';
 
 interface CanvasTestHooksProps {
+  beginCropFullResize?: (
+    handle: ResizeHandle,
+    pointer: { x: number; y: number },
+  ) => void;
+  beginCropFullRotate?: (pointer: { x: number; y: number }) => void;
+  beginCropPan?: (pointer: { x: number; y: number }) => void;
+  beginCropResize?: (handle: ResizeHandle) => void;
   beginGroupDrag: (pointer: { x: number; y: number }) => void;
   beginGroupResize: (
     handle: ResizeHandle,
@@ -25,6 +32,13 @@ interface CanvasTestHooksProps {
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: { x: number; y: number },
   ) => void;
+  cropFullImageHandleViewportPoints?: Record<string, { x: number; y: number }> | null;
+  cropFullImageRotaterViewportPoint?: { x: number; y: number } | null;
+  cropHandleViewportPoints?: Record<string, { x: number; y: number }> | null;
+  cropSession?: {
+    fullImageItem: { rotation: number; x: number; y: number; width: number; height: number };
+    previewItem: { rotation: number; x: number; y: number; width: number; height: number };
+  } | null;
   getViewportPointerFromClient: (clientX: number, clientY: number) => { x: number; y: number } | null;
   groupHandleViewportPoints: Record<string, { x: number; y: number }> | null;
   groupOverlayFrame: { rotation: number } | null;
@@ -60,12 +74,20 @@ interface CanvasTestHooksProps {
 }
 
 export function CanvasTestHooks({
+  beginCropFullResize = () => {},
+  beginCropFullRotate = () => {},
+  beginCropPan = () => {},
+  beginCropResize = () => {},
   beginGroupDrag,
   beginGroupResize,
   beginGroupRotate,
   beginLineHandle,
   beginResize,
   beginRotate,
+  cropFullImageHandleViewportPoints = null,
+  cropFullImageRotaterViewportPoint = null,
+  cropHandleViewportPoints = null,
+  cropSession = null,
   getViewportPointerFromClient,
   groupHandleViewportPoints,
   groupOverlayFrame,
@@ -137,6 +159,103 @@ export function CanvasTestHooks({
           zIndex: 5,
         }}
       >
+        {cropSession ? (
+          <>
+            <div
+              data-testid="canvas-crop-pan-overlay"
+              onMouseDown={(event) => {
+                const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                if (!pointer || event.button !== 0) {
+                  return;
+                }
+                beginCropPan(toCanvasPointer(pointer));
+              }}
+              style={{
+                position: 'absolute',
+                pointerEvents: 'auto',
+                background: 'rgba(0, 0, 0, 0.001)',
+                transform: `rotate(${cropSession.fullImageItem.rotation}deg)`,
+                transformOrigin: 'center',
+                ...toOverlayStyle(
+                  toViewportRect({
+                    x: cropSession.fullImageItem.x,
+                    y: cropSession.fullImageItem.y,
+                    width: cropSession.fullImageItem.width,
+                    height: cropSession.fullImageItem.height,
+                  }),
+                ),
+              }}
+            />
+            {cropHandleViewportPoints
+              ? Object.entries(cropHandleViewportPoints).map(([handle, point]) => (
+                  <div
+                    key={`crop-handle-${handle}`}
+                    data-testid={`canvas-crop-handle-${handle}`}
+                    onMouseDown={(event) => {
+                      if (event.button !== 0) {
+                        return;
+                      }
+                      beginCropResize(handle as ResizeHandle);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      pointerEvents: 'auto',
+                      background: 'rgba(0, 0, 0, 0.001)',
+                      left: `${point.x - 8}px`,
+                      top: `${point.y - 8}px`,
+                      width: '16px',
+                      height: '16px',
+                    }}
+                  />
+                ))
+              : null}
+            {cropFullImageHandleViewportPoints
+              ? Object.entries(cropFullImageHandleViewportPoints).map(([handle, point]) => (
+                  <div
+                    key={`crop-full-handle-${handle}`}
+                    data-testid={`canvas-crop-full-handle-${handle}`}
+                    onMouseDown={(event) => {
+                      const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                      if (!pointer || event.button !== 0) {
+                        return;
+                      }
+                      beginCropFullResize(handle as ResizeHandle, toCanvasPointer(pointer));
+                    }}
+                    style={{
+                      position: 'absolute',
+                      pointerEvents: 'auto',
+                      background: 'rgba(0, 0, 0, 0.001)',
+                      left: `${point.x - 8}px`,
+                      top: `${point.y - 8}px`,
+                      width: '16px',
+                      height: '16px',
+                    }}
+                  />
+                ))
+              : null}
+            {cropFullImageRotaterViewportPoint ? (
+              <div
+                data-testid="canvas-crop-full-rotater"
+                onMouseDown={(event) => {
+                  const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+                  if (!pointer || event.button !== 0) {
+                    return;
+                  }
+                  beginCropFullRotate(toCanvasPointer(pointer));
+                }}
+                style={{
+                  position: 'absolute',
+                  pointerEvents: 'auto',
+                  background: 'rgba(0, 0, 0, 0.001)',
+                  left: `${cropFullImageRotaterViewportPoint.x - 8}px`,
+                  top: `${cropFullImageRotaterViewportPoint.y - 8}px`,
+                  width: '16px',
+                  height: '16px',
+                }}
+              />
+            ) : null}
+          </>
+        ) : null}
         {selectedItemViewportRect && selectedRenderedItem ? (
           <div
             data-testid="canvas-selected-item-overlay"

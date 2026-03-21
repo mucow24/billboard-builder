@@ -37,12 +37,24 @@ const {
 
 vi.mock('react-konva', () => ({
   Image: React.forwardRef<HTMLDivElement, React.PropsWithChildren<Record<string, unknown>>>(
-    ({ children, shadowColor, shadowBlur, shadowOffsetX, shadowOffsetY, shadowOpacity }, forwardedRef) => {
+    (
+      {
+        children,
+        crop,
+        shadowColor,
+        shadowBlur,
+        shadowOffsetX,
+        shadowOffsetY,
+        shadowOpacity,
+      },
+      forwardedRef,
+    ) => {
       React.useImperativeHandle(forwardedRef, () => mockKonvaImageNode as never);
       return React.createElement(
         'div',
         {
           'data-konva-node': 'Image',
+          'data-crop': JSON.stringify(crop),
           'data-shadow-color': shadowColor,
           'data-shadow-blur': shadowBlur,
           'data-shadow-offset-x': shadowOffsetX,
@@ -92,6 +104,10 @@ describe('ImageItemNode', () => {
     );
 
     const node = container.querySelector('[data-konva-node="Image"]');
+    expect(node).toHaveAttribute(
+      'data-crop',
+      JSON.stringify({ x: 0, y: 0, width: 40, height: 20 }),
+    );
     expect(node).toHaveAttribute('data-shadow-color', '#112233');
     expect(node).toHaveAttribute('data-shadow-blur', '4');
     expect(node).toHaveAttribute('data-shadow-offset-x', '5');
@@ -159,5 +175,29 @@ describe('ImageItemNode', () => {
     expect(mockKonvaImageNode.filters).toHaveBeenCalledWith([]);
     expect(mockKonvaImageNode.clearCache).toHaveBeenCalled();
     expect(mockKonvaImageNode.cache).not.toHaveBeenCalled();
+  });
+
+  it('passes the persisted crop rectangle to the Konva image node', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+    item.crop = {
+      x: 5,
+      y: 3,
+      width: 24,
+      height: 11,
+    };
+
+    const { container } = render(
+      <ImageItemNode item={item} image={document.createElement('img')} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+    );
+
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-crop',
+      JSON.stringify(item.crop),
+    );
   });
 });

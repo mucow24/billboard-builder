@@ -55,6 +55,7 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
       shadowOpacity={item.shadow.opacity}
       x={0}
       y={0}
+      crop={item.crop}
       image={image ?? undefined}
       width={renderBox.width}
       height={renderBox.height}

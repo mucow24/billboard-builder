@@ -297,6 +297,19 @@ export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
     };
   }
 
+  if (item.kind === 'image') {
+    return {
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+      rotation: item.rotation,
+      crop: item.crop,
+      scaleX: 1,
+      scaleY: 1,
+    };
+  }
+
   return {
     x: item.x,
     y: item.y,

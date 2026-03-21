@@ -101,11 +101,23 @@ describe('document schema', () => {
       tintColor: '#336699',
       tintStrength: 80,
     };
+    document.nodes[0].crop = {
+      x: 4,
+      y: 2,
+      width: 30,
+      height: 12,
+    };
 
     const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
 
     expect(parsed.nodes[0]).toMatchObject({
       kind: 'image',
+      crop: {
+        x: 4,
+        y: 2,
+        width: 30,
+        height: 12,
+      },
       adjustments: {
         brightness: 120,
         contrast: 30,
@@ -167,5 +179,34 @@ describe('document schema', () => {
     const serialized = JSON.parse(serializeProjectDocument(document));
 
     expect(serialized.selectedNodeIds).toBeUndefined();
+  });
+
+  it('defaults missing image crop data when loading older saved files', () => {
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+    const { crop: ignoredCrop, ...legacyPayload } = imageItem;
+    void ignoredCrop;
+
+    const parsed = parseProjectDocument({
+      version: 1,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      items: [legacyPayload],
+    });
+
+    expect(parsed.nodes[0]).toMatchObject({
+      kind: 'image',
+      crop: {
+        x: 0,
+        y: 0,
+        width: 40,
+        height: 20,
+      },
+    });
   });
 });

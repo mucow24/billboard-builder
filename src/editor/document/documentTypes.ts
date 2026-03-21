@@ -52,6 +52,13 @@ export interface ImageAdjustments {
   tintStrength: number;
 }
 
+export interface ImageCropRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface TextPadding {
   top: number;
   right: number;
@@ -99,6 +106,7 @@ export interface ImageCanvasItem extends BaseCanvasItem {
   mimeType: string;
   originalWidth: number;
   originalHeight: number;
+  crop: ImageCropRect;
   preserveAspectRatio: boolean;
   adjustments: ImageAdjustments;
 }

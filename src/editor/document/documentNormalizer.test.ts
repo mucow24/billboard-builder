@@ -27,6 +27,12 @@ describe('document normalizer', () => {
       tintColor: '',
       tintStrength: 999,
     };
+    imageItem.crop = {
+      x: -5,
+      y: 10,
+      width: 100,
+      height: 0,
+    };
 
     const textItem = createTextItem({
       zIndex: 1,
@@ -68,6 +74,12 @@ describe('document normalizer', () => {
     });
     expect(normalized.nodes[1]).toMatchObject({
       kind: 'image',
+      crop: {
+        x: 0,
+        y: 10,
+        width: 40,
+        height: 1,
+      },
       adjustments: {
         brightness: 200,
         contrast: 0,

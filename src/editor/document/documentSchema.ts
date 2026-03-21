@@ -20,6 +20,13 @@ const ImageAdjustmentsSchema = z.object({
   tintStrength: z.number().min(0).max(100),
 });
 
+const ImageCropRectSchema = z.object({
+  x: z.number().nonnegative(),
+  y: z.number().nonnegative(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+});
+
 const TextPaddingSchema = z.object({
   top: z.number(),
   right: z.number(),
@@ -66,6 +73,7 @@ const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   mimeType: z.string(),
   originalWidth: z.number().positive(),
   originalHeight: z.number().positive(),
+  crop: ImageCropRectSchema.optional(),
   preserveAspectRatio: z.boolean(),
   adjustments: ImageAdjustmentsSchema.optional(),
 });

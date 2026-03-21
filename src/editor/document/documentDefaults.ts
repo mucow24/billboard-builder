@@ -9,6 +9,7 @@ import type {
   CanvasSize,
   CanvasShadow,
   EllipseCanvasItem,
+  ImageCropRect,
   ImageCanvasItem,
   LineCanvasItem,
   ProjectDocument,
@@ -46,6 +47,18 @@ export const DEFAULT_ITEM_SHADOW: CanvasShadow = {
   offsetY: 0,
   opacity: 0,
 } as const;
+
+export function createFullImageCropRect(
+  originalWidth: number,
+  originalHeight: number,
+): ImageCropRect {
+  return {
+    x: 0,
+    y: 0,
+    width: originalWidth,
+    height: originalHeight,
+  };
+}
 
 const DEFAULT_CANVAS: CanvasSize = {
   width: 1024,
@@ -179,6 +192,7 @@ export function createImageItem(params: {
     mimeType: params.mimeType,
     originalWidth: params.originalWidth,
     originalHeight: params.originalHeight,
+    crop: createFullImageCropRect(params.originalWidth, params.originalHeight),
     preserveAspectRatio: true,
     adjustments: { ...DEFAULT_IMAGE_ADJUSTMENTS },
   };

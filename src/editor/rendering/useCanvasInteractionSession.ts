@@ -13,6 +13,7 @@ import {
   getSelectionRenderBounds,
 } from './transformGeometry';
 import {
+  getCommitChanges,
   buildInteractionCommit,
   buildRenderedRenderables,
   createCreateSession,
@@ -30,6 +31,12 @@ import {
   type SessionWithModifiers,
   type ShapeItem,
 } from './interactionSession';
+import {
+  buildCroppedImagePreviewItem,
+  buildFullImageTransformItem,
+  panImageUnderCrop,
+  resizeImageCrop,
+} from './imageCropGeometry';
 import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
 import {
   collectLeafItems,
@@ -41,6 +48,8 @@ import {
 } from '../document/sceneGraph';
 import type {
   CanvasItem,
+  ImageCanvasItem,
+  ImageCropRect,
   CanvasTool,
   CanvasNode,
   GuideLine,
@@ -98,6 +107,43 @@ interface StageDescendantClickSample {
   button: number;
 }
 
+type CropInteraction =
+  | {
+      kind: 'crop-resize';
+      handle: ResizeHandle;
+      initialPreviewItem: ImageCanvasItem;
+      initialFullImageItem: ImageCanvasItem;
+      initialCrop: ImageCropRect;
+    }
+  | {
+      kind: 'image-pan';
+      pointerStart: Point;
+      initialPreviewItem: ImageCanvasItem;
+      initialFullImageItem: ImageCanvasItem;
+      initialCrop: ImageCropRect;
+    }
+  | {
+      kind: 'full-resize';
+      resizeSession: ReturnType<typeof createResizeSession>;
+      initialCrop: ImageCropRect;
+      initialPreviewItem: ImageCanvasItem;
+    }
+  | {
+      kind: 'full-rotate';
+      rotateSession: ReturnType<typeof createRotateSession>;
+      initialCrop: ImageCropRect;
+      initialPreviewItem: ImageCanvasItem;
+    };
+
+interface ImageCropSessionState {
+  itemId: string;
+  originalItem: ImageCanvasItem;
+  previewItem: ImageCanvasItem;
+  fullImageItem: ImageCanvasItem;
+  crop: ImageCropRect;
+  activeInteraction: CropInteraction | null;
+}
+
 const PICKUP_DRAG_THRESHOLD = 3;
 const GROUP_DRILL_DOUBLE_CLICK_MS = 500;
 const GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA = 6;
@@ -150,6 +196,7 @@ export function useCanvasInteractionSession({
 }: UseCanvasInteractionSessionParams) {
   const shapeRefs = useRef(new Map<string, Konva.Node>());
   const sessionRef = useRef<InteractionSession | null>(null);
+  const cropSessionRef = useRef<ImageCropSessionState | null>(null);
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
   const pendingPickupDragRef = useRef<PendingPickupDrag | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
@@ -157,6 +204,7 @@ export function useCanvasInteractionSession({
   const previousItemPointerClickRef = useRef<PointerClickSample | null>(null);
   const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
+  const [cropSession, setCropSession] = useState<ImageCropSessionState | null>(null);
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
   const [lastDrilldownSource, setLastDrilldownSource] = useState<'item-hit' | 'stage-surface' | null>(null);
   const [hasPendingMarquee, setHasPendingMarquee] = useState(false);
@@ -198,8 +246,21 @@ export function useCanvasInteractionSession({
   const stageBounds = useMemo(() => ({ x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }), [document.canvas.height, document.canvas.width]);
 
   const renderedItems = useMemo(
-    () => buildRenderedRenderables(renderables, session),
-    [renderables, session]
+    () => {
+      const nextRenderables = buildRenderedRenderables(renderables, session);
+      if (!cropSession) {
+        return nextRenderables;
+      }
+      return nextRenderables.map((renderable) =>
+        renderable.id === cropSession.itemId
+          ? {
+              ...renderable,
+              ...cropSession.previewItem,
+            }
+          : renderable,
+      );
+    },
+    [cropSession, renderables, session]
   );
 
   const renderedSelectedItems = useMemo(() => renderedItems.filter((item) => selectedLeafIdSet.has(item.id)), [renderedItems, selectedLeafIdSet]);
@@ -253,6 +314,11 @@ export function useCanvasInteractionSession({
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
     sessionRef.current = nextSession;
     setSession(nextSession);
+  }, []);
+
+  const updateCropSession = useCallback((nextSession: ImageCropSessionState | null) => {
+    cropSessionRef.current = nextSession;
+    setCropSession(nextSession);
   }, []);
 
   const setPendingMarquee = useCallback((nextPending: { pointerStart: Point; toggleMode: boolean } | null) => {
@@ -386,6 +452,140 @@ export function useCanvasInteractionSession({
     });
   }, [document.nodes, orderedItems, renderedItems]);
 
+  const startImageCropSession = useCallback((item: ImageCanvasItem) => {
+    updateSession(null);
+    clearPendingMarquee();
+    clearPendingPickupDrag();
+    onGuidesChange([]);
+    updateCropSession({
+      itemId: item.id,
+      originalItem: item,
+      previewItem: item,
+      fullImageItem: buildFullImageTransformItem(item),
+      crop: item.crop,
+      activeInteraction: null,
+    });
+  }, [clearPendingMarquee, clearPendingPickupDrag, onGuidesChange, updateCropSession, updateSession]);
+
+  const commitCropSession = useCallback(() => {
+    const current = cropSessionRef.current;
+    if (!current) {
+      return false;
+    }
+    onGuidesChange([]);
+    const originalChanges = getCommitChanges(current.originalItem);
+    const nextChanges = getCommitChanges(current.previewItem);
+    if (JSON.stringify(originalChanges) !== JSON.stringify(nextChanges)) {
+      onUpdateItem(current.itemId, nextChanges);
+    }
+    updateCropSession(null);
+    return true;
+  }, [onGuidesChange, onUpdateItem, updateCropSession]);
+
+  const cancelCropSession = useCallback(() => {
+    if (!cropSessionRef.current) {
+      return false;
+    }
+    onGuidesChange([]);
+    updateCropSession(null);
+    return true;
+  }, [onGuidesChange, updateCropSession]);
+
+  useEffect(() => {
+    if (!cropSession) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      cancelCropSession();
+    }
+
+    window.document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [cancelCropSession, cropSession]);
+
+  const beginCropResize = useCallback((handle: ResizeHandle) => {
+    const current = cropSessionRef.current;
+    if (!current) {
+      return;
+    }
+    updateCropSession({
+      ...current,
+      activeInteraction: {
+        kind: 'crop-resize',
+        handle,
+        initialPreviewItem: current.previewItem,
+        initialFullImageItem: current.fullImageItem,
+        initialCrop: current.crop,
+      },
+    });
+  }, [updateCropSession]);
+
+  const beginCropPan = useCallback((pointer: Point) => {
+    const current = cropSessionRef.current;
+    if (!current) {
+      return;
+    }
+    updateCropSession({
+      ...current,
+      activeInteraction: {
+        kind: 'image-pan',
+        pointerStart: pointer,
+        initialPreviewItem: current.previewItem,
+        initialFullImageItem: current.fullImageItem,
+        initialCrop: current.crop,
+      },
+    });
+  }, [updateCropSession]);
+
+  const beginCropFullResize = useCallback((handle: ResizeHandle, pointer: Point) => {
+    const current = cropSessionRef.current;
+    if (!current) {
+      return;
+    }
+    updateCropSession({
+      ...current,
+      activeInteraction: {
+        kind: 'full-resize',
+        resizeSession: createResizeSession(
+          current.fullImageItem,
+          handle,
+          pointer,
+          orderedItems.filter((entry) => entry.id !== current.itemId),
+        ),
+        initialCrop: current.crop,
+        initialPreviewItem: current.previewItem,
+      },
+    });
+  }, [orderedItems, updateCropSession]);
+
+  const beginCropFullRotate = useCallback((pointer: Point) => {
+    const current = cropSessionRef.current;
+    if (!current) {
+      return;
+    }
+    updateCropSession({
+      ...current,
+      activeInteraction: {
+        kind: 'full-rotate',
+        rotateSession: createRotateSession(
+          current.fullImageItem,
+          pointer,
+          orderedItems.filter((entry) => entry.id !== current.itemId),
+        ),
+        initialCrop: current.crop,
+        initialPreviewItem: current.previewItem,
+      },
+    });
+  }, [orderedItems, updateCropSession]);
+
   const finishSession = useCallback((current: InteractionSession, pointer: Point) => {
     const resolved = resolveSession(current, pointer);
     onGuidesChange([]);
@@ -494,7 +694,101 @@ export function useCanvasInteractionSession({
     [clearPendingMarquee, clearPendingPickupDrag, createPendingPickupSession, onGuidesChange, resolveSession, updateSession],
   );
 
+  const advanceCropInteractionAtPointer = useCallback((pointer: Point | null) => {
+    const current = cropSessionRef.current;
+    if (!current?.activeInteraction || !pointer) {
+      return;
+    }
+
+    switch (current.activeInteraction.kind) {
+      case 'crop-resize': {
+        const next = resizeImageCrop({
+          baseItem: current.activeInteraction.initialPreviewItem,
+          fullImageItem: current.activeInteraction.initialFullImageItem,
+          crop: current.activeInteraction.initialCrop,
+          handle: current.activeInteraction.handle,
+          pointer,
+        });
+        updateCropSession({
+          ...current,
+          crop: next.crop,
+          previewItem: next.previewItem,
+          fullImageItem: current.activeInteraction.initialFullImageItem,
+        });
+        return;
+      }
+      case 'image-pan': {
+        const next = panImageUnderCrop({
+          baseItem: current.activeInteraction.initialPreviewItem,
+          fullImageItem: current.activeInteraction.initialFullImageItem,
+          crop: current.activeInteraction.initialCrop,
+          pointerStart: current.activeInteraction.pointerStart,
+          pointer,
+        });
+        updateCropSession({
+          ...current,
+          crop: next.crop,
+          previewItem: next.previewItem,
+          fullImageItem: next.fullImageItem,
+        });
+        return;
+      }
+      case 'full-resize': {
+        const resolved = resolveSession(current.activeInteraction.resizeSession, pointer);
+        const nextFullImageItem = 'previewItem' in resolved ? resolved.previewItem : null;
+        if (!nextFullImageItem || nextFullImageItem.kind !== 'image') {
+          return;
+        }
+        updateCropSession({
+          ...current,
+          fullImageItem: nextFullImageItem,
+          previewItem: buildCroppedImagePreviewItem(
+            current.activeInteraction.initialPreviewItem,
+            nextFullImageItem,
+            current.activeInteraction.initialCrop,
+          ),
+          crop: current.activeInteraction.initialCrop,
+        });
+        return;
+      }
+      case 'full-rotate': {
+        const resolved = resolveSession(current.activeInteraction.rotateSession, pointer);
+        const nextFullImageItem = 'previewItem' in resolved ? resolved.previewItem : null;
+        if (!nextFullImageItem || nextFullImageItem.kind !== 'image') {
+          return;
+        }
+        updateCropSession({
+          ...current,
+          fullImageItem: nextFullImageItem,
+          previewItem: buildCroppedImagePreviewItem(
+            current.activeInteraction.initialPreviewItem,
+            nextFullImageItem,
+            current.activeInteraction.initialCrop,
+          ),
+          crop: current.activeInteraction.initialCrop,
+        });
+      }
+    }
+  }, [resolveSession, updateCropSession]);
+
+  const endCropInteraction = useCallback(() => {
+    const current = cropSessionRef.current;
+    if (!current || !current.activeInteraction) {
+      return false;
+    }
+    updateCropSession({
+      ...current,
+      activeInteraction: null,
+    });
+    return true;
+  }, [updateCropSession]);
+
   const handleWindowMouseMove = useEffectEvent((event: MouseEvent) => {
+    if (cropSessionRef.current?.activeInteraction) {
+      const pointer = getCurrentPointer(event);
+      advanceCropInteractionAtPointer(pointer);
+      return;
+    }
     if (isClientPointInsideStage(event.clientX, event.clientY)) {
       return;
     }
@@ -550,6 +844,12 @@ export function useCanvasInteractionSession({
   );
 
   const handleWindowMouseUp = useEffectEvent((event: MouseEvent) => {
+    if (cropSessionRef.current?.activeInteraction) {
+      const pointer = getCurrentPointer(event);
+      advanceCropInteractionAtPointer(pointer);
+      endCropInteraction();
+      return;
+    }
     if (pendingPickupDragRef.current) {
       const pointer = getCurrentPointer(event);
       if (commitPendingPickupDrag(pointer)) {
@@ -565,7 +865,7 @@ export function useCanvasInteractionSession({
   });
 
   useEffect(() => {
-    if (!session && !hasPendingMarquee && !hasPendingPickupDrag) {
+    if (!session && !hasPendingMarquee && !hasPendingPickupDrag && !cropSession?.activeInteraction) {
       return;
     }
 
@@ -583,7 +883,7 @@ export function useCanvasInteractionSession({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [handleWindowMouseMove, handleWindowMouseUp, hasPendingMarquee, hasPendingPickupDrag, session]);
+  }, [cropSession?.activeInteraction, handleWindowMouseMove, handleWindowMouseUp, hasPendingMarquee, hasPendingPickupDrag, session]);
 
   const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
     updateSession(createCreateSession(tool, pointer));
@@ -686,6 +986,9 @@ export function useCanvasInteractionSession({
         selectionNodeId,
       };
     }
+    if (cropSessionRef.current && cropSessionRef.current.itemId !== item.id) {
+      commitCropSession();
+    }
     if (shiftKey && onToggleSelectItem) {
       clearPendingPickupDrag();
       setLastDrilldownSource(null);
@@ -742,6 +1045,7 @@ export function useCanvasInteractionSession({
   }, [
     beginDrag,
     beginGroupDrag,
+    commitCropSession,
     createPendingPickupSession,
     document.nodes,
     onSelectItem,
@@ -756,6 +1060,9 @@ export function useCanvasInteractionSession({
   ]);
 
   const handleItemDoubleClick = useCallback((item: CanvasItem) => {
+    if (cropSessionRef.current) {
+      return;
+    }
     const latestClick = latestItemPointerClickRef.current;
     const previousClick = previousItemPointerClickRef.current;
     if (!latestClick || !previousClick) {
@@ -776,14 +1083,46 @@ export function useCanvasInteractionSession({
       return;
     }
     const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedItemIds[0], item.id);
-    if (!nextNodeId || nextNodeId === selectedItemIds[0]) {
+    if (nextNodeId && nextNodeId !== selectedItemIds[0]) {
+      setLastDrilldownSource('item-hit');
+      onSelectItem(nextNodeId);
       return;
     }
-    setLastDrilldownSource('item-hit');
-    onSelectItem(nextNodeId);
-  }, [document.nodes, onSelectItem, selectedItemIds]);
+    if (
+      selectedItemIds[0] === item.id &&
+      item.kind === 'image' &&
+      !item.locked &&
+      !item.hidden
+    ) {
+      setLastDrilldownSource(null);
+      startImageCropSession(item);
+    }
+  }, [document.nodes, onSelectItem, selectedItemIds, startImageCropSession]);
 
   const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
+    const target = event.target;
+    const stage = event.target.getStage();
+    const isCanvasSurface =
+      target === stage ||
+      target.hasName?.('canvas-surface') ||
+      target.hasName?.('canvas-background') ||
+      target.hasName?.('canvas-backdrop') ||
+      target.name() === 'canvas-surface' ||
+      target.name() === 'canvas-background' ||
+      target.name() === 'canvas-backdrop';
+    const pointer = getCanvasPointerFromStageEvent(event);
+    if (cropSessionRef.current) {
+      if (
+        pointer &&
+        isCanvasSurface &&
+        activeTool === 'select' &&
+        event.evt?.button !== 1
+      ) {
+        commitCropSession();
+        onSelectItem(undefined);
+      }
+      return;
+    }
     if (pendingPickupDragRef.current || sessionRef.current) {
       return;
     }
@@ -804,17 +1143,6 @@ export function useCanvasInteractionSession({
       return;
     }
     lastHandledItemPointerEventRef.current = null;
-    const target = event.target;
-    const stage = event.target.getStage();
-    const isCanvasSurface =
-      target === stage ||
-      target.hasName?.('canvas-surface') ||
-      target.hasName?.('canvas-background') ||
-      target.hasName?.('canvas-backdrop') ||
-      target.name() === 'canvas-surface' ||
-      target.name() === 'canvas-background' ||
-      target.name() === 'canvas-backdrop';
-    const pointer = getCanvasPointerFromStageEvent(event);
     if (
       pointer &&
       isCanvasSurface &&
@@ -888,6 +1216,7 @@ export function useCanvasInteractionSession({
   }, [
     activeTool,
     beginCreate,
+    commitCropSession,
     document.nodes,
     getCanvasPointerFromStageEvent,
     onGuidesChange,
@@ -929,9 +1258,14 @@ export function useCanvasInteractionSession({
     beginGroupDrag,
     beginGroupResize,
     beginGroupRotate,
+    beginCropFullResize,
+    beginCropFullRotate,
+    beginCropPan,
+    beginCropResize,
     beginLineHandle,
     beginResize,
     beginRotate,
+    cropSession,
     handleItemDoubleClick,
     handleItemPointerDown,
     handleStageMouseDown,

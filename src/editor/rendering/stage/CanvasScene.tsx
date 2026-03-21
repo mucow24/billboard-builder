@@ -16,11 +16,16 @@ import { CanvasItemLayer } from './CanvasItemLayer';
 import { CanvasPreviewLayer } from './CanvasPreviewLayer';
 import { CanvasSurface, CanvasWorkspaceBackdrop } from './CanvasSurface';
 import { GroupSelectionOverlay } from './GroupSelectionOverlay';
+import { ImageCropOverlay } from './ImageCropOverlay';
 import { SELECTION_STROKE } from './renderConstants';
 import { SingleSelectionOverlay } from './SingleSelectionOverlay';
 
 interface CanvasSceneProps {
   activeTool: CanvasTool;
+  beginCropFullResize: (handle: ResizeHandle, pointer: Point) => void;
+  beginCropFullRotate: (pointer: Point) => void;
+  beginCropPan: (pointer: Point) => void;
+  beginCropResize: (handle: ResizeHandle) => void;
   beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
   beginGroupRotate: (pointer: Point) => void;
   beginLineHandle: (
@@ -37,6 +42,11 @@ interface CanvasSceneProps {
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: Point,
   ) => void;
+  cropSession: {
+    itemId: string;
+    previewItem: Extract<CanvasItem, { kind: 'image' }>;
+    fullImageItem: Extract<CanvasItem, { kind: 'image' }>;
+  } | null;
   document: ProjectDocument;
   groupOverlayFrame: {
     bounds: { x: number; y: number; width: number; height: number };
@@ -90,11 +100,16 @@ interface CanvasSceneProps {
 
 export function CanvasScene({
   activeTool,
+  beginCropFullResize,
+  beginCropFullRotate,
+  beginCropPan,
+  beginCropResize,
   beginGroupResize,
   beginGroupRotate,
   beginLineHandle,
   beginResize,
   beginRotate,
+  cropSession,
   document,
   groupOverlayFrame,
   guides,
@@ -121,6 +136,10 @@ export function CanvasScene({
   viewportPan,
   zoom,
 }: CanvasSceneProps) {
+  const sceneItems = cropSession
+    ? renderedItems.filter((item) => item.id !== cropSession.itemId)
+    : renderedItems;
+
   return (
     <Stage
       ref={stageRef}
@@ -149,7 +168,7 @@ export function CanvasScene({
           <Group name="export-content">
             <CanvasItemLayer
               activeTool={activeTool}
-              items={renderedItems}
+              items={sceneItems}
               onBeginLineHandle={beginLineHandle}
               onBeginResize={beginResize}
               onBeginRotate={beginRotate}
@@ -196,7 +215,19 @@ export function CanvasScene({
                 toCanvasPointer={toCanvasPointer}
               />
             ) : null}
-            {!showGroupSelection && selectedRenderedItem ? (
+            {cropSession ? (
+              <ImageCropOverlay
+                beginCropFullResize={beginCropFullResize}
+                beginCropFullRotate={beginCropFullRotate}
+                beginCropPan={beginCropPan}
+                beginCropResize={beginCropResize}
+                fullImageItem={cropSession.fullImageItem}
+                previewItem={cropSession.previewItem}
+                registerShapeRef={registerShapeRef}
+                toCanvasPointer={toCanvasPointer}
+              />
+            ) : null}
+            {!cropSession && !showGroupSelection && selectedRenderedItem ? (
               <SingleSelectionOverlay
                 activeTool={activeTool}
                 beginLineHandle={beginLineHandle}

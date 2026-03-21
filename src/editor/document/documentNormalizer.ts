@@ -1,4 +1,8 @@
-import { createDefaultProjectDocument, DEFAULT_ITEM_SHADOW } from './documentDefaults';
+import {
+  createDefaultProjectDocument,
+  createFullImageCropRect,
+  DEFAULT_ITEM_SHADOW,
+} from './documentDefaults';
 import { normalizeImageAdjustments } from './imageAdjustments';
 import { collectLeafItems, normalizeLeafZIndices, isGroupNode } from './sceneGraph';
 import { normalizeTextPadding } from './textPadding';
@@ -59,6 +63,33 @@ function normalizeShadow(shadow: Partial<CanvasShadow> | undefined): CanvasShado
   };
 }
 
+function normalizeImageCrop(
+  crop: Partial<ImageCanvasItem['crop']> | undefined,
+  originalWidth: number,
+  originalHeight: number,
+): ImageCanvasItem['crop'] {
+  const defaultCrop = createFullImageCropRect(originalWidth, originalHeight);
+  const nextCrop = {
+    ...defaultCrop,
+    ...(crop ?? {}),
+  };
+
+  let width = clampFinite(nextCrop.width, defaultCrop.width, 1, originalWidth);
+  let height = clampFinite(nextCrop.height, defaultCrop.height, 1, originalHeight);
+  const x = clampFinite(nextCrop.x, defaultCrop.x, 0, originalWidth - width);
+  const y = clampFinite(nextCrop.y, defaultCrop.y, 0, originalHeight - height);
+
+  width = Math.min(width, originalWidth - x);
+  height = Math.min(height, originalHeight - y);
+
+  return {
+    x,
+    y,
+    width: Math.max(1, width),
+    height: Math.max(1, height),
+  };
+}
+
 export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
   switch (item.kind) {
     case 'text': {
@@ -84,6 +115,8 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
       return normalizedTextItem;
     }
     case 'image': {
+      const originalWidth = clampFinite(item.originalWidth, 1, 1);
+      const originalHeight = clampFinite(item.originalHeight, 1, 1);
       const normalizedImageItem: ImageCanvasItem = {
         ...item,
         x: clampFinite(item.x, 0),
@@ -98,8 +131,9 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
-        originalWidth: clampFinite(item.originalWidth, 1, 1),
-        originalHeight: clampFinite(item.originalHeight, 1, 1),
+        originalWidth,
+        originalHeight,
+        crop: normalizeImageCrop(item.crop, originalWidth, originalHeight),
         preserveAspectRatio: Boolean(item.preserveAspectRatio),
         adjustments: normalizeImageAdjustments(item.adjustments),
       };

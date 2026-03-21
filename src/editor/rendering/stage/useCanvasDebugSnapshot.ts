@@ -4,6 +4,7 @@ import type Konva from 'konva';
 import type { CanvasItem } from '../../document/documentTypes';
 import {
   getLineHandleRects,
+  getShapeHandlePoints,
   getShapeHandleRects,
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -78,6 +79,14 @@ function readViewportHookPoint(node: HTMLElement | null) {
 }
 
 interface UseCanvasDebugSnapshotParams {
+  cropFullImageHandleViewportPoints?: Record<string, Point> | null;
+  cropFullImageRotaterViewportPoint?: Point | null;
+  cropHandleViewportPoints?: Record<string, Point> | null;
+  cropSession?: {
+    crop: { x: number; y: number; width: number; height: number };
+    fullImageItem: CanvasItem;
+    previewItem: CanvasItem;
+  } | null;
   groupHandleViewportPoints: Record<string, Point> | null;
   groupOverlayFrame: { bounds: { x: number; y: number; width: number; height: number }; rotation: number } | null;
   groupOverlayViewportRect: { left: number; top: number; width: number; height: number } | null;
@@ -116,6 +125,10 @@ interface UseCanvasDebugSnapshotParams {
 }
 
 export function useCanvasDebugSnapshot({
+  cropFullImageHandleViewportPoints = null,
+  cropFullImageRotaterViewportPoint = null,
+  cropHandleViewportPoints = null,
+  cropSession = null,
   groupHandleViewportPoints,
   groupOverlayFrame,
   groupOverlayViewportRect,
@@ -151,7 +164,7 @@ export function useCanvasDebugSnapshot({
         panX: pan.x,
         panY: pan.y,
       },
-      sessionKind: session?.kind ?? null,
+      sessionKind: cropSession ? 'image-crop' : session?.kind ?? null,
       sessionHandle:
         session?.kind === 'resize' ||
         session?.kind === 'rotate' ||
@@ -167,6 +180,30 @@ export function useCanvasDebugSnapshot({
         session?.kind === 'group-rotate'
           ? session.handle ?? null
           : null,
+      cropSession: cropSession
+        ? {
+            crop: cropSession.crop,
+            previewItem: {
+              ...getRenderBox(cropSession.previewItem),
+              rotation: cropSession.previewItem.rotation,
+            },
+            fullImageItem: {
+              ...getRenderBox(cropSession.fullImageItem),
+              rotation: cropSession.fullImageItem.rotation,
+            },
+            cropHandlePoints:
+              cropSession.previewItem.kind !== 'line'
+                ? getShapeHandlePoints(cropSession.previewItem)
+                : null,
+            fullImageHandlePoints:
+              cropSession.fullImageItem.kind !== 'line'
+                ? getShapeHandlePoints(cropSession.fullImageItem)
+                : null,
+            cropHandleViewportPoints,
+            fullImageHandleViewportPoints: cropFullImageHandleViewportPoints,
+            fullImageRotaterViewportPoint: cropFullImageRotaterViewportPoint,
+          }
+        : null,
       documentItem: selectedDocumentItem
         ? {
             ...getRenderBox(selectedDocumentItem),
@@ -265,6 +302,10 @@ export function useCanvasDebugSnapshot({
       subgroupOutlineFrames,
       viewportSize,
       zoom,
+      cropFullImageHandleViewportPoints,
+      cropFullImageRotaterViewportPoint,
+      cropHandleViewportPoints,
+      cropSession,
     ],
   );
 
@@ -331,6 +372,9 @@ export function useCanvasDebugSnapshot({
       const overlay = readViewportHookRect(
         root.querySelector<HTMLElement>('[data-testid="canvas-group-overlay"]'),
       );
+      const cropPanOverlay = readViewportHookRect(
+        root.querySelector<HTMLElement>('[data-testid="canvas-crop-pan-overlay"]'),
+      );
       const subgroupOutlines = stage
         .find('.subgroup-selection-outline')
         .map((node) => {
@@ -374,7 +418,7 @@ export function useCanvasDebugSnapshot({
         : null;
 
       return {
-        sessionKind: session?.kind ?? null,
+        sessionKind: cropSession ? 'image-crop' : session?.kind ?? null,
         sessionHandle:
           session?.kind === 'resize' ||
           session?.kind === 'rotate' ||
@@ -397,6 +441,7 @@ export function useCanvasDebugSnapshot({
         hasGroupOverlay: Boolean(canvasOverlay),
         hasShapeHandles,
         hasLineHandles,
+        cropPanOverlay,
       };
     }
 
@@ -414,7 +459,7 @@ export function useCanvasDebugSnapshot({
         delete window.__BB_TEST__;
       }
     };
-  }, [pan.x, pan.y, renderedItems, selectedItemIds, session, stageRef, viewportRef, zoom]);
+  }, [cropSession, pan.x, pan.y, renderedItems, selectedItemIds, session, stageRef, viewportRef, zoom]);
 
   return debugInfo;
 }

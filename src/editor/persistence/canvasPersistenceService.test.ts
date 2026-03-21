@@ -55,6 +55,12 @@ describe('CanvasPersistenceService', () => {
       tintColor: '#abcdef',
       tintStrength: 40,
     };
+    image.crop = {
+      x: 6,
+      y: 4,
+      width: 28,
+      height: 12,
+    };
 
     await service.save({
       ...createDefaultProjectDocument(),
@@ -65,6 +71,12 @@ describe('CanvasPersistenceService', () => {
       items: [
         {
           kind: 'image',
+          crop: {
+            x: 6,
+            y: 4,
+            width: 28,
+            height: 12,
+          },
           adjustments: {
             brightness: 180,
             contrast: 25,

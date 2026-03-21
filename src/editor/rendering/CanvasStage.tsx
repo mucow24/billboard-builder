@@ -69,9 +69,14 @@ export function CanvasStage({
     beginGroupDrag,
     beginGroupResize,
     beginGroupRotate,
+    beginCropFullResize,
+    beginCropFullRotate,
+    beginCropPan,
+    beginCropResize,
     beginLineHandle,
     beginResize,
     beginRotate,
+    cropSession,
     handleItemDoubleClick,
     handleItemPointerDown,
     handleStageMouseDown,
@@ -110,6 +115,9 @@ export function CanvasStage({
 
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
   const {
+    cropFullImageHandleViewportPoints,
+    cropFullImageRotaterViewportPoint,
+    cropHandleViewportPoints,
     groupHandleViewportPoints,
     groupOverlayFrame,
     groupOverlayViewportRect,
@@ -126,6 +134,7 @@ export function CanvasStage({
     renderedSelectionFrame,
     selectedRenderedItem,
     session: session as never,
+    cropSession: cropSession as never,
     viewport,
   });
 
@@ -184,11 +193,16 @@ export function CanvasStage({
       />
       <CanvasScene
         activeTool={activeTool}
+        beginCropFullResize={beginCropFullResize}
+        beginCropFullRotate={beginCropFullRotate}
+        beginCropPan={beginCropPan}
+        beginCropResize={beginCropResize}
         beginGroupResize={beginGroupResize}
         beginGroupRotate={beginGroupRotate}
         beginLineHandle={beginLineHandle}
         beginResize={beginResize}
         beginRotate={beginRotate}
+        cropSession={cropSession as never}
         document={document}
         groupOverlayFrame={groupOverlayFrame}
         guides={guides}
@@ -217,6 +231,10 @@ export function CanvasStage({
       />
       {debugMode ? (
         <CanvasStageDebug
+          cropFullImageHandleViewportPoints={cropFullImageHandleViewportPoints}
+          cropFullImageRotaterViewportPoint={cropFullImageRotaterViewportPoint}
+          cropHandleViewportPoints={cropHandleViewportPoints}
+          cropSession={cropSession as never}
           groupHandleViewportPoints={groupHandleViewportPoints}
           groupOverlayFrame={groupOverlayFrame}
           groupOverlayViewportRect={groupOverlayViewportRect}
@@ -247,12 +265,20 @@ export function CanvasStage({
       ) : null}
       {showCanvasTestHooks ? (
         <CanvasTestHooks
+          beginCropFullResize={beginCropFullResize}
+          beginCropFullRotate={beginCropFullRotate}
+          beginCropPan={beginCropPan}
+          beginCropResize={beginCropResize}
           beginGroupDrag={beginGroupDrag}
           beginGroupResize={beginGroupResize}
           beginGroupRotate={beginGroupRotate}
           beginLineHandle={beginLineHandle}
           beginResize={beginResize}
           beginRotate={beginRotate}
+          cropFullImageHandleViewportPoints={cropFullImageHandleViewportPoints}
+          cropFullImageRotaterViewportPoint={cropFullImageRotaterViewportPoint}
+          cropHandleViewportPoints={cropHandleViewportPoints}
+          cropSession={cropSession as never}
           getViewportPointerFromClient={viewport.getViewportPointerFromClient}
           groupHandleViewportPoints={groupHandleViewportPoints}
           groupOverlayFrame={groupOverlayFrame}
@@ -350,6 +376,10 @@ function toBoundsCueStyle(rect: { left: number; top: number; width: number; heig
 }
 
 function CanvasStageDebug({
+  cropFullImageHandleViewportPoints,
+  cropFullImageRotaterViewportPoint,
+  cropHandleViewportPoints,
+  cropSession,
   groupHandleViewportPoints,
   groupOverlayFrame,
   groupOverlayViewportRect,
@@ -378,6 +408,10 @@ function CanvasStageDebug({
   zoom,
 }: Parameters<typeof useCanvasDebugSnapshot>[0]) {
   const debugInfo = useCanvasDebugSnapshot({
+    cropFullImageHandleViewportPoints,
+    cropFullImageRotaterViewportPoint,
+    cropHandleViewportPoints,
+    cropSession,
     groupHandleViewportPoints,
     groupOverlayFrame,
     groupOverlayViewportRect,

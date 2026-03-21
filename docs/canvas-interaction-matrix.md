@@ -153,7 +153,22 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | ST-14 | Canvas | Selected item | Shift-drag | Constrained preview visible | Axis-constrained drag where implemented | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-15 | Canvas | Rectangle selected, resize handle is off-canvas but visible in the unclipped workspace | Drag the off-canvas resize handle | Resize affordance stays live | Off-canvas handle resize commits like the on-canvas case | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 
-## 5. Group and Multi-Selection Transform Flows
+## 5. Image Crop Flows
+
+| ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| IC-01 | Canvas | Group with image child selected | Double-click grouped image content | Group affordance yields to the image leaf selection, not crop mode | Drill-in selects the image leaf only | user-flow | Cross-browser subset | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-02 | Canvas | Image leaf already selected | Double-click selected image | Crop affordance appears and normal single-selection handles disappear | Image crop session starts | user-flow | Cross-browser subset | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-03 | Canvas | Crop mode active | Observe crop mode | Black crop frame stays visible while the full image extent remains visible behind it | Crop session exposes crop and full-image frames together | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-04 | Canvas | Crop mode active | Drag a black crop handle | Crop bounds visibly change while crop mode remains active | Persisted crop rect changes on commit | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-05 | Canvas | Crop mode active | Drag inside the image | Image pans under the crop frame | Persisted crop source translation changes on commit | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-06 | Canvas | Crop mode active | Click blank canvas | Crop affordance disappears and normal selection state exits | Crop session commits and selection clears | user-flow | Cross-browser subset | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-07 | Canvas | Crop mode active, another selectable item visible | Click another item | Crop affordance disappears and the other item becomes selected | Crop session commits and selection switches | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-08 | Keyboard | Crop mode active | Press Escape | Crop affordance disappears and the original image appearance returns | Crop session cancels with no document mutation | user-flow | Cross-browser subset | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-09 | Canvas | Crop mode active | Drag a blue full-image resize handle | Blue full-image frame resizes while crop mode stays active | Committed visible crop stays coherent with resized full-image frame | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-10 | Canvas | Crop mode active | Drag the blue full-image rotater | Blue full-image frame rotates while crop mode stays active | Committed visible crop stays coherent with rotated full-image frame | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+
+## 6. Group and Multi-Selection Transform Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -169,7 +184,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | GT-10 | Canvas | Real group node is unselected | Mouse down on grouped content, drag, then mouse up | Group overlay appears and the group moves in one gesture | Group pickup drag commits without needing a prior selection click | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-11 | Canvas | Real group node selected | Single-click grouped content, drag grouped content, then double-click grouped content | Group affordance stays active through single-click and drag, then yields to child affordance on double-click | Single-click is a no-op, drag moves descendants as a unit, and double-click drills into the target descendant | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 
-## 6. Viewport and Navigation Flows
+## 7. Viewport and Navigation Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -184,7 +199,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | VP-09 | HUD | Any state | Click Fit | Canvas fits viewport | Zoom/pan recomputed | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | VP-10 | Canvas/HUD | Tool changes | Change tool or modifier state | Cursor changes correctly | No document mutation | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 
-## 7. Layers Flows
+## 8. Layers Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -201,7 +216,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | LY-11 | Layers | Group selected | Reorder group row | Group moves as unit | Group node reordered as a unit | user-flow | Chromium | Covered in [e2e/editor.groups.layers.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.layers.spec.ts) |
 | LY-12 | Layers | Any state | Edit canvas background | Background swatch/value updates | Canvas background changes | user-flow | Chromium | Covered in [e2e/editor.groups.layers.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.layers.spec.ts) |
 
-## 8. Properties and Inspector Flows
+## 9. Properties and Inspector Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -217,7 +232,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | PI-10 | Properties | Any item selected | Edit geometry fields | Values update | Item geometry updates | user-flow | Chromium | Covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
 | PI-11 | Properties | Any item selected | Edit shadow fields | Values update | Item shadow updates | user-flow | Chromium | Covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
 
-## 9. Template Library Flows
+## 10. Template Library Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -227,7 +242,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | TL-04 | Templates + Browser reload | Saved template exists | Reload, delete template, reload | Template persists across reload and then disappears after deletion | Local template library round-trips | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
 | TL-05 | Templates + Browser reload | Saved template references an uploaded font but current canvas no longer does | Reload, verify current canvas font menu, then insert template | Uploaded family is absent before insertion, then inserted text shows the uploaded family with no missing-font warning | Template insertion lazily rehydrates the retained uploaded font from local storage | user-flow | Cross-browser subset | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
 
-## 10. Keyboard Flows
+## 11. Keyboard Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -244,7 +259,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | KB-11 | Keyboard | Selection or drill-in state exists | Press Escape | Selection climbs or clears visibly | Parent selected or selection cleared | user-flow | Cross-browser subset | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts), [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | KB-12 | Keyboard | History exists | Press undo/redo shortcuts | Visible state rewinds or reapplies | History changes applied | user-flow | Cross-browser subset | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 
-## 11. Clipboard Flows
+## 12. Clipboard Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -257,7 +272,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | CB-07 | Clipboard | Image file in clipboard | Paste | New image item appears | Image inserted | user-flow | Cross-browser subset | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | CB-08 | Clipboard | Editable target focused | Copy/cut/paste | Editor does not hijack editable interaction | No editor mutation | user-flow | Chromium | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 
-## 12. File, Media, and Font Flows
+## 13. File, Media, and Font Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -272,7 +287,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | FL-09 | IndexedDB | Corrupt persisted state exists | Reload app | Safe empty state loads | Corrupt persistence cleared | user-flow | Chromium | Covered in [e2e/editor.files-and-persistence.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.files-and-persistence.spec.ts) |
 | FL-10 | Toolbar | Any state | Hover or focus Export PNG | Workspace outside the canvas darkens while the canvas interior stays clear | Export bounds cue appears and clears with intent state | user-flow | Chromium | Covered in [e2e/editor.toolbar.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.toolbar.spec.ts) |
 
-## 13. UI Regression Matrix
+## 14. UI Regression Matrix
 
 These are state snapshots and affordance checks, not just behavior checks.
 

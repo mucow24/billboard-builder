@@ -8,6 +8,7 @@ import { getSelectionFrameForRotation } from './transformGeometry';
 import {
   createGroupNode,
   createDefaultProjectDocument,
+  createImageItem,
   createLineItem,
   createRectangleItem,
 } from '../document/documentDefaults';
@@ -1503,6 +1504,132 @@ describe('useCanvasInteractionSession', () => {
 
     expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
     expect(result.current.lastDrilldownSource).toBe('stage-surface');
+  });
+
+  it('keeps grouped-image double-click drill-in precedence before entering crop mode', () => {
+    const groupedImage = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+    });
+    groupedImage.id = 'grouped-image';
+    const group = createGroupNode([groupedImage], 'Images');
+    group.id = 'image-group';
+    const params = createHookParams({
+      document: createDocument([group]),
+      selectedItemIds: [group.id],
+    });
+    const { result, rerender } = renderHook(
+      (hookParams) => useCanvasInteractionSession(hookParams),
+      { initialProps: params },
+    );
+
+    act(() => {
+      result.current.handleItemPointerDown(
+        groupedImage,
+        groupedImage.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemPointerDown(
+        groupedImage,
+        groupedImage.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemDoubleClick(groupedImage);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(groupedImage.id);
+    expect(result.current.cropSession).toBeNull();
+
+    const selectedImageParams = {
+      ...params,
+      onSelectItem: vi.fn(),
+      selectedItemIds: [groupedImage.id],
+    };
+    rerender(selectedImageParams);
+
+    act(() => {
+      result.current.handleItemPointerDown(
+        groupedImage,
+        groupedImage.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemPointerDown(
+        groupedImage,
+        groupedImage.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemDoubleClick(groupedImage);
+    });
+
+    expect(selectedImageParams.onSelectItem).not.toHaveBeenCalled();
+    expect(result.current.cropSession).toMatchObject({
+      itemId: groupedImage.id,
+      crop: groupedImage.crop,
+    });
+  });
+
+  it('cancels crop mode on Escape before selection-climb behavior can run', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+    });
+    image.id = 'selected-image';
+    const params = createHookParams({
+      document: createDocument([image]),
+      selectedItemIds: [image.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(
+        image,
+        image.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemPointerDown(
+        image,
+        image.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+
+    expect(result.current.cropSession).not.toBeNull();
+
+    act(() => {
+      window.document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+
+    expect(result.current.cropSession).toBeNull();
+    expect(params.onUpdateItem).not.toHaveBeenCalled();
   });
 
   it('snaps group drag previews and emits guides', () => {

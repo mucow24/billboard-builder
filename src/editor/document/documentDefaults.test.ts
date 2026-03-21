@@ -63,6 +63,12 @@ describe('document defaults', () => {
     expect(imageItem.width).toBe(400);
     expect(imageItem.height).toBe(200);
     expect(imageItem.preserveAspectRatio).toBe(true);
+    expect(imageItem.crop).toEqual({
+      x: 0,
+      y: 0,
+      width: 400,
+      height: 200,
+    });
     expect(imageItem.adjustments).toEqual({
       brightness: 100,
       contrast: 50,

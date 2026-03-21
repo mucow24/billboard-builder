@@ -1,6 +1,7 @@
 import type { CanvasItem } from '../../document/documentTypes';
 import {
   getLineHandleRects,
+  getShapeHandlePoints,
   getShapeHandleRects,
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -113,6 +114,10 @@ export function buildStageDerivedState(params: {
     rotation: number;
   } | null;
   selectedRenderedItem: CanvasItem | null;
+  cropSession?: {
+    previewItem: CanvasItem;
+    fullImageItem: CanvasItem;
+  } | null;
   session: {
     kind: string;
     currentPointer?: { x: number; y: number };
@@ -126,12 +131,14 @@ export function buildStageDerivedState(params: {
   } | null;
   viewport: StageViewportAdapter;
 }) {
+  const cropSession = params.cropSession ?? null;
   const groupOverlayFrame = getGroupOverlayFrame({
     renderedGroupBounds: params.renderedGroupBounds,
     renderedSelectionFrame: params.renderedSelectionFrame,
     session: params.session,
   });
   const selectedShapeHandleRects =
+    !cropSession &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem &&
     params.selectedRenderedItem.kind !== 'line'
@@ -142,6 +149,7 @@ export function buildStageDerivedState(params: {
         )
       : null;
   const selectedLineHandleRects =
+    !cropSession &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem?.kind === 'line'
       ? Object.fromEntries(
@@ -211,8 +219,39 @@ export function buildStageDerivedState(params: {
         ),
       )
     : null;
+  const cropHandleViewportPoints = cropSession
+    ? Object.fromEntries(
+        RESIZE_HANDLE_NAMES.map((handle) => [
+          handle,
+          params.viewport.toViewportPoint(getShapeHandlePoints(cropSession.previewItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>)[handle]),
+        ]),
+      )
+    : null;
+  const cropFullImageHandleViewportPoints = cropSession
+    ? Object.fromEntries(
+        RESIZE_HANDLE_NAMES.map((handle) => [
+          handle,
+          params.viewport.toViewportPoint(getShapeHandlePoints(cropSession.fullImageItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>)[handle]),
+        ]),
+      )
+    : null;
+  const cropFullImageRotaterViewportPoint = cropSession
+    ? params.viewport.toViewportPoint(
+        localToStage(
+          { x: 0, y: -(cropSession.fullImageItem.height / 2) - 50 },
+          {
+            x: cropSession.fullImageItem.x + cropSession.fullImageItem.width / 2,
+            y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
+          },
+          cropSession.fullImageItem.rotation,
+        ),
+      )
+    : null;
 
   return {
+    cropFullImageHandleViewportPoints,
+    cropFullImageRotaterViewportPoint,
+    cropHandleViewportPoints,
     groupHandleViewportPoints,
     groupOverlayFrame,
     groupOverlayViewportRect,
