@@ -1,5 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import type { FontOption } from '../FontFamilyPicker';
+import { FontFamilyPicker } from '../FontFamilyPicker';
+
 import { formatDisplayedNumber } from './inspectorModel';
 
 function clampNumberInputValue(value: number, min?: number, max?: number): number {
@@ -35,7 +38,7 @@ interface NumberInputProps {
   value: number | null;
 }
 
-function FieldShell({
+export function FieldShell({
   children,
   hint,
   label,
@@ -316,6 +319,125 @@ export function SelectInput({
           </option>
         ))}
       </select>
+    </FieldShell>
+  );
+}
+
+interface FontPickerInputProps {
+  disabled?: boolean;
+  fonts: readonly FontOption[];
+  label: string;
+  mixed?: boolean;
+  onChange: (value: string) => void;
+  value: string;
+}
+
+export function FontPickerInput({
+  disabled = false,
+  fonts,
+  label,
+  mixed = false,
+  onChange,
+  value,
+}: FontPickerInputProps) {
+  const labelId = useId();
+
+  return (
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+      <div className="inspector-font-picker-field">
+        <span id={labelId} className="sr-only">
+          {label}
+        </span>
+        <FontFamilyPicker
+          disabled={disabled}
+          fonts={fonts}
+          labelId={labelId}
+          mixed={mixed}
+          value={value}
+          onChange={onChange}
+        />
+      </div>
+    </FieldShell>
+  );
+}
+
+interface ToggleButtonInputProps {
+  active: boolean | null;
+  children: ReactNode;
+  disabled?: boolean;
+  label: string;
+  mixed?: boolean;
+  onChange: (value: boolean) => void;
+}
+
+export function ToggleButtonInput({
+  active,
+  children,
+  disabled = false,
+  label,
+  mixed = false,
+  onChange,
+}: ToggleButtonInputProps) {
+  return (
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={!mixed && Boolean(active)}
+        className={[
+          'inspector-toggle-button',
+          !mixed && active ? 'active' : '',
+          mixed ? 'mixed' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        disabled={disabled}
+        onClick={() => onChange(!(active ?? false))}
+      >
+        {children}
+      </button>
+    </FieldShell>
+  );
+}
+
+interface SegmentedOption {
+  ariaLabel: string;
+  icon: ReactNode;
+  value: string;
+}
+
+interface SegmentedSelectInputProps {
+  disabled?: boolean;
+  label: string;
+  mixed?: boolean;
+  onChange: (value: string) => void;
+  options: readonly SegmentedOption[];
+  value: string | null;
+}
+
+export function SegmentedSelectInput({
+  disabled = false,
+  label,
+  mixed = false,
+  onChange,
+  options,
+  value,
+}: SegmentedSelectInputProps) {
+  return (
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+      <div className="segmented-control inspector-segmented-control" role="group" aria-label={label}>
+        {options.map((option) => (
+          <SegmentedIconButton
+            key={option.value}
+            active={!mixed && value === option.value}
+            ariaLabel={option.ariaLabel}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
+          >
+            {option.icon}
+          </SegmentedIconButton>
+        ))}
+      </div>
     </FieldShell>
   );
 }

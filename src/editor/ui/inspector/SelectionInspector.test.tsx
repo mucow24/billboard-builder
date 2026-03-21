@@ -97,22 +97,23 @@ describe('SelectionInspector', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Text' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Arial' })).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Custom Family')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Font' })).toHaveTextContent('Custom Family');
+    expect(screen.getByRole('button', { name: 'Previous font' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next font' })).toBeInTheDocument();
     expect(screen.getByLabelText('Bold')).toBeDisabled();
     expect(screen.getByLabelText('Italic')).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Headline' },
     });
-    fireEvent.change(screen.getByLabelText('Font'), {
-      target: { value: 'Arial' },
-    });
+    await user.click(screen.getByRole('button', { name: 'Font' }));
+    expect(screen.getByRole('option', { name: 'Arial' })).toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Arial' }));
     fireEvent.change(screen.getByLabelText('Size'), {
       target: { value: '1' },
     });
-    await user.selectOptions(screen.getByLabelText('Align'), 'center');
-    await user.selectOptions(screen.getByLabelText('Vertical align'), 'middle');
+    await user.click(screen.getByLabelText('Align center'));
+    await user.click(screen.getByLabelText('Align middle'));
 
     expect(expectLatestChange(onItemChange, textItem)).toEqual({
       verticalAlign: 'middle',
@@ -127,6 +128,52 @@ describe('SelectionInspector', () => {
         { verticalAlign: 'middle' },
       ])
     );
+  });
+
+  it('cycles fonts from the descriptor-driven text inspector with wraparound controls', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const textItem = createTextItem({
+      fontFamily: 'Verdana',
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[
+          {
+            family: 'Zulu Display',
+            sourceName: 'ZuluDisplay.ttf',
+            weight: '400',
+            style: 'normal',
+            kind: 'uploaded',
+          },
+          {
+            family: 'Alpha Sans',
+            sourceName: 'AlphaSans.ttf',
+            weight: '400',
+            style: 'normal',
+            kind: 'uploaded',
+          },
+        ]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={textItem}
+        selectedNodeCount={1}
+        selectedItems={[textItem]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next font' }));
+    await user.click(screen.getByRole('button', { name: 'Previous font' }));
+
+    expect(onItemChange).toHaveBeenNthCalledWith(1, expect.any(Function));
+    expect(onItemChange.mock.calls[0]?.[0](textItem)).toEqual({
+      fontFamily: 'Zulu Display',
+    });
+    expect(onItemChange.mock.calls[1]?.[0](textItem)).toEqual({
+      fontFamily: 'Trebuchet MS',
+    });
   });
 
   it('renders line and image descriptor fields and keeps nested patches per item', async () => {
@@ -225,6 +272,7 @@ describe('SelectionInspector', () => {
     const onItemChange = vi.fn();
     const first = createTextItem({
       fill: '#ff0000',
+      fontFamily: 'Arial',
       text: 'First headline',
       fontWeight: 'bold',
       align: 'left',
@@ -238,6 +286,7 @@ describe('SelectionInspector', () => {
     });
     const second = createTextItem({
       fill: '#00ff00',
+      fontFamily: 'Verdana',
       text: 'Second headline',
       fontWeight: 'normal',
       align: 'right',
@@ -263,9 +312,8 @@ describe('SelectionInspector', () => {
 
     expect(screen.getByRole('heading', { name: '2 items selected' })).toBeInTheDocument();
     expect(screen.getByLabelText('Text content')).toHaveValue('');
-    expect(screen.getByLabelText('Bold')).not.toBeChecked();
-    expect((screen.getByLabelText('Bold') as HTMLInputElement).indeterminate).toBe(true);
-    expect(screen.getByLabelText('Align')).toHaveValue('');
+    expect(screen.getByLabelText('Bold')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Font' })).toHaveTextContent('Mixed fonts');
     expect(screen.getAllByText('Mixed').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
 
@@ -273,7 +321,7 @@ describe('SelectionInspector', () => {
       target: { value: 'Shared headline' },
     });
     await user.click(screen.getByLabelText('Bold'));
-    await user.selectOptions(screen.getByLabelText('Align'), 'center');
+    await user.click(screen.getByLabelText('Align center'));
     await user.click(screen.getByRole('button', { name: 'Fill' }));
     fireEvent.change(screen.getByLabelText('Fill hex'), {
       target: { value: '#abcdef12' },

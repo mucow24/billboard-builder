@@ -178,11 +178,12 @@ test.describe('editor properties flows', () => {
 
     await page.getByLabel('Text content').fill('Edited text from Properties');
     await page.getByRole('spinbutton', { name: 'Size' }).fill('1');
-    await page.getByLabel('Font').selectOption('Georgia');
-    await expect(page.getByLabel('Font')).toHaveValue('Georgia');
-    await page.getByLabel('Bold').check();
-    await page.getByLabel('Align', { exact: true }).selectOption('center');
-    await page.getByLabel('Vertical align', { exact: true }).selectOption('middle');
+    await page.getByTestId('font-family-picker-trigger').click();
+    await page.getByRole('option', { name: 'Georgia', exact: true }).click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Georgia');
+    await page.getByRole('button', { name: 'Bold' }).click();
+    await page.getByRole('button', { name: 'Align center' }).click();
+    await page.getByRole('button', { name: 'Align middle' }).click();
 
     await page.getByRole('button', { name: 'Advanced text' }).click();
     await page.getByRole('spinbutton', { name: 'Line height' }).fill('1.4');

@@ -123,9 +123,8 @@ function FieldRenderer({
       );
     case 'custom':
       return field.descriptor.render({
-        descriptor: field.descriptor,
+        field,
         onCommit: commitValue,
-        state: field.state,
       });
     default:
       return null;

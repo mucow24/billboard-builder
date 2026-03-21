@@ -10,13 +10,19 @@ const FONT_OPTIONS = [
   { family: 'Verdana', sourceName: 'Verdana', kind: 'system' as const },
 ];
 
-function renderFontFamilyPicker(onChange = vi.fn(), value = 'Arial') {
+function renderFontFamilyPicker(
+  onChange = vi.fn(),
+  value = 'Arial',
+  { disabled = false, mixed = false }: { disabled?: boolean; mixed?: boolean } = {}
+) {
   render(
     <div>
       <span id="font-family-label">Font family</span>
       <FontFamilyPicker
+        disabled={disabled}
         fonts={FONT_OPTIONS}
         labelId="font-family-label"
+        mixed={mixed}
         onChange={onChange}
         value={value}
       />
@@ -182,5 +188,19 @@ describe('FontFamilyPicker', () => {
     expect(screen.getByRole('option', { name: 'Georgia' })).toHaveStyle({
       fontSize: '1.3em',
     });
+  });
+
+  it('shows a mixed trigger state while still cycling from the first selected value', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    renderFontFamilyPicker(onChange, 'Georgia', { mixed: true });
+
+    expect(screen.getByRole('button', { name: 'Font family' })).toHaveTextContent(
+      'Mixed fonts',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Next font' }));
+    expect(onChange).toHaveBeenCalledWith('Verdana');
   });
 });

@@ -78,11 +78,14 @@ export function ColorPickerControl({
 
   return (
     <div
-      className={
+      className={[
         variant === 'compact'
           ? 'color-picker-control color-picker-control-compact'
-          : 'color-picker-control'
-      }
+          : 'color-picker-control',
+        mixed ? 'color-picker-control-mixed' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       <button
         aria-controls={panelId}

@@ -813,28 +813,39 @@ button {
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.3rem;
-  align-items: stretch;
+  gap: 0.55rem;
+  align-items: center;
 }
 
 .font-family-picker-cycle-button {
-  min-width: 2rem;
-  padding: 0.36rem 0.4rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0.36rem 0.5rem;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
+  border-radius: 14px;
   background: rgba(12, 18, 32, 0.84);
   color: #f8fbff;
   cursor: pointer;
+  font-size: 1rem;
 }
 
-.font-family-picker-cycle-button:hover {
+.font-family-picker-cycle-button:hover:not(:disabled) {
   background: rgba(30, 41, 59, 0.95);
 }
 
 .font-family-picker-trigger {
   width: 100%;
-  padding: 0.75rem 0.8rem;
+  min-height: 3rem;
+  padding: 0.9rem 1rem;
   text-align: left;
+  border-radius: 16px;
+}
+
+.font-family-picker-trigger-mixed {
+  color: #d7e3f7;
+  background:
+    linear-gradient(135deg, rgba(37, 53, 79, 0.72), rgba(12, 18, 32, 0.94)),
+    rgba(12, 18, 32, 0.84);
 }
 
 .font-family-picker-trigger-text {
@@ -842,21 +853,23 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 1.05rem;
+  font-weight: 600;
 }
 
 .font-family-picker-popover {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + 0.45rem);
   left: 0;
   right: 0;
   z-index: 10;
 }
 
 .font-family-picker-listbox {
-  max-height: 240px;
+  max-height: 320px;
   overflow: auto;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 18px;
+  border-radius: 22px;
   background: rgba(10, 16, 30, 0.98);
   box-shadow:
     0 22px 40px rgba(15, 23, 42, 0.42),
@@ -864,8 +877,8 @@ button {
 }
 
 .font-family-picker-option {
-  min-height: 48px;
-  padding: 0.8rem 0.9rem;
+  min-height: 66px;
+  padding: 0.95rem 1rem;
   color: #f8fafc;
   cursor: pointer;
 }
@@ -881,7 +894,7 @@ button {
 
 .font-family-picker-option-text {
   display: block;
-  font-size: 1.3em;
+  font-size: 1.55em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -942,6 +955,13 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.color-picker-control-mixed .color-picker-trigger {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, rgba(23, 36, 56, 0.92), rgba(12, 18, 32, 0.96)),
+    rgba(12, 18, 32, 0.84);
 }
 
 .color-picker-panel {
@@ -1559,6 +1579,48 @@ button {
   margin-top: 0;
 }
 
+.inspector-font-picker-field {
+  width: 100%;
+}
+
+.inspector-toggle-button {
+  width: 100%;
+  min-height: 2.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.68rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(12, 18, 32, 0.84);
+  color: #f8fbff;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.inspector-toggle-button:hover:not(:disabled) {
+  background: rgba(24, 37, 58, 0.95);
+}
+
+.inspector-toggle-button.active {
+  background: linear-gradient(180deg, rgba(31, 60, 96, 0.92), rgba(23, 44, 70, 0.92));
+  border-color: rgba(112, 188, 255, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.inspector-toggle-button.mixed {
+  border-style: dashed;
+  color: #d4e1f7;
+}
+
+.inspector-toggle-button-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+}
+
 .inspector-checkbox-field {
   margin-top: 0;
 }
@@ -1588,8 +1650,9 @@ button {
 
 .number-input-slider-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.42rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
 }
 
 .number-input-field-with-slider input[type='range'] {
@@ -1598,8 +1661,14 @@ button {
 }
 
 .number-input-field-with-slider input[type='number'] {
-  width: 4.5rem;
+  width: 4.9rem;
   justify-self: end;
+  border-radius: 12px;
+  text-align: right;
+}
+
+.number-input-field-with-slider {
+  gap: 0.3rem;
 }
 
 .properties-panel input,
@@ -1653,6 +1722,19 @@ button {
 .segmented-control-button.active {
   background: rgba(79, 70, 229, 0.26);
   border-color: rgba(96, 165, 250, 0.5);
+}
+
+.inspector-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.inspector-segmented-control .segmented-control-button {
+  min-width: 0;
+  width: 100%;
+  min-height: 2.5rem;
+  border-radius: 14px;
 }
 
 .align-row .segmented-control-button {

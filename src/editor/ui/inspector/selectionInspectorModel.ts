@@ -8,6 +8,13 @@ import type {
   UploadedFont,
 } from '../../document/documentTypes';
 import type { FontOption } from '../FontFamilyPicker';
+import {
+  renderAlignField,
+  renderBoldField,
+  renderFontFamilyField,
+  renderItalicField,
+  renderVerticalAlignField,
+} from './selectionInspectorRenderers';
 
 import {
   buildFontOptions,
@@ -28,7 +35,9 @@ export interface SelectionFieldChangeContext {
 }
 
 export interface SelectOption {
+  kind?: FontOption['kind'];
   label: string;
+  sourceName?: string;
   value: string;
 }
 
@@ -46,6 +55,7 @@ interface BaseInspectorFieldDescriptor<TValue> {
   supportsMultiEdit: boolean;
   valueType: InspectorValueType;
   getDisabled?: (context: InspectorDescriptorContext) => boolean;
+  getOptions?: (context: InspectorDescriptorContext) => SelectOption[];
   getValue: (item: CanvasItem) => TValue;
 }
 
@@ -75,16 +85,15 @@ export interface ColorFieldDescriptor extends BaseInspectorFieldDescriptor<strin
 
 export interface SelectFieldDescriptor extends BaseInspectorFieldDescriptor<string> {
   controlKind: 'select';
-  getOptions: (context: InspectorDescriptorContext) => SelectOption[];
 }
 
 export interface CustomFieldRenderProps {
-  descriptor: CustomFieldDescriptor;
+  field: ResolvedInspectorField;
   onCommit: (nextValue: unknown) => void;
-  state: ResolvedInspectorFieldState<unknown>;
 }
 
-export interface CustomFieldDescriptor extends BaseInspectorFieldDescriptor<unknown> {
+export interface CustomFieldDescriptor
+  extends BaseInspectorFieldDescriptor<unknown> {
   controlKind: 'custom';
   render: (props: CustomFieldRenderProps) => ReactNode;
 }
@@ -189,11 +198,11 @@ function createColorField(
   };
 }
 
-function createSelectField(
-  descriptor: Omit<SelectFieldDescriptor, 'controlKind'>
-): SelectFieldDescriptor {
+function createCustomField(
+  descriptor: Omit<CustomFieldDescriptor, 'controlKind'>
+): CustomFieldDescriptor {
   return {
-    controlKind: 'select',
+    controlKind: 'custom',
     ...descriptor,
   };
 }
@@ -278,15 +287,23 @@ function createShadowNumberField(
   });
 }
 
-function createFontFamilyField(): SelectFieldDescriptor {
-  return createSelectField({
-    buildChange: (_context, nextValue) => ({ fontFamily: nextValue }),
+function createFontFamilyField(): CustomFieldDescriptor {
+  return createCustomField({
+    buildChange: (_context, nextValue) => ({
+      fontFamily: String(nextValue),
+    }),
     fieldOrder: 20,
     getOptions: ({ fontOptions }) =>
-      fontOptions.map((font) => ({ label: font.family, value: font.family })),
+      fontOptions.map((font) => ({
+        kind: font.kind,
+        label: font.family,
+        sourceName: font.sourceName,
+        value: font.family,
+      })),
     getValue: (item) => (item.kind === 'text' ? item.fontFamily : ''),
     label: 'Font',
     propertyKey: 'fontFamily',
+    render: renderFontFamilyField,
     sectionKey: 'text',
     sectionLabel: 'Text',
     sectionOrder: SECTION_ORDER.text,
@@ -338,7 +355,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       supportsMultiEdit: true,
       valueType: 'number',
     }),
-    createBooleanField({
+    createCustomField({
       buildChange: (_context, nextValue) => ({
         fontWeight: nextValue ? 'bold' : 'normal',
       }),
@@ -352,13 +369,14 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       getValue: (item) => item.kind === 'text' && item.fontWeight === 'bold',
       label: 'Bold',
       propertyKey: 'fontWeight',
+      render: renderBoldField,
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
       supportsMultiEdit: true,
       valueType: 'boolean',
     }),
-    createBooleanField({
+    createCustomField({
       buildChange: (_context, nextValue) => ({
         fontStyle: nextValue ? 'italic' : 'normal',
       }),
@@ -372,34 +390,39 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       getValue: (item) => item.kind === 'text' && item.fontStyle === 'italic',
       label: 'Italic',
       propertyKey: 'fontStyle',
+      render: renderItalicField,
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
       supportsMultiEdit: true,
       valueType: 'boolean',
     }),
-    createSelectField({
-      buildChange: (_context, nextValue) => ({ align: nextValue as TextAlign }),
+    createCustomField({
+      buildChange: (_context, nextValue) => ({
+        align: String(nextValue) as TextAlign,
+      }),
       fieldOrder: 60,
       getOptions: () => ALIGN_OPTIONS,
       getValue: (item) => (item.kind === 'text' ? item.align : 'left'),
       label: 'Align',
       propertyKey: 'align',
+      render: renderAlignField,
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
       supportsMultiEdit: true,
       valueType: 'select',
     }),
-    createSelectField({
+    createCustomField({
       buildChange: (_context, nextValue) => ({
-        verticalAlign: nextValue as TextVerticalAlign,
+        verticalAlign: String(nextValue) as TextVerticalAlign,
       }),
       fieldOrder: 70,
       getOptions: () => VERTICAL_ALIGN_OPTIONS,
       getValue: (item) => (item.kind === 'text' ? item.verticalAlign : 'top'),
       label: 'Vertical align',
       propertyKey: 'verticalAlign',
+      render: renderVerticalAlignField,
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
@@ -976,8 +999,7 @@ export function buildSelectionInspectorSections(
       descriptor,
       disabled: descriptor.getDisabled?.(context) ?? false,
       key: getDescriptorKey(descriptor),
-      options:
-        descriptor.controlKind === 'select' ? descriptor.getOptions(context) : [],
+      options: descriptor.getOptions?.(context) ?? [],
       state: {
         firstValue,
         isMixed,
