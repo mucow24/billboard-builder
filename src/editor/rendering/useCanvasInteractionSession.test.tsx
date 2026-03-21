@@ -1690,6 +1690,80 @@ describe('useCanvasInteractionSession', () => {
     expect(params.onUpdateItem).not.toHaveBeenCalled();
   });
 
+  it('snaps crop-resize previews to guides and disables that snapping while ctrl is held', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 50,
+      x: 20,
+      y: 10,
+      width: 100,
+      height: 50,
+    });
+    image.id = 'crop-image';
+    image.crop = {
+      x: 20,
+      y: 0,
+      width: 100,
+      height: 50,
+    };
+    const sibling = createRectangleItem({
+      id: 'snap-target',
+      x: 132,
+      y: 0,
+      width: 40,
+      height: 80,
+    });
+    const params = createHookParams({
+      document: createDocument([image, sibling]),
+      selectedItemIds: [image.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+    act(() => {
+      result.current.beginCropResize('middle-right');
+    });
+    params.onGuidesChange.mockClear();
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 126,
+          clientY: 35,
+        }),
+      );
+    });
+
+    expect(params.onGuidesChange).toHaveBeenCalledWith([
+      { orientation: 'vertical', position: 132 },
+    ]);
+    expect(result.current.cropSession?.previewItem.width).toBeCloseTo(112, 10);
+
+    act(() => {
+      window.dispatchEvent(new MouseEvent('mouseup', { clientX: 126, clientY: 35 }));
+    });
+
+    act(() => {
+      result.current.beginCropResize('middle-right');
+    });
+    params.onGuidesChange.mockClear();
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 126,
+          clientY: 35,
+          ctrlKey: true,
+        }),
+      );
+    });
+
+    expect(params.onGuidesChange).toHaveBeenCalledWith([]);
+    expect(result.current.cropSession?.previewItem.width).toBeCloseTo(106, 10);
+  });
+
   it('snaps group drag previews and emits guides', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });

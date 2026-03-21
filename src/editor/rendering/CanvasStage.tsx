@@ -69,6 +69,7 @@ export function CanvasStage({
     beginGroupDrag,
     beginGroupResize,
     beginGroupRotate,
+    commitCropSession,
     beginCropFullResize,
     beginCropFullRotate,
     beginCropPan,
@@ -197,6 +198,7 @@ export function CanvasStage({
         beginCropFullRotate={beginCropFullRotate}
         beginCropPan={beginCropPan}
         beginCropResize={beginCropResize}
+        commitCropSession={commitCropSession}
         beginGroupResize={beginGroupResize}
         beginGroupRotate={beginGroupRotate}
         beginLineHandle={beginLineHandle}

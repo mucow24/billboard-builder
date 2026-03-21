@@ -17,6 +17,7 @@ interface ImageCropOverlayProps {
   beginCropFullRotate: (pointer: Point) => void;
   beginCropPan: (pointer: Point) => void;
   beginCropResize: (handle: ResizeHandle) => void;
+  commitCropSession: () => boolean;
   fullImageItem: ImageCanvasItem;
   previewItem: ImageCanvasItem;
   registerShapeRef: (itemId: string, node: Konva.Node | null) => void;
@@ -31,6 +32,7 @@ export function ImageCropOverlay({
   beginCropFullRotate,
   beginCropPan,
   beginCropResize,
+  commitCropSession,
   fullImageItem,
   previewItem,
   registerShapeRef,
@@ -80,6 +82,10 @@ export function ImageCropOverlay({
           }
           event.cancelBubble = true;
           beginCropPan(toCanvasPointer(pointer));
+        }}
+        onDblClick={(event) => {
+          event.cancelBubble = true;
+          commitCropSession();
         }}
       >
         <Rect

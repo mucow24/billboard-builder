@@ -1,8 +1,12 @@
 import { createFullImageCropRect } from '../document/documentDefaults';
 import type {
+  CanvasItem,
+  GuideLine,
   ImageCanvasItem,
   ImageCropRect,
+  SnapRect,
 } from '../document/documentTypes';
+import { getResizeSnappedRect } from './snapping';
 import { stageToLocal, type Point, type ResizeHandle } from './interactionGeometry';
 
 function clamp(value: number, min: number, max: number): number {
@@ -72,8 +76,20 @@ export function resizeImageCrop(params: {
   crop: ImageCropRect;
   handle: ResizeHandle;
   pointer: Point;
+  siblingItems: CanvasItem[];
+  snapEnabled?: boolean;
+  stageRect: SnapRect;
 }) {
-  const { baseItem, crop, fullImageItem, handle, pointer } = params;
+  const {
+    baseItem,
+    crop,
+    fullImageItem,
+    handle,
+    pointer,
+    siblingItems,
+    snapEnabled = true,
+    stageRect,
+  } = params;
   const localPointer = stageToLocal(
     pointer,
     { x: fullImageItem.x, y: fullImageItem.y },
@@ -103,6 +119,34 @@ export function resizeImageCrop(params: {
     bottom = edges.bottom;
   }
 
+  let guides: GuideLine[] = [];
+  if (snapEnabled && Math.abs(fullImageItem.rotation) < 0.001) {
+    const snapped = getResizeSnappedRect(
+      {
+        x: fullImageItem.x + left,
+        y: fullImageItem.y + top,
+        width: right - left,
+        height: bottom - top,
+      },
+      siblingItems,
+      stageRect,
+      handle,
+    );
+    left = clamp(snapped.rect.x - fullImageItem.x, 0, fullImageItem.width - edges.minWidth);
+    top = clamp(snapped.rect.y - fullImageItem.y, 0, fullImageItem.height - edges.minHeight);
+    right = clamp(
+      snapped.rect.x + snapped.rect.width - fullImageItem.x,
+      left + edges.minWidth,
+      fullImageItem.width,
+    );
+    bottom = clamp(
+      snapped.rect.y + snapped.rect.height - fullImageItem.y,
+      top + edges.minHeight,
+      fullImageItem.height,
+    );
+    guides = snapped.guides;
+  }
+
   const nextCrop: ImageCropRect = {
     x: left / edges.scaleX,
     y: top / edges.scaleY,
@@ -112,6 +156,7 @@ export function resizeImageCrop(params: {
 
   return {
     crop: nextCrop,
+    guides,
     previewItem: buildCroppedImagePreviewItem(baseItem, fullImageItem, nextCrop),
   };
 }

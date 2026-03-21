@@ -683,7 +683,10 @@ export function useCanvasInteractionSession({
     [clearPendingMarquee, clearPendingPickupDrag, createPendingPickupSession, onGuidesChange, resolveSession, updateSession],
   );
 
-  const advanceCropInteractionAtPointer = useCallback((pointer: Point | null) => {
+  const advanceCropInteractionAtPointer = useCallback((
+    pointer: Point | null,
+    modifiers: { ctrlKey: boolean; shiftKey: boolean },
+  ) => {
     const current = cropSessionRef.current;
     if (!current?.activeInteraction || !pointer) {
       return;
@@ -697,7 +700,11 @@ export function useCanvasInteractionSession({
           crop: current.activeInteraction.initialCrop,
           handle: current.activeInteraction.handle,
           pointer,
+          siblingItems: orderedItems.filter((entry) => entry.id !== current.itemId),
+          snapEnabled: !modifiers.ctrlKey,
+          stageRect: stageBounds,
         });
+        onGuidesChange(next.guides);
         updateCropSession({
           ...current,
           crop: next.crop,
@@ -707,6 +714,7 @@ export function useCanvasInteractionSession({
         return;
       }
       case 'image-pan': {
+        onGuidesChange([]);
         const next = panImageUnderCrop({
           baseItem: current.activeInteraction.initialPreviewItem,
           fullImageItem: current.activeInteraction.initialFullImageItem,
@@ -723,11 +731,16 @@ export function useCanvasInteractionSession({
         return;
       }
       case 'full-resize': {
-        const resolved = resolveSession(current.activeInteraction.resizeSession, pointer);
+        const resolved = resolveSession({
+          ...current.activeInteraction.resizeSession,
+          snapDisabled: modifiers.ctrlKey,
+          shiftConstrain: modifiers.shiftKey,
+        } as SessionWithModifiers, pointer);
         const nextFullImageItem = 'previewItem' in resolved ? resolved.previewItem : null;
         if (!nextFullImageItem || nextFullImageItem.kind !== 'image') {
           return;
         }
+        onGuidesChange(resolved.guides);
         updateCropSession({
           ...current,
           fullImageItem: nextFullImageItem,
@@ -741,11 +754,16 @@ export function useCanvasInteractionSession({
         return;
       }
       case 'full-rotate': {
-        const resolved = resolveSession(current.activeInteraction.rotateSession, pointer);
+        const resolved = resolveSession({
+          ...current.activeInteraction.rotateSession,
+          snapDisabled: modifiers.ctrlKey,
+          shiftConstrain: modifiers.shiftKey,
+        } as SessionWithModifiers, pointer);
         const nextFullImageItem = 'previewItem' in resolved ? resolved.previewItem : null;
         if (!nextFullImageItem || nextFullImageItem.kind !== 'image') {
           return;
         }
+        onGuidesChange([]);
         updateCropSession({
           ...current,
           fullImageItem: nextFullImageItem,
@@ -758,24 +776,28 @@ export function useCanvasInteractionSession({
         });
       }
     }
-  }, [resolveSession, updateCropSession]);
+  }, [onGuidesChange, orderedItems, resolveSession, stageBounds, updateCropSession]);
 
   const endCropInteraction = useCallback(() => {
     const current = cropSessionRef.current;
     if (!current || !current.activeInteraction) {
       return false;
     }
+    onGuidesChange([]);
     updateCropSession({
       ...current,
       activeInteraction: null,
     });
     return true;
-  }, [updateCropSession]);
+  }, [onGuidesChange, updateCropSession]);
 
   const handleWindowMouseMove = useEffectEvent((event: MouseEvent) => {
     if (cropSessionRef.current?.activeInteraction) {
       const pointer = getCurrentPointer(event);
-      advanceCropInteractionAtPointer(pointer);
+      advanceCropInteractionAtPointer(pointer, {
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+      });
       return;
     }
     if (isClientPointInsideStage(event.clientX, event.clientY)) {
@@ -835,7 +857,10 @@ export function useCanvasInteractionSession({
   const handleWindowMouseUp = useEffectEvent((event: MouseEvent) => {
     if (cropSessionRef.current?.activeInteraction) {
       const pointer = getCurrentPointer(event);
-      advanceCropInteractionAtPointer(pointer);
+      advanceCropInteractionAtPointer(pointer, {
+        ctrlKey: event.ctrlKey,
+        shiftKey: event.shiftKey,
+      });
       endCropInteraction();
       return;
     }
@@ -1237,6 +1262,7 @@ export function useCanvasInteractionSession({
     beginGroupDrag,
     beginGroupResize,
     beginGroupRotate,
+    commitCropSession,
     beginCropFullResize,
     beginCropFullRotate,
     beginCropPan,

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  beginCanvasDrag,
   clickCanvas,
   createGroupedProjectDocument,
   createGroupNodeFixture,
@@ -8,9 +9,12 @@ import {
   createRectangleFixture,
   doubleClickCanvas,
   dragCanvas,
+  dragCanvasWithModifier,
+  movePointerToCanvasPoint,
   openFreshEditor,
   openLayersTab,
   readStageDebug,
+  releasePointer,
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -230,6 +234,150 @@ test.describe('editor image crop', () => {
       (item) => item.id === 'crop-switch-image',
     );
     expect(Number((savedImage as { crop: { width: number } }).crop.width)).toBeGreaterThan(100);
+  });
+
+  test('double-clicking the image inside or outside the crop exits crop mode and commits', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'crop-double-click-image',
+      name: 'Double Click Image',
+      x: 520,
+      y: 320,
+      crop: {
+        x: 20,
+        y: 10,
+        width: 100,
+        height: 60,
+      },
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createGroupedProjectDocument([image]),
+      'crop-double-click-exit.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 600, y: 365 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+
+    let cropSession = await expectCropMode(page);
+    const handle = cropSession.cropHandlePoints?.['middle-right'];
+    if (!handle) {
+      throw new Error('Expected a crop right handle.');
+    }
+    await dragCanvas(page, handle, { x: handle.x + 24, y: handle.y });
+
+    cropSession = await expectCropMode(page);
+    const insideCropPoint = {
+      x: cropSession.previewItem.x + cropSession.previewItem.width / 2,
+      y: cropSession.previewItem.y + cropSession.previewItem.height / 2,
+    };
+    await doubleClickCanvas(page, insideCropPoint);
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+    await openLayersTab(page);
+    await expectActiveLayerId(page, 'crop-double-click-image');
+
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, insideCropPoint);
+    cropSession = await expectCropMode(page);
+
+    const outsideCropPoint = {
+      x: cropSession.fullImageItem.x + 12,
+      y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
+    };
+    expect(outsideCropPoint.x).toBeLessThan(cropSession.previewItem.x);
+    await doubleClickCanvas(page, outsideCropPoint);
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+
+    const savedProject = await saveAndReadProject(page);
+    const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-double-click-image',
+    );
+    expect(Number((savedImage as { crop: { width: number } }).crop.width)).toBeGreaterThan(100);
+  });
+
+  test('crop boundaries snap to guides and ctrl-drag disables that snapping', async ({ page }) => {
+    const image = createImageFixture({
+      id: 'crop-snap-image',
+      name: 'Crop Snap Image',
+      x: 520,
+      y: 320,
+      crop: {
+        x: 20,
+        y: 10,
+        width: 100,
+        height: 60,
+      },
+      zIndex: 0,
+    });
+    const rectangle = createRectangleFixture({
+      id: 'crop-snap-rect',
+      name: 'Crop Snap Rect',
+      x: 700,
+      y: 220,
+      width: 100,
+      height: 180,
+      zIndex: 1,
+    });
+    const project = createGroupedProjectDocument([image, rectangle]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, project, 'crop-snap.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 600, y: 365 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+
+    let cropSession = await expectCropMode(page);
+    const handle = cropSession.cropHandlePoints?.['middle-right'];
+    if (!handle) {
+      throw new Error('Expected a crop right handle.');
+    }
+
+    await beginCanvasDrag(page, handle);
+    await movePointerToCanvasPoint(page, { x: 696, y: handle.y });
+    await expect(page.getByTestId('guide-count')).not.toContainText('Guides: 0');
+    await releasePointer(page);
+
+    await clickCanvas(page, { x: 120, y: 120 });
+    let savedProject = await saveAndReadProject(page);
+    let savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-snap-image',
+    ) as { crop: { width: number } } | undefined;
+    expect(savedImage).toBeDefined();
+    const snappedWidth = Number(savedImage?.crop.width);
+
+    await openFreshEditor(page);
+    await uploadProject(page, project, 'crop-snap-ctrl.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 600, y: 365 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+
+    cropSession = await expectCropMode(page);
+    const ctrlHandle = cropSession.cropHandlePoints?.['middle-right'];
+    if (!ctrlHandle) {
+      throw new Error('Expected a crop right handle for ctrl test.');
+    }
+
+    await dragCanvasWithModifier(page, 'Control', ctrlHandle, { x: 696, y: ctrlHandle.y });
+    await expect(page.getByTestId('guide-count')).toContainText('Guides: 0');
+
+    await clickCanvas(page, { x: 120, y: 120 });
+    savedProject = await saveAndReadProject(page);
+    savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-snap-image',
+    ) as { crop: { width: number } } | undefined;
+    expect(savedImage).toBeDefined();
+    const unsnappedWidth = Number(savedImage?.crop.width);
+    expect(snappedWidth).toBeGreaterThan(unsnappedWidth);
+    expect(snappedWidth - unsnappedWidth).toBeGreaterThan(2);
   });
 
   test('supports full-image resize and rotate inside crop mode, and Escape cancels the session', async ({

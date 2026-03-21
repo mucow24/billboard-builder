@@ -26,6 +26,7 @@ interface CanvasSceneProps {
   beginCropFullRotate: (pointer: Point) => void;
   beginCropPan: (pointer: Point) => void;
   beginCropResize: (handle: ResizeHandle) => void;
+  commitCropSession: () => boolean;
   beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
   beginGroupRotate: (pointer: Point) => void;
   beginLineHandle: (
@@ -104,6 +105,7 @@ export function CanvasScene({
   beginCropFullRotate,
   beginCropPan,
   beginCropResize,
+  commitCropSession,
   beginGroupResize,
   beginGroupRotate,
   beginLineHandle,
@@ -221,6 +223,7 @@ export function CanvasScene({
                 beginCropFullRotate={beginCropFullRotate}
                 beginCropPan={beginCropPan}
                 beginCropResize={beginCropResize}
+                commitCropSession={commitCropSession}
                 fullImageItem={cropSession.fullImageItem}
                 previewItem={cropSession.previewItem}
                 registerShapeRef={registerShapeRef}

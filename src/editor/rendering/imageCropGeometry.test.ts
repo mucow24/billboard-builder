@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createImageItem } from '../document/documentDefaults';
+import { createImageItem, createRectangleItem } from '../document/documentDefaults';
 import {
   buildCroppedImagePreviewItem,
   buildFullImageTransformItem,
@@ -99,6 +99,9 @@ describe('image crop geometry', () => {
       crop: item.crop,
       handle: 'middle-right',
       pointer: { x: 150, y: 30 },
+      siblingItems: [],
+      snapEnabled: false,
+      stageRect: { x: 0, y: 0, width: 300, height: 200 },
     });
 
     expect(resized.crop).toMatchObject({
@@ -113,6 +116,63 @@ describe('image crop geometry', () => {
       width: 120,
       height: 45,
     });
+    expect(resized.guides).toEqual([]);
+  });
+
+  it('snaps crop bounds to sibling guides and allows ctrl-style unsnapped drags', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 50,
+      width: 100,
+      height: 50,
+    });
+    item.x = 20;
+    item.y = 10;
+    item.crop = {
+      x: 20,
+      y: 0,
+      width: 100,
+      height: 50,
+    };
+    const fullImageItem = buildFullImageTransformItem(item);
+    const sibling = createRectangleItem({
+      x: 132,
+      y: 0,
+      width: 40,
+      height: 80,
+    });
+
+    const snapped = resizeImageCrop({
+      baseItem: item,
+      fullImageItem,
+      crop: item.crop,
+      handle: 'middle-right',
+      pointer: { x: 126, y: 35 },
+      siblingItems: [sibling],
+      stageRect: { x: 0, y: 0, width: 300, height: 200 },
+    });
+
+    expect(snapped.crop.width).toBeCloseTo(112, 10);
+    expect(snapped.previewItem.width).toBeCloseTo(112, 10);
+    expect(snapped.guides).toEqual([
+      { orientation: 'vertical', position: 132 },
+    ]);
+
+    const unsnapped = resizeImageCrop({
+      baseItem: item,
+      fullImageItem,
+      crop: item.crop,
+      handle: 'middle-right',
+      pointer: { x: 126, y: 35 },
+      siblingItems: [sibling],
+      snapEnabled: false,
+      stageRect: { x: 0, y: 0, width: 300, height: 200 },
+    });
+
+    expect(unsnapped.crop.width).toBeCloseTo(106, 10);
+    expect(unsnapped.guides).toEqual([]);
   });
 
   it('pans the source image under a fixed crop frame', () => {
