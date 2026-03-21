@@ -127,8 +127,11 @@ describe('useEditorController', () => {
     mockTemplateLibraryService.load.mockReturnValue([]);
     mockTemplateLibraryService.save.mockReset();
     mockUploadedFontPersistenceService.clear.mockReset();
+    mockUploadedFontPersistenceService.loadByReferences.mockReset();
     mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([]);
+    mockUploadedFontPersistenceService.pruneUnreferenced.mockReset();
     mockUploadedFontPersistenceService.pruneUnreferenced.mockResolvedValue(undefined);
+    mockUploadedFontPersistenceService.save.mockReset();
     mockUploadedFontPersistenceService.save.mockResolvedValue(undefined);
     resetEditorStore();
   });

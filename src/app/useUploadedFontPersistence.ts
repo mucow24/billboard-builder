@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { collectRetainedUploadedFontReferences } from './uploadedFontPersistence';
 import type { DocumentFontReference } from '../editor/document/documentTypes';
@@ -18,11 +18,14 @@ export function useUploadedFontPersistence({
   templates,
   templatesReady,
 }: UseUploadedFontPersistenceArgs) {
+  const hasPrunedOnBootstrapRef = useRef(false);
+
   useEffect(() => {
-    if (!persistenceReady || !templatesReady) {
+    if (!persistenceReady || !templatesReady || hasPrunedOnBootstrapRef.current) {
       return;
     }
 
+    hasPrunedOnBootstrapRef.current = true;
     void defaultUploadedFontPersistenceService.pruneUnreferenced(
       collectRetainedUploadedFontReferences(documentFonts, templates),
     );

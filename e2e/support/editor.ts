@@ -6,6 +6,7 @@ import { expect, type Download, type FileChooser, type Locator, type Page } from
 
 export const APP_CLIPBOARD_MIME_TYPE = 'application/x-billboard-builder-selection+json';
 const EDITOR_TEST_URL = '/?bb-test=1';
+const EDITOR_DATABASE_VERSION = 2;
 
 export interface CanvasPoint {
   x: number;
@@ -1051,9 +1052,9 @@ export async function readDownloadedPngSize(download: Download) {
 
 export async function seedPersistence(page: Page, payload: string | Record<string, unknown>) {
   const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  await page.evaluate(async (value) => {
+  await page.evaluate(async ({ value, version }) => {
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('billboard-builder', 1);
+      const request = indexedDB.open('billboard-builder', version);
       request.onerror = () => reject(request.error);
       request.onupgradeneeded = () => {
         const database = request.result;
@@ -1074,18 +1075,18 @@ export async function seedPersistence(page: Page, payload: string | Record<strin
         };
       };
     });
-  }, serialized);
+  }, { value: serialized, version: EDITOR_DATABASE_VERSION });
 }
 
 export async function primePersistenceBeforeLoad(page: Page, payload: string | Record<string, unknown>) {
   const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  await page.addInitScript(async (value) => {
+  await page.addInitScript(async ({ value, version }) => {
     if (window.sessionStorage.getItem('bb-persist-seeded') === 'true') {
       return;
     }
     window.sessionStorage.setItem('bb-persist-seeded', 'true');
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('billboard-builder', 1);
+      const request = indexedDB.open('billboard-builder', version);
       request.onerror = () => reject(request.error);
       request.onupgradeneeded = () => {
         const database = request.result;
@@ -1106,7 +1107,7 @@ export async function primePersistenceBeforeLoad(page: Page, payload: string | R
         };
       };
     });
-  }, serialized);
+  }, { value: serialized, version: EDITOR_DATABASE_VERSION });
 }
 
 export async function clearPersistence(page: Page) {

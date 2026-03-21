@@ -1,3 +1,4 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { expect, test } from '@playwright/test';
@@ -12,9 +13,7 @@ import {
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
-  gotoEditor,
   openFreshEditor,
-  primePersistenceBeforeLoad,
   openLayersTab,
   openPropertiesTab,
   readDownloadedJson,
@@ -28,7 +27,145 @@ import {
   waitForEditor,
 } from './support/editor';
 
+async function countUploadedFontRecords(page: Parameters<typeof test>[0]['page']) {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('billboard-builder', 2);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const transaction = database.transaction('uploaded-fonts', 'readonly');
+        const store = transaction.objectStore('uploaded-fonts');
+        const request = store.count();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
+async function readPersistedCanvasDocument(page: Parameters<typeof test>[0]['page']) {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('billboard-builder', 2);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    try {
+      const serializedDocument = await new Promise<unknown>((resolve, reject) => {
+        const transaction = database.transaction('canvas', 'readonly');
+        const store = transaction.objectStore('canvas');
+        const request = store.get('current');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+
+      if (typeof serializedDocument !== 'string') {
+        return null;
+      }
+
+      return JSON.parse(serializedDocument) as Record<string, unknown>;
+    } finally {
+      database.close();
+    }
+  });
+}
+
+function collectPersistedTextFontFamilies(node: unknown): string[] {
+  if (!node || typeof node !== 'object') {
+    return [];
+  }
+
+  const candidate = node as {
+    kind?: unknown;
+    fontFamily?: unknown;
+    children?: unknown;
+  };
+
+  const families =
+    candidate.kind === 'text' && typeof candidate.fontFamily === 'string'
+      ? [candidate.fontFamily]
+      : [];
+  const childFamilies = Array.isArray(candidate.children)
+    ? candidate.children.flatMap((child) => collectPersistedTextFontFamilies(child))
+    : [];
+
+  return [...families, ...childFamilies];
+}
+
+async function expectPersistedCanvasToReferenceFontFamily(
+  page: Parameters<typeof test>[0]['page'],
+  expectedFamily: string,
+  expectedRegisteredFamilies: string[],
+) {
+  await expect
+    .poll(async () => {
+      const persistedDocument = await readPersistedCanvasDocument(page);
+      if (!persistedDocument) {
+        return null;
+      }
+
+      const nodes = Array.isArray(persistedDocument.nodes) ? persistedDocument.nodes : [];
+      const textFamilies = nodes.flatMap((node) => collectPersistedTextFontFamilies(node)).sort();
+      const registeredFamilies = Array.isArray(persistedDocument.fonts)
+        ? persistedDocument.fonts
+            .flatMap((font) =>
+              font &&
+              typeof font === 'object' &&
+              'family' in font &&
+              typeof font.family === 'string'
+                ? [font.family]
+                : [],
+            )
+            .sort()
+        : [];
+
+      return {
+        registeredFamilies,
+        textFamilies,
+      };
+    }, {
+      message: `Expected persisted canvas document to reference ${expectedFamily}.`,
+    })
+    .toEqual({
+      registeredFamilies: expectedRegisteredFamilies,
+      textFamilies: [expectedFamily],
+    });
+}
+
+async function expectUploadedFontRecordCount(
+  page: Parameters<typeof test>[0]['page'],
+  expectedCount: number,
+) {
+  await expect
+    .poll(async () => countUploadedFontRecords(page), {
+      message: `Expected uploaded font store count to become ${expectedCount}.`,
+    })
+    .toBe(expectedCount);
+}
+
+async function uploadNamedFontFromPath(
+  page: Parameters<typeof test>[0]['page'],
+  filePath: string,
+  uploadedName: string,
+) {
+  const chooser = await startToolbarFileChooser(page, 'Upload', 'Font...');
+  await chooser.setFiles({
+    name: uploadedName,
+    mimeType: 'font/ttf',
+    buffer: await fs.readFile(filePath),
+  });
+}
+
 test.describe('editor file and persistence flows', () => {
+  test.describe.configure({ mode: 'serial' });
+
   test('uploads images and fonts through the real hidden file inputs', async ({ page }) => {
     await openFreshEditor(page);
 
@@ -48,6 +185,75 @@ test.describe('editor file and persistence flows', () => {
     await expect(uploadedFontOption).toBeVisible();
     await uploadedFontOption.click();
     await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Cal Sans');
+  });
+
+  test('reload restores uploaded fonts used by the persisted canvas without showing a missing-font warning', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'persisted-font-text' })]),
+      'persisted-font-project.json',
+    );
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+
+    const fontPath = path.join(process.cwd(), 'src/assets/fonts/CalSans-Regular.ttf');
+    await uploadNamedFontFromPath(page, fontPath, 'Uploaded-Only-Regular.ttf');
+    await page.getByTestId('font-family-picker-trigger').click();
+    const uploadedFontOption = page.getByRole('option', { name: 'Uploaded Only' }).first();
+    await expect(uploadedFontOption).toBeVisible();
+    await uploadedFontOption.click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Only');
+
+    await expectUploadedFontRecordCount(page, 1);
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Uploaded Only', ['Uploaded Only']);
+
+    await page.reload();
+    await waitForEditor(page);
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+    await expect(page.getByText('Missing fonts')).toHaveCount(0);
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Only');
+    await expectUploadedFontRecordCount(page, 1);
+  });
+
+  test('reload purges persisted uploaded fonts once neither canvas nor templates reference them', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'purged-font-text' })]),
+      'purged-font-project.json',
+    );
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+
+    const fontPath = path.join(process.cwd(), 'src/assets/fonts/CalSans-Regular.ttf');
+    await uploadNamedFontFromPath(page, fontPath, 'Uploaded-Only-Regular.ttf');
+    await page.getByTestId('font-family-picker-trigger').click();
+    await page.getByRole('option', { name: 'Uploaded Only' }).first().click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Only');
+    await expectUploadedFontRecordCount(page, 1);
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Uploaded Only', ['Uploaded Only']);
+
+    await page.getByTestId('font-family-picker-trigger').click();
+    await page.getByRole('option', { name: 'Arial' }).first().click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Arial');
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Arial', []);
+
+    await page.reload();
+    await waitForEditor(page);
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+    await expect(page.getByText('Missing fonts')).toHaveCount(0);
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Arial');
+    await expectUploadedFontRecordCount(page, 0);
+
+    await page.getByTestId('font-family-picker-trigger').click();
+    await expect(page.getByRole('option', { name: 'Uploaded Only' })).toHaveCount(0);
   });
 
   test('round-trips project save/open and exports a PNG with the canvas dimensions', async ({ page }) => {
@@ -116,8 +322,9 @@ test.describe('editor file and persistence flows', () => {
       createRectangleFixture({ id: 'persisted-rect', x: 200, y: 220, width: 180, height: 120 }),
     ]);
 
-    await primePersistenceBeforeLoad(page, persistedDocument);
-    await gotoEditor(page);
+    await openFreshEditor(page);
+    await seedPersistence(page, persistedDocument);
+    await page.reload();
     await waitForEditor(page);
     await openLayersTab(page);
     await expect(page.locator('.layer-row-select')).toHaveCount(1);
@@ -202,8 +409,8 @@ test.describe('editor file and persistence flows', () => {
     await openPropertiesTab(page);
     await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
 
-    await primePersistenceBeforeLoad(page, savedGroupedDocument);
-    await gotoEditor(page);
+    await seedPersistence(page, savedGroupedDocument);
+    await page.reload();
     await waitForEditor(page);
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Persisted Group', exact: true })).toBeVisible();
