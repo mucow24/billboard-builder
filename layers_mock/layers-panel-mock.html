@@ -30,6 +30,7 @@
         --button-bg-active: #1d2d49;
         --button-border: #2b3956;
         --button-disabled: #101725;
+        --toolbar-control-size: 1.8rem;
       }
 
       * {
@@ -112,7 +113,7 @@
         border-right: 1px solid var(--rule);
         background: transparent;
         color: var(--text-secondary);
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         line-height: 1;
       }
@@ -147,7 +148,7 @@
         border-radius: 3px;
         background: var(--badge);
         color: var(--text-strong);
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 700;
       }
 
@@ -447,8 +448,8 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 20px;
-        height: 20px;
+        width: var(--toolbar-control-size);
+        height: var(--toolbar-control-size);
         border: 1px solid rgba(148, 163, 184, 0.28);
         border-radius: 3px;
         background: rgba(19, 28, 46, 0.98);
@@ -510,8 +511,8 @@
       .toolbar-button svg,
       .background-button svg,
       .delete-button svg {
-        width: 11px;
-        height: 11px;
+        width: 15px;
+        height: 15px;
         stroke: currentColor;
         stroke-width: 1.6;
         stroke-linecap: round;

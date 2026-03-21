@@ -110,4 +110,24 @@ describe('ColorPickerControl', () => {
 
     expect(onChange).toHaveBeenCalledWith('#12345678');
   });
+
+  it('supports a compact trigger variant without the inline label copy', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ColorPickerControl
+        label="Canvas background"
+        value="#33669980"
+        onChange={vi.fn()}
+        variant="compact"
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Canvas background' });
+    expect(trigger).toHaveClass('color-picker-trigger-compact');
+    expect(screen.queryByText('Canvas background')).not.toBeInTheDocument();
+
+    await user.click(trigger);
+    expect(screen.getByLabelText('Canvas background hex')).toHaveValue('#33669980');
+  });
 });

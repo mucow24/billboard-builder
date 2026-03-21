@@ -23,7 +23,6 @@ export default function App() {
 
   const {
     actions: {
-      deleteItem,
       deleteTemplate,
       deleteSelectedItems,
       dispatch,
@@ -177,7 +176,7 @@ export default function App() {
                 selectedNodeIds={selectedNodeIds}
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onGroupOpacityChange={updateSelectedGroup}
-                onDeleteItem={deleteItem}
+                onDeleteSelection={deleteSelectedItems}
                 onItemChange={(changes: Partial<CanvasItem>) => {
                   if (selectedItems.length > 1) {
                     updateSelectedItems(selectedItems.map((item) => ({ itemId: item.id, changes })));

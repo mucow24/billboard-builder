@@ -484,6 +484,129 @@ export function createMixedShapeLineGroupFixture() {
   ]);
 }
 
+export function createLayersPanelMockParityFixture() {
+  return createGroupedProjectDocument([
+    createGroupNodeFixture(
+      [
+        createRectangleFixture({
+          id: 'legal-rectangle',
+          name: 'Rectangle',
+          x: 690,
+          y: 700,
+          width: 180,
+          height: 90,
+          fill: '#2d86ff',
+          stroke: '#2563ebff',
+          zIndex: 0,
+        }),
+      ],
+      {
+        id: 'legal-group',
+        name: 'Legal',
+      },
+    ),
+    createRectangleFixture({
+      id: 'base-rectangle',
+      name: 'Rectangle',
+      x: 620,
+      y: 620,
+      width: 200,
+      height: 110,
+      fill: '#2563eb',
+      stroke: '#22c55eff',
+      zIndex: 1,
+    }),
+    createGroupNodeFixture(
+      [
+        createLineFixture({
+          id: 'hero-line',
+          name: 'Line',
+          x: 170,
+          y: 470,
+          width: 250,
+          height: 28,
+          stroke: '#d6e2f5ff',
+          strokeWidth: 4,
+          startX: 170,
+          startY: 492,
+          endX: 420,
+          endY: 464,
+          zIndex: 0,
+        }),
+        createGroupNodeFixture(
+          [
+            createEllipseFixture({
+              id: 'details-ellipse',
+              name: 'Ellipse',
+              x: 340,
+              y: 390,
+              width: 56,
+              height: 56,
+              fill: '#00000000',
+              stroke: '#a855f7ff',
+              zIndex: 0,
+            }),
+            createTextFixture({
+              id: 'details-text',
+              name: 'Text',
+              x: 208,
+              y: 358,
+              width: 320,
+              height: 56,
+              text: 'Free shipping over $75',
+              fill: '#17deef',
+              fontSize: 28,
+              zIndex: 1,
+            }),
+          ],
+          {
+            id: 'details-cluster',
+            name: 'Details Cluster',
+          },
+        ),
+        createEllipseFixture({
+          id: 'hero-ellipse',
+          name: 'Ellipse',
+          x: 170,
+          y: 300,
+          width: 72,
+          height: 72,
+          fill: '#3b82f6',
+          stroke: '#93a8c942',
+          zIndex: 2,
+        }),
+        createTextFixture({
+          id: 'hero-text',
+          name: 'Text',
+          x: 210,
+          y: 200,
+          width: 420,
+          height: 70,
+          text: 'Spring drop now live',
+          fill: '#f3f6fc',
+          fontSize: 34,
+          zIndex: 3,
+        }),
+      ],
+      {
+        id: 'hero-group',
+        name: 'Hero Group',
+      },
+    ),
+    createRectangleFixture({
+      id: 'top-rectangle',
+      name: 'Rectangle',
+      x: 120,
+      y: 120,
+      width: 180,
+      height: 110,
+      fill: '#ff4d4d',
+      stroke: '#93a8c942',
+      zIndex: 3,
+    }),
+  ]);
+}
+
 export async function waitForEditor(page: Page) {
   await expect(page.getByTestId('canvas-stage-root')).toBeVisible();
   await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();

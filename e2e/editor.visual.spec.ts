@@ -4,7 +4,9 @@ import {
   beginCanvasHookDrag,
   canvasPointToPage,
   clickCanvas,
+  clickLayerRow,
   createLineFixture,
+  createLayersPanelMockParityFixture,
   createMixedShapeTextGroupFixture,
   createNestedGroupFixture,
   createProjectDocument,
@@ -14,6 +16,7 @@ import {
   dragCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
+  openLayersTab,
   readStageDebug,
   releasePointer,
   setCanvasTestHooksEnabled,
@@ -62,6 +65,73 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-shape-handle-middle-right')).toBeAttached();
 
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('single-selection-handles.png');
+  });
+
+  test.describe('layers panel mock parity', () => {
+    test.use({
+      deviceScaleFactor: 2,
+      viewport: {
+        width: 1600,
+        height: 1600,
+      },
+    });
+
+    test('captures the layers panel mock parity rail', async ({ page }) => {
+      await page.addInitScript(() => {
+        const timestamp = '2026-03-20T12:00:00.000Z';
+        window.localStorage.setItem(
+          'billboard-builder:templates:v1',
+          JSON.stringify({
+            version: 1,
+            templates: [
+              {
+                id: 'mock-template-1',
+                name: 'Mock Template 1',
+                nodes: [],
+                fonts: [],
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              {
+                id: 'mock-template-2',
+                name: 'Mock Template 2',
+                nodes: [],
+                fonts: [],
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+            ],
+          }),
+        );
+      });
+      await openFreshEditor(page);
+      await uploadProject(
+        page,
+        createLayersPanelMockParityFixture(),
+        'layers-panel-mock-parity.json',
+      );
+
+      await openLayersTab(page);
+      await clickLayerRow(page, 'Hero Group');
+      await page.getByRole('button', { name: 'Collapse Legal' }).click();
+
+      const railBounds = await page.getByTestId('layers-panel-rail').boundingBox();
+      if (!railBounds) {
+        throw new Error('Expected the layers panel rail to have a bounding box.');
+      }
+
+      const screenshot = await page.screenshot({
+        clip: {
+          x: railBounds.x,
+          y: railBounds.y,
+          width: 317,
+          height: 760,
+        },
+        scale: 'device',
+      });
+
+      expect(screenshot).toMatchSnapshot('layers-panel-mock-parity.png');
+    });
   });
 
   test('captures a rectangle snapped flush to the right canvas edge without checkerboard bleed', async ({ page }) => {

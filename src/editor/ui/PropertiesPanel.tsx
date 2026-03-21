@@ -21,7 +21,7 @@ export function PropertiesPanel({
   selectedNodeIds,
   onBackgroundChange,
   onGroupOpacityChange,
-  onDeleteItem,
+  onDeleteSelection,
   onItemChange,
   onInsertTemplate = () => {},
   onReorder,
@@ -110,7 +110,10 @@ export function PropertiesPanel({
         </section>
       ) : null}
 
-      <section className="panel-section panel-section-tabbed-rail">
+      <section
+        className="panel-section panel-section-tabbed-rail"
+        data-testid="layers-panel-rail"
+      >
         <div className="rail-tab-strip" role="tablist" aria-label="Inspector panels">
           <button
             type="button"
@@ -155,7 +158,7 @@ export function PropertiesPanel({
               collapsedGroupIds={collapsedGroupIds}
               rows={layerRows}
               onBackgroundChange={onBackgroundChange}
-              onDeleteItem={onDeleteItem}
+              onDeleteSelection={onDeleteSelection}
               onOpenProperties={() => handleTabChange('properties')}
               onReorder={onReorder}
               onSelectNode={onSelectNode}

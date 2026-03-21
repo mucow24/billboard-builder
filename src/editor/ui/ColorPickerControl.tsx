@@ -15,6 +15,7 @@ interface ColorPickerControlProps {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  variant?: 'default' | 'compact';
 }
 
 function clampSliderValue(value: number, min: number, max: number): number {
@@ -25,6 +26,7 @@ export function ColorPickerControl({
   label,
   value,
   onChange,
+  variant = 'default',
 }: ColorPickerControlProps) {
   const panelId = useId();
   const storedValue = toStoredHexColor(value);
@@ -71,12 +73,22 @@ export function ColorPickerControl({
   }
 
   return (
-    <div className="color-picker-control">
+    <div
+      className={
+        variant === 'compact'
+          ? 'color-picker-control color-picker-control-compact'
+          : 'color-picker-control'
+      }
+    >
       <button
         aria-controls={panelId}
         aria-expanded={isOpen}
         aria-label={label}
-        className="color-picker-trigger"
+        className={
+          variant === 'compact'
+            ? 'color-picker-trigger color-picker-trigger-compact'
+            : 'color-picker-trigger'
+        }
         type="button"
         onClick={() => setIsOpen((open) => !open)}
       >
@@ -86,14 +98,25 @@ export function ColorPickerControl({
             style={{ backgroundColor: storedValue }}
           />
         </span>
-        <span className="color-picker-trigger-copy">
-          <span className="color-picker-trigger-label">{label}</span>
-          <span className="color-picker-trigger-value">{storedValue}</span>
-        </span>
+        {variant === 'compact' ? (
+          <span className="color-picker-trigger-caret" aria-hidden="true" />
+        ) : (
+          <span className="color-picker-trigger-copy">
+            <span className="color-picker-trigger-label">{label}</span>
+            <span className="color-picker-trigger-value">{storedValue}</span>
+          </span>
+        )}
       </button>
 
       {isOpen ? (
-        <div className="color-picker-panel" id={panelId}>
+        <div
+          className={
+            variant === 'compact'
+              ? 'color-picker-panel color-picker-panel-compact'
+              : 'color-picker-panel'
+          }
+          id={panelId}
+        >
           <div className="color-picker-wheel">
             <Wheel
               color={hsva}

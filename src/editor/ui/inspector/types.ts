@@ -24,7 +24,7 @@ export interface PropertiesPanelProps {
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: Partial<CanvasItem>) => void;
   onInsertTemplate?: (templateId: string) => void;
-  onDeleteItem: (itemId: string) => void;
+  onDeleteSelection: () => void;
   onSelectNode: (nodeId: string) => void;
   onReorder: (mode: ReorderMode) => void;
   templates?: StoredTemplate[];
@@ -36,7 +36,7 @@ export interface LayersInspectorTabProps {
   collapsedGroupIds: ReadonlySet<string>;
   rows: LayerRow[];
   onBackgroundChange: (background: string) => void;
-  onDeleteItem: (itemId: string) => void;
+  onDeleteSelection: () => void;
   onOpenProperties: () => void;
   onReorder: (mode: ReorderMode) => void;
   onSelectNode: (nodeId: string) => void;

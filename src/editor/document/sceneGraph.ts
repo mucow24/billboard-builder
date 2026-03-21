@@ -16,7 +16,7 @@ export interface FlattenedLeafNode {
 
 export interface LayerRow {
   ancestorGroupIds: string[];
-  childCount: number;
+  immediateChildCount: number;
   depth: number;
   hasChildren: boolean;
   isSelectable: boolean;
@@ -147,7 +147,7 @@ export function flattenLayerRows(
   for (const node of nodes.slice().reverse()) {
     rows.push({
       ancestorGroupIds,
-      childCount: isGroupNode(node) ? collectLeafItems(node).length : 0,
+      immediateChildCount: isGroupNode(node) ? node.children.length : 0,
       depth,
       hasChildren: isGroupNode(node) && node.children.length > 0,
       isSelectable: true,

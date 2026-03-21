@@ -12,10 +12,10 @@ import { flattenLayerRows } from '../../document/sceneGraph';
 import { LayersInspectorTab } from './LayersInspectorTab';
 
 describe('LayersInspectorTab', () => {
-  it('renders layers in z-index order and selects or deletes rows correctly', async () => {
+  it('renders layers in z-index order and deletes the current selection from the utility row', async () => {
     const user = userEvent.setup();
     const onSelectNode = vi.fn();
-    const onDeleteItem = vi.fn();
+    const onDeleteSelection = vi.fn();
     const backItem = createRectangleItem({ zIndex: 0 });
     const frontItem = createTextItem({ zIndex: 1 });
 
@@ -25,7 +25,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([backItem, frontItem])}
         onBackgroundChange={vi.fn()}
-        onDeleteItem={onDeleteItem}
+        onDeleteSelection={onDeleteSelection}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -42,8 +42,11 @@ describe('LayersInspectorTab', () => {
     await user.click(layerRows[0]);
     expect(onSelectNode).toHaveBeenCalledWith(frontItem.id);
 
-    await user.click(screen.getByRole('button', { name: 'Delete Rectangle' }));
-    expect(onDeleteItem).toHaveBeenCalledWith(backItem.id);
+    expect(screen.queryByRole('button', { name: 'Delete Rectangle' })).not.toBeInTheDocument();
+    expect(screen.getByText('2 items')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Delete selected (1)' }));
+    expect(onDeleteSelection).toHaveBeenCalledTimes(1);
   });
 
   it('opens properties on double-click and wires layer reorder controls', async () => {
@@ -59,7 +62,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([item])}
         onBackgroundChange={vi.fn()}
-        onDeleteItem={vi.fn()}
+        onDeleteSelection={vi.fn()}
         onOpenProperties={onOpenProperties}
         onReorder={onReorder}
         onSelectNode={onSelectNode}
@@ -88,7 +91,7 @@ describe('LayersInspectorTab', () => {
         canReorder={false}
         rows={flattenLayerRows([item])}
         onBackgroundChange={onBackgroundChange}
-        onDeleteItem={vi.fn()}
+        onDeleteSelection={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={vi.fn()}
@@ -99,6 +102,7 @@ describe('LayersInspectorTab', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Bring front' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete selected' })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Canvas background' }));
     await user.clear(screen.getByLabelText('Canvas background hex'));
@@ -110,7 +114,7 @@ describe('LayersInspectorTab', () => {
     expect(onBackgroundChange).toHaveBeenCalledWith('#11223344');
   });
 
-  it('toggles group disclosure and allows selecting child rows from layers', async () => {
+  it('toggles group disclosure inline and allows selecting child rows from layers', async () => {
     const user = userEvent.setup();
     const onSelectNode = vi.fn();
     const onToggleGroupCollapse = vi.fn();
@@ -118,13 +122,13 @@ describe('LayersInspectorTab', () => {
     const group = createGroupNode([child], 'Hero Group');
     group.id = 'group-1';
 
-    const { rerender } = render(
+    const { container, rerender } = render(
       <LayersInspectorTab
         background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
         onBackgroundChange={vi.fn()}
-        onDeleteItem={vi.fn()}
+        onDeleteSelection={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -136,6 +140,8 @@ describe('LayersInspectorTab', () => {
 
     expect(screen.getByRole('button', { name: 'Hero Group' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument();
+    expect(container.querySelector('.layer-row-chevron-button')).toBeNull();
+    expect(container.querySelector('.layer-row-type-toggle')).not.toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Collapse Hero Group' }));
     expect(onToggleGroupCollapse).toHaveBeenCalledWith(group.id);
@@ -146,7 +152,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([group])}
         onBackgroundChange={vi.fn()}
-        onDeleteItem={vi.fn()}
+        onDeleteSelection={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -165,7 +171,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([group])}
         onBackgroundChange={vi.fn()}
-        onDeleteItem={vi.fn()}
+        onDeleteSelection={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}

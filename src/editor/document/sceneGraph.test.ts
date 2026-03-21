@@ -53,7 +53,7 @@ describe('scene graph helpers', () => {
         isSelectable: true,
         selectableNodeId: 'group-1',
         ancestorGroupIds: [],
-        childCount: 2,
+        immediateChildCount: 2,
         hasChildren: true,
       }),
       expect.objectContaining({
@@ -61,7 +61,7 @@ describe('scene graph helpers', () => {
         isSelectable: true,
         selectableNodeId: 'child-front',
         ancestorGroupIds: ['group-1'],
-        childCount: 0,
+        immediateChildCount: 0,
         hasChildren: false,
       }),
       expect.objectContaining({
@@ -69,8 +69,36 @@ describe('scene graph helpers', () => {
         isSelectable: true,
         selectableNodeId: 'child-back',
         ancestorGroupIds: ['group-1'],
-        childCount: 0,
+        immediateChildCount: 0,
         hasChildren: false,
+      }),
+    ]);
+  });
+
+  it('tracks immediate child counts for groups instead of descendant leaf counts', () => {
+    const nestedLeaf = createRectangleItem({ id: 'nested-leaf', zIndex: 0 });
+    const nestedGroup = createGroupNode([nestedLeaf], 'Nested Group');
+    nestedGroup.id = 'nested-group';
+    const siblingLeaf = createTextItem({ id: 'sibling-leaf', zIndex: 1 });
+    const group = createGroupNode([nestedGroup, siblingLeaf], 'Outer Group');
+    group.id = 'outer-group';
+
+    expect(flattenLayerRows([group])).toEqual([
+      expect.objectContaining({
+        selectableNodeId: 'outer-group',
+        immediateChildCount: 2,
+      }),
+      expect.objectContaining({
+        selectableNodeId: 'sibling-leaf',
+        immediateChildCount: 0,
+      }),
+      expect.objectContaining({
+        selectableNodeId: 'nested-group',
+        immediateChildCount: 1,
+      }),
+      expect.objectContaining({
+        selectableNodeId: 'nested-leaf',
+        immediateChildCount: 0,
       }),
     ]);
   });

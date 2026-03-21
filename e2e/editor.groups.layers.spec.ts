@@ -6,6 +6,7 @@ import {
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
+  createLayersPanelMockParityFixture,
   createRectangleFixture,
   createTextFixture,
   doubleClickLayerRow,
@@ -219,12 +220,77 @@ test.describe('editor group layers and inspector flows', () => {
     await openFreshEditor(page);
     await openLayersTab(page);
 
+    await expect(page.locator('.color-picker-trigger-compact')).toHaveCount(1);
     await page.getByRole('button', { name: 'Canvas background' }).click();
     await page.getByLabel('Canvas background hex').fill('#11223344');
     await page.getByLabel('Canvas background hex').press('Enter');
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.background).toBe('#11223344');
+  });
+
+  test('surfaces the compact Layers background trigger in the utility row for the mock parity fixture', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, createLayersPanelMockParityFixture(), 'layers-panel-mock-parity.json');
+
+    await openLayersTab(page);
+    await expect(page.locator('.layers-panel-utility-row .color-picker-trigger-compact')).toHaveCount(
+      1,
+    );
+    await page.getByRole('button', { name: 'Canvas background' }).click();
+    await expect(page.getByLabel('Canvas background hex')).toBeVisible();
+  });
+
+  test('shows immediate child counts for nested groups and the footer meta count', async ({ page }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createGroupNodeFixture(
+            [
+              createRectangleFixture({
+                id: 'nested-group-rect',
+                x: 220,
+                y: 220,
+                width: 180,
+                height: 120,
+                zIndex: 0,
+              }),
+            ],
+            {
+              id: 'nested-group',
+              name: 'Nested Group',
+            },
+          ),
+          createTextFixture({
+            id: 'outer-text',
+            x: 460,
+            y: 240,
+            width: 220,
+            height: 72,
+            text: 'Outer sibling text',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'outer-group',
+          name: 'Outer Group',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'layers-immediate-child-counts.json');
+
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row-select').filter({ hasText: 'Outer Group' })).toContainText(
+      '2 items',
+    );
+    await expect(page.locator('.layer-row-select').filter({ hasText: 'Nested Group' })).toContainText(
+      '1 item',
+    );
+    await expect(page.locator('.layers-panel-meta-copy')).toHaveText('2 items');
   });
 
   test('deletes a grouped subtree from the layers tab', async ({ page }) => {
@@ -251,7 +317,8 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, groupedDocument, 'delete-group.json');
 
     await openLayersTab(page);
-    await page.getByRole('button', { name: 'Delete Delete Group' }).click({ force: true });
+    await clickLayerRow(page, 'Delete Group');
+    await page.getByRole('button', { name: 'Delete selected (1)' }).click();
     await expect(page.locator('.layer-row-select')).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);

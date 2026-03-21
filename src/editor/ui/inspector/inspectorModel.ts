@@ -168,8 +168,8 @@ export function getLayerSecondaryLabel(item: CanvasItem): string | null {
 export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
   if (item.kind === 'line') {
     return {
-      background: 'transparent',
-      borderColor: item.stroke,
+      background: 'rgba(12, 19, 32, 0.92)',
+      borderColor: 'rgba(147, 168, 201, 0.26)',
       color: item.stroke,
     };
   }
