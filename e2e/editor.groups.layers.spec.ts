@@ -6,6 +6,7 @@ import {
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
+  createImageFixture,
   createLayersPanelMockParityFixture,
   createRectangleFixture,
   createTextFixture,
@@ -68,6 +69,25 @@ test.describe('editor group layers and inspector flows', () => {
     await expect(page.locator('.layer-row.active').filter({ hasText: 'Rectangle' })).toHaveCount(1);
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+  });
+
+  test('shows an image thumbnail preview for image rows in Layers', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createImageFixture({
+        id: 'layers-image-preview',
+        zIndex: 0,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'layers-image-preview.json');
+
+    await openLayersTab(page);
+    const thumbnail = page.getByTestId('layers-thumbnail-layers-image-preview');
+
+    await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible();
+    await expect(thumbnail).toBeVisible();
+    await expect(thumbnail).toHaveAttribute('src', /^data:image\/svg\+xml;base64,/);
   });
 
   test('shows grouped hierarchy, toggles collapse, opens properties from layers, and persists group opacity edits', async ({

@@ -9,6 +9,7 @@ import prettier from 'eslint-config-prettier';
 export default tseslint.config(
   {
     ignores: [
+      '.claude/**',
       'dist',
       'coverage',
       'playwright-report',

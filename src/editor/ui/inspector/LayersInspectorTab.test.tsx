@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createGroupNode,
+  createImageItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -112,6 +113,37 @@ describe('LayersInspectorTab', () => {
     );
 
     expect(onBackgroundChange).toHaveBeenCalledWith('#11223344');
+  });
+
+  it('renders an image thumbnail preview for image rows instead of the fallback glyph', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([item])}
+        onBackgroundChange={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    const preview = screen.getByTestId(`layers-preview-anchor-${item.id}`);
+    const thumbnail = screen.getByTestId(`layers-thumbnail-${item.id}`);
+
+    expect(thumbnail).toHaveAttribute('src', item.src);
+    expect(preview).not.toHaveTextContent('▣');
   });
 
   it('toggles group disclosure inline and allows selecting child rows from layers', async () => {

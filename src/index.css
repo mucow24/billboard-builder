@@ -1911,6 +1911,14 @@ button {
   transform-origin: center;
 }
 
+.layer-row-type-image .layer-row-thumbnail {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
 .layer-row-copy.compact.richer {
   display: inline-flex;
   flex-direction: row;

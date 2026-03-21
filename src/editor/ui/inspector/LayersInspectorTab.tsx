@@ -195,8 +195,10 @@ export function LayersInspectorTab({
                 : isCanvasItemNode(row.node)
                   ? getLayerPrimaryLabel(row.node)
                   : row.node.name;
+              const imagePreviewItem =
+                isCanvasItemNode(row.node) && row.node.kind === 'image' ? row.node : null;
               const rowGlyph =
-                isCanvasItemNode(row.node) && row.node.kind === 'image'
+                isCanvasItemNode(row.node) && !imagePreviewItem
                   ? getItemGlyph(row.node.kind)
                   : null;
               const rowPreviewStyle = isCanvasItemNode(row.node)
@@ -269,7 +271,17 @@ export function LayersInspectorTab({
                         aria-hidden="true"
                         style={rowPreviewStyle}
                       >
-                        {rowGlyph}
+                        {imagePreviewItem ? (
+                          <img
+                            className="layer-row-thumbnail"
+                            data-testid={`layers-thumbnail-${row.node.id}`}
+                            src={imagePreviewItem.src}
+                            alt=""
+                            draggable={false}
+                          />
+                        ) : (
+                          rowGlyph
+                        )}
                       </span>
                     )}
                     <span
