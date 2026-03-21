@@ -60,6 +60,7 @@ describe('ColorPickerControl', () => {
     await user.type(input, '#abcdef33{Enter}');
 
     expect(onChange).toHaveBeenCalledWith('#abcdef33');
+    expect(screen.queryByLabelText('Fill hex')).not.toBeInTheDocument();
   });
 
   it('reverts invalid hex input on blur', async () => {
@@ -78,7 +79,7 @@ describe('ColorPickerControl', () => {
     fireEvent.blur(input);
 
     expect(onChange).not.toHaveBeenCalled();
-    expect(input).toHaveValue('#33669980');
+    expect(screen.queryByLabelText('Fill hex')).not.toBeInTheDocument();
   });
 
   it('updates the stored color from the HSL sliders', async () => {
@@ -129,5 +130,22 @@ describe('ColorPickerControl', () => {
 
     await user.click(trigger);
     expect(screen.getByLabelText('Canvas background hex')).toHaveValue('#33669980');
+  });
+
+  it('closes the picker when clicking outside the control', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <div>
+        <ColorPickerControl label="Fill" value="#33669980" onChange={vi.fn()} />
+        <button type="button">Outside</button>
+      </div>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /fill/i }));
+    expect(screen.getByLabelText('Fill hex')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Outside' }));
+    expect(screen.queryByLabelText('Fill hex')).not.toBeInTheDocument();
   });
 });

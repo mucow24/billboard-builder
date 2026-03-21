@@ -325,9 +325,11 @@ describe('App shell', () => {
 
     render(<App />);
 
-    expect(await screen.findByText('Mixed')).toBeInTheDocument();
-    const opacityInput = await screen.findByLabelText('Opacity');
-    fireEvent.change(opacityInput, { target: { value: '0.5' } });
+    expect((await screen.findAllByText('Mixed')).length).toBeGreaterThan(0);
+    const opacityInputs = await screen.findAllByLabelText('Opacity', { selector: 'input' });
+    const opacityInput = opacityInputs.find((input) => !input.closest('[hidden]'));
+    expect(opacityInput).toBeDefined();
+    fireEvent.change(opacityInput as HTMLInputElement, { target: { value: '0.5' } });
 
     const updatedItems = useEditorStore.getState().editor.document.items;
     expect(updatedItems.find((item) => item.id === first.id)?.opacity).toBe(0.5);

@@ -193,6 +193,10 @@ test.describe('editor properties flows', () => {
     await page.getByRole('button', { name: /Geometry/ }).click();
     await page.getByRole('spinbutton', { name: 'X' }).fill('260');
     await page.getByRole('spinbutton', { name: 'Rotation' }).fill('18');
+    await page.getByRole('button', { name: /Geometry/ }).click();
+    await expect(page.getByRole('spinbutton', { name: 'X' })).toBeHidden();
+    await page.getByRole('button', { name: /Geometry/ }).click();
+    await expect(page.getByRole('spinbutton', { name: 'X' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Shadow' }).click();
     await page.getByRole('button', { name: 'Shadow color' }).click();

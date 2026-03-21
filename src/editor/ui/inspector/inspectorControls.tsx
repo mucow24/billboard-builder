@@ -42,18 +42,36 @@ export function FieldShell({
   children,
   hint,
   label,
+  layout = 'inline',
 }: {
   children: ReactNode;
   hint?: string;
   label: string;
+  layout?: 'inline' | 'stacked';
 }) {
-  return (
-    <div className="inspector-field">
-      <div className="inspector-field-header">
-        <span className="inspector-field-label">{label}</span>
-        {hint ? <span className="inspector-field-hint">{hint}</span> : null}
+  if (layout === 'stacked') {
+    return (
+      <div className="inspector-field inspector-field-stacked">
+        <div className="inspector-field-header">
+          <span className="inspector-field-label">{label}</span>
+          {hint ? <span className="inspector-field-hint">{hint}</span> : null}
+        </div>
+        {children}
       </div>
-      {children}
+    );
+  }
+
+  return (
+    <div className="inspector-field inspector-field-inline">
+      <div className="inspector-field-inline-copy">
+        <div className="inspector-field-header">
+          <span className="inspector-field-label">{label}:</span>
+          {hint ? <span className="inspector-field-hint">{hint}</span> : null}
+        </div>
+      </div>
+      <div className="inspector-field-inline-control">
+        {children}
+      </div>
     </div>
   );
 }
@@ -172,7 +190,7 @@ export function SectionBlock({
   const sectionId = useId();
 
   return (
-    <section className="property-block">
+    <section className={expanded ? 'property-block expanded' : 'property-block collapsed'}>
       <button
         type="button"
         className="property-block-toggle"
@@ -185,11 +203,13 @@ export function SectionBlock({
           {expanded ? '▾' : '▸'}
         </span>
       </button>
-      {expanded ? (
-        <div id={sectionId} className="property-block-body">
-          {children}
-        </div>
-      ) : null}
+      <div
+        id={sectionId}
+        className={expanded ? 'property-block-body' : 'property-block-body hidden'}
+        hidden={!expanded}
+      >
+        {children}
+      </div>
     </section>
   );
 }
@@ -215,7 +235,11 @@ export function TextInput({
   const displayedValue = value ?? '';
 
   return (
-    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+    <FieldShell
+      hint={mixed ? 'Mixed' : undefined}
+      label={label}
+      layout={multiline ? 'stacked' : 'inline'}
+    >
       {multiline ? (
         <textarea
           aria-label={label}
@@ -266,8 +290,9 @@ export function CheckboxInput({
 
   return (
     <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
-      <label className="checkbox-row compact-checkbox-row inspector-checkbox-field">
+      <div className="inspector-checkbox-control">
         <input
+          className="inspector-checkbox-input"
           ref={inputRef}
           aria-label={label}
           checked={mixed ? false : Boolean(checked)}
@@ -275,8 +300,7 @@ export function CheckboxInput({
           type="checkbox"
           onChange={(event) => onChange(event.target.checked)}
         />
-        {label}
-      </label>
+      </div>
     </FieldShell>
   );
 }

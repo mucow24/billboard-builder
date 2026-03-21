@@ -40,7 +40,6 @@ export function renderBoldField({ field, onCommit }: CustomFieldRenderProps) {
       <span className="inspector-toggle-button-glyph" aria-hidden="true">
         <strong>B</strong>
       </span>
-      <span>Bold</span>
     </ToggleButtonInput>
   );
 }
@@ -57,7 +56,6 @@ export function renderItalicField({ field, onCommit }: CustomFieldRenderProps) {
       <span className="inspector-toggle-button-glyph" aria-hidden="true">
         <em>I</em>
       </span>
-      <span>Italic</span>
     </ToggleButtonInput>
   );
 }

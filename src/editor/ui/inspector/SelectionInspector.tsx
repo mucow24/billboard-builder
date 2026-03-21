@@ -12,6 +12,7 @@ import {
 import type { SelectionInspectorProps } from './types';
 import {
   CheckboxInput,
+  FieldShell,
   NumberInput,
   SectionBlock,
   SelectInput,
@@ -94,21 +95,19 @@ function FieldRenderer({
       );
     case 'color':
       return (
-        <div className="inspector-field">
-          {field.state.isMixed ? (
-            <div className="inspector-field-header">
-              <span className="inspector-field-label">{field.descriptor.label}</span>
-              <span className="inspector-field-hint">Mixed</span>
-            </div>
-          ) : null}
+        <FieldShell
+          hint={field.state.isMixed ? 'Mixed' : undefined}
+          label={field.descriptor.label}
+        >
           <ColorPickerControl
             disabled={field.disabled}
             label={field.descriptor.label}
             mixed={field.state.isMixed}
             value={String(field.state.firstValue ?? '#000000')}
+            variant="compact"
             onChange={commitValue}
           />
-        </div>
+        </FieldShell>
       );
     case 'select':
       return (
@@ -147,7 +146,7 @@ export function SelectionInspector({
 
   if (selectedGroup && !isMultiNodeSelection) {
     return (
-      <>
+      <div className="selection-inspector">
         <SectionBlock title="Group">
           <NumberInput
             label="Group Opacity"
@@ -160,13 +159,13 @@ export function SelectionInspector({
             onChange={onGroupOpacityChange}
           />
         </SectionBlock>
-      </>
+      </div>
     );
   }
 
   if (!selectedItem && selectedItems.length === 0) {
     return (
-      <>
+      <div className="selection-inspector">
         <section className="empty-panel-inner">
           <span className="eyebrow">Nothing selected</span>
           <p>Select an item to edit it, or choose a tool and drag a new item onto the canvas.</p>
@@ -174,7 +173,7 @@ export function SelectionInspector({
             <p>{availableFonts.length} uploaded font(s) ready in this session.</p>
           ) : null}
         </section>
-      </>
+      </div>
     );
   }
 
@@ -182,19 +181,23 @@ export function SelectionInspector({
   const primaryItem = selectedItem ?? selectedItems[0];
 
   return (
-    <>
+    <div className="selection-inspector">
       {isMultiSelection ? (
-        <SelectionHeading
-          kind="◎"
-          subtitle="Multi-selection"
-          title={`${selectedItems.length} items selected`}
-        />
+        <div className="selection-inspector-header">
+          <SelectionHeading
+            kind="◎"
+            subtitle="Multi-selection"
+            title={`${selectedItems.length} items selected`}
+          />
+        </div>
       ) : primaryItem ? (
-        <SelectionHeading
-          kind={getItemGlyph(primaryItem.kind)}
-          subtitle={primaryItem.name || primaryItem.kind}
-          title={getLayerPrimaryLabel(primaryItem)}
-        />
+        <div className="selection-inspector-header">
+          <SelectionHeading
+            kind={getItemGlyph(primaryItem.kind)}
+            subtitle={primaryItem.name || primaryItem.kind}
+            title={getLayerPrimaryLabel(primaryItem)}
+          />
+        </div>
       ) : null}
 
       {sections.length === 0 && isMultiSelection ? (
@@ -203,28 +206,30 @@ export function SelectionInspector({
         </section>
       ) : null}
 
-      {sections.map((section) => (
-        <SectionBlock
-          key={section.key}
-          defaultExpanded={
-            section.key !== 'advancedText' &&
-            section.key !== 'geometry' &&
-            section.key !== 'shadow'
-          }
-          title={section.label}
-        >
-          <div className="inspector-section-fields">
-            {section.fields.map((field) => (
-              <div
-                key={field.key}
-                className={field.disabled ? 'inspector-field-shell disabled' : 'inspector-field-shell'}
-              >
-                <FieldRenderer field={field} onItemChange={onItemChange} />
-              </div>
-            ))}
-          </div>
-        </SectionBlock>
-      ))}
-    </>
+      <div className="selection-inspector-sections">
+        {sections.map((section) => (
+          <SectionBlock
+            key={section.key}
+            defaultExpanded={
+              section.key !== 'advancedText' &&
+              section.key !== 'geometry' &&
+              section.key !== 'shadow'
+            }
+            title={section.label}
+          >
+            <div className="inspector-section-fields">
+              {section.fields.map((field) => (
+                <div
+                  key={field.key}
+                  className={field.disabled ? 'inspector-field-shell disabled' : 'inspector-field-shell'}
+                >
+                  <FieldRenderer field={field} onItemChange={onItemChange} />
+                </div>
+              ))}
+            </div>
+          </SectionBlock>
+        ))}
+      </div>
+    </div>
   );
 }

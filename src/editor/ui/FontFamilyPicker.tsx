@@ -185,7 +185,7 @@ export function FontFamilyPicker({
   return (
     <div
       ref={rootRef}
-      className="font-family-picker"
+      className={isOpen ? 'font-family-picker open' : 'font-family-picker'}
       data-editor-interactive="true"
     >
       <button
@@ -203,11 +203,13 @@ export function FontFamilyPicker({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         aria-labelledby={labelId}
-        className={
-          mixed
-            ? 'font-family-picker-trigger font-family-picker-trigger-mixed'
-            : 'font-family-picker-trigger'
-        }
+        className={[
+          'font-family-picker-trigger',
+          mixed ? 'font-family-picker-trigger-mixed' : '',
+          isOpen ? 'font-family-picker-trigger-open' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         disabled={disabled}
         data-testid="font-family-picker-trigger"
         style={{

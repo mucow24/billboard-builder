@@ -102,6 +102,8 @@ describe('SelectionInspector', () => {
     expect(screen.getByRole('button', { name: 'Next font' })).toBeInTheDocument();
     expect(screen.getByLabelText('Bold')).toBeDisabled();
     expect(screen.getByLabelText('Italic')).toBeEnabled();
+    expect(screen.getByLabelText('Size').closest('.inspector-field-inline')).not.toBeNull();
+    expect(screen.getByLabelText('Text content').closest('.inspector-field-stacked')).not.toBeNull();
 
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Headline' },
@@ -174,6 +176,42 @@ describe('SelectionInspector', () => {
     expect(onItemChange.mock.calls[1]?.[0](textItem)).toEqual({
       fontFamily: 'Trebuchet MS',
     });
+  });
+
+  it('collapses and re-expands section bodies without removing them from the DOM', async () => {
+    const user = userEvent.setup();
+    const rectangleItem = createRectangleItem({
+      x: 120,
+      y: 160,
+      width: 180,
+      height: 110,
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={rectangleItem}
+        selectedNodeCount={1}
+        selectedItems={[rectangleItem]}
+      />
+    );
+
+    const geometryToggle = screen.getByRole('button', { name: 'Geometry' });
+    const xField = screen.getByRole('spinbutton', { hidden: true, name: 'X' });
+
+    expect(geometryToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(xField).not.toBeVisible();
+
+    await user.click(geometryToggle);
+    expect(geometryToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(xField).toBeVisible();
+
+    await user.click(geometryToggle);
+    expect(geometryToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(xField).not.toBeVisible();
   });
 
   it('renders line and image descriptor fields and keeps nested patches per item', async () => {

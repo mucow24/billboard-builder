@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { Wheel, type ColorResult } from '@uiw/react-color';
 
@@ -33,6 +33,7 @@ export function ColorPickerControl({
   variant = 'default',
 }: ColorPickerControlProps) {
   const panelId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const storedValue = toStoredHexColor(value);
   const hsva = hexColorToHsva(storedValue);
   const hsla = hexColorToHsla(storedValue);
@@ -43,15 +44,37 @@ export function ColorPickerControl({
     setDraftHex(storedValue);
   }, [storedValue]);
 
-  function commitDraftHex() {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!(event.target instanceof Node) || rootRef.current?.contains(event.target)) {
+        return;
+      }
+      setIsOpen(false);
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [isOpen]);
+
+  function commitDraftHex(closeAfterCommit = false) {
     const committedValue = commitHexColorInput(draftHex, hsva.a);
     if (!committedValue) {
       setDraftHex(storedValue);
+      if (closeAfterCommit) {
+        setIsOpen(false);
+      }
       return;
     }
     setDraftHex(committedValue);
     if (committedValue !== storedValue) {
       onChange(committedValue);
+    }
+    if (closeAfterCommit) {
+      setIsOpen(false);
     }
   }
 
@@ -78,6 +101,7 @@ export function ColorPickerControl({
 
   return (
     <div
+      ref={rootRef}
       className={[
         variant === 'compact'
           ? 'color-picker-control color-picker-control-compact'
@@ -130,6 +154,11 @@ export function ColorPickerControl({
               : 'color-picker-panel'
           }
           id={panelId}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
         >
           <div className="color-picker-wheel">
             <Wheel
@@ -147,16 +176,17 @@ export function ColorPickerControl({
               spellCheck={false}
               type="text"
               value={draftHex}
-              onBlur={commitDraftHex}
+              onBlur={() => commitDraftHex(true)}
               onChange={(event) => setDraftHex(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  commitDraftHex();
+                  commitDraftHex(true);
                 }
                 if (event.key === 'Escape') {
                   event.preventDefault();
                   setDraftHex(storedValue);
+                  setIsOpen(false);
                 }
               }}
             />
