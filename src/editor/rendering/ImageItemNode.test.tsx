@@ -200,4 +200,44 @@ describe('ImageItemNode', () => {
       JSON.stringify(item.crop),
     );
   });
+
+  it('refreshes the Konva image when the crop rectangle changes', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+    const image = document.createElement('img');
+
+    const { rerender } = render(
+      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+    );
+
+    Object.values(mockKonvaImageNode).forEach((value) => {
+      if (typeof value === 'function') {
+        value.mockClear();
+      }
+    });
+    mockBatchDraw.mockClear();
+
+    rerender(
+      <ImageItemNode
+        item={{
+          ...item,
+          crop: {
+            x: 4,
+            y: 2,
+            width: 24,
+            height: 12,
+          },
+        }}
+        image={image}
+        renderBox={{ x: 0, y: 0, width: 40, height: 20 }}
+      />,
+    );
+
+    expect(mockBatchDraw).toHaveBeenCalledTimes(1);
+    expect(mockKonvaImageNode.clearCache).toHaveBeenCalled();
+  });
 });

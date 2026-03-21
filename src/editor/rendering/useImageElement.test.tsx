@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useImageElement } from './useImageElement';
+import { resetImageElementCacheForTests, useImageElement } from './useImageElement';
 
 class MockImage {
   static instances: MockImage[] = [];
@@ -34,6 +34,7 @@ class MockImage {
 describe('useImageElement', () => {
   beforeEach(() => {
     MockImage.instances = [];
+    resetImageElementCacheForTests();
     vi.stubGlobal('Image', MockImage);
   });
 
@@ -55,7 +56,7 @@ describe('useImageElement', () => {
     });
   });
 
-  it('resets to null while the hook swaps to a new image source', async () => {
+  it('resets to null while the hook swaps to a new uncached image source', async () => {
     const { result, rerender } = renderHook(
       ({ src }) => useImageElement(src),
       { initialProps: { src: '/first.png' } }
@@ -79,6 +80,25 @@ describe('useImageElement', () => {
     await vi.waitFor(() => {
       expect(result.current).toBe(MockImage.instances[1]);
     });
+  });
+
+  it('reuses a cached image synchronously when the same source remounts', async () => {
+    const firstMount = renderHook(() => useImageElement('/poster.png'));
+
+    act(() => {
+      MockImage.instances[0].triggerLoad();
+    });
+
+    await vi.waitFor(() => {
+      expect(firstMount.result.current).toBe(MockImage.instances[0]);
+    });
+
+    firstMount.unmount();
+
+    const secondMount = renderHook(() => useImageElement('/poster.png'));
+
+    expect(secondMount.result.current).toBe(MockImage.instances[0]);
+    expect(MockImage.instances).toHaveLength(1);
   });
 
   it('keeps returning null after an image load failure', async () => {

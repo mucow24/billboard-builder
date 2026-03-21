@@ -43,7 +43,16 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
     return () => {
       node.clearCache();
     };
-  }, [adjustments, image, renderBox.width, renderBox.height]);
+  }, [
+    adjustments,
+    image,
+    item.crop.height,
+    item.crop.width,
+    item.crop.x,
+    item.crop.y,
+    renderBox.width,
+    renderBox.height,
+  ]);
 
   return (
     <KonvaImage

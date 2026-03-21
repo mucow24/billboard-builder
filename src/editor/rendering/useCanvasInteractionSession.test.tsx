@@ -1586,6 +1586,30 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
+  it('enters crop mode from a selected image double-click without requiring custom pointer cadence samples', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+    });
+    image.id = 'selected-image';
+    const params = createHookParams({
+      document: createDocument([image]),
+      selectedItemIds: [image.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+
+    expect(result.current.cropSession).toMatchObject({
+      itemId: image.id,
+      crop: image.crop,
+    });
+  });
+
   it('cancels crop mode on Escape before selection-climb behavior can run', () => {
     const image = createImageItem({
       src: 'data:image/png;base64,AAA',

@@ -44,6 +44,32 @@ async function expectCropMode(page: Page) {
 }
 
 test.describe('editor image crop', () => {
+  test('double-clicking an unselected image enters crop mode in one browser gesture', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'one-gesture-image',
+      name: 'One Gesture Image',
+      x: 520,
+      y: 320,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-one-gesture.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row.active')).toHaveCount(0);
+
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+
+    const cropSession = await expectCropMode(page);
+    expect(cropSession.previewItem.width).toBeGreaterThan(0);
+    await openLayersTab(page);
+    await expectActiveLayerId(page, 'one-gesture-image');
+  });
+
   test('grouped image double-click drills in before a selected-image double-click enters crop mode', async ({
     page,
   }) => {

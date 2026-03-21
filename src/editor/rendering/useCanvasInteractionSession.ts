@@ -89,15 +89,6 @@ interface HandledItemPointerEvent {
   selectionNodeId: string;
 }
 
-interface PointerClickSample {
-  itemId: string;
-  selectionNodeId: string;
-  recordedAtMs: number;
-  clientX: number;
-  clientY: number;
-  button: number;
-}
-
 interface StageDescendantClickSample {
   groupId: string;
   itemId: string;
@@ -200,8 +191,6 @@ export function useCanvasInteractionSession({
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
   const pendingPickupDragRef = useRef<PendingPickupDrag | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
-  const latestItemPointerClickRef = useRef<PointerClickSample | null>(null);
-  const previousItemPointerClickRef = useRef<PointerClickSample | null>(null);
   const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
   const [cropSession, setCropSession] = useState<ImageCropSessionState | null>(null);
@@ -966,16 +955,6 @@ export function useCanvasInteractionSession({
     nativeEvent?: MouseEvent,
   ) => {
     if (nativeEvent) {
-      const recordedAtMs = Date.now();
-      previousItemPointerClickRef.current = latestItemPointerClickRef.current;
-      latestItemPointerClickRef.current = {
-        itemId: item.id,
-        selectionNodeId,
-        recordedAtMs,
-        clientX: nativeEvent.clientX,
-        clientY: nativeEvent.clientY,
-        button: nativeEvent.button,
-      };
       lastHandledItemPointerEventRef.current = {
         nativeEvent,
         timeStamp: nativeEvent.timeStamp,
@@ -1061,22 +1040,6 @@ export function useCanvasInteractionSession({
 
   const handleItemDoubleClick = useCallback((item: CanvasItem) => {
     if (cropSessionRef.current) {
-      return;
-    }
-    const latestClick = latestItemPointerClickRef.current;
-    const previousClick = previousItemPointerClickRef.current;
-    if (!latestClick || !previousClick) {
-      return;
-    }
-    const pointerDelta = Math.hypot(
-      latestClick.clientX - previousClick.clientX,
-      latestClick.clientY - previousClick.clientY,
-    );
-    const withinTimeWindow =
-      latestClick.recordedAtMs - previousClick.recordedAtMs <= GROUP_DRILL_DOUBLE_CLICK_MS;
-    const sameItem = latestClick.itemId === item.id && previousClick.itemId === item.id;
-    const isPrimaryButton = latestClick.button === 0 && previousClick.button === 0;
-    if (!(withinTimeWindow && sameItem && isPrimaryButton && pointerDelta <= GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA)) {
       return;
     }
     if (selectedItemIds.length !== 1) {
