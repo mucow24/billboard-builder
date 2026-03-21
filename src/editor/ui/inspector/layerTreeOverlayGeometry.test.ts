@@ -45,7 +45,7 @@ describe('layerTreeOverlayGeometry', () => {
         x2: 22,
         y2: 62,
       },
-      { kind: 'trunk', parentNodeId: 'nested-group', x1: 30, y1: 69, x2: 30, y2: 86 },
+      { kind: 'trunk', parentNodeId: 'nested-group', x1: 30, y1: 62, x2: 30, y2: 86 },
       {
         childNodeId: 'nested-leaf',
         kind: 'branch',

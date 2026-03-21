@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   beginCanvasHookDrag,
@@ -22,6 +22,105 @@ import {
   setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
+
+async function seedMockTemplates(page: Page) {
+  await page.addInitScript(() => {
+    const timestamp = '2026-03-20T12:00:00.000Z';
+    window.localStorage.setItem(
+      'billboard-builder:templates:v1',
+      JSON.stringify({
+        version: 1,
+        templates: [
+          {
+            id: 'mock-template-1',
+            name: 'Mock Template 1',
+            nodes: [],
+            fonts: [],
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+          {
+            id: 'mock-template-2',
+            name: 'Mock Template 2',
+            nodes: [],
+            fonts: [],
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ],
+      }),
+    );
+  });
+}
+
+async function prepareLayersPanelMockParity(page: Page) {
+  await seedMockTemplates(page);
+  await openFreshEditor(page);
+  await uploadProject(page, createLayersPanelMockParityFixture(), 'layers-panel-mock-parity.json');
+
+  await openLayersTab(page);
+  await clickLayerRow(page, 'Hero Group');
+  await page.getByRole('button', { name: 'Collapse Legal' }).click();
+}
+
+async function getLayersPanelRailBounds(page: Page) {
+  const railBounds = await page.getByTestId('layers-panel-rail').boundingBox();
+  if (!railBounds) {
+    throw new Error('Expected the layers panel rail to have a bounding box.');
+  }
+  return railBounds;
+}
+
+async function readLayersTreeGeometry(page: Page) {
+  return page.evaluate(() => {
+    function readAnchorMetric(nodeId: string) {
+      const anchor = document.querySelector<HTMLElement>(`[data-testid="layers-preview-anchor-${nodeId}"]`);
+      const list = document.querySelector<HTMLElement>('[data-testid="layers-layer-list"]');
+      if (!anchor || !list) {
+        throw new Error(`Expected anchor metric elements for ${nodeId}.`);
+      }
+      const anchorRect = anchor.getBoundingClientRect();
+      const listRect = list.getBoundingClientRect();
+      const left = Math.round(anchorRect.left - listRect.left + list.scrollLeft);
+      const top = Math.round(anchorRect.top - listRect.top + list.scrollTop);
+      return {
+        centerY: top + Math.round(anchorRect.height / 2),
+        bottomY: top + Math.round(anchorRect.height),
+        entryX: left,
+      };
+    }
+
+    function readLineMetric(testId: string) {
+      const line = document.querySelector<SVGLineElement>(`[data-testid="${testId}"]`);
+      if (!line) {
+        throw new Error(`Expected overlay line ${testId}.`);
+      }
+      return {
+        x1: Number(line.getAttribute('x1')),
+        y1: Number(line.getAttribute('y1')),
+        x2: Number(line.getAttribute('x2')),
+        y2: Number(line.getAttribute('y2')),
+      };
+    }
+
+    return {
+      anchors: {
+        heroGroup: readAnchorMetric('hero-group'),
+        detailsCluster: readAnchorMetric('details-cluster'),
+        heroText: readAnchorMetric('hero-text'),
+        detailsText: readAnchorMetric('details-text'),
+        heroLine: readAnchorMetric('hero-line'),
+      },
+      lines: {
+        heroDetailsBranch: readLineMetric('layers-tree-branch-hero-group-details-cluster'),
+        detailsTrunk: readLineMetric('layers-tree-trunk-details-cluster'),
+        heroTextBranch: readLineMetric('layers-tree-branch-hero-group-hero-text'),
+        detailsTextBranch: readLineMetric('layers-tree-branch-details-cluster-details-text'),
+        heroLineBranch: readLineMetric('layers-tree-branch-hero-group-hero-line'),
+      },
+    };
+  });
+}
 
 test.describe('editor visual regression', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Visual snapshots run only on Chromium.');
@@ -77,48 +176,8 @@ test.describe('editor visual regression', () => {
     });
 
     test('captures the layers panel mock parity rail', async ({ page }) => {
-      await page.addInitScript(() => {
-        const timestamp = '2026-03-20T12:00:00.000Z';
-        window.localStorage.setItem(
-          'billboard-builder:templates:v1',
-          JSON.stringify({
-            version: 1,
-            templates: [
-              {
-                id: 'mock-template-1',
-                name: 'Mock Template 1',
-                nodes: [],
-                fonts: [],
-                createdAt: timestamp,
-                updatedAt: timestamp,
-              },
-              {
-                id: 'mock-template-2',
-                name: 'Mock Template 2',
-                nodes: [],
-                fonts: [],
-                createdAt: timestamp,
-                updatedAt: timestamp,
-              },
-            ],
-          }),
-        );
-      });
-      await openFreshEditor(page);
-      await uploadProject(
-        page,
-        createLayersPanelMockParityFixture(),
-        'layers-panel-mock-parity.json',
-      );
-
-      await openLayersTab(page);
-      await clickLayerRow(page, 'Hero Group');
-      await page.getByRole('button', { name: 'Collapse Legal' }).click();
-
-      const railBounds = await page.getByTestId('layers-panel-rail').boundingBox();
-      if (!railBounds) {
-        throw new Error('Expected the layers panel rail to have a bounding box.');
-      }
+      await prepareLayersPanelMockParity(page);
+      const railBounds = await getLayersPanelRailBounds(page);
 
       const screenshot = await page.screenshot({
         clip: {
@@ -131,6 +190,36 @@ test.describe('editor visual regression', () => {
       });
 
       expect(screenshot).toMatchSnapshot('layers-panel-mock-parity.png');
+    });
+
+    test('captures the layers panel mock parity tree region', async ({ page }) => {
+      await prepareLayersPanelMockParity(page);
+      const railBounds = await getLayersPanelRailBounds(page);
+
+      const screenshot = await page.screenshot({
+        clip: {
+          x: railBounds.x,
+          y: railBounds.y + 85,
+          width: 317,
+          height: 260,
+        },
+        scale: 'device',
+      });
+
+      expect(screenshot).toMatchSnapshot('layers-panel-mock-tree-parity.png');
+    });
+
+    test('keeps nested group trunks continuous with the incoming branch junction', async ({
+      page,
+    }) => {
+      await prepareLayersPanelMockParity(page);
+      const geometry = await readLayersTreeGeometry(page);
+
+      expect(geometry.lines.heroTextBranch.y1).toBe(geometry.anchors.heroText.centerY);
+      expect(geometry.lines.heroDetailsBranch.y1).toBe(geometry.anchors.detailsCluster.centerY);
+      expect(geometry.lines.detailsTrunk.y1).toBe(geometry.lines.heroDetailsBranch.y1);
+      expect(geometry.lines.detailsTextBranch.y1).toBe(geometry.anchors.detailsText.centerY);
+      expect(geometry.lines.heroLineBranch.y1).toBe(geometry.anchors.heroLine.centerY);
     });
   });
 

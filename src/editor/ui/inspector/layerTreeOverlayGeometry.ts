@@ -50,7 +50,9 @@ export function buildLayerTreeOverlaySegments(
       kind: 'trunk',
       parentNodeId: row.node.id,
       x1: parentMetric.anchorX,
-      y1: parentMetric.bottomY,
+      // Nested group trunks should continue through the incoming parent
+      // branch junction rather than starting below it.
+      y1: row.depth > 0 ? parentMetric.centerY : parentMetric.bottomY,
       x2: parentMetric.anchorX,
       y2: lastChildMetric.centerY,
     });
