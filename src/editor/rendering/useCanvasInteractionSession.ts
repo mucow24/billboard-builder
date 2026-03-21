@@ -1042,17 +1042,33 @@ export function useCanvasInteractionSession({
     if (cropSessionRef.current) {
       return;
     }
-    if (selectedItemIds.length !== 1) {
+    const latestHandledItemEvent = lastHandledItemPointerEventRef.current;
+    const currentSelectedNodeId = selectedItemIds.length === 1 ? selectedItemIds[0] : null;
+    const currentSelectionDrillTarget = currentSelectedNodeId
+      ? getNextDrilldownNodeId(document.nodes, currentSelectedNodeId, item.id)
+      : null;
+    const directItemHitNodeId =
+      latestHandledItemEvent &&
+      latestHandledItemEvent.itemId === item.id &&
+      latestHandledItemEvent.selectionNodeId === item.id
+        ? item.id
+        : null;
+    const effectiveSelectedNodeId =
+      currentSelectedNodeId &&
+      (currentSelectedNodeId === item.id || currentSelectionDrillTarget)
+        ? currentSelectedNodeId
+        : directItemHitNodeId;
+    if (!effectiveSelectedNodeId) {
       return;
     }
-    const nextNodeId = getNextDrilldownNodeId(document.nodes, selectedItemIds[0], item.id);
-    if (nextNodeId && nextNodeId !== selectedItemIds[0]) {
+    const nextNodeId = getNextDrilldownNodeId(document.nodes, effectiveSelectedNodeId, item.id);
+    if (nextNodeId && nextNodeId !== effectiveSelectedNodeId) {
       setLastDrilldownSource('item-hit');
       onSelectItem(nextNodeId);
       return;
     }
     if (
-      selectedItemIds[0] === item.id &&
+      effectiveSelectedNodeId === item.id &&
       item.kind === 'image' &&
       !item.locked &&
       !item.hidden

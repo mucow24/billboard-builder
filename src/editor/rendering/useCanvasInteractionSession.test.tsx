@@ -1610,6 +1610,40 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
+  it('enters crop mode when a direct image double-click outruns the selection rerender', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+    });
+    image.id = 'stale-selection-image';
+    const params = createHookParams({
+      document: createDocument([image]),
+      selectedItemIds: [],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(
+        image,
+        image.id,
+        { x: 140, y: 140 },
+        false,
+        new MouseEvent('mousedown', { button: 0, clientX: 140, clientY: 140 }),
+      );
+    });
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+
+    expect(params.onSelectItem).toHaveBeenCalledWith(image.id);
+    expect(result.current.cropSession).toMatchObject({
+      itemId: image.id,
+      crop: image.crop,
+    });
+  });
+
   it('cancels crop mode on Escape before selection-climb behavior can run', () => {
     const image = createImageItem({
       src: 'data:image/png;base64,AAA',
