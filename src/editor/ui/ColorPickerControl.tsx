@@ -12,7 +12,9 @@ import {
 } from '../ui/colors';
 
 interface ColorPickerControlProps {
+  disabled?: boolean;
   label: string;
+  mixed?: boolean;
   value: string;
   onChange: (value: string) => void;
   variant?: 'default' | 'compact';
@@ -23,7 +25,9 @@ function clampSliderValue(value: number, min: number, max: number): number {
 }
 
 export function ColorPickerControl({
+  disabled = false,
   label,
+  mixed = false,
   value,
   onChange,
   variant = 'default',
@@ -86,16 +90,21 @@ export function ColorPickerControl({
         aria-label={label}
         className={
           variant === 'compact'
-            ? 'color-picker-trigger color-picker-trigger-compact'
-            : 'color-picker-trigger'
+          ? 'color-picker-trigger color-picker-trigger-compact'
+          : 'color-picker-trigger'
         }
         type="button"
+        disabled={disabled}
         onClick={() => setIsOpen((open) => !open)}
       >
         <span className="color-picker-swatch" aria-hidden="true">
           <span
             className="color-picker-swatch-fill"
-            style={{ backgroundColor: storedValue }}
+            style={{
+              background: mixed
+                ? 'linear-gradient(135deg, rgba(110, 126, 153, 0.28), rgba(12, 18, 32, 0.96))'
+                : storedValue,
+            }}
           />
         </span>
         {variant === 'compact' ? (
@@ -103,12 +112,14 @@ export function ColorPickerControl({
         ) : (
           <span className="color-picker-trigger-copy">
             <span className="color-picker-trigger-label">{label}</span>
-            <span className="color-picker-trigger-value">{storedValue}</span>
+            <span className="color-picker-trigger-value">
+              {mixed ? 'Mixed' : storedValue}
+            </span>
           </span>
         )}
       </button>
 
-      {isOpen ? (
+      {isOpen && !disabled ? (
         <div
           className={
             variant === 'compact'

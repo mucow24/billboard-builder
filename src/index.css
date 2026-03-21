@@ -1517,6 +1517,52 @@ button {
   padding-top: 0.3rem;
 }
 
+.inspector-section-fields {
+  display: grid;
+  gap: 0.46rem;
+}
+
+.inspector-field-shell.disabled {
+  opacity: 0.6;
+}
+
+.inspector-field {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.inspector-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.42rem;
+}
+
+.inspector-field-label,
+.inspector-field-hint {
+  color: #aebfdd;
+  font-size: 0.71rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.inspector-field-hint {
+  color: #8fa4c8;
+  text-transform: uppercase;
+}
+
+.inspector-field-control {
+  width: 100%;
+}
+
+.inspector-field .number-input-field {
+  margin-top: 0;
+}
+
+.inspector-checkbox-field {
+  margin-top: 0;
+}
+
 .field-grid.dense-grid,
 .field-grid.two-up-grid {
   gap: 0.42rem;

@@ -59,6 +59,105 @@ test.describe('editor properties flows', () => {
     ]);
   });
 
+  test('PI-04 PI-05 PI-10 PI-11 shows exact shared fields across mixed kinds and applies shared edits', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'shared-rect',
+      name: 'Shared Rectangle',
+      x: 140,
+      y: 160,
+      width: 170,
+      height: 110,
+      fill: '#f97316',
+      shadow: {
+        color: '#111111',
+        blur: 2,
+        offsetX: 3,
+        offsetY: 4,
+        opacity: 0.3,
+      },
+      zIndex: 0,
+    });
+    const text = createTextFixture({
+      id: 'shared-text',
+      name: 'Shared Text',
+      x: 430,
+      y: 170,
+      width: 260,
+      height: 96,
+      fill: '#ffffff',
+      shadow: {
+        color: '#222222',
+        blur: 7,
+        offsetX: 8,
+        offsetY: 9,
+        opacity: 0.6,
+      },
+      zIndex: 1,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([rectangle, text]),
+      'properties-shared-cross-kind.json',
+    );
+
+    await clickCanvas(page, { x: 225, y: 215 });
+    await page.keyboard.down('Shift');
+    await clickCanvas(page, { x: 510, y: 220 });
+    await page.keyboard.up('Shift');
+    await openPropertiesTab(page);
+
+    await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Color' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Geometry' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Shadow' })).toBeVisible();
+    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByLabel('Stroke width')).toHaveCount(0);
+    await expect(page.getByLabel('Font')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Geometry' }).click();
+    await expect(page.getByRole('spinbutton', { name: 'X' })).toBeVisible();
+    await page.getByRole('button', { name: 'Shadow' }).click();
+    await expect(page.getByRole('spinbutton', { name: 'Blur' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Fill' }).click();
+    await page.getByLabel('Fill hex').fill('#33669980');
+    await page.getByLabel('Fill hex').press('Enter');
+    await page.getByRole('spinbutton', { name: 'X', exact: true }).fill('280');
+    await page.getByRole('spinbutton', { name: 'Blur' }).fill('12');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({
+        id: 'shared-rect',
+        fill: '#33669980',
+        x: 280,
+        shadow: expect.objectContaining({
+          color: '#111111',
+          blur: 12,
+          offsetX: 3,
+          offsetY: 4,
+          opacity: 0.3,
+        }),
+      }),
+      expect.objectContaining({
+        id: 'shared-text',
+        fill: '#33669980',
+        x: 280,
+        shadow: expect.objectContaining({
+          color: '#222222',
+          blur: 12,
+          offsetX: 8,
+          offsetY: 9,
+          opacity: 0.6,
+        }),
+      }),
+    ]);
+  });
+
   test('PI-06 PI-10 PI-11 edits text content, font, advanced text, geometry, and shadow through the Properties panel', async ({
     page,
   }) => {
@@ -79,14 +178,11 @@ test.describe('editor properties flows', () => {
 
     await page.getByLabel('Text content').fill('Edited text from Properties');
     await page.getByRole('spinbutton', { name: 'Size' }).fill('1');
-    await page.getByTestId('font-family-picker-trigger').click();
-    await page.getByRole('option', { name: 'Georgia', exact: true }).click();
-    const selectedFont = (await page.getByTestId('font-family-picker-trigger').textContent())?.trim();
-    expect(selectedFont).toBeTruthy();
-    expect(selectedFont).toBe('Georgia');
-    await page.getByRole('button', { name: 'Bold' }).click();
-    await page.getByRole('button', { name: 'Align center' }).click();
-    await page.getByRole('button', { name: 'Align middle' }).click();
+    await page.getByLabel('Font').selectOption('Georgia');
+    await expect(page.getByLabel('Font')).toHaveValue('Georgia');
+    await page.getByLabel('Bold').check();
+    await page.getByLabel('Align', { exact: true }).selectOption('center');
+    await page.getByLabel('Vertical align', { exact: true }).selectOption('middle');
 
     await page.getByRole('button', { name: 'Advanced text' }).click();
     await page.getByRole('spinbutton', { name: 'Line height' }).fill('1.4');
@@ -110,7 +206,7 @@ test.describe('editor properties flows', () => {
         id: 'properties-text',
         text: 'Edited text from Properties',
         fontSize: 1,
-        fontFamily: selectedFont,
+        fontFamily: 'Georgia',
         fontWeight: 'bold',
         align: 'center',
         verticalAlign: 'middle',

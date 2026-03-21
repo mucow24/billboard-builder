@@ -177,12 +177,26 @@ export default function App() {
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onGroupOpacityChange={updateSelectedGroup}
                 onDeleteSelection={deleteSelectedItems}
-                onItemChange={(changes: Partial<CanvasItem>) => {
+                onItemChange={(changes) => {
+                  const resolveChanges = (item: CanvasItem) =>
+                    typeof changes === 'function' ? changes(item) : changes;
+
                   if (selectedItems.length > 1) {
-                    updateSelectedItems(selectedItems.map((item) => ({ itemId: item.id, changes })));
+                    updateSelectedItems(
+                      selectedItems.map((item) => ({
+                        itemId: item.id,
+                        changes: resolveChanges(item),
+                      }))
+                    );
                     return;
                   }
-                  updateSelectedItem(changes);
+
+                  const targetItem = selectedItems[0] ?? selectedItem ?? null;
+                  if (!targetItem) {
+                    return;
+                  }
+
+                  updateSelectedItem(resolveChanges(targetItem));
                 }}
                 onInsertTemplate={insertTemplate}
                 onSelectNode={selectSingleItem}

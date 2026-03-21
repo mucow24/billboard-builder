@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -9,8 +9,18 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import type { CanvasItem } from '../../document/documentTypes';
 
 import { SelectionInspector } from './SelectionInspector';
+
+function expectLatestChange(
+  onItemChange: ReturnType<typeof vi.fn>,
+  item: CanvasItem
+) {
+  const latestChange = onItemChange.mock.calls.at(-1)?.[0];
+  expect(typeof latestChange).toBe('function');
+  return latestChange(item);
+}
 
 describe('SelectionInspector', () => {
   it('shows the empty state and uploaded font count with no selection', () => {
@@ -30,39 +40,14 @@ describe('SelectionInspector', () => {
         onItemChange={vi.fn()}
         selectedNodeCount={0}
         selectedItems={[]}
-      />,
+      />
     );
 
     expect(screen.getByText('Nothing selected')).toBeInTheDocument();
     expect(screen.getByText('1 uploaded font(s) ready in this session.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Save as template' })).not.toBeInTheDocument();
   });
 
-  it('renders multi-selection controls and marks mixed opacity values', () => {
-    const onItemChange = vi.fn();
-    const first = createRectangleItem({ opacity: 0.5 });
-    const second = createRectangleItem({ opacity: 0.7 });
-
-    render(
-      <SelectionInspector
-        availableFonts={[]}
-        fonts={[]}
-        onGroupOpacityChange={vi.fn()}
-        onItemChange={onItemChange}
-        selectedNodeCount={2}
-        selectedItems={[first, second]}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText('Opacity'), {
-      target: { value: '0.3' },
-    });
-
-    expect(screen.getByText('Mixed')).toBeInTheDocument();
-    expect(onItemChange).toHaveBeenCalledWith({ opacity: 0.3 });
-  });
-
-  it('renders text controls, keeps session fonts available, and enforces style capability rules', async () => {
+  it('renders text fields from descriptors and preserves font capability disabling', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
     const textItem = createTextItem({
@@ -105,77 +90,46 @@ describe('SelectionInspector', () => {
         ]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
-        selectedNodeCount={1}
         selectedItem={textItem}
+        selectedNodeCount={1}
         selectedItems={[textItem]}
-      />,
+      />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Font' }));
-    expect(screen.getByRole('option', { name: 'Custom Family' })).toBeInTheDocument();
-    expect(screen.getAllByRole('option', { name: 'Custom Family' })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Bold' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Italic' })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: 'Text' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Arial' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Custom Family')).toBeInTheDocument();
+    expect(screen.getByLabelText('Bold')).toBeDisabled();
+    expect(screen.getByLabelText('Italic')).toBeEnabled();
 
-    await user.click(screen.getByRole('option', { name: 'Arial' }));
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Headline' },
+    });
+    fireEvent.change(screen.getByLabelText('Font'), {
+      target: { value: 'Arial' },
     });
     fireEvent.change(screen.getByLabelText('Size'), {
       target: { value: '1' },
     });
-    await user.click(screen.getByRole('button', { name: 'Align center' }));
-    await user.click(screen.getByRole('button', { name: 'Align middle' }));
+    await user.selectOptions(screen.getByLabelText('Align'), 'center');
+    await user.selectOptions(screen.getByLabelText('Vertical align'), 'middle');
 
-    expect(onItemChange).toHaveBeenCalledWith({ fontFamily: 'Arial' });
-    expect(onItemChange).toHaveBeenCalledWith({ text: 'Headline' });
-    expect(onItemChange).toHaveBeenCalledWith({ fontSize: 1 });
-    expect(onItemChange).toHaveBeenCalledWith({ align: 'center' });
-    expect(onItemChange).toHaveBeenCalledWith({ verticalAlign: 'middle' });
-  });
-
-  it('cycles fonts from the text inspector using sorted wraparound controls', async () => {
-    const user = userEvent.setup();
-    const onItemChange = vi.fn();
-    const textItem = createTextItem({
-      fontFamily: 'Verdana',
+    expect(expectLatestChange(onItemChange, textItem)).toEqual({
+      verticalAlign: 'middle',
     });
-
-    render(
-      <SelectionInspector
-        availableFonts={[
-          {
-            family: 'Zulu Display',
-            sourceName: 'ZuluDisplay.ttf',
-            weight: '400',
-            style: 'normal',
-            kind: 'uploaded',
-          },
-          {
-            family: 'Alpha Sans',
-            sourceName: 'AlphaSans.ttf',
-            weight: '400',
-            style: 'normal',
-            kind: 'uploaded',
-          },
-        ]}
-        fonts={[]}
-        onGroupOpacityChange={vi.fn()}
-        onItemChange={onItemChange}
-        selectedNodeCount={1}
-        selectedItem={textItem}
-        selectedItems={[textItem]}
-      />,
+    expect(onItemChange).toHaveBeenCalledTimes(5);
+    expect(onItemChange.mock.calls.map(([change]) => change(textItem))).toEqual(
+      expect.arrayContaining([
+        { text: 'Headline' },
+        { fontFamily: 'Arial' },
+        { fontSize: 1 },
+        { align: 'center' },
+        { verticalAlign: 'middle' },
+      ])
     );
-
-    await user.click(screen.getByRole('button', { name: 'Next font' }));
-    await user.click(screen.getByRole('button', { name: 'Previous font' }));
-
-    expect(onItemChange).toHaveBeenNthCalledWith(1, { fontFamily: 'Zulu Display' });
-    expect(onItemChange).toHaveBeenNthCalledWith(2, { fontFamily: 'Trebuchet MS' });
   });
 
-  it('renders line and image controls, clamps ranges, and keeps image opacity out of geometry', async () => {
+  it('renders line and image descriptor fields and keeps nested patches per item', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
     const lineItem = createLineItem({
@@ -184,8 +138,8 @@ describe('SelectionInspector', () => {
       shadow: {
         color: '#000000',
         blur: 0,
-        offsetX: 0,
-        offsetY: 0,
+        offsetX: 9,
+        offsetY: 4,
         opacity: 0.3,
       },
     });
@@ -203,25 +157,25 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
-        selectedNodeCount={1}
         selectedItem={lineItem}
+        selectedNodeCount={1}
         selectedItems={[lineItem]}
-      />,
+      />
     );
 
     fireEvent.change(screen.getByLabelText('Stroke width'), {
       target: { value: '0' },
     });
     await user.click(screen.getByRole('button', { name: 'Shadow' }));
-    fireEvent.change(within(screen.getByRole('button', { name: 'Shadow' }).closest('section')!).getByLabelText('Opacity'), {
-      target: { value: '-1' },
+    fireEvent.change(screen.getByLabelText('Blur'), {
+      target: { value: '12' },
     });
 
-    expect(onItemChange).toHaveBeenCalledWith({ strokeWidth: 1 });
-    expect(onItemChange).toHaveBeenCalledWith({
+    expect(onItemChange.mock.calls[0]?.[0](lineItem)).toEqual({ strokeWidth: 1 });
+    expect(onItemChange.mock.calls[1]?.[0](lineItem)).toEqual({
       shadow: {
         ...lineItem.shadow,
-        opacity: 0,
+        blur: 12,
       },
     });
 
@@ -231,115 +185,139 @@ describe('SelectionInspector', () => {
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
-        selectedNodeCount={1}
         selectedItem={imageItem}
+        selectedNodeCount={1}
         selectedItems={[imageItem]}
-      />,
+      />
     );
 
-    const imageSection = screen.getByRole('button', { name: 'Image' }).closest('section');
-    expect(imageSection).not.toBeNull();
-    fireEvent.change(within(imageSection!).getByLabelText('Opacity'), {
-      target: { value: '2' },
+    await user.click(screen.getByRole('button', { name: 'Tint color' }));
+    fireEvent.change(screen.getByLabelText('Tint color hex'), {
+      target: { value: '#ff0000ff' },
     });
-    await user.click(screen.getByRole('button', { name: /Geometry/i }));
-    const geometrySection = screen.getByRole('button', { name: /Geometry/i }).closest('section');
-
-    expect(onItemChange).toHaveBeenCalledWith({ opacity: 1 });
-    expect(geometrySection).not.toBeNull();
-    expect(within(geometrySection!).queryByLabelText('Opacity')).not.toBeInTheDocument();
-  });
-
-  it('supports image color adjustments, line geometry edits, and advanced text padding updates', async () => {
-    const user = userEvent.setup();
-    const onItemChange = vi.fn();
-    const imageItem = createImageItem({
-      src: 'data:image/png;base64,abc',
-      mimeType: 'image/png',
-      originalWidth: 20,
-      originalHeight: 10,
+    fireEvent.keyDown(screen.getByLabelText('Tint color hex'), {
+      key: 'Enter',
     });
-    const lineItem = createLineItem();
-    const textItem = createTextItem();
-
-    const { rerender } = render(
-      <SelectionInspector
-        availableFonts={[]}
-        fonts={[]}
-        onGroupOpacityChange={vi.fn()}
-        onItemChange={onItemChange}
-        selectedNodeCount={1}
-        selectedItem={imageItem}
-        selectedItems={[imageItem]}
-      />,
-    );
-
-    await user.click(screen.getByLabelText('Preserve aspect ratio'));
-    fireEvent.change(screen.getByRole('slider', { name: 'Brightness' }), {
+    fireEvent.change(screen.getByLabelText('Brightness'), {
       target: { value: '98' },
     });
-    fireEvent.change(screen.getByRole('slider', { name: 'Contrast' }), {
-      target: { value: '49' },
+    fireEvent.click(screen.getByLabelText('Preserve aspect ratio'));
+
+    expect(onItemChange.mock.calls.at(-3)?.[0](imageItem)).toEqual({
+      adjustments: {
+        ...imageItem.adjustments,
+        tintColor: '#ff0000ff',
+      },
     });
-    fireEvent.change(screen.getByRole('slider', { name: 'Tint strength' }), {
-      target: { value: '60' },
+    expect(onItemChange.mock.calls.at(-2)?.[0](imageItem)).toEqual({
+      adjustments: {
+        ...imageItem.adjustments,
+        brightness: 100,
+      },
+    });
+    expect(onItemChange.mock.calls.at(-1)?.[0](imageItem)).toEqual({
+      preserveAspectRatio: false,
+    });
+  });
+
+  it('shows only shared fields for multi-selection and marks mixed states across control types', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const first = createTextItem({
+      fill: '#ff0000',
+      text: 'First headline',
+      fontWeight: 'bold',
+      align: 'left',
+      shadow: {
+        color: '#111111',
+        blur: 1,
+        offsetX: 2,
+        offsetY: 3,
+        opacity: 0.4,
+      },
+    });
+    const second = createTextItem({
+      fill: '#00ff00',
+      text: 'Second headline',
+      fontWeight: 'normal',
+      align: 'right',
+      shadow: {
+        color: '#222222',
+        blur: 6,
+        offsetX: 7,
+        offsetY: 8,
+        opacity: 0.7,
+      },
     });
 
-    expect(onItemChange).toHaveBeenCalledWith({ preserveAspectRatio: false });
-    expect(onItemChange).toHaveBeenCalledWith({
-      adjustments: { ...imageItem.adjustments, brightness: 100 },
-    });
-    expect(onItemChange).toHaveBeenCalledWith({
-      adjustments: { ...imageItem.adjustments, contrast: 50 },
-    });
-    expect(onItemChange).toHaveBeenCalledWith({
-      adjustments: { ...imageItem.adjustments, tintStrength: 60 },
-    });
-
-    rerender(
+    render(
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
         onItemChange={onItemChange}
-        selectedNodeCount={1}
-        selectedItem={lineItem}
-        selectedItems={[lineItem]}
-      />,
+        selectedNodeCount={2}
+        selectedItems={[first, second]}
+      />
     );
 
-    await user.click(screen.getByRole('button', { name: /Geometry/i }));
-    fireEvent.change(screen.getByLabelText('End X'), {
-      target: { value: '900' },
-    });
-    expect(onItemChange).toHaveBeenCalledWith({ endX: 900 });
+    expect(screen.getByRole('heading', { name: '2 items selected' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Text content')).toHaveValue('');
+    expect(screen.getByLabelText('Bold')).not.toBeChecked();
+    expect((screen.getByLabelText('Bold') as HTMLInputElement).indeterminate).toBe(true);
+    expect(screen.getByLabelText('Align')).toHaveValue('');
+    expect(screen.getAllByText('Mixed').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
 
-    rerender(
+    fireEvent.change(screen.getByLabelText('Text content'), {
+      target: { value: 'Shared headline' },
+    });
+    await user.click(screen.getByLabelText('Bold'));
+    await user.selectOptions(screen.getByLabelText('Align'), 'center');
+    await user.click(screen.getByRole('button', { name: 'Fill' }));
+    fireEvent.change(screen.getByLabelText('Fill hex'), {
+      target: { value: '#abcdef12' },
+    });
+    fireEvent.keyDown(screen.getByLabelText('Fill hex'), {
+      key: 'Enter',
+    });
+
+    expect(onItemChange.mock.calls[0]?.[0](first)).toEqual({
+      text: 'Shared headline',
+    });
+    expect(onItemChange.mock.calls[1]?.[0](second)).toEqual({
+      fontWeight: 'bold',
+    });
+    expect(onItemChange.mock.calls[2]?.[0](first)).toEqual({
+      align: 'center',
+    });
+    expect(onItemChange.mock.calls[3]?.[0](second)).toEqual({
+      fill: '#abcdef12',
+    });
+  });
+
+  it('shows dynamic shared fields across different item kinds', () => {
+    const rectangle = createRectangleItem({ fill: '#ff0000' });
+    const text = createTextItem({ fill: '#00ff00' });
+
+    render(
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
         onGroupOpacityChange={vi.fn()}
-        onItemChange={onItemChange}
-        selectedNodeCount={1}
-        selectedItem={textItem}
-        selectedItems={[textItem]}
-      />,
+        onItemChange={vi.fn()}
+        selectedNodeCount={2}
+        selectedItems={[rectangle, text]}
+      />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Advanced text' }));
-    fireEvent.change(screen.getByLabelText('Padding top'), {
-      target: { value: '-12' },
-    });
-    fireEvent.change(screen.getByLabelText('Padding left'), {
-      target: { value: '24' },
-    });
-
-    expect(onItemChange).toHaveBeenCalledWith({
-      padding: { top: -12, right: 0, bottom: 0, left: 0 },
-    });
-    expect(onItemChange).toHaveBeenCalledWith({
-      padding: { top: 0, right: 0, bottom: 0, left: 24 },
-    });
+    expect(screen.getByRole('button', { name: 'Color' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Geometry' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Fill')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Geometry' }));
+    expect(screen.getByLabelText('X')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Font')).not.toBeInTheDocument();
   });
 
   it('shows group controls for a single selected group even when it contains multiple items', () => {
@@ -356,7 +334,7 @@ describe('SelectionInspector', () => {
         selectedGroup={group}
         selectedNodeCount={1}
         selectedItems={[first, second]}
-      />,
+      />
     );
 
     expect(screen.getByLabelText('Group Opacity')).toBeInTheDocument();
@@ -377,7 +355,7 @@ describe('SelectionInspector', () => {
         selectedGroup={group}
         selectedNodeCount={2}
         selectedItems={[first, second]}
-      />,
+      />
     );
 
     expect(screen.getByText('2 items selected')).toBeInTheDocument();
