@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+tmp
+.design_spec.md.swp
+*.d.ts
+*.js
+*.tsbuildinfo
+*.swp
+*.un~

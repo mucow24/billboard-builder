@@ -1,0 +1,10 @@
+README.md is the canonical overview for this patch.
+
+Source of truth deliverable: bb_v8.zip
+
+Notes:
+- Tests were run with Vitest parallelism forced to 1.
+- A single full-suite Vitest invocation appears to hang in this environment, so verification was done in four passing chunks instead.
+- Main rendering logic lives in src/editor/rendering/CanvasStage.tsx.
+- Overflow geometry helpers live in src/editor/rendering/overflowRendering.ts.
+- Export regression coverage is in src/editor/io/exportPng.test.ts.

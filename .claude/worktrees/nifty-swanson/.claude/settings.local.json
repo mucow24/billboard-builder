@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest:*)",
+      "Bash(cd \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\mikek\\\\src\\\\billboard-builder\\\\.claude\\\\worktrees\\\\nifty-swanson\")",
+      "Bash(wsl -e bash -c \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && npx vitest run src/editor/ui/inspector/layerTreeOverlayGeometry.test.ts 2>&1\")",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && npx vitest run src/editor/ui/inspector/layerTreeOverlayGeometry.test.ts 2>&1\")",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && npm run dev 2>&1 &\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npm.cmd)",
+      "Bash(where npx:*)",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && npx vitest run src/editor/ui/inspector/layerTreeGuides.test.ts 2>&1\")",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && rm src/editor/ui/inspector/useLayerTreeOverlay.ts src/editor/ui/inspector/layerTreeOverlayGeometry.ts src/editor/ui/inspector/layerTreeOverlayGeometry.test.ts\")",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && npx vitest run 2>&1\")",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder/.claude/worktrees/nifty-swanson && npm run dev -- --port 5174 2>&1\")"
+    ]
+  }
+}
