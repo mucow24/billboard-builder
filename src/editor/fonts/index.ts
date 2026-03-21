@@ -13,4 +13,6 @@ export {
   loadBundledFonts,
   loadFontEntries,
   registerFontFile,
+  registerUploadedFontBytes,
 } from './browserFontLoader';
+export type { PersistedUploadedFont } from './fontModel';

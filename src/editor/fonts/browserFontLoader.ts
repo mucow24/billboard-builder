@@ -3,6 +3,8 @@ import {
   createBundledFont,
   createUploadedFont,
   parseFontSourceName,
+  type ParsedFontMetadata,
+  type PersistedUploadedFont,
 } from './fontModel';
 
 const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,woff2}', {
@@ -11,30 +13,52 @@ const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,wof
   eager: true,
 }) as Record<string, string>;
 
+type FontRegistrationMetadata = ParsedFontMetadata;
+
+function toRuntimeFont(
+  metadata: FontRegistrationMetadata,
+  kind: UploadedFont['kind'],
+): UploadedFont {
+  const parsedMetadata: ParsedFontMetadata = {
+    family: metadata.family,
+    sourceName: metadata.sourceName,
+    weight: metadata.weight,
+    style: metadata.style,
+  };
+  return kind === 'bundled'
+    ? createBundledFont(parsedMetadata)
+    : createUploadedFont(parsedMetadata);
+}
+
 async function registerFontSource(
-  sourceName: string,
+  metadata: FontRegistrationMetadata,
   source: ArrayBuffer | string,
   kind: UploadedFont['kind']
 ): Promise<UploadedFont> {
-  const parsed = parseFontSourceName(sourceName);
   const fontFace =
     typeof source === 'string'
-      ? new FontFace(parsed.family, `url(${source})`, {
-          weight: parsed.weight,
-          style: parsed.style,
+      ? new FontFace(metadata.family, `url(${source})`, {
+          weight: metadata.weight,
+          style: metadata.style,
         })
-      : new FontFace(parsed.family, source, {
-          weight: parsed.weight,
-          style: parsed.style,
+      : new FontFace(metadata.family, source, {
+          weight: metadata.weight,
+          style: metadata.style,
         });
   await fontFace.load();
   document.fonts.add(fontFace);
-  return kind === 'bundled' ? createBundledFont(parsed) : createUploadedFont(parsed);
+  return toRuntimeFont(metadata, kind);
 }
 
 export async function registerFontFile(file: File): Promise<UploadedFont> {
   const arrayBuffer = await file.arrayBuffer();
-  return registerFontSource(file.name, arrayBuffer, 'uploaded');
+  return registerFontSource(parseFontSourceName(file.name), arrayBuffer, 'uploaded');
+}
+
+export async function registerUploadedFontBytes(
+  record: PersistedUploadedFont,
+): Promise<UploadedFont> {
+  return registerFontSource(record, record.bytes, 'uploaded');
 }
 
 export async function loadFontEntries(
@@ -43,7 +67,7 @@ export async function loadFontEntries(
   const loadedFonts = await Promise.allSettled(
     fontEntries.map(async ([path, url]) => {
       const sourceName = path.split('/').at(-1) ?? 'Bundled Font';
-      return registerFontSource(sourceName, url, 'bundled');
+      return registerFontSource(parseFontSourceName(sourceName), url, 'bundled');
     })
   );
 

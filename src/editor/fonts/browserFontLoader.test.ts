@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadBundledFonts, loadFontEntries, registerFontFile } from './browserFontLoader';
+import type { PersistedUploadedFont } from './fontModel';
+import {
+  loadBundledFonts,
+  loadFontEntries,
+  registerFontFile,
+  registerUploadedFontBytes,
+} from './browserFontLoader';
 
 class MockFontFace {
   family: string;
@@ -80,6 +86,27 @@ describe('browser font loader', () => {
       sourceName: 'SessionSans-BoldItalic.ttf',
       weight: '700',
       style: 'italic',
+      kind: 'uploaded',
+    });
+  });
+
+  it('registers persisted uploaded font bytes with preserved metadata', async () => {
+    const persistedFont: PersistedUploadedFont = {
+      family: 'Stored Sans',
+      sourceName: 'StoredSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+      bytes: new Uint8Array([9, 8, 7]).buffer,
+    };
+
+    const font = await registerUploadedFontBytes(persistedFont);
+
+    expect(font).toEqual({
+      family: 'Stored Sans',
+      sourceName: 'StoredSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
       kind: 'uploaded',
     });
   });

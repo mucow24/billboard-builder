@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  CANVAS_STORE_NAME,
   createDefaultRawCanvasStore,
   IndexedDbCanvasStore,
   NoopCanvasStore,
+  UPLOADED_FONT_STORE_NAME,
 } from './indexedDbCanvasStore';
 
 type RequestHandler<T> = (request: IDBRequest<T>) => void;
@@ -172,7 +174,8 @@ describe('indexedDbCanvasStore', () => {
     );
 
     await expect(store.read()).resolves.toBe('saved');
-    expect(harness.createObjectStore).toHaveBeenCalledWith('canvas');
+    expect(harness.createObjectStore).toHaveBeenCalledWith(CANVAS_STORE_NAME);
+    expect(harness.createObjectStore).toHaveBeenCalledWith(UPLOADED_FONT_STORE_NAME);
     expect(harness.close).toHaveBeenCalled();
   });
 

@@ -7,6 +7,11 @@ export interface ParsedFontMetadata {
   style: UploadedFont['style'];
 }
 
+export interface PersistedUploadedFont extends UploadedFont {
+  bytes: ArrayBuffer;
+  kind: 'uploaded';
+}
+
 const WEIGHT_TOKENS = new Set(['bold']);
 const ITALIC_TOKENS = new Set(['italic', 'oblique']);
 const NORMAL_TOKENS = new Set(['regular', 'roman', 'book']);
