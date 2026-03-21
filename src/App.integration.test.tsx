@@ -12,9 +12,14 @@ const {
   mockPersistenceSave,
   mockReadProjectFile,
   mockRegisterFontFile,
+  mockRegisterUploadedFontBytes,
   mockTemplateLibraryClear,
   mockTemplateLibraryLoad,
   mockTemplateLibrarySave,
+  mockUploadedFontPersistenceClear,
+  mockUploadedFontPersistenceLoadByReferences,
+  mockUploadedFontPersistencePruneUnreferenced,
+  mockUploadedFontPersistenceSave,
 } = vi.hoisted(() => ({
   mockDownloadProject: vi.fn(),
   mockDownloadStageAsPng: vi.fn(),
@@ -25,9 +30,14 @@ const {
   mockPersistenceSave: vi.fn(),
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
+  mockRegisterUploadedFontBytes: vi.fn(),
   mockTemplateLibraryClear: vi.fn(),
   mockTemplateLibraryLoad: vi.fn(),
   mockTemplateLibrarySave: vi.fn(),
+  mockUploadedFontPersistenceClear: vi.fn(),
+  mockUploadedFontPersistenceLoadByReferences: vi.fn(),
+  mockUploadedFontPersistencePruneUnreferenced: vi.fn(),
+  mockUploadedFontPersistenceSave: vi.fn(),
 }));
 
 vi.mock('konva', () => ({
@@ -135,6 +145,22 @@ vi.mock('./editor/persistence/templateLibraryService', () => ({
   },
 }));
 
+vi.mock('./editor/persistence/uploadedFontPersistenceService', async () => {
+  const actual =
+    await vi.importActual<typeof import('./editor/persistence/uploadedFontPersistenceService')>(
+      './editor/persistence/uploadedFontPersistenceService',
+    );
+  return {
+    ...actual,
+    defaultUploadedFontPersistenceService: {
+      clear: (...args: unknown[]) => mockUploadedFontPersistenceClear(...args),
+      loadByReferences: (...args: unknown[]) => mockUploadedFontPersistenceLoadByReferences(...args),
+      pruneUnreferenced: (...args: unknown[]) => mockUploadedFontPersistencePruneUnreferenced(...args),
+      save: (...args: unknown[]) => mockUploadedFontPersistenceSave(...args),
+    },
+  };
+});
+
 vi.mock('./editor/fonts', async () => {
   const actual = await vi.importActual<typeof import('./editor/fonts')>('./editor/fonts');
   return {
@@ -142,6 +168,7 @@ vi.mock('./editor/fonts', async () => {
     findMissingFonts: vi.fn(() => []),
     loadBundledFonts: (...args: unknown[]) => mockLoadBundledFonts(...args),
     registerFontFile: (...args: unknown[]) => mockRegisterFontFile(...args),
+    registerUploadedFontBytes: (...args: unknown[]) => mockRegisterUploadedFontBytes(...args),
   };
 });
 
@@ -168,9 +195,14 @@ describe('App integration', () => {
     mockPersistenceClear.mockResolvedValue(undefined);
     mockPersistenceLoad.mockResolvedValue(null);
     mockPersistenceSave.mockResolvedValue(undefined);
+    mockRegisterUploadedFontBytes.mockReset();
     mockTemplateLibraryClear.mockReset();
     mockTemplateLibraryLoad.mockReturnValue([]);
     mockTemplateLibrarySave.mockReset();
+    mockUploadedFontPersistenceClear.mockReset();
+    mockUploadedFontPersistenceLoadByReferences.mockResolvedValue([]);
+    mockUploadedFontPersistencePruneUnreferenced.mockResolvedValue(undefined);
+    mockUploadedFontPersistenceSave.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

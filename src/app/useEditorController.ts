@@ -9,12 +9,15 @@ import {
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
+import { restoreUploadedFontsForReferences } from './uploadedFontPersistence';
+import { useUploadedFontPersistence } from './useUploadedFontPersistence';
 import { buildTemplateSelectionPayload } from '../editor/document/templateLibrary';
 import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
 import { defaultTemplateLibraryService, type StoredTemplate } from '../editor/persistence/templateLibraryService';
+import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
 import {
   selectCanRedo,
   selectCanUndo,
@@ -40,9 +43,17 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === 'function') {
+    return blob.arrayBuffer();
+  }
+  return new Response(blob).arrayBuffer();
+}
+
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [templates, setTemplates] = useState<StoredTemplate[]>([]);
+  const [templatesReady, setTemplatesReady] = useState(false);
   const templateInsertCountsRef = useRef<Record<string, number>>({});
 
   const {
@@ -92,7 +103,6 @@ export function useEditorController() {
   const canRedo = selectCanRedo(history);
 
   const { persistenceReady } = useCanvasBootstrap({
-    dispatch,
     loadDocument,
     registerAvailableFont,
   });
@@ -104,14 +114,25 @@ export function useEditorController() {
       setErrorMessage(
         `Failed to load template library: ${getErrorMessage(error, 'Unknown error.')}`,
       );
+    } finally {
+      setTemplatesReady(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!persistenceReady) {
+      return;
+    }
     setMissingFontFamilies(findMissingFonts(document.fonts, availableFonts));
-  }, [availableFonts, document.fonts, setMissingFontFamilies]);
+  }, [availableFonts, document.fonts, persistenceReady, setMissingFontFamilies]);
 
   useCanvasPersistence({ document, persistenceReady });
+  useUploadedFontPersistence({
+    documentFonts: document.fonts,
+    persistenceReady,
+    templates,
+    templatesReady,
+  });
 
   useEditorShortcuts({
     applyTransaction,
@@ -165,6 +186,17 @@ export function useEditorController() {
     try {
       const uploadedFont = await registerFontFile(file);
       registerAvailableFont(uploadedFont);
+      try {
+        await defaultUploadedFontPersistenceService.save(
+          uploadedFont,
+          await readBlobArrayBuffer(file),
+        );
+      } catch (error) {
+        setErrorMessage(
+          `Uploaded font is ready for this session, but failed to persist it: ${getErrorMessage(error, 'Unknown error.')}`,
+        );
+        return;
+      }
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(`Failed to register font: ${getErrorMessage(error, 'Unknown error.')}`);
@@ -276,11 +308,17 @@ export function useEditorController() {
     }
   }
 
-  function insertTemplate(templateId: string) {
+  async function insertTemplate(templateId: string) {
     const template = templates.find((entry) => entry.id === templateId);
     if (!template) {
       return;
     }
+
+    await restoreUploadedFontsForReferences({
+      references: template.fonts,
+      availableFonts,
+      registerAvailableFont,
+    });
 
     const nextInsertCount = (templateInsertCountsRef.current[templateId] ?? 0) + 1;
     templateInsertCountsRef.current[templateId] = nextInsertCount;

@@ -10,14 +10,18 @@ import {
   createDefaultProjectDocument,
   createImageItem,
   createRectangleItem,
+  createTextItem,
 } from './editor/document/documentDefaults';
+import type { PersistedUploadedFont } from './editor/fonts';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
 
 const {
   mockCanvasPersistenceService,
   mockImportImageFile,
+  mockRegisterUploadedFontBytes,
   mockTemplateLibraryService,
+  mockUploadedFontPersistenceService,
 } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
     load: vi.fn().mockResolvedValue(null),
@@ -25,10 +29,17 @@ const {
     clear: vi.fn().mockResolvedValue(undefined),
   },
   mockImportImageFile: vi.fn(),
+  mockRegisterUploadedFontBytes: vi.fn(),
   mockTemplateLibraryService: {
     load: vi.fn(() => []),
     save: vi.fn(),
     clear: vi.fn(),
+  },
+  mockUploadedFontPersistenceService: {
+    clear: vi.fn().mockResolvedValue(undefined),
+    loadByReferences: vi.fn().mockResolvedValue([]),
+    pruneUnreferenced: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -40,6 +51,7 @@ vi.mock('./editor/fonts', async () => {
   return {
     ...actual,
     loadBundledFonts: vi.fn().mockResolvedValue([]),
+    registerUploadedFontBytes: (...args: unknown[]) => mockRegisterUploadedFontBytes(...args),
   };
 });
 
@@ -51,6 +63,17 @@ vi.mock('./editor/persistence/canvasPersistenceService', () => ({
 vi.mock('./editor/persistence/templateLibraryService', () => ({
   defaultTemplateLibraryService: mockTemplateLibraryService,
 }));
+
+vi.mock('./editor/persistence/uploadedFontPersistenceService', async () => {
+  const actual =
+    await vi.importActual<typeof import('./editor/persistence/uploadedFontPersistenceService')>(
+      './editor/persistence/uploadedFontPersistenceService',
+    );
+  return {
+    ...actual,
+    defaultUploadedFontPersistenceService: mockUploadedFontPersistenceService,
+  };
+});
 
 vi.mock('./editor/io/images', async () => {
   const actual =
@@ -122,9 +145,14 @@ describe('App shell', () => {
     mockCanvasPersistenceService.save.mockResolvedValue(undefined);
     mockCanvasPersistenceService.clear.mockResolvedValue(undefined);
     mockImportImageFile.mockReset();
+    mockRegisterUploadedFontBytes.mockReset();
     mockTemplateLibraryService.clear.mockReset();
     mockTemplateLibraryService.load.mockReturnValue([]);
     mockTemplateLibraryService.save.mockReset();
+    mockUploadedFontPersistenceService.clear.mockReset();
+    mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([]);
+    mockUploadedFontPersistenceService.pruneUnreferenced.mockResolvedValue(undefined);
+    mockUploadedFontPersistenceService.save.mockResolvedValue(undefined);
     resetEditorStore();
   });
 
@@ -166,6 +194,63 @@ describe('App shell', () => {
     await waitFor(() => {
       expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
     });
+  });
+
+  it('does not show a missing-font warning while uploaded font restoration is still pending', async () => {
+    let resolveRestore: ((value: PersistedUploadedFont[]) => void) | undefined;
+    const persistedDocument = createDefaultProjectDocument();
+    persistedDocument.fonts = [
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans-Regular.ttf',
+        kind: 'uploaded',
+      },
+    ];
+    persistedDocument.items = [
+      createTextItem({
+        id: 'persisted-text',
+        fontFamily: 'Poster Sans',
+      }),
+    ];
+    mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
+    mockUploadedFontPersistenceService.loadByReferences.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRestore = resolve;
+      }),
+    );
+    mockRegisterUploadedFontBytes.mockResolvedValue({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    expect(screen.queryByText('Missing fonts')).not.toBeInTheDocument();
+
+    if (resolveRestore) {
+      resolveRestore([
+        {
+          family: 'Poster Sans',
+          sourceName: 'PosterSans-Regular.ttf',
+          weight: '400',
+          style: 'normal',
+          kind: 'uploaded',
+          bytes: new Uint8Array([1, 2, 3]).buffer,
+        },
+      ]);
+    }
+
+    await waitFor(() => {
+      expect(mockRegisterUploadedFontBytes).toHaveBeenCalled();
+    });
+    expect(screen.queryByText('Missing fonts')).not.toBeInTheDocument();
   });
 
   it('persists the latest canvas snapshot after edits', async () => {

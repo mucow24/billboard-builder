@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useEditorController } from './useEditorController';
+import type { StoredTemplate } from '../editor/persistence/templateLibraryService';
 import {
   createDefaultProjectDocument,
   createRectangleItem,
@@ -17,7 +18,9 @@ const {
   mockImportImageFile,
   mockReadProjectFile,
   mockRegisterFontFile,
+  mockRegisterUploadedFontBytes,
   mockTemplateLibraryService,
+  mockUploadedFontPersistenceService,
 } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
     load: vi.fn().mockResolvedValue(null),
@@ -29,10 +32,17 @@ const {
   mockImportImageFile: vi.fn(),
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
+  mockRegisterUploadedFontBytes: vi.fn(),
   mockTemplateLibraryService: {
     load: vi.fn(() => []),
     save: vi.fn(),
     clear: vi.fn(),
+  },
+  mockUploadedFontPersistenceService: {
+    clear: vi.fn().mockResolvedValue(undefined),
+    loadByReferences: vi.fn().mockResolvedValue([]),
+    pruneUnreferenced: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -43,6 +53,17 @@ vi.mock('../editor/persistence/canvasPersistenceService', () => ({
 vi.mock('../editor/persistence/templateLibraryService', () => ({
   defaultTemplateLibraryService: mockTemplateLibraryService,
 }));
+
+vi.mock('../editor/persistence/uploadedFontPersistenceService', async () => {
+  const actual =
+    await vi.importActual<typeof import('../editor/persistence/uploadedFontPersistenceService')>(
+      '../editor/persistence/uploadedFontPersistenceService',
+    );
+  return {
+    ...actual,
+    defaultUploadedFontPersistenceService: mockUploadedFontPersistenceService,
+  };
+});
 
 vi.mock('../editor/io/exportPng', () => ({
   downloadStageAsPng: mockDownloadStageAsPng,
@@ -74,6 +95,7 @@ vi.mock('../editor/fonts', async () => {
     ...actual,
     loadBundledFonts: vi.fn().mockResolvedValue([]),
     registerFontFile: mockRegisterFontFile,
+    registerUploadedFontBytes: mockRegisterUploadedFontBytes,
   };
 });
 
@@ -100,9 +122,14 @@ describe('useEditorController', () => {
     mockImportImageFile.mockReset();
     mockReadProjectFile.mockReset();
     mockRegisterFontFile.mockReset();
+    mockRegisterUploadedFontBytes.mockReset();
     mockTemplateLibraryService.clear.mockReset();
     mockTemplateLibraryService.load.mockReturnValue([]);
     mockTemplateLibraryService.save.mockReset();
+    mockUploadedFontPersistenceService.clear.mockReset();
+    mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([]);
+    mockUploadedFontPersistenceService.pruneUnreferenced.mockResolvedValue(undefined);
+    mockUploadedFontPersistenceService.save.mockResolvedValue(undefined);
     resetEditorStore();
   });
 
@@ -204,6 +231,11 @@ describe('useEditorController', () => {
 
   it('registers uploaded fonts, opens projects, and delegates save/export actions', async () => {
     const fontFile = new File(['font'], 'PosterSans.ttf', { type: 'font/ttf' });
+    const fontBytes = new Uint8Array([5, 4, 3]).buffer;
+    Object.defineProperty(fontFile, 'arrayBuffer', {
+      configurable: true,
+      value: async () => fontBytes,
+    });
     const textItem = createTextItem({ id: 'font-target' });
     const projectDocument = {
       ...createDefaultProjectDocument(),
@@ -247,6 +279,16 @@ describe('useEditorController', () => {
         kind: 'uploaded',
       });
     });
+    expect(mockUploadedFontPersistenceService.save).toHaveBeenCalledWith(
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans.ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'uploaded',
+      },
+      fontBytes,
+    );
     expect(result.current.state.document.fonts).toEqual([]);
 
     act(() => {
@@ -315,6 +357,68 @@ describe('useEditorController', () => {
     expect(result.current.state.missingFontFamilies).toEqual([]);
   });
 
+  it('restores uploaded fonts referenced by the persisted canvas document during bootstrap', async () => {
+    const persistedDocument = {
+      ...createDefaultProjectDocument(),
+      fonts: [
+        {
+          family: 'Poster Sans',
+          sourceName: 'PosterSans-Regular.ttf',
+          kind: 'uploaded' as const,
+        },
+      ],
+      items: [
+        createTextItem({
+          id: 'persisted-text',
+          fontFamily: 'Poster Sans',
+        }),
+      ],
+    };
+    mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
+    mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans-Regular.ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'uploaded',
+        bytes: new Uint8Array([1, 2, 3]).buffer,
+      },
+    ]);
+    mockRegisterUploadedFontBytes.mockResolvedValue({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+    });
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(result.current.state.availableFonts).toContainEqual({
+        family: 'Poster Sans',
+        sourceName: 'PosterSans-Regular.ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'uploaded',
+      });
+    });
+
+    expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenCalledWith(
+      persistedDocument.fonts,
+    );
+    expect(mockRegisterUploadedFontBytes).toHaveBeenCalledWith({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+      bytes: expect.any(ArrayBuffer),
+    });
+    expect(result.current.state.missingFontFamilies).toEqual([]);
+  });
+
   it('saves a selected node as a template and inserts it with cumulative offsets', async () => {
     const rectangle = createRectangleItem({
       id: 'template-rectangle',
@@ -350,9 +454,9 @@ describe('useEditorController', () => {
 
     const savedTemplateId = result.current.state.templates[0]!.id;
 
-    act(() => {
-      result.current.actions.insertTemplate(savedTemplateId);
-      result.current.actions.insertTemplate(savedTemplateId);
+    await act(async () => {
+      await result.current.actions.insertTemplate(savedTemplateId);
+      await result.current.actions.insertTemplate(savedTemplateId);
     });
 
     const insertedRectangles = result.current.state.document.items.filter(
@@ -413,8 +517,8 @@ describe('useEditorController', () => {
 
     const savedTemplateId = result.current.state.templates[0]!.id;
 
-    act(() => {
-      result.current.actions.insertTemplate(savedTemplateId);
+    await act(async () => {
+      await result.current.actions.insertTemplate(savedTemplateId);
     });
 
     expect(result.current.state.document.fonts).toContainEqual({
@@ -427,6 +531,138 @@ describe('useEditorController', () => {
         (item) => item.kind === 'text' && item.fontFamily === 'Poster Sans',
       ),
     ).toBe(true);
+  });
+
+  it('restores missing uploaded fonts before inserting a template', async () => {
+    const persistedTemplates: StoredTemplate[] = [
+      {
+        id: 'persisted-template',
+        name: 'Persisted template',
+        nodes: [
+          createTextItem({
+            id: 'template-text',
+            fontFamily: 'Poster Sans',
+          }),
+        ],
+        fonts: [
+          {
+            family: 'Poster Sans',
+            sourceName: 'PosterSans-Regular.ttf',
+            kind: 'uploaded' as const,
+          },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ];
+    mockTemplateLibraryService.load.mockReturnValue(persistedTemplates as never);
+    mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans-Regular.ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'uploaded',
+        bytes: new Uint8Array([9, 9, 9]).buffer,
+      },
+    ]);
+    mockRegisterUploadedFontBytes.mockResolvedValue({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+    });
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(result.current.state.templates).toHaveLength(1);
+    });
+
+    await act(async () => {
+      await result.current.actions.insertTemplate('persisted-template');
+    });
+
+    expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenCalledWith([
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans-Regular.ttf',
+        kind: 'uploaded',
+      },
+    ]);
+    expect(mockRegisterUploadedFontBytes).toHaveBeenCalled();
+    expect(result.current.state.availableFonts).toContainEqual({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+    });
+    expect(
+      result.current.state.document.items.some(
+        (item) => item.kind === 'text' && item.fontFamily === 'Poster Sans',
+      ),
+    ).toBe(true);
+  });
+
+  it('prunes persisted uploaded fonts using canvas and template references as the retention set', async () => {
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        fonts: [
+          {
+            family: 'Canvas Font',
+            sourceName: 'CanvasFont-Regular.ttf',
+            kind: 'uploaded',
+          },
+        ],
+        items: [
+          createTextItem({
+            id: 'canvas-font-text',
+            fontFamily: 'Canvas Font',
+          }),
+        ],
+      },
+    });
+    const retainedTemplates: StoredTemplate[] = [
+      {
+        id: 'retained-template',
+        name: 'Retained template',
+        nodes: [],
+        fonts: [
+          {
+            family: 'Template Font',
+            sourceName: 'TemplateFont-Regular.ttf',
+            kind: 'uploaded' as const,
+          },
+        ],
+        createdAt: '2025-01-01T00:00:00.000Z',
+        updatedAt: '2025-01-01T00:00:00.000Z',
+      },
+    ];
+    mockTemplateLibraryService.load.mockReturnValue(retainedTemplates as never);
+
+    renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(mockUploadedFontPersistenceService.pruneUnreferenced).toHaveBeenCalled();
+    });
+
+    expect(mockUploadedFontPersistenceService.pruneUnreferenced).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        {
+          family: 'Canvas Font',
+          sourceName: 'CanvasFont-Regular.ttf',
+          kind: 'uploaded',
+        },
+        {
+          family: 'Template Font',
+          sourceName: 'TemplateFont-Regular.ttf',
+          kind: 'uploaded',
+        },
+      ]),
+    );
   });
 
   it('surfaces template library persistence errors', async () => {
