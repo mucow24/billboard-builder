@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder && git stash pop && npx playwright test editor.files-and-persistence.spec.ts:320 --project=chromium 2>&1 | grep -A 20 ''Error\\\\|failed\\\\|expect\\\\|timeout''\")",
+      "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder && git status --short\")",
+      "Bash(wsl -e bash -lc \"head -20 ~/src/billboard-builder/src/main.tsx\")",
+      "mcp__Claude_Preview__preview_start"
     ]
   }
 }

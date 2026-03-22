@@ -1,27 +1,11 @@
-/* ── Layer actions (legacy card layout) ──────────────────────────────────── */
+/* ── Layer list container ────────────────────────────────────────────────── */
 
-.layer-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-  margin-top: 0.9rem;
-}
-
-/* ── Layer list ──────────────────────────────────────────────────────────── */
-
-.layer-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-/* Tabbed rail mode — list becomes a proper flex container */
 .layer-list {
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  flex-direction: column;
   padding: 4px 0 0;
   gap: 0;
   border: 0;
@@ -39,6 +23,7 @@
   min-height: 100%;
 }
 
+/* SVG tree-line overlay — sits above rows, never catches pointer events */
 .layer-tree-overlay {
   position: absolute;
   inset: 0 0 auto;
@@ -61,20 +46,10 @@
 
 .layer-row {
   display: flex;
-  align-items: stretch;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-/* Tabbed rail mode — depth-indented compact rows */
-.layer-row {
-  display: flex;
   align-items: center;
   width: 100%;
   min-width: 0;
   padding-left: calc(var(--depth, 0) * 20px);
-  gap: 0;
-  background: transparent;
   position: relative;
   z-index: 1;
 }
@@ -83,54 +58,25 @@
   margin-top: 1px;
 }
 
-.layer-row-chevron-button,
-.layer-row-chevron-spacer {
-  flex: 0 0 1.85rem;
-  width: 1.85rem;
-}
+/* ── Row select (the clickable surface) ──────────────────────────────────── */
 
-.layer-row-chevron-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: 12px;
-}
-
-.layer-row-chevron-spacer {
-  display: inline-block;
-}
-
-/* ── Layer row select button ─────────────────────────────────────────────── */
-
-.layer-row-select {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
-}
-
-/* Tabbed rail mode */
 .layer-row-select {
   display: flex;
   align-items: center;
   flex: 1 1 auto;
-  width: 100%;
   min-width: 0;
   gap: 6px;
-  min-height: 22px;
-  padding: 1px 4px;
+  min-height: 30px;
+  padding: 2px 4px;
   border: 1px solid transparent;
-  border-radius: 2px;
+  border-radius: 3px;
   background: transparent;
   color: inherit;
   text-align: left;
-  position: relative;
+  cursor: default;
 }
 
 .layer-row-group .layer-row-select {
-  min-height: 24px;
   background: rgba(15, 23, 38, 0.44);
   border-color: rgba(45, 63, 97, 0.16);
 }
@@ -138,6 +84,12 @@
 .layer-row:hover .layer-row-select {
   background: rgba(22, 35, 57, 0.7);
   border-color: rgba(54, 80, 122, 0.24);
+}
+
+.layer-row.active .layer-row-select {
+  background: rgba(37, 54, 83, 0.58);
+  border-color: rgba(86, 118, 171, 0.56);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
 }
 
 .layer-row.contains-selection .layer-row-select {
@@ -150,160 +102,7 @@
   border-color: rgba(54, 80, 122, 0.16);
 }
 
-.layer-row.active .layer-row-select {
-  background: rgba(37, 54, 83, 0.58);
-  border-color: rgba(86, 118, 171, 0.56);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
-}
-
-.layer-row-group.contains-selection .layer-row-select {
-  background: rgba(22, 33, 52, 0.58);
-  border-color: rgba(63, 92, 136, 0.2);
-}
-
-.layer-row-group.in-selected-group .layer-row-select {
-  background: rgba(21, 33, 54, 0.68);
-  border-color: rgba(54, 80, 122, 0.24);
-}
-
-.layer-row-group.active .layer-row-select {
-  background: rgba(34, 50, 78, 0.74);
-  border-color: rgba(86, 118, 171, 0.48);
-}
-
-/* ── Layer row copy (label area) ─────────────────────────────────────────── */
-
-.layer-row-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* Tabbed rail mode */
-.layer-row-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-}
-
-.layer-row-copy strong {
-  font-size: 0.94rem;
-}
-
-.layer-row-copy small,
-.layer-row-chevron {
-  color: #8fa2c4;
-}
-
-/* Compact richer copy layout */
-.layer-row-copy.compact.richer {
-  display: inline-flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  /* Tabbed rail mode */
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 12px;
-  line-height: 14.4px;
-  font-family: Inter, 'Segoe UI', Arial, sans-serif;
-}
-
-.layer-row-copy strong {
-  display: inline-block;
-  color: #f8fbff;
-  font-size: 10px;
-  line-height: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  margin: 0;
-  padding: 0;
-}
-
-.layer-row-copy.compact.richer small {
-  display: inline-block;
-  color: #93a8c9;
-  font-size: 9px;
-  line-height: 11px;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: none;
-  margin: 0;
-  padding-bottom: 1px;
-}
-
-/* Tabbed rail mode — small in compact.richer becomes block */
-.layer-row-copy.compact.richer small {
-  display: block;
-  line-height: 11.25px;
-}
-
-.layer-row-group .layer-row-copy strong,
-.layer-row-group .layer-row-copy.compact.richer strong {
-  font-weight: 700;
-  color: #f6f9ff;
-}
-
-.layer-row-group .layer-row-copy small,
-.layer-row-group .layer-row-copy.compact.richer small {
-  color: #9ab0d2;
-}
-
-.layer-row-label {
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin: 0;
-  padding: 0;
-}
-
-/* ── Layer row delete button ─────────────────────────────────────────────── */
-
-.layer-row-delete {
-  flex: 0 0 auto;
-  min-width: 2.8rem;
-  font-size: 1.15rem;
-  line-height: 1;
-}
-
-.layer-row-select,
-.layer-row-delete {
-  padding: 0.72rem 0.8rem;
-  border-radius: 16px;
-}
-
-/* ── Legacy layer row state classes ──────────────────────────────────────── */
-
-.layer-row.active {
-  border-radius: 18px;
-  background: rgba(79, 70, 229, 0.12);
-}
-
-.layer-row.contains-selection {
-  border-radius: 18px;
-  background: rgba(59, 130, 246, 0.08);
-}
-
-.layer-row.active .layer-row-select,
-.layer-row.active .layer-row-delete,
-.layer-row.active .layer-row-chevron-button {
-  border-color: rgba(96, 165, 250, 0.52);
-}
-
-/* ── Layer row type icon ─────────────────────────────────────────────────── */
+/* ── Type icon (shape preview / group toggle) ────────────────────────────── */
 
 .layer-row-type {
   position: relative;
@@ -311,25 +110,42 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  min-width: 14px;
-  height: 14px;
   flex: 0 0 auto;
-  border: 1px solid rgba(147, 168, 201, 0.26);
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
   border-radius: 2px;
   background: rgba(12, 19, 32, 0.92);
-  color: #93a8c9;
-  line-height: 1;
+  color: rgba(147, 168, 201, 0.6);
   font-size: 0;
+  line-height: 1;
 }
 
-.layer-row-type-rectangle,
-.layer-row-type-ellipse,
-.layer-row-type-line,
-.layer-row-type-text {
-  border: 1px solid currentColor;
+/* Shape-specific border radius */
+.layer-row-type-ellipse {
+  border-radius: 999px;
 }
 
+/* Diagonal line across the icon box */
+.layer-row-type-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  clip-path: polygon(0 45%, 100% 55%, 100% 65%, 0 55%);
+  transform: rotate(-18deg);
+}
+
+/* Image thumbnails fill the icon box */
+.layer-row-type-image .layer-row-thumbnail {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Group toggle button (+/-) */
 .layer-row-type-group {
   background: rgba(22, 35, 57, 0.96);
   border-color: rgba(108, 139, 187, 0.5);
@@ -337,49 +153,60 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   font-weight: 700;
+  cursor: pointer;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
-.layer-row-type-toggle {
-  padding: 0;
-  cursor: pointer;
-}
-
-.layer-row-type-toggle:hover {
+.layer-row-type-group:hover {
   border-color: rgba(147, 168, 201, 0.6);
   background: rgba(29, 47, 76, 0.98);
 }
 
-.layer-row-type-rectangle {
-  border-radius: 0.25rem;
+/* ── Copy (label + secondary text) ──────────────────────────────────────── */
+
+.layer-row-copy {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 5px;
 }
 
-.layer-row-type-ellipse {
-  border-radius: 999px;
-}
-
-.layer-row-type-line {
-  border-radius: 2px;
-}
-
-.layer-row-type-line::after {
-  content: '';
-  position: absolute;
-  left: 1px;
-  right: 1px;
-  top: 6px;
-  height: 1px;
-  background: currentColor;
-  transform: rotate(-28deg);
-  transform-origin: center;
-}
-
-.layer-row-type-image .layer-row-thumbnail {
+.layer-row-copy strong {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f8fbff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+}
+
+.layer-row-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #8fa2c4;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+/* Groups get a bolder primary label */
+.layer-row-group .layer-row-copy strong {
+  font-weight: 700;
+  color: #f6f9ff;
+}
+
+.layer-row-group .layer-row-copy small {
+  color: #9ab0d2;
 }
 
 /* ── Layers footer toolbar ───────────────────────────────────────────────── */
@@ -393,19 +220,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 0 4px 4px;
   border-bottom: 1px solid rgba(66, 87, 124, 0.62);
   background: linear-gradient(180deg, rgba(11, 18, 31, 0.34), rgba(10, 16, 28, 0.18));
   box-shadow: 0 1px 0 rgba(5, 9, 16, 0.7);
-  padding-left: 4px;
-  padding-right: 4px;
-  padding-bottom: 4px;
 }
 
 .order-controls {
   display: flex;
   align-items: center;
   gap: 3px;
-  min-width: 0;
 }
 
 .layer-order-toolbar {
@@ -415,9 +239,8 @@
 }
 
 /*
- * Shared button shell used by layers footer toolbar buttons, the compact color
- * picker trigger, and the delete button. The .color-picker-trigger-compact
- * shape overrides live in pickers.css.
+ * Shared button shell: layers footer toolbar buttons, compact color picker
+ * trigger, and delete button. Color-picker shape overrides live in pickers.css.
  */
 .toolbar-button,
 .color-picker-trigger-compact,
@@ -427,12 +250,12 @@
   justify-content: center;
   width: 1.8rem;
   height: 1.8rem;
+  padding: 0;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 3px;
   background: rgba(19, 28, 46, 0.98);
   color: #f8fbff;
   line-height: 1;
-  padding: 0;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
@@ -539,8 +362,8 @@
 
 .favorite-card-copy {
   display: flex;
-  min-width: 0;
   flex-direction: column;
+  min-width: 0;
   gap: 0.16rem;
 }
 
@@ -567,7 +390,7 @@
   border-top: 1px solid rgba(148, 163, 184, 0.08);
 }
 
-/* ── Layers panel meta (bottom of layers list) ───────────────────────────── */
+/* ── Layers panel meta (bottom item count strip) ─────────────────────────── */
 
 .layers-panel-meta {
   margin: 0 -8px;
