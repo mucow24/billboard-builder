@@ -1,5 +1,6 @@
 import type { CanvasItem, CanvasTool } from '../../document/documentTypes';
 import type { Point, ResizeHandle } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { LineItemView } from './LineItemView';
@@ -11,15 +12,18 @@ interface SingleSelectionOverlayProps {
     item: Extract<CanvasItem, { kind: 'line' }>,
     handle: 'start' | 'end',
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginResize: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     handle: ResizeHandle,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginRotate: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   handleItemDoubleClick?: (item: CanvasItem) => void;
   handleItemPointerDown: (

@@ -9,14 +9,15 @@ import {
   type Point,
   type ResizeHandle,
 } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 
 import { ShapeItemView } from './ShapeItemView';
 
 interface ImageCropOverlayProps {
-  beginCropFullResize: (handle: ResizeHandle, pointer: Point) => void;
-  beginCropFullRotate: (pointer: Point) => void;
-  beginCropPan: (pointer: Point) => void;
-  beginCropResize: (handle: ResizeHandle, pointer: Point) => void;
+  beginCropFullResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginCropFullRotate: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropPan: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   commitCropSession: () => boolean;
   fullImageItem: ImageCanvasItem;
   previewItem: ImageCanvasItem;
@@ -128,7 +129,7 @@ export function ImageCropOverlay({
             return;
           }
           event.cancelBubble = true;
-          beginCropPan(toCanvasPointer(pointer));
+          beginCropPan(toCanvasPointer(pointer), 'overlay');
         }}
         onDblClick={(event) => {
           event.cancelBubble = true;
@@ -166,7 +167,7 @@ export function ImageCropOverlay({
                 return;
               }
               event.cancelBubble = true;
-              beginCropFullResize(handle, toCanvasPointer(pointer));
+              beginCropFullResize(handle, toCanvasPointer(pointer), 'overlay');
             }}
           />
         );
@@ -184,7 +185,7 @@ export function ImageCropOverlay({
             return;
           }
           event.cancelBubble = true;
-          beginCropFullRotate(toCanvasPointer(pointer));
+          beginCropFullRotate(toCanvasPointer(pointer), 'overlay');
         }}
       />
       <Group
@@ -255,7 +256,7 @@ export function ImageCropOverlay({
                 return;
               }
               event.cancelBubble = true;
-              beginCropResize(handle, toCanvasPointer(pointer));
+              beginCropResize(handle, toCanvasPointer(pointer), 'overlay');
             }}
           />
         );

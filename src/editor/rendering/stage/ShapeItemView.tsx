@@ -11,6 +11,7 @@ import {
   type Point,
   type ResizeHandle,
 } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 import { ImageItemNode } from '../ImageItemNode';
 import { useImageElement } from '../useImageElement';
 import { getRenderBox } from '../transformGeometry';
@@ -30,8 +31,17 @@ interface ShapeItemViewProps {
   item: ShapeItem;
   selectableNodeId?: string;
   onItemDoubleClick?: (item: ShapeItem) => void;
-  onBeginResize: (item: ShapeItem, handle: ResizeHandle, pointer: Point) => void;
-  onBeginRotate: (item: ShapeItem, pointer: Point) => void;
+  onBeginResize: (
+    item: ShapeItem,
+    handle: ResizeHandle,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  onBeginRotate: (
+    item: ShapeItem,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
   onItemPointerDown: (
     item: ShapeItem,
     selectionNodeId: string,
@@ -299,7 +309,7 @@ export const ShapeItemView = memo(function ShapeItemView({
                         return;
                       }
                       event.cancelBubble = true;
-                      onBeginResize(item, handle, toCanvasPointer(pointer));
+                      onBeginResize(item, handle, toCanvasPointer(pointer), 'overlay');
                     }}
                   />
                 );
@@ -328,7 +338,7 @@ export const ShapeItemView = memo(function ShapeItemView({
                     return;
                   }
                   event.cancelBubble = true;
-                  onBeginRotate(item, toCanvasPointer(pointer));
+                  onBeginRotate(item, toCanvasPointer(pointer), 'overlay');
                 }}
               />
             </>

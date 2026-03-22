@@ -9,6 +9,7 @@ import type {
   ProjectDocument,
 } from '../../document/documentTypes';
 import type { Point, ResizeHandle } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { CanvasGuidesLayer } from './CanvasGuidesLayer';
@@ -22,26 +23,29 @@ import { SingleSelectionOverlay } from './SingleSelectionOverlay';
 
 interface CanvasSceneProps {
   activeTool: CanvasTool;
-  beginCropFullResize: (handle: ResizeHandle, pointer: Point) => void;
-  beginCropFullRotate: (pointer: Point) => void;
-  beginCropPan: (pointer: Point) => void;
-  beginCropResize: (handle: ResizeHandle, pointer: Point) => void;
+  beginCropFullResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginCropFullRotate: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropPan: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   commitCropSession: () => boolean;
-  beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
-  beginGroupRotate: (pointer: Point) => void;
+  beginGroupResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
   beginLineHandle: (
     item: Extract<CanvasItem, { kind: 'line' }>,
     handle: 'start' | 'end',
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginResize: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     handle: ResizeHandle,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginRotate: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   cropSession: {
     itemId: string;

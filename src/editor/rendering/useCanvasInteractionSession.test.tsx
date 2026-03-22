@@ -1037,6 +1037,44 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
+  it('updates overlay-owned resize sessions from window mousemove events that stay inside the stage', () => {
+    const stageRef = makeStageRef();
+    stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 120,
+      height: 80,
+    });
+    const params = createHookParams({
+      document: createDocument([item]),
+      stageRef: stageRef.ref,
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+    const handlePoint = getShapeHandlePoints(item)['middle-right'];
+
+    act(() => {
+      result.current.beginResize(item, 'middle-right', handlePoint, 'overlay');
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 420,
+          clientY: 160,
+        }),
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('resize');
+    if (result.current.session?.kind !== 'resize') {
+      throw new Error('Expected resize session.');
+    }
+    expect(result.current.session.previewItem).toMatchObject({
+      width: expect.any(Number),
+    });
+    expect(result.current.session.previewItem.width).toBeGreaterThan(item.width);
+  });
+
   it('disables snapping while ctrl-dragging', () => {
     const item = createRectangleItem({
       x: 200,

@@ -93,7 +93,7 @@ describe('LineItemView', () => {
       false,
       expect.anything(),
     );
-    expect(onBeginLineHandle).toHaveBeenCalledWith(line, 'start', { x: 240, y: 160 });
+    expect(onBeginLineHandle).toHaveBeenCalledWith(line, 'start', { x: 240, y: 160 }, 'overlay');
   });
 
   it('skips the render-item node when content rendering is disabled', () => {

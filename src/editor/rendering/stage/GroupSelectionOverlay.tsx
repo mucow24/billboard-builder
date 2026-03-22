@@ -7,6 +7,7 @@ import {
   type Point,
   type ResizeHandle,
 } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 
 import { LineItemView } from './LineItemView';
 import {
@@ -18,21 +19,24 @@ import { ShapeItemView } from './ShapeItemView';
 
 interface GroupSelectionOverlayProps {
   activeTool: CanvasTool;
-  beginGroupResize: (handle: ResizeHandle, pointer: Point) => void;
-  beginGroupRotate: (pointer: Point) => void;
+  beginGroupResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
   beginLineHandle: (
     item: Extract<CanvasItem, { kind: 'line' }>,
     handle: 'start' | 'end',
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginResize: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     handle: ResizeHandle,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginRotate: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   groupOverlayFrame: {
     bounds: { x: number; y: number; width: number; height: number };
@@ -160,7 +164,7 @@ export function GroupSelectionOverlay({
                     return;
                   }
                   event.cancelBubble = true;
-                  beginGroupResize(handle, toCanvasPointer(pointer));
+                  beginGroupResize(handle, toCanvasPointer(pointer), 'overlay');
                 }}
               />
             );
@@ -183,7 +187,7 @@ export function GroupSelectionOverlay({
                 return;
               }
               event.cancelBubble = true;
-              beginGroupRotate(toCanvasPointer(pointer));
+              beginGroupRotate(toCanvasPointer(pointer), 'overlay');
             }}
           />
         </Group>

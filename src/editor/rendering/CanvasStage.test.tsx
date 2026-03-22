@@ -587,6 +587,7 @@ describe('CanvasStage viewport controls', () => {
     expect(mockInteractionSession.beginGroupResize).toHaveBeenCalledWith(
       'middle-right',
       expect.any(Object),
+      'overlay',
     );
   });
 
@@ -1101,6 +1102,7 @@ describe('CanvasStage viewport controls', () => {
       line,
       'start',
       expect.any(Object),
+      'overlay',
     );
   });
 
@@ -1168,10 +1170,12 @@ describe('CanvasStage viewport controls', () => {
       rectangle,
       'middle-right',
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      'overlay',
     );
     expect(mockInteractionSession.beginRotate).toHaveBeenCalledWith(
       rectangle,
       expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      'overlay',
     );
   });
 

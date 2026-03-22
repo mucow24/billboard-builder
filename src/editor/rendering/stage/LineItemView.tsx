@@ -4,6 +4,7 @@ import type Konva from 'konva';
 
 import type { CanvasTool, LineCanvasItem } from '../../document/documentTypes';
 import { getLineHandleRects, type Point } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 
 import {
   HANDLE_FILL,
@@ -21,6 +22,7 @@ interface LineItemViewProps {
     item: LineCanvasItem,
     handle: 'start' | 'end',
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   onItemPointerDown: (
     item: LineCanvasItem,
@@ -190,7 +192,7 @@ export const LineItemView = memo(function LineItemView({
                         return;
                       }
                       event.cancelBubble = true;
-                      onBeginLineHandle(item, handle, toCanvasPointer(pointer));
+                      onBeginLineHandle(item, handle, toCanvasPointer(pointer), 'overlay');
                     }}
                   />
                 );

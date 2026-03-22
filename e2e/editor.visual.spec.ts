@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  beginCanvasDrag,
   beginCanvasHookDrag,
   canvasPointToPage,
   clickCanvas,
@@ -394,6 +395,54 @@ test.describe('editor visual regression', () => {
       .poll(async () => Math.abs((await readStageDebug(page)).previewItem?.rotation ?? 0))
       .toBeGreaterThan(15);
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('single-rotate-preview.png');
+    await releasePointer(page);
+  });
+
+  test('captures live single-item resize and rotate previews from real canvas handles', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createRectangleFixture({
+          id: 'single-live-real',
+          x: 180,
+          y: 180,
+          width: 220,
+          height: 140,
+        }),
+      ]),
+      'single-live-real.json'
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 300, y: 260 });
+
+    await beginCanvasDrag(page, { x: 400, y: 250 });
+    await movePointerToCanvasPoint(page, { x: 560, y: 250 });
+    await expect
+      .poll(async () => (await readStageDebug(page)).sessionKind)
+      .toBe('resize');
+    await expect
+      .poll(async () => (await readStageDebug(page)).previewItem?.width ?? 0)
+      .toBeGreaterThan(220);
+    await releasePointer(page);
+
+    const resizedItem = (await readStageDebug(page)).selectedItems?.[0];
+    if (!resizedItem) {
+      throw new Error('Expected selected item geometry after resize.');
+    }
+
+    await beginCanvasDrag(page, {
+      x: resizedItem.x + resizedItem.width / 2,
+      y: resizedItem.y - 50,
+    });
+    await movePointerToCanvasPoint(page, { x: 520, y: 420 });
+    await expect
+      .poll(async () => (await readStageDebug(page)).sessionKind)
+      .toBe('rotate');
+    await expect
+      .poll(async () => Math.abs((await readStageDebug(page)).previewItem?.rotation ?? 0))
+      .toBeGreaterThan(15);
     await releasePointer(page);
   });
 
