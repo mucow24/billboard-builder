@@ -1,0 +1,147 @@
+.editor-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.editor-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+  min-height: 0;
+}
+
+/* Overlay layout — replaces the classic side-by-side layout */
+
+.editor-layout-overlay {
+  position: relative;
+  flex: 1;
+  padding: 0;
+  min-height: 0;
+}
+
+.editor-overlays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  --overlay-gap: 0.4rem;
+  --overlay-edge: 0.45rem;
+  --overlay-topbar-height: 56px;
+  --overlay-below-topbar: calc(var(--overlay-edge) + var(--overlay-topbar-height) + var(--overlay-gap));
+}
+
+.overlay-topbar {
+  position: absolute;
+  top: var(--overlay-edge);
+  left: var(--overlay-edge);
+  right: var(--overlay-edge);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.overlay-topbar > * {
+  pointer-events: auto;
+}
+
+.overlay-status {
+  position: absolute;
+  top: calc(var(--overlay-below-topbar) + 0.1rem);
+  left: var(--overlay-edge);
+  z-index: 21;
+  max-width: min(32rem, calc(100vw - 1.5rem));
+}
+
+.overlay-tools {
+  position: absolute;
+  top: var(--overlay-below-topbar);
+  left: var(--overlay-edge);
+  pointer-events: none;
+}
+
+.overlay-tools > * {
+  pointer-events: auto;
+}
+
+.overlay-properties {
+  position: absolute;
+  top: var(--overlay-below-topbar);
+  right: var(--overlay-edge);
+  bottom: var(--overlay-edge);
+  width: min(340px, calc(100vw - 1.3rem));
+  pointer-events: none;
+}
+
+.overlay-properties > * {
+  height: 100%;
+  pointer-events: auto;
+}
+
+.overlay-properties-panel {
+  height: 100%;
+}
+
+/* Compact width for right rail */
+.overlay-properties {
+  width: min(317px, calc(100vw - 1.15rem));
+}
+
+.editor-stage-fullscreen {
+  position: absolute;
+  inset: 0;
+}
+
+@media (max-width: 1350px) {
+  .editor-layout {
+    grid-template-columns: 230px minmax(0, 1fr) 320px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .editor-main {
+    grid-template-columns: 1fr;
+  }
+
+  .properties-panel {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .editor-overlays {
+    --overlay-edge: 0.35rem;
+  }
+
+  .overlay-topbar {
+    top: var(--overlay-edge);
+    left: var(--overlay-edge);
+    right: var(--overlay-edge);
+  }
+
+  .overlay-properties {
+    top: auto;
+    left: auto;
+    right: var(--overlay-edge);
+    bottom: var(--overlay-edge);
+    width: min(320px, calc(100vw - 4rem));
+    max-height: calc(100vh - 3.8rem);
+  }
+
+  .overlay-tools {
+    top: var(--overlay-below-topbar);
+    left: var(--overlay-edge);
+  }
+
+  .overlay-status {
+    left: var(--overlay-edge);
+    top: calc(var(--overlay-below-topbar) + 0.1rem);
+  }
+
+  /* canvas-hud position adjustment at small viewport — see canvas.css for the hud styles */
+  .canvas-hud {
+    left: 0.12rem;
+  }
+}

@@ -1,0 +1,293 @@
+/* ── Font family picker ───────────────────────────────────────────────────── */
+
+.font-family-picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.font-family-picker-cycle-button {
+  min-width: 1.8rem;
+  min-height: 1.8rem;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.font-family-picker-cycle-button:hover:not(:disabled) {
+  background: rgba(26, 39, 63, 1);
+}
+
+.font-family-picker-trigger {
+  width: 100%;
+  min-height: 1.8rem;
+  padding: 0.22rem 0.38rem;
+  text-align: left;
+}
+
+.font-family-picker-trigger-open {
+  border-color: rgba(125, 211, 252, 0.9);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: rgba(26, 39, 63, 1);
+}
+
+.font-family-picker-trigger-mixed {
+  color: #d7e3f7;
+  background:
+    linear-gradient(135deg, rgba(37, 53, 79, 0.72), rgba(12, 18, 32, 0.94)),
+    rgba(12, 18, 32, 0.84);
+}
+
+.font-family-picker-trigger-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.font-family-picker-popover {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 0;
+  right: 0;
+  z-index: 14;
+}
+
+.font-family-picker-listbox {
+  max-height: 260px;
+  overflow: auto;
+  padding: 3px;
+  border: 1px solid rgba(125, 211, 252, 0.9);
+  border-radius: 0 0 3px 3px;
+  background: rgba(26, 39, 63, 1);
+  box-shadow:
+    0 24px 44px rgba(2, 6, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.font-family-picker-option {
+  min-height: 2.5rem;
+  padding: 0.38rem 0.44rem;
+  border-radius: 3px;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.font-family-picker-option:hover,
+.font-family-picker-option.active {
+  background: rgba(68, 143, 224, 0.16);
+}
+
+.font-family-picker-option.selected {
+  background: rgba(50, 132, 214, 0.24);
+}
+
+.font-family-picker-option-text {
+  display: block;
+  font-size: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Color picker ────────────────────────────────────────────────────────── */
+
+.color-picker-control {
+  margin-top: 0.75rem;
+  /* Compact rail mode */
+  margin-top: 0;
+}
+
+.color-picker-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem;
+  text-align: left;
+  /* Compact rail mode */
+  gap: 0.42rem;
+  padding: 0.28rem 0.34rem;
+  border-radius: 3px;
+}
+
+.color-picker-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  padding: 0.25rem;
+  background-image:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.22) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(148, 163, 184, 0.22) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, 0.22) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, 0.22) 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.16);
+  /* Compact rail mode */
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0.1rem;
+  border-radius: 3px;
+}
+
+.color-picker-swatch-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(248, 250, 252, 0.2);
+  /* Compact rail mode */
+  border-radius: 2px;
+}
+
+.color-picker-trigger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  /* Compact rail mode */
+  gap: 0;
+}
+
+.color-picker-trigger-label {
+  font-weight: 700;
+  /* Compact rail mode */
+  font-size: 0.7rem;
+  line-height: 1.15;
+}
+
+.color-picker-trigger-value {
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Compact rail mode */
+  font-size: 0.68rem;
+}
+
+.color-picker-control-mixed .color-picker-trigger {
+  border-style: dashed;
+  background:
+    linear-gradient(135deg, rgba(23, 36, 56, 0.92), rgba(12, 18, 32, 0.96)),
+    rgba(12, 18, 32, 0.84);
+}
+
+.color-picker-panel {
+  margin-top: 0.65rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  background: rgba(17, 26, 42, 0.98);
+  /* Compact rail mode */
+  margin-top: 0.28rem;
+  padding: 0.55rem;
+}
+
+.color-picker-wheel {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+  /* Compact rail mode */
+  margin-bottom: 0.4rem;
+}
+
+.color-picker-field {
+  margin-top: 0 !important;
+}
+
+.color-picker-field + .color-picker-field {
+  margin-top: 0.75rem;
+  /* Compact rail mode */
+  margin-top: 0.35rem;
+}
+
+.color-picker-slider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.color-picker-slider-row output {
+  min-width: 3.5rem;
+  text-align: right;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.color-picker-panel input[type='range'] {
+  padding: 0;
+}
+
+/* ── Compact color picker (layers toolbar) ───────────────────────────────── */
+
+.color-picker-control-compact {
+  position: relative;
+  display: flex;
+  width: 100%;
+  flex: 1 1 auto;
+  margin-top: 0;
+  align-items: stretch;
+}
+
+.color-picker-trigger-compact .color-picker-swatch {
+  width: 0.9rem;
+  height: 0.9rem;
+  padding: 0;
+  border-radius: 2px;
+}
+
+.color-picker-trigger-compact .color-picker-swatch-fill {
+  inset: 0;
+  border-radius: 2px;
+}
+
+.color-picker-trigger-caret {
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.72;
+  transform: translateY(1px);
+}
+
+.color-picker-panel-compact {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 0;
+  z-index: 14;
+  min-width: 244px;
+  transform-origin: top left;
+}
+
+.color-picker-panel-compact::before,
+.color-picker-panel-compact::after {
+  display: none;
+}
+
+/* compact trigger open state — see also layers.css for the base button shape */
+.color-picker-trigger-compact {
+  width: auto;
+  padding: 0 5px 0 4px;
+  gap: 3px;
+}
+
+.color-picker-trigger-compact[aria-expanded='true'] {
+  border-color: rgba(125, 211, 252, 0.9);
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: rgba(26, 39, 63, 1);
+  z-index: 6;
+}

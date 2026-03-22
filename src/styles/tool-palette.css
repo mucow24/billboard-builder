@@ -1,0 +1,83 @@
+.tool-palette {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.28rem 0.24rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(8, 13, 25, 0.86);
+  box-shadow: 0 16px 32px rgba(2, 6, 23, 0.22);
+  /* Receives pointer events when used inside an overlay */
+  pointer-events: auto;
+}
+
+.tool-palette-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.2rem 0.3rem 0.6rem;
+}
+
+.tool-palette-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.tool-button {
+  display: grid;
+  place-items: center;
+  width: 2.72rem;
+  height: 2.72rem;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.tool-button.active,
+.tool-button:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.28), rgba(6, 182, 212, 0.18));
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.2);
+}
+
+.tool-button-icon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: transparent;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.tool-button-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.tool-button-copy > span {
+  font-weight: 700;
+}
+
+.tool-button small,
+.tool-hotkey {
+  color: #93a9cc;
+}
+
+.tool-hotkey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.55rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.1);
+  font-size: 0.76rem;
+  font-weight: 700;
+}

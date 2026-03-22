@@ -1,0 +1,62 @@
+/*
+ * Shared base styles applied to all interactive controls across the app.
+ * These selectors span multiple components (properties panel, tool palette,
+ * layers panel, color picker, font picker, inspector) to ensure consistent
+ * border, hover, and focus-visible behaviour.
+ */
+
+.properties-panel input:not([type='range']):not([type='checkbox']),
+.properties-panel select,
+.properties-panel textarea,
+.tool-button,
+.layer-row-select,
+.layer-row-delete,
+.font-family-picker-cycle-button,
+.font-family-picker-trigger,
+.color-picker-trigger,
+.inspector-toggle-button,
+.segmented-control-button {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(12, 18, 32, 0.84);
+  color: #f8fbff;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.top-toolbar .top-toolbar-button:hover,
+.top-toolbar .top-toolbar-field:hover,
+.properties-panel input:not([type='range']):not([type='checkbox']):hover,
+.properties-panel select:hover,
+.properties-panel textarea:hover,
+.tool-button:hover,
+.layer-row-select:hover,
+.layer-row-delete:hover,
+.font-family-picker-cycle-button:hover,
+.font-family-picker-trigger:hover,
+.color-picker-trigger:hover,
+.inspector-toggle-button:hover,
+.segmented-control-button:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.top-toolbar .top-toolbar-button:focus-visible,
+.top-toolbar .top-toolbar-field:focus-visible,
+.properties-panel input:not([type='range']):not([type='checkbox']):focus-visible,
+.properties-panel select:focus-visible,
+.properties-panel textarea:focus-visible,
+.tool-button:focus-visible,
+.layer-row-select:focus-visible,
+.layer-row-delete:focus-visible,
+.font-family-picker-cycle-button:focus-visible,
+.font-family-picker-trigger:focus-visible,
+.font-family-picker-listbox:focus-visible,
+.color-picker-trigger:focus-visible,
+.inspector-toggle-button:focus-visible,
+.segmented-control-button:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.85);
+  outline-offset: 2px;
+}

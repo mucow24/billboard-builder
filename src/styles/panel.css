@@ -1,0 +1,347 @@
+/* ── Panel action button ─────────────────────────────────────────────────── */
+
+.panel-action-button {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(96, 165, 250, 0.26);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(6, 182, 212, 0.18));
+  color: #f8fbff;
+  font-weight: 700;
+}
+
+.panel-action-button:hover {
+  border-color: rgba(96, 165, 250, 0.42);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.24), rgba(6, 182, 212, 0.24));
+}
+
+/* ── Properties panel shell ──────────────────────────────────────────────── */
+
+.properties-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 280px;
+  min-height: 0;
+  /* Inspector variable definitions — used by child controls */
+  --inspector-shell: rgba(6, 11, 23, 0.84);
+  --inspector-surface: rgba(19, 28, 46, 0.98);
+  --inspector-surface-hover: rgba(26, 39, 63, 1);
+  --inspector-border: rgba(148, 163, 184, 0.28);
+  --inspector-border-active: rgba(125, 211, 252, 0.9);
+  --inspector-text: #f8fbff;
+  --inspector-text-muted: #c2d1e8;
+  --inspector-control-size: 1.8rem;
+  /* Overlay / rail mode */
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+  height: 100%;
+  overflow: hidden;
+  padding-right: 0.1rem;
+  gap: 0.32rem;
+  padding-right: 0;
+}
+
+/* ── Panel sections ──────────────────────────────────────────────────────── */
+
+.panel-section {
+  padding: 1.05rem;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: linear-gradient(180deg, rgba(9, 15, 28, 0.92), rgba(10, 16, 28, 0.78));
+  box-shadow: 0 22px 36px rgba(2, 6, 23, 0.22);
+  /* Compact rail mode */
+  backdrop-filter: blur(18px);
+  background: rgba(9, 15, 28, 0.82);
+  /* Compact rail refresh */
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: var(--inspector-shell);
+  box-shadow:
+    0 10px 22px rgba(2, 6, 23, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  padding: 0.62rem;
+}
+
+.panel-section h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.panel-section p {
+  margin: 0;
+  color: #b6c7e2;
+}
+
+.panel-section-hero {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.18), rgba(12, 18, 32, 0.88));
+}
+
+.panel-section-banner {
+  flex: 0 0 auto;
+}
+
+.panel-section-layers,
+.panel-section-details {
+  min-height: 0;
+}
+
+.panel-section-layers {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  max-height: min(42%, 20rem);
+  overflow: hidden;
+  /* Compact rail mode — tighter max height */
+  max-height: min(28%, 11rem);
+}
+
+.panel-section-details {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.warning {
+  border-color: rgba(251, 191, 36, 0.28);
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.38), rgba(72, 28, 9, 0.28));
+}
+
+/* ── Panel headings ──────────────────────────────────────────────────────── */
+
+.panel-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  margin: 0;
+}
+
+.panel-heading-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.9rem;
+  margin: 0;
+}
+
+.panel-heading-row-collapsible {
+  margin-bottom: 0;
+}
+
+.compact-heading-row {
+  min-height: 1.15rem;
+  margin-bottom: 0.26rem;
+}
+
+.panel-heading-stack.compact {
+  gap: 0.01rem;
+}
+
+.panel-heading-stack.compact h2 {
+  font-size: 0.92rem;
+}
+
+/* ── Panel badge ─────────────────────────────────────────────────────────── */
+
+.panel-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.16);
+  color: #bfd3ff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  /* Compact size in rail mode */
+  min-width: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.38rem;
+  font-size: 0.73rem;
+}
+
+/* ── Section toggle ──────────────────────────────────────────────────────── */
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+}
+
+.section-toggle .panel-badge {
+  margin-left: auto;
+}
+
+.section-toggle-icon {
+  color: #8fa2c4;
+  font-size: 0.9rem;
+}
+
+/* ── Layers panel body / footer ──────────────────────────────────────────── */
+
+.layers-panel-body {
+  margin-top: 0.9rem;
+  /* Rail mode */
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  margin: 0;
+}
+
+.layers-panel-footer {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  /* Rail mode */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0;
+  margin-left: -8px;
+  margin-right: -8px;
+  padding: 0;
+}
+
+/* ── Empty panel ─────────────────────────────────────────────────────────── */
+
+.empty-panel {
+  min-height: 220px;
+  /* Compact rail mode */
+  min-height: 10rem;
+}
+
+.empty-panel-inner {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0 8px;
+}
+
+.empty-panel-inner p {
+  margin: 0;
+  color: #aebfdd;
+}
+
+/* ── Tabbed right rail ───────────────────────────────────────────────────── */
+
+.panel-section-tabbed-rail {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, #0d1526 0%, #0a1120 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+}
+
+.panel-section-tabbed-rail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(72, 92, 127, 0.88);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.panel-section-tabbed-rail .panel-badge {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  background: #273754;
+  color: #f8fbff;
+  font-size: 10px;
+}
+
+.rail-tab-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border-bottom: 1px solid rgba(66, 87, 124, 0.62);
+  background: linear-gradient(180deg, rgba(15, 23, 39, 0.96), rgba(11, 18, 32, 0.96));
+  box-shadow: inset 0 -1px 0 rgba(5, 9, 16, 0.58);
+}
+
+.rail-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid rgba(27, 38, 61, 1);
+  background: transparent;
+  color: #93a8c9;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rail-tab:last-child {
+  border-right: 0;
+}
+
+.rail-tab.active {
+  color: #f8fbff;
+  background: rgba(31, 46, 74, 0.9);
+}
+
+.rail-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: rgba(126, 160, 214, 0.38);
+}
+
+.rail-tab-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  flex-direction: column;
+  overflow: auto;
+  padding: 4px 8px 8px;
+}
+
+.rail-tab-body-properties {
+  padding: 4px 0 8px;
+}
+
+.rail-tab-body-layers {
+  gap: 0;
+  overflow: hidden;
+}
+
+.rail-tab-body-favorites {
+  padding-right: 0.05rem;
+}
+
+.panel-action-row {
+  margin-bottom: 0.75rem;
+}
