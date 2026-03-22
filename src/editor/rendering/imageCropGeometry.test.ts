@@ -26,22 +26,39 @@ describe('image crop geometry', () => {
       width: 80,
       height: 45,
     };
+    item.sourceTransform = {
+      x: -20,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 0,
+    };
+    item.sourceTransform = {
+      x: -20,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 18,
+    };
 
     expect(buildFullImageTransformItem(item)).toMatchObject({
       x: 10,
       y: 10,
       width: 160,
       height: 90,
+      rotation: 18,
       crop: { x: 0, y: 0, width: 160, height: 90 },
     });
   });
 
-  it('rebuilds the visible cropped image from a full image transform and crop rectangle', () => {
+  it('rebuilds the visible cropped image from the persisted source transform', () => {
     const item = createImageItem({
       src: 'data:image/png;base64,AAA',
       mimeType: 'image/png',
       originalWidth: 160,
       originalHeight: 90,
+      width: 80,
+      height: 45,
     });
     item.crop = {
       x: 20,
@@ -49,28 +66,23 @@ describe('image crop geometry', () => {
       width: 80,
       height: 45,
     };
-    const fullImageItem = buildFullImageTransformItem({
-      ...item,
-      x: 10,
-      y: 10,
-      width: 80,
-      height: 45,
-      crop: {
-        x: 20,
-        y: 10,
-        width: 80,
-        height: 45,
-      },
-    });
+    item.sourceTransform = {
+      x: -20,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 18,
+    };
 
     expect(
-      buildCroppedImagePreviewItem(item, fullImageItem, item.crop),
+      buildCroppedImagePreviewItem(item, item.sourceTransform),
     ).toMatchObject({
-      x: 10,
-      y: 10,
+      x: item.x,
+      y: item.y,
       width: 80,
       height: 45,
-      crop: item.crop,
+      rotation: item.rotation,
+      sourceTransform: item.sourceTransform,
     });
   });
 
@@ -91,12 +103,16 @@ describe('image crop geometry', () => {
       width: 80,
       height: 45,
     };
-    const fullImageItem = buildFullImageTransformItem(item);
+    item.sourceTransform = {
+      x: -20,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 0,
+    };
 
     const resized = resizeImageCrop({
       baseItem: item,
-      fullImageItem,
-      crop: item.crop,
       handle: 'middle-right',
       pointer: { x: 150, y: 30 },
       siblingItems: [],
@@ -115,6 +131,13 @@ describe('image crop geometry', () => {
       y: 20,
       width: 120,
       height: 45,
+      sourceTransform: {
+        x: -20,
+        y: -10,
+        width: 160,
+        height: 90,
+        rotation: 0,
+      },
     });
     expect(resized.guides).toEqual([]);
   });
@@ -136,7 +159,13 @@ describe('image crop geometry', () => {
       width: 100,
       height: 50,
     };
-    const fullImageItem = buildFullImageTransformItem(item);
+    item.sourceTransform = {
+      x: -20,
+      y: 0,
+      width: 160,
+      height: 50,
+      rotation: 0,
+    };
     const sibling = createRectangleItem({
       x: 132,
       y: 0,
@@ -146,8 +175,6 @@ describe('image crop geometry', () => {
 
     const snapped = resizeImageCrop({
       baseItem: item,
-      fullImageItem,
-      crop: item.crop,
       handle: 'middle-right',
       pointer: { x: 126, y: 35 },
       siblingItems: [sibling],
@@ -162,8 +189,6 @@ describe('image crop geometry', () => {
 
     const unsnapped = resizeImageCrop({
       baseItem: item,
-      fullImageItem,
-      crop: item.crop,
       handle: 'middle-right',
       pointer: { x: 126, y: 35 },
       siblingItems: [sibling],
@@ -192,7 +217,13 @@ describe('image crop geometry', () => {
       width: 100,
       height: 50,
     };
-    const fullImageItem = buildFullImageTransformItem(item);
+    item.sourceTransform = {
+      x: -20,
+      y: 0,
+      width: 160,
+      height: 50,
+      rotation: 0,
+    };
     const sibling = createRectangleItem({
       x: 132,
       y: 0,
@@ -202,8 +233,6 @@ describe('image crop geometry', () => {
 
     const snapped = resizeImageCrop({
       baseItem: item,
-      fullImageItem,
-      crop: item.crop,
       handle: 'middle-right',
       pointer: { x: 123, y: 35 },
       pointerOffset: { x: -5, y: 0 },
@@ -234,12 +263,16 @@ describe('image crop geometry', () => {
       width: 80,
       height: 45,
     };
-    const fullImageItem = buildFullImageTransformItem(item);
+    item.sourceTransform = {
+      x: -20,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 0,
+    };
 
     const panned = panImageUnderCrop({
       baseItem: item,
-      fullImageItem,
-      crop: item.crop,
       pointerStart: { x: 40, y: 30 },
       pointer: { x: 50, y: 40 },
     });
@@ -255,6 +288,13 @@ describe('image crop geometry', () => {
       y: 20,
       width: 80,
       height: 45,
+      sourceTransform: {
+        x: -10,
+        y: 0,
+        width: 160,
+        height: 90,
+        rotation: 0,
+      },
     });
     expect(panned.fullImageItem).toMatchObject({
       x: 20,

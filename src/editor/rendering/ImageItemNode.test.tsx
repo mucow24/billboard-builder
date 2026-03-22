@@ -36,16 +36,39 @@ const {
 });
 
 vi.mock('react-konva', () => ({
+  Group: React.forwardRef<HTMLDivElement, React.PropsWithChildren<Record<string, unknown>>>(
+    ({ children, clipX, clipY, clipWidth, clipHeight }, forwardedRef) => {
+      void forwardedRef;
+      return (
+      React.createElement(
+        'div',
+        {
+          'data-konva-node': 'Group',
+          'data-clip-x': clipX,
+          'data-clip-y': clipY,
+          'data-clip-width': clipWidth,
+          'data-clip-height': clipHeight,
+        },
+        children as React.ReactNode,
+      )
+      );
+    },
+  ),
   Image: React.forwardRef<HTMLDivElement, React.PropsWithChildren<Record<string, unknown>>>(
     (
       {
         children,
         crop,
+        rotation,
         shadowColor,
         shadowBlur,
         shadowOffsetX,
         shadowOffsetY,
         shadowOpacity,
+        width,
+        height,
+        x,
+        y,
       },
       forwardedRef,
     ) => {
@@ -55,11 +78,16 @@ vi.mock('react-konva', () => ({
         {
           'data-konva-node': 'Image',
           'data-crop': JSON.stringify(crop),
+          'data-rotation': rotation,
           'data-shadow-color': shadowColor,
           'data-shadow-blur': shadowBlur,
           'data-shadow-offset-x': shadowOffsetX,
           'data-shadow-offset-y': shadowOffsetY,
           'data-shadow-opacity': shadowOpacity,
+          'data-width': width,
+          'data-height': height,
+          'data-x': x,
+          'data-y': y,
         },
         children as React.ReactNode,
       );
@@ -103,11 +131,18 @@ describe('ImageItemNode', () => {
       <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
     );
 
+    const clipGroup = container.querySelector('[data-konva-node="Group"]');
     const node = container.querySelector('[data-konva-node="Image"]');
-    expect(node).toHaveAttribute(
-      'data-crop',
-      JSON.stringify({ x: 0, y: 0, width: 40, height: 20 }),
-    );
+    expect(clipGroup).toHaveAttribute('data-clip-x', '0');
+    expect(clipGroup).toHaveAttribute('data-clip-y', '0');
+    expect(clipGroup).toHaveAttribute('data-clip-width', '40');
+    expect(clipGroup).toHaveAttribute('data-clip-height', '20');
+    expect(node).not.toHaveAttribute('data-crop');
+    expect(node).toHaveAttribute('data-x', '0');
+    expect(node).toHaveAttribute('data-y', '0');
+    expect(node).toHaveAttribute('data-width', '40');
+    expect(node).toHaveAttribute('data-height', '20');
+    expect(node).toHaveAttribute('data-rotation', '0');
     expect(node).toHaveAttribute('data-shadow-color', '#112233');
     expect(node).toHaveAttribute('data-shadow-blur', '4');
     expect(node).toHaveAttribute('data-shadow-offset-x', '5');
@@ -177,18 +212,19 @@ describe('ImageItemNode', () => {
     expect(mockKonvaImageNode.cache).not.toHaveBeenCalled();
   });
 
-  it('passes the persisted crop rectangle to the Konva image node', () => {
+  it('renders the full source image through the persisted source transform', () => {
     const item = createImageItem({
       src: 'data:image/png;base64,AAA',
       mimeType: 'image/png',
       originalWidth: 40,
       originalHeight: 20,
     });
-    item.crop = {
-      x: 5,
+    item.sourceTransform = {
+      x: -8,
       y: 3,
-      width: 24,
-      height: 11,
+      width: 56,
+      height: 28,
+      rotation: 18,
     };
 
     const { container } = render(
@@ -196,12 +232,28 @@ describe('ImageItemNode', () => {
     );
 
     expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
-      'data-crop',
-      JSON.stringify(item.crop),
+      'data-x',
+      '-8',
+    );
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-y',
+      '3',
+    );
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-width',
+      '56',
+    );
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-height',
+      '28',
+    );
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-rotation',
+      '18',
     );
   });
 
-  it('refreshes the Konva image when the crop rectangle changes', () => {
+  it('refreshes the Konva image when the source transform changes', () => {
     const item = createImageItem({
       src: 'data:image/png;base64,AAA',
       mimeType: 'image/png',
@@ -225,11 +277,12 @@ describe('ImageItemNode', () => {
       <ImageItemNode
         item={{
           ...item,
-          crop: {
-            x: 4,
+          sourceTransform: {
+            x: -4,
             y: 2,
-            width: 24,
-            height: 12,
+            width: 44,
+            height: 22,
+            rotation: 12,
           },
         }}
         image={image}

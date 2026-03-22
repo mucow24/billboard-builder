@@ -27,6 +27,14 @@ const ImageCropRectSchema = z.object({
   height: z.number().positive(),
 });
 
+const ImageSourceTransformSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number().positive(),
+  height: z.number().positive(),
+  rotation: z.number(),
+});
+
 const TextPaddingSchema = z.object({
   top: z.number(),
   right: z.number(),
@@ -74,6 +82,7 @@ const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   originalWidth: z.number().positive(),
   originalHeight: z.number().positive(),
   crop: ImageCropRectSchema.optional(),
+  sourceTransform: ImageSourceTransformSchema.optional(),
   preserveAspectRatio: z.boolean(),
   adjustments: ImageAdjustmentsSchema.optional(),
 });

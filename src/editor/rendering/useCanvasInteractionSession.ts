@@ -35,6 +35,7 @@ import {
 import {
   buildCroppedImagePreviewItem,
   buildFullImageTransformItem,
+  buildSourceTransformFromFullImageItem,
   panImageUnderCrop,
   resizeImageCrop,
 } from './imageCropGeometry';
@@ -105,26 +106,20 @@ type CropInteraction =
       handle: ResizeHandle;
       pointerOffset: Point;
       initialPreviewItem: ImageCanvasItem;
-      initialFullImageItem: ImageCanvasItem;
-      initialCrop: ImageCropRect;
     }
   | {
       kind: 'image-pan';
       pointerStart: Point;
       initialPreviewItem: ImageCanvasItem;
-      initialFullImageItem: ImageCanvasItem;
-      initialCrop: ImageCropRect;
     }
   | {
       kind: 'full-resize';
       resizeSession: ReturnType<typeof createResizeSession>;
-      initialCrop: ImageCropRect;
       initialPreviewItem: ImageCanvasItem;
     }
   | {
       kind: 'full-rotate';
       rotateSession: ReturnType<typeof createRotateSession>;
-      initialCrop: ImageCropRect;
       initialPreviewItem: ImageCanvasItem;
     };
 
@@ -518,8 +513,6 @@ export function useCanvasInteractionSession({
           y: pointer.y - handlePoint.y,
         },
         initialPreviewItem: current.previewItem,
-        initialFullImageItem: current.fullImageItem,
-        initialCrop: current.crop,
       },
     });
   }, [updateCropSession]);
@@ -535,8 +528,6 @@ export function useCanvasInteractionSession({
         kind: 'image-pan',
         pointerStart: pointer,
         initialPreviewItem: current.previewItem,
-        initialFullImageItem: current.fullImageItem,
-        initialCrop: current.crop,
       },
     });
   }, [updateCropSession]);
@@ -556,7 +547,6 @@ export function useCanvasInteractionSession({
           pointer,
           orderedItems.filter((entry) => entry.id !== current.itemId),
         ),
-        initialCrop: current.crop,
         initialPreviewItem: current.previewItem,
       },
     });
@@ -576,7 +566,6 @@ export function useCanvasInteractionSession({
           pointer,
           orderedItems.filter((entry) => entry.id !== current.itemId),
         ),
-        initialCrop: current.crop,
         initialPreviewItem: current.previewItem,
       },
     });
@@ -703,8 +692,6 @@ export function useCanvasInteractionSession({
       case 'crop-resize': {
         const next = resizeImageCrop({
           baseItem: current.activeInteraction.initialPreviewItem,
-          fullImageItem: current.activeInteraction.initialFullImageItem,
-          crop: current.activeInteraction.initialCrop,
           handle: current.activeInteraction.handle,
           pointer,
           pointerOffset: current.activeInteraction.pointerOffset,
@@ -717,7 +704,7 @@ export function useCanvasInteractionSession({
           ...current,
           crop: next.crop,
           previewItem: next.previewItem,
-          fullImageItem: current.activeInteraction.initialFullImageItem,
+          fullImageItem: next.fullImageItem,
         });
         return;
       }
@@ -725,8 +712,6 @@ export function useCanvasInteractionSession({
         onGuidesChange([]);
         const next = panImageUnderCrop({
           baseItem: current.activeInteraction.initialPreviewItem,
-          fullImageItem: current.activeInteraction.initialFullImageItem,
-          crop: current.activeInteraction.initialCrop,
           pointerStart: current.activeInteraction.pointerStart,
           pointer,
         });
@@ -749,15 +734,19 @@ export function useCanvasInteractionSession({
           return;
         }
         onGuidesChange(resolved.guides);
+        const nextSourceTransform = buildSourceTransformFromFullImageItem(
+          current.activeInteraction.initialPreviewItem,
+          nextFullImageItem,
+        );
+        const nextPreviewItem = buildCroppedImagePreviewItem(
+          current.activeInteraction.initialPreviewItem,
+          nextSourceTransform,
+        );
         updateCropSession({
           ...current,
           fullImageItem: nextFullImageItem,
-          previewItem: buildCroppedImagePreviewItem(
-            current.activeInteraction.initialPreviewItem,
-            nextFullImageItem,
-            current.activeInteraction.initialCrop,
-          ),
-          crop: current.activeInteraction.initialCrop,
+          previewItem: nextPreviewItem,
+          crop: nextPreviewItem.crop,
         });
         return;
       }
@@ -772,15 +761,19 @@ export function useCanvasInteractionSession({
           return;
         }
         onGuidesChange([]);
+        const nextSourceTransform = buildSourceTransformFromFullImageItem(
+          current.activeInteraction.initialPreviewItem,
+          nextFullImageItem,
+        );
+        const nextPreviewItem = buildCroppedImagePreviewItem(
+          current.activeInteraction.initialPreviewItem,
+          nextSourceTransform,
+        );
         updateCropSession({
           ...current,
           fullImageItem: nextFullImageItem,
-          previewItem: buildCroppedImagePreviewItem(
-            current.activeInteraction.initialPreviewItem,
-            nextFullImageItem,
-            current.activeInteraction.initialCrop,
-          ),
-          crop: current.activeInteraction.initialCrop,
+          previewItem: nextPreviewItem,
+          crop: nextPreviewItem.crop,
         });
       }
     }

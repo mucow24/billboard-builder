@@ -59,6 +59,14 @@ export interface ImageCropRect {
   height: number;
 }
 
+export interface ImageSourceTransform {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}
+
 export interface TextPadding {
   top: number;
   right: number;
@@ -107,6 +115,7 @@ export interface ImageCanvasItem extends BaseCanvasItem {
   originalWidth: number;
   originalHeight: number;
   crop: ImageCropRect;
+  sourceTransform: ImageSourceTransform;
   preserveAspectRatio: boolean;
   adjustments: ImageAdjustments;
 }

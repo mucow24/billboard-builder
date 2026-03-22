@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
+import { Group } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 
@@ -17,6 +18,7 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
     () => getRenderableImageAdjustments(item.adjustments),
     [item.adjustments],
   );
+  const sourceTransform = item.sourceTransform;
 
   useLayoutEffect(() => {
     const node = imageRef.current;
@@ -46,29 +48,38 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
   }, [
     adjustments,
     image,
-    item.crop.height,
-    item.crop.width,
-    item.crop.x,
-    item.crop.y,
+    sourceTransform.height,
+    sourceTransform.rotation,
+    sourceTransform.width,
+    sourceTransform.x,
+    sourceTransform.y,
     renderBox.width,
     renderBox.height,
   ]);
 
   return (
-    <KonvaImage
-      ref={imageRef}
-      shadowColor={item.shadow.color}
-      shadowBlur={item.shadow.blur}
-      shadowOffsetX={item.shadow.offsetX}
-      shadowOffsetY={item.shadow.offsetY}
-      shadowOpacity={item.shadow.opacity}
-      x={0}
-      y={0}
-      crop={item.crop}
-      image={image ?? undefined}
-      width={renderBox.width}
-      height={renderBox.height}
+    <Group
+      clipX={0}
+      clipY={0}
+      clipWidth={renderBox.width}
+      clipHeight={renderBox.height}
       listening={false}
-    />
+    >
+      <KonvaImage
+        ref={imageRef}
+        shadowColor={item.shadow.color}
+        shadowBlur={item.shadow.blur}
+        shadowOffsetX={item.shadow.offsetX}
+        shadowOffsetY={item.shadow.offsetY}
+        shadowOpacity={item.shadow.opacity}
+        x={sourceTransform.x}
+        y={sourceTransform.y}
+        rotation={sourceTransform.rotation}
+        image={image ?? undefined}
+        width={sourceTransform.width}
+        height={sourceTransform.height}
+        listening={false}
+      />
+    </Group>
   );
 }

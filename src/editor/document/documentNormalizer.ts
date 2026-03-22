@@ -90,6 +90,54 @@ function normalizeImageCrop(
   };
 }
 
+function deriveImageSourceTransformFromCrop(params: {
+  crop: ImageCanvasItem['crop'];
+  frameWidth: number;
+  frameHeight: number;
+  originalWidth: number;
+  originalHeight: number;
+}): ImageCanvasItem['sourceTransform'] {
+  const scaleX = params.frameWidth / Math.max(params.crop.width, 1);
+  const scaleY = params.frameHeight / Math.max(params.crop.height, 1);
+
+  return {
+    x: -params.crop.x * scaleX,
+    y: -params.crop.y * scaleY,
+    width: params.originalWidth * scaleX,
+    height: params.originalHeight * scaleY,
+    rotation: 0,
+  };
+}
+
+function normalizeImageSourceTransform(
+  sourceTransform: Partial<ImageCanvasItem['sourceTransform']> | undefined,
+  fallbackCrop: ImageCanvasItem['crop'],
+  frameWidth: number,
+  frameHeight: number,
+  originalWidth: number,
+  originalHeight: number,
+): ImageCanvasItem['sourceTransform'] {
+  const fallback = deriveImageSourceTransformFromCrop({
+    crop: fallbackCrop,
+    frameWidth,
+    frameHeight,
+    originalWidth,
+    originalHeight,
+  });
+  const nextSourceTransform = {
+    ...fallback,
+    ...(sourceTransform ?? {}),
+  };
+
+  return {
+    x: clampFinite(nextSourceTransform.x, fallback.x),
+    y: clampFinite(nextSourceTransform.y, fallback.y),
+    width: clampDimension(nextSourceTransform.width),
+    height: clampDimension(nextSourceTransform.height),
+    rotation: clampFinite(nextSourceTransform.rotation, fallback.rotation),
+  };
+}
+
 export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
   switch (item.kind) {
     case 'text': {
@@ -117,12 +165,15 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
     case 'image': {
       const originalWidth = clampFinite(item.originalWidth, 1, 1);
       const originalHeight = clampFinite(item.originalHeight, 1, 1);
+      const width = clampDimension(item.width);
+      const height = clampDimension(item.height);
+      const crop = normalizeImageCrop(item.crop, originalWidth, originalHeight);
       const normalizedImageItem: ImageCanvasItem = {
         ...item,
         x: clampFinite(item.x, 0),
         y: clampFinite(item.y, 0),
-        width: clampDimension(item.width),
-        height: clampDimension(item.height),
+        width,
+        height,
         rotation: clampFinite(item.rotation, 0),
         scaleX: clampFinite(item.scaleX, 1),
         scaleY: clampFinite(item.scaleY, 1),
@@ -133,7 +184,15 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         shadow: normalizeShadow(item.shadow),
         originalWidth,
         originalHeight,
-        crop: normalizeImageCrop(item.crop, originalWidth, originalHeight),
+        crop,
+        sourceTransform: normalizeImageSourceTransform(
+          item.sourceTransform,
+          crop,
+          width,
+          height,
+          originalWidth,
+          originalHeight,
+        ),
         preserveAspectRatio: Boolean(item.preserveAspectRatio),
         adjustments: normalizeImageAdjustments(item.adjustments),
       };

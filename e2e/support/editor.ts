@@ -314,8 +314,7 @@ function buildSvgFixture() {
 export function createImageFixture(overrides: Record<string, unknown> = {}) {
   const svg = buildSvgFixture();
   const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`;
-
-  return {
+  const baseItem = {
     id: 'image-item',
     kind: 'image',
     name: 'Image',
@@ -349,6 +348,23 @@ export function createImageFixture(overrides: Record<string, unknown> = {}) {
       tintStrength: 0,
     },
     ...overrides,
+  };
+
+  const crop = baseItem.crop as { x: number; y: number; width: number; height: number };
+  const scaleX = Number(baseItem.width) / Math.max(crop.width, 1);
+  const scaleY = Number(baseItem.height) / Math.max(crop.height, 1);
+
+  return {
+    ...baseItem,
+    sourceTransform:
+      overrides.sourceTransform ??
+      {
+        x: -crop.x * scaleX,
+        y: -crop.y * scaleY,
+        width: Number(baseItem.originalWidth) * scaleX,
+        height: Number(baseItem.originalHeight) * scaleY,
+        rotation: 0,
+      },
   };
 }
 

@@ -305,6 +305,7 @@ export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
       height: item.height,
       rotation: item.rotation,
       crop: item.crop,
+      sourceTransform: item.sourceTransform,
       scaleX: 1,
       scaleY: 1,
     };

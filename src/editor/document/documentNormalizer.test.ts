@@ -11,8 +11,53 @@ import {
   normalizeExistingProjectDocument,
   normalizeProjectDocument,
 } from './documentNormalizer';
+import type { ImageCanvasItem } from './documentTypes';
 
 describe('document normalizer', () => {
+  it('derives a canonical image source transform from legacy crop data', () => {
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      width: 80,
+      height: 45,
+    });
+    imageItem.crop = {
+      x: 20,
+      y: 10,
+      width: 80,
+      height: 45,
+    };
+    const legacyImageItem = {
+      ...imageItem,
+      sourceTransform: undefined,
+    } as unknown as ImageCanvasItem;
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [legacyImageItem],
+      fonts: [],
+    });
+
+    expect(normalized.nodes[0]).toMatchObject({
+      kind: 'image',
+      crop: {
+        x: 20,
+        y: 10,
+        width: 80,
+        height: 45,
+      },
+      sourceTransform: {
+        x: -20,
+        y: -10,
+        width: 160,
+        height: 90,
+        rotation: 0,
+      },
+    });
+  });
+
   it('normalizes recursive node ordering, shadows, image adjustments, and font entries', () => {
     const imageItem = createImageItem({
       src: 'data:image/png;base64,AAA',

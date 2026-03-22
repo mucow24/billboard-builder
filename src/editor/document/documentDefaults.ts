@@ -193,6 +193,13 @@ export function createImageItem(params: {
     originalWidth: params.originalWidth,
     originalHeight: params.originalHeight,
     crop: createFullImageCropRect(params.originalWidth, params.originalHeight),
+    sourceTransform: {
+      x: 0,
+      y: 0,
+      width: params.width ?? params.originalWidth,
+      height: params.height ?? params.originalHeight,
+      rotation: 0,
+    },
     preserveAspectRatio: true,
     adjustments: { ...DEFAULT_IMAGE_ADJUSTMENTS },
   };

@@ -454,4 +454,91 @@ test.describe('editor image crop', () => {
       },
     });
   });
+
+  test('keeps the crop frame fixed while crop-mode rotation commits a source-only transform', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'crop-source-rotate-image',
+      name: 'Source Rotate Image',
+      x: 520,
+      y: 320,
+      crop: {
+        x: 20,
+        y: 10,
+        width: 100,
+        height: 60,
+      },
+      sourceTransform: {
+        x: -32,
+        y: -15,
+        width: 256,
+        height: 135,
+        rotation: 0,
+      },
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createGroupedProjectDocument([image]),
+      'crop-source-rotate.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 600, y: 365 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+
+    let cropSession = await expectCropMode(page);
+    const initialTopLeft = cropSession.cropHandleViewportPoints?.['top-left'];
+    const initialBottomRight = cropSession.cropHandleViewportPoints?.['bottom-right'];
+    const fullRotater = cropSession.fullImageHandlePoints?.rotater;
+    if (!initialTopLeft || !initialBottomRight || !fullRotater) {
+      throw new Error('Expected crop and full-image handles.');
+    }
+
+    await dragCanvas(page, fullRotater, {
+      x: cropSession.fullImageItem.x + cropSession.fullImageItem.width + 40,
+      y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
+    });
+
+    cropSession = await expectCropMode(page);
+    expect(Math.abs(cropSession.fullImageItem.rotation)).toBeGreaterThan(10);
+    expect(cropSession.previewItem.rotation).toBe(0);
+    expect(cropSession.cropHandleViewportPoints?.['top-left']?.x).toBeCloseTo(initialTopLeft.x, 1);
+    expect(cropSession.cropHandleViewportPoints?.['top-left']?.y).toBeCloseTo(initialTopLeft.y, 1);
+    expect(cropSession.cropHandleViewportPoints?.['bottom-right']?.x).toBeCloseTo(initialBottomRight.x, 1);
+    expect(cropSession.cropHandleViewportPoints?.['bottom-right']?.y).toBeCloseTo(initialBottomRight.y, 1);
+
+    await doubleClickCanvas(page, {
+      x: cropSession.previewItem.x + cropSession.previewItem.width / 2,
+      y: cropSession.previewItem.y + cropSession.previewItem.height / 2,
+    });
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+
+    const savedProject = await saveAndReadProject(page);
+    const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-source-rotate-image',
+    ) as {
+      rotation: number;
+      sourceTransform?: { rotation: number };
+    } | undefined;
+    expect(savedImage).toBeDefined();
+    expect(savedImage?.rotation).toBe(0);
+    expect(Math.abs(savedImage?.sourceTransform?.rotation ?? 0)).toBeGreaterThan(10);
+
+    await openFreshEditor(page);
+    await uploadProject(page, savedProject as Record<string, unknown>, 'crop-source-rotate-reload.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 600, y: 365 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+
+    cropSession = await expectCropMode(page);
+    expect(Math.abs(cropSession.fullImageItem.rotation)).toBeGreaterThan(10);
+    expect(cropSession.cropHandleViewportPoints?.['top-left']?.x).toBeCloseTo(initialTopLeft.x, 1);
+    expect(cropSession.cropHandleViewportPoints?.['top-left']?.y).toBeCloseTo(initialTopLeft.y, 1);
+  });
 });

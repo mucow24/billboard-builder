@@ -1690,6 +1690,81 @@ describe('useCanvasInteractionSession', () => {
     expect(params.onUpdateItem).not.toHaveBeenCalled();
   });
 
+  it('keeps the crop frame fixed while crop-mode rotation changes only the source transform', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      x: 520,
+      y: 320,
+      width: 160,
+      height: 90,
+    });
+    image.id = 'crop-rotate-image';
+    image.crop = {
+      x: 20,
+      y: 10,
+      width: 100,
+      height: 60,
+    };
+    const params = createHookParams({
+      document: createDocument([image]),
+      selectedItemIds: [image.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+
+    const initialCropSession = result.current.cropSession;
+    expect(initialCropSession).not.toBeNull();
+    if (!initialCropSession) {
+      throw new Error('Expected crop session to be active.');
+    }
+
+    const rotater = getShapeHandlePoints(initialCropSession.fullImageItem).rotater;
+    const fullImageCenter = {
+      x: initialCropSession.fullImageItem.x + initialCropSession.fullImageItem.width / 2,
+      y: initialCropSession.fullImageItem.y + initialCropSession.fullImageItem.height / 2,
+    };
+
+    act(() => {
+      result.current.beginCropFullRotate(rotater);
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: fullImageCenter.x + initialCropSession.fullImageItem.width / 2 + 40,
+          clientY: fullImageCenter.y,
+        }),
+      );
+    });
+
+    expect(result.current.cropSession?.previewItem.x).toBe(initialCropSession.previewItem.x);
+    expect(result.current.cropSession?.previewItem.y).toBe(initialCropSession.previewItem.y);
+    expect(result.current.cropSession?.previewItem.width).toBe(initialCropSession.previewItem.width);
+    expect(result.current.cropSession?.previewItem.height).toBe(initialCropSession.previewItem.height);
+    expect(result.current.cropSession?.previewItem.rotation).toBe(image.rotation);
+    expect(Math.abs(result.current.cropSession?.previewItem.sourceTransform.rotation ?? 0)).toBeGreaterThan(10);
+    expect(Math.abs(result.current.cropSession?.fullImageItem.rotation ?? 0)).toBeGreaterThan(10);
+
+    act(() => {
+      result.current.commitCropSession();
+    });
+
+    expect(params.onUpdateItem).toHaveBeenCalledWith(
+      image.id,
+      expect.objectContaining({
+        rotation: image.rotation,
+        sourceTransform: expect.objectContaining({
+          rotation: expect.any(Number),
+        }),
+      }),
+    );
+  });
+
   it('snaps crop-resize previews to guides and disables that snapping while ctrl is held', () => {
     const image = createImageItem({
       src: 'data:image/png;base64,AAA',

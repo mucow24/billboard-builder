@@ -4,76 +4,114 @@ import type {
   GuideLine,
   ImageCanvasItem,
   ImageCropRect,
+  ImageSourceTransform,
   SnapRect,
 } from '../document/documentTypes';
 import { getResizeSnappedRect } from './snapping';
-import { stageToLocal, type Point, type ResizeHandle } from './interactionGeometry';
+import {
+  localToStage,
+  stageToLocal,
+  type Point,
+  type ResizeHandle,
+} from './interactionGeometry';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function buildLegacyCropFromSourceTransform(
+  item: ImageCanvasItem,
+  sourceTransform: ImageSourceTransform,
+): ImageCropRect {
+  if (Math.abs(sourceTransform.rotation) > 0.001) {
+    return item.crop;
+  }
+
+  const scaleX = sourceTransform.width / Math.max(item.originalWidth, 1);
+  const scaleY = sourceTransform.height / Math.max(item.originalHeight, 1);
+  const width = clamp(item.width / Math.max(scaleX, 0.0001), 1, item.originalWidth);
+  const height = clamp(item.height / Math.max(scaleY, 0.0001), 1, item.originalHeight);
+  const x = clamp(-sourceTransform.x / Math.max(scaleX, 0.0001), 0, item.originalWidth - width);
+  const y = clamp(-sourceTransform.y / Math.max(scaleY, 0.0001), 0, item.originalHeight - height);
+
+  return {
+    x,
+    y,
+    width,
+    height,
+  };
+}
+
+export function buildImagePreviewItem(
+  baseItem: ImageCanvasItem,
+  sourceTransform: ImageSourceTransform,
+): ImageCanvasItem {
+  return {
+    ...baseItem,
+    crop: buildLegacyCropFromSourceTransform(baseItem, sourceTransform),
+    sourceTransform,
+    scaleX: 1,
+    scaleY: 1,
+  };
+}
+
 export function buildFullImageTransformItem(item: ImageCanvasItem): ImageCanvasItem {
-  const scaleX = item.width / Math.max(item.crop.width, 1);
-  const scaleY = item.height / Math.max(item.crop.height, 1);
+  const origin = { x: item.x, y: item.y };
+  const stageTopLeft = localToStage(
+    { x: item.sourceTransform.x, y: item.sourceTransform.y },
+    origin,
+    item.rotation,
+  );
 
   return {
     ...item,
     id: `crop-full-${item.id}`,
-    x: item.x - item.crop.x * scaleX,
-    y: item.y - item.crop.y * scaleY,
-    width: item.originalWidth * scaleX,
-    height: item.originalHeight * scaleY,
+    x: stageTopLeft.x,
+    y: stageTopLeft.y,
+    width: item.sourceTransform.width,
+    height: item.sourceTransform.height,
+    rotation: item.rotation + item.sourceTransform.rotation,
     crop: createFullImageCropRect(item.originalWidth, item.originalHeight),
+    sourceTransform: {
+      x: 0,
+      y: 0,
+      width: item.sourceTransform.width,
+      height: item.sourceTransform.height,
+      rotation: 0,
+    },
     scaleX: 1,
     scaleY: 1,
+  };
+}
+
+export function buildSourceTransformFromFullImageItem(
+  baseItem: ImageCanvasItem,
+  fullImageItem: ImageCanvasItem,
+): ImageSourceTransform {
+  const localTopLeft = stageToLocal(
+    { x: fullImageItem.x, y: fullImageItem.y },
+    { x: baseItem.x, y: baseItem.y },
+    baseItem.rotation,
+  );
+
+  return {
+    x: localTopLeft.x,
+    y: localTopLeft.y,
+    width: fullImageItem.width,
+    height: fullImageItem.height,
+    rotation: fullImageItem.rotation - baseItem.rotation,
   };
 }
 
 export function buildCroppedImagePreviewItem(
   baseItem: ImageCanvasItem,
-  fullImageItem: ImageCanvasItem,
-  crop: ImageCropRect,
+  sourceTransform: ImageSourceTransform,
 ): ImageCanvasItem {
-  const scaleX = fullImageItem.width / Math.max(fullImageItem.originalWidth, 1);
-  const scaleY = fullImageItem.height / Math.max(fullImageItem.originalHeight, 1);
-
-  return {
-    ...baseItem,
-    x: fullImageItem.x + crop.x * scaleX,
-    y: fullImageItem.y + crop.y * scaleY,
-    width: crop.width * scaleX,
-    height: crop.height * scaleY,
-    rotation: fullImageItem.rotation,
-    crop,
-    scaleX: 1,
-    scaleY: 1,
-  };
-}
-
-function getCropEdgesInFullFrame(
-  fullImageItem: ImageCanvasItem,
-  crop: ImageCropRect,
-) {
-  const scaleX = fullImageItem.width / Math.max(fullImageItem.originalWidth, 1);
-  const scaleY = fullImageItem.height / Math.max(fullImageItem.originalHeight, 1);
-
-  return {
-    left: crop.x * scaleX,
-    top: crop.y * scaleY,
-    right: (crop.x + crop.width) * scaleX,
-    bottom: (crop.y + crop.height) * scaleY,
-    minWidth: scaleX,
-    minHeight: scaleY,
-    scaleX,
-    scaleY,
-  };
+  return buildImagePreviewItem(baseItem, sourceTransform);
 }
 
 export function resizeImageCrop(params: {
   baseItem: ImageCanvasItem;
-  fullImageItem: ImageCanvasItem;
-  crop: ImageCropRect;
   handle: ResizeHandle;
   pointer: Point;
   pointerOffset?: Point;
@@ -83,8 +121,6 @@ export function resizeImageCrop(params: {
 }) {
   const {
     baseItem,
-    crop,
-    fullImageItem,
     handle,
     pointer,
     pointerOffset = { x: 0, y: 0 },
@@ -98,39 +134,41 @@ export function resizeImageCrop(params: {
   };
   const localPointer = stageToLocal(
     adjustedPointer,
-    { x: fullImageItem.x, y: fullImageItem.y },
-    fullImageItem.rotation,
+    { x: baseItem.x, y: baseItem.y },
+    baseItem.rotation,
   );
-  const edges = getCropEdgesInFullFrame(fullImageItem, crop);
-  let { left, top, right, bottom } = edges;
+  let left = 0;
+  let top = 0;
+  let right = baseItem.width;
+  let bottom = baseItem.height;
 
   if (handle.includes('left')) {
-    left = clamp(localPointer.x, 0, right - edges.minWidth);
+    left = clamp(localPointer.x, 0, right - 1);
   }
   if (handle.includes('right')) {
-    right = clamp(localPointer.x, left + edges.minWidth, fullImageItem.width);
+    right = clamp(localPointer.x, left + 1, Number.MAX_SAFE_INTEGER);
   }
   if (handle.includes('top')) {
-    top = clamp(localPointer.y, 0, bottom - edges.minHeight);
+    top = clamp(localPointer.y, 0, bottom - 1);
   }
   if (handle.includes('bottom')) {
-    bottom = clamp(localPointer.y, top + edges.minHeight, fullImageItem.height);
+    bottom = clamp(localPointer.y, top + 1, Number.MAX_SAFE_INTEGER);
   }
   if (handle === 'top-center' || handle === 'bottom-center') {
-    left = edges.left;
-    right = edges.right;
+    left = 0;
+    right = baseItem.width;
   }
   if (handle === 'middle-left' || handle === 'middle-right') {
-    top = edges.top;
-    bottom = edges.bottom;
+    top = 0;
+    bottom = baseItem.height;
   }
 
   let guides: GuideLine[] = [];
-  if (snapEnabled && Math.abs(fullImageItem.rotation) < 0.001) {
+  if (snapEnabled && Math.abs(baseItem.rotation) < 0.001) {
     const snapped = getResizeSnappedRect(
       {
-        x: fullImageItem.x + left,
-        y: fullImageItem.y + top,
+        x: baseItem.x + left,
+        y: baseItem.y + top,
         width: right - left,
         height: bottom - top,
       },
@@ -138,80 +176,84 @@ export function resizeImageCrop(params: {
       stageRect,
       handle,
     );
-    left = clamp(snapped.rect.x - fullImageItem.x, 0, fullImageItem.width - edges.minWidth);
-    top = clamp(snapped.rect.y - fullImageItem.y, 0, fullImageItem.height - edges.minHeight);
-    right = clamp(
-      snapped.rect.x + snapped.rect.width - fullImageItem.x,
-      left + edges.minWidth,
-      fullImageItem.width,
-    );
-    bottom = clamp(
-      snapped.rect.y + snapped.rect.height - fullImageItem.y,
-      top + edges.minHeight,
-      fullImageItem.height,
-    );
+    left = snapped.rect.x - baseItem.x;
+    top = snapped.rect.y - baseItem.y;
+    right = snapped.rect.x + snapped.rect.width - baseItem.x;
+    bottom = snapped.rect.y + snapped.rect.height - baseItem.y;
     guides = snapped.guides;
   }
 
-  const nextCrop: ImageCropRect = {
-    x: left / edges.scaleX,
-    y: top / edges.scaleY,
-    width: (right - left) / edges.scaleX,
-    height: (bottom - top) / edges.scaleY,
+  const nextWidth = Math.max(1, right - left);
+  const nextHeight = Math.max(1, bottom - top);
+  const nextOrigin = localToStage(
+    { x: left, y: top },
+    { x: baseItem.x, y: baseItem.y },
+    baseItem.rotation,
+  );
+  const nextSourceTransform: ImageSourceTransform = {
+    ...baseItem.sourceTransform,
+    x: baseItem.sourceTransform.x - left,
+    y: baseItem.sourceTransform.y - top,
   };
+  const previewItem = buildImagePreviewItem(
+    {
+      ...baseItem,
+      x: nextOrigin.x,
+      y: nextOrigin.y,
+      width: nextWidth,
+      height: nextHeight,
+    },
+    nextSourceTransform,
+  );
 
   return {
-    crop: nextCrop,
+    crop: previewItem.crop,
     guides,
-    previewItem: buildCroppedImagePreviewItem(baseItem, fullImageItem, nextCrop),
+    previewItem,
+    fullImageItem: buildFullImageTransformItem(previewItem),
   };
 }
 
 export function panImageUnderCrop(params: {
   baseItem: ImageCanvasItem;
-  fullImageItem: ImageCanvasItem;
-  crop: ImageCropRect;
   pointerStart: Point;
   pointer: Point;
 }) {
-  const { baseItem, crop, fullImageItem, pointer, pointerStart } = params;
+  const { baseItem, pointer, pointerStart } = params;
   const pointerStartLocal = stageToLocal(
     pointerStart,
     { x: 0, y: 0 },
-    fullImageItem.rotation,
+    baseItem.rotation,
   );
-  const pointerLocal = stageToLocal(pointer, { x: 0, y: 0 }, fullImageItem.rotation);
+  const pointerLocal = stageToLocal(pointer, { x: 0, y: 0 }, baseItem.rotation);
   const deltaLocal = {
     x: pointerLocal.x - pointerStartLocal.x,
     y: pointerLocal.y - pointerStartLocal.y,
   };
-  const scaleX = fullImageItem.width / Math.max(fullImageItem.originalWidth, 1);
-  const scaleY = fullImageItem.height / Math.max(fullImageItem.originalHeight, 1);
-  const nextCrop: ImageCropRect = {
-    x: clamp(
-      crop.x - deltaLocal.x / scaleX,
-      0,
-      fullImageItem.originalWidth - crop.width,
-    ),
-    y: clamp(
-      crop.y - deltaLocal.y / scaleY,
-      0,
-      fullImageItem.originalHeight - crop.height,
-    ),
-    width: crop.width,
-    height: crop.height,
+  const nextSourceTransform: ImageSourceTransform = {
+    ...baseItem.sourceTransform,
+    x:
+      Math.abs(baseItem.sourceTransform.rotation) < 0.001
+        ? clamp(
+            baseItem.sourceTransform.x + deltaLocal.x,
+            baseItem.width - baseItem.sourceTransform.width,
+            0,
+          )
+        : baseItem.sourceTransform.x + deltaLocal.x,
+    y:
+      Math.abs(baseItem.sourceTransform.rotation) < 0.001
+        ? clamp(
+            baseItem.sourceTransform.y + deltaLocal.y,
+            baseItem.height - baseItem.sourceTransform.height,
+            0,
+          )
+        : baseItem.sourceTransform.y + deltaLocal.y,
   };
-  const nextFullImageItem = buildFullImageTransformItem({
-    ...baseItem,
-    crop: nextCrop,
-  });
+  const previewItem = buildImagePreviewItem(baseItem, nextSourceTransform);
 
   return {
-    crop: nextCrop,
-    fullImageItem: nextFullImageItem,
-    previewItem: {
-      ...baseItem,
-      crop: nextCrop,
-    },
+    crop: previewItem.crop,
+    fullImageItem: buildFullImageTransformItem(previewItem),
+    previewItem,
   };
 }
