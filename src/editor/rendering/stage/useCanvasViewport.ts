@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { CanvasTool } from '../../document/documentTypes';
 import type { Point } from '../interactionGeometry';
+import { useModifierKeys } from '../useModifierKeys';
 
 import { clampZoom, toCanvasPointer, toViewportPoint, toViewportRect } from './viewportMath';
 
@@ -28,12 +29,15 @@ export function useCanvasViewport({
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
-  const [isShiftPanActive, setIsShiftPanActive] = useState(false);
-  const [isAltZoomActive, setIsAltZoomActive] = useState(false);
   const [isPanDragging, setIsPanDragging] = useState(false);
   const panDragRef = useRef<{ startPointer: Point; startPan: Point } | null>(null);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
+  const { modifierKeys } = useModifierKeys({
+    onBlur: () => {
+      panDragRef.current = null;
+    },
+  });
 
   const centerPoint = useMemo(
     () => ({ x: viewportSize.width / 2, y: viewportSize.height / 2 }),
@@ -92,41 +96,6 @@ export function useCanvasViewport({
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Shift') {
-        setIsShiftPanActive(true);
-      }
-      if (event.key === 'Alt') {
-        setIsAltZoomActive(true);
-      }
-    }
-
-    function handleKeyUp(event: KeyboardEvent) {
-      if (event.key === 'Shift') {
-        setIsShiftPanActive(false);
-      }
-      if (event.key === 'Alt') {
-        setIsAltZoomActive(false);
-      }
-    }
-
-    function handleWindowBlur() {
-      setIsShiftPanActive(false);
-      setIsAltZoomActive(false);
-      panDragRef.current = null;
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleWindowBlur);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleWindowBlur);
-    };
-  }, []);
 
   const getViewportPointerFromClient = useCallback((clientX: number, clientY: number) => {
     const bounds = viewportRef.current?.getBoundingClientRect();
@@ -248,16 +217,16 @@ export function useCanvasViewport({
     (hasActiveSession: boolean) =>
       panDragRef.current
         ? 'grabbing'
-        : activeTool === 'pan' || (isShiftPanActive && !hasActiveSession)
+        : activeTool === 'pan' || (modifierKeys.shiftKey && !hasActiveSession)
           ? 'grab'
           : activeTool === 'zoom'
-            ? isAltZoomActive
+            ? modifierKeys.altKey
               ? 'zoom-out'
               : 'zoom-in'
             : activeTool === 'select'
               ? 'default'
               : 'crosshair',
-    [activeTool, isAltZoomActive, isShiftPanActive],
+    [activeTool, modifierKeys.altKey, modifierKeys.shiftKey],
   );
 
   const handleStagePointerMove = useCallback((pointer: ViewportPoint | null) => {

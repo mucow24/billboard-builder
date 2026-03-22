@@ -153,6 +153,7 @@ describe('CanvasTestHooks', () => {
       { x: 120, y: 90 },
       false,
       expect.any(MouseEvent),
+      'overlay',
     );
     expect(beginResize).not.toHaveBeenCalled();
     expect(onTestEvent).toHaveBeenCalledWith('selected-item-overlay');
@@ -216,8 +217,8 @@ describe('CanvasTestHooks', () => {
       clientY: 40,
     });
 
-    expect(beginLineHandle).toHaveBeenCalledWith(renderedLine, 'start', { x: 30, y: 40 });
-    expect(beginGroupResize).toHaveBeenCalledWith('middle-right', { x: 110, y: 70 });
-    expect(beginGroupRotate).toHaveBeenCalledWith({ x: 90, y: 20 });
+    expect(beginLineHandle).toHaveBeenCalledWith(renderedLine, 'start', { x: 30, y: 40 }, 'overlay');
+    expect(beginGroupResize).toHaveBeenCalledWith('middle-right', { x: 110, y: 70 }, 'overlay');
+    expect(beginGroupRotate).toHaveBeenCalledWith({ x: 90, y: 20 }, 'overlay');
   });
 });

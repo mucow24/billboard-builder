@@ -186,11 +186,27 @@ test.describe('editor transforms', () => {
 
     const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'transform-image',
-    );
+    ) as {
+      id: string;
+      x: number;
+      width: number;
+      height: number;
+      rotation: number;
+      sourceTransform?: {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        rotation: number;
+      };
+    } | undefined;
     expect(savedImage).toEqual(expect.objectContaining({ id: 'transform-image' }));
     expect(Number(savedImage?.x)).toBeGreaterThan(620);
     expect(Number(savedImage?.width)).toBeGreaterThan(240);
     expect(Math.abs(Number(savedImage?.rotation))).toBeGreaterThan(10);
+    expect(savedImage?.sourceTransform?.width).toBeCloseTo(Number(savedImage?.width), 5);
+    expect(savedImage?.sourceTransform?.height).toBeCloseTo(Number(savedImage?.height), 5);
+    expect(savedImage?.sourceTransform?.rotation).toBe(0);
   });
 
   test('ST-13 disables snapping during a control-modified item drag', async ({ page }) => {
@@ -345,6 +361,42 @@ test.describe('editor transforms', () => {
     expect(savedRectangle).toBeDefined();
     expect(Number(savedRectangle?.x)).toBeCloseTo(300, 0);
     expect(Number(savedRectangle?.y)).toBeCloseTo(120, 0);
+  });
+
+  test('toggles selection off when shift-clicking an already-selected item', async ({ page }) => {
+    const rectangle = createRectangleFixture({
+      id: 'shift-toggle-rect',
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'shift-toggle-rect.json');
+
+    await clickCanvas(page, { x: 220, y: 140 });
+    expect((await readStageDebug(page)).hasShapeHandles).toBe(true);
+
+    await page.keyboard.down('Shift');
+    try {
+      await clickCanvas(page, { x: 220, y: 140 });
+    } finally {
+      await page.keyboard.up('Shift');
+    }
+
+    const debug = await readStageDebug(page);
+    expect(debug.hasShapeHandles).toBe(false);
+    expect(debug.selectedItems ?? []).toHaveLength(0);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedRectangle = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'shift-toggle-rect',
+    );
+
+    expect(savedRectangle).toBeDefined();
+    expect(Number(savedRectangle?.x)).toBe(200);
+    expect(Number(savedRectangle?.y)).toBe(120);
   });
 
   test('keeps rotated group resizing aligned to the rotated frame across repeated transforms', async ({ page }) => {

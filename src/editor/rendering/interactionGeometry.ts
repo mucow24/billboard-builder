@@ -269,13 +269,13 @@ function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
   item: T,
   localRect: SnapRect
 ): T {
+  const renderBox = getRenderBox(item);
   const stageOrigin = localToStage(
     { x: localRect.x, y: localRect.y },
     { x: item.x, y: item.y },
     item.rotation
   );
-
-  return {
+  const resizedItem = {
     ...item,
     x: stageOrigin.x,
     y: stageOrigin.y,
@@ -283,6 +283,24 @@ function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
     height: localRect.height,
     scaleX: 1,
     scaleY: 1,
+  };
+
+  if (item.kind !== 'image') {
+    return resizedItem;
+  }
+
+  const scaleX = localRect.width / Math.max(renderBox.width, 1);
+  const scaleY = localRect.height / Math.max(renderBox.height, 1);
+
+  return {
+    ...resizedItem,
+    sourceTransform: {
+      ...item.sourceTransform,
+      x: item.sourceTransform.x * scaleX,
+      y: item.sourceTransform.y * scaleY,
+      width: item.sourceTransform.width * scaleX,
+      height: item.sourceTransform.height * scaleY,
+    },
   };
 }
 

@@ -154,6 +154,52 @@ describe('interaction geometry', () => {
     expect(result.item.width).toBeGreaterThan(item.width);
   });
 
+  it('scales image source transforms with the resized frame', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      x: 200,
+      y: 120,
+      width: 160,
+      height: 90,
+    });
+    item.crop = {
+      x: 20,
+      y: 10,
+      width: 100,
+      height: 60,
+    };
+    item.sourceTransform = {
+      x: -32,
+      y: -15,
+      width: 256,
+      height: 135,
+      rotation: 0,
+    };
+    const handle = getShapeHandlePoints(item)['bottom-right'];
+    const result = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: handle.x + 80, y: handle.y + 30 },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 }
+    );
+
+    if (result.item.kind !== 'image') {
+      throw new Error('Expected image resize result.');
+    }
+
+    const scaleX = result.item.width / item.width;
+    const scaleY = result.item.height / item.height;
+    expect(result.item.sourceTransform.x).toBeCloseTo(item.sourceTransform.x * scaleX, 5);
+    expect(result.item.sourceTransform.y).toBeCloseTo(item.sourceTransform.y * scaleY, 5);
+    expect(result.item.sourceTransform.width).toBeCloseTo(item.sourceTransform.width * scaleX, 5);
+    expect(result.item.sourceTransform.height).toBeCloseTo(item.sourceTransform.height * scaleY, 5);
+  });
+
   it('grows text height when a live resize narrows the text box', () => {
     const item = createTextItem({
       x: 200,

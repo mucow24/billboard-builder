@@ -687,7 +687,10 @@ describe('CanvasStage viewport controls', () => {
       renderedItems: [rectangle],
       renderedSelectedItems: [rectangle],
       selectedItemId: rectangle.id,
-      selectedRenderedItem: rectangle,
+      selectedRenderedItem: {
+        ...rectangle,
+        selectableNodeId: rectangle.id,
+      },
     });
 
     render(
@@ -715,6 +718,56 @@ describe('CanvasStage viewport controls', () => {
     expect(mockInteractionSession.handleItemPointerDown).not.toHaveBeenCalled();
     expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
     expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
+  });
+
+  it('forwards shift-modified selected-item overlay drags to the interaction session', () => {
+    const document = createDefaultProjectDocument();
+    const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
+    document.items = [rectangle];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [rectangle],
+      renderedSelectedItems: [rectangle],
+      selectedItemId: rectangle.id,
+      selectedRenderedItem: {
+        ...rectangle,
+        selectableNodeId: rectangle.id,
+      },
+    });
+
+    render(
+      <CanvasStage
+        activeTool="select"
+        document={document}
+        selectedItemIds={[rectangle.id]}
+        guides={[]}
+        onGuidesChange={vi.fn()}
+        onSelectItem={vi.fn()}
+        onUpdateItem={vi.fn()}
+        onAddItem={vi.fn()}
+        onSetActiveTool={vi.fn()}
+        stageRef={createRef<Konva.Stage>()}
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByTestId('canvas-selected-item-overlay'), {
+      button: 0,
+      shiftKey: true,
+      clientX: 240,
+      clientY: 160,
+    });
+
+    expect(mockInteractionSession.handleItemPointerDown).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: rectangle.id,
+        selectableNodeId: rectangle.id,
+      }),
+      rectangle.id,
+      expect.any(Object),
+      true,
+      expect.anything(),
+      'overlay',
+    );
   });
 
   it('starts a pan drag instead of item resize when middle-clicking a selected item handle hook', () => {

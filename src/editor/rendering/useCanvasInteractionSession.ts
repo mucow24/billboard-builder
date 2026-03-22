@@ -28,6 +28,7 @@ import {
   currentSelectionSetSignature,
   resolveInteractionSession,
   type InteractionSession,
+  type PointerGestureSource,
   type SelectionFrame,
   type SessionWithModifiers,
   type ShapeItem,
@@ -40,6 +41,7 @@ import {
   resizeImageCrop,
 } from './imageCropGeometry';
 import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
+import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
   getNextDrilldownNodeId,
@@ -75,10 +77,12 @@ interface UseCanvasInteractionSessionParams {
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
-interface PendingPickupDrag {
+interface PendingItemGesture {
+  kind: 'pickup-drag' | 'shift-toggle';
   pointerStart: Point;
   selectionNodeId: string;
   item: CanvasItem;
+  source: PointerGestureSource;
 }
 
 interface HandledItemPointerEvent {
@@ -106,21 +110,25 @@ type CropInteraction =
       handle: ResizeHandle;
       pointerOffset: Point;
       initialPreviewItem: ImageCanvasItem;
+      source: PointerGestureSource;
     }
   | {
       kind: 'image-pan';
       pointerStart: Point;
       initialPreviewItem: ImageCanvasItem;
+      source: PointerGestureSource;
     }
   | {
       kind: 'full-resize';
       resizeSession: ReturnType<typeof createResizeSession>;
       initialPreviewItem: ImageCanvasItem;
+      source: PointerGestureSource;
     }
   | {
       kind: 'full-rotate';
       rotateSession: ReturnType<typeof createRotateSession>;
       initialPreviewItem: ImageCanvasItem;
+      source: PointerGestureSource;
     };
 
 interface ImageCropSessionState {
@@ -186,7 +194,7 @@ export function useCanvasInteractionSession({
   const sessionRef = useRef<InteractionSession | null>(null);
   const cropSessionRef = useRef<ImageCropSessionState | null>(null);
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
-  const pendingPickupDragRef = useRef<PendingPickupDrag | null>(null);
+  const pendingItemGestureRef = useRef<PendingItemGesture | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
   const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
@@ -194,7 +202,7 @@ export function useCanvasInteractionSession({
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
   const [lastDrilldownSource, setLastDrilldownSource] = useState<'item-hit' | 'stage-surface' | null>(null);
   const [hasPendingMarquee, setHasPendingMarquee] = useState(false);
-  const [hasPendingPickupDrag, setHasPendingPickupDrag] = useState(false);
+  const [hasPendingItemGesture, setHasPendingItemGesture] = useState(false);
 
   const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
   const renderables = useMemo(
@@ -297,6 +305,8 @@ export function useCanvasInteractionSession({
       );
   }, [document.nodes, renderedItems, selectedNodes]);
 
+  const { resolveModifierKeys } = useModifierKeys({ capture: true });
+
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
     sessionRef.current = nextSession;
     setSession(nextSession);
@@ -317,14 +327,14 @@ export function useCanvasInteractionSession({
     setHasPendingMarquee(false);
   }, []);
 
-  const setPendingPickupDrag = useCallback((nextPending: PendingPickupDrag | null) => {
-    pendingPickupDragRef.current = nextPending;
-    setHasPendingPickupDrag(Boolean(nextPending));
+  const setPendingItemGesture = useCallback((nextPending: PendingItemGesture | null) => {
+    pendingItemGestureRef.current = nextPending;
+    setHasPendingItemGesture(Boolean(nextPending));
   }, []);
 
-  const clearPendingPickupDrag = useCallback(() => {
-    pendingPickupDragRef.current = null;
-    setHasPendingPickupDrag(false);
+  const clearPendingItemGesture = useCallback(() => {
+    pendingItemGestureRef.current = null;
+    setHasPendingItemGesture(false);
   }, []);
 
   const getCanvasPointerFromClient = useCallback((clientX: number, clientY: number) => {
@@ -409,21 +419,17 @@ export function useCanvasInteractionSession({
     [stageBounds]
   );
 
-  const createPendingPickupSession = useCallback((pending: PendingPickupDrag) => {
-    if (pending.selectionNodeId === pending.item.id) {
-      return createDragSession(
-        pending.item,
-        pending.pointerStart,
-        orderedItems.filter((entry) => entry.id !== pending.item.id),
-      );
-    }
-
-    const selectedNode = getNodeById(document.nodes, pending.selectionNodeId);
-    if (!selectedNode || !isGroupNode(selectedNode)) {
+  const createGroupDragSessionForNode = useCallback((
+    nodeId: string,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
+    const node = getNodeById(document.nodes, nodeId);
+    if (!node || !isGroupNode(node)) {
       return null;
     }
 
-    const groupItems = collectLeafItems(selectedNode)
+    const groupItems = collectLeafItems(node)
       .slice()
       .sort((left, right) => left.zIndex - right.zIndex);
     const groupLeafIds = new Set(groupItems.map((groupItem) => groupItem.id));
@@ -431,17 +437,117 @@ export function useCanvasInteractionSession({
       renderedItems.filter((renderedItem) => groupLeafIds.has(renderedItem.id)),
     );
 
-    return createGroupDragSession(pending.pointerStart, {
+    return createGroupDragSession(pointer, {
       selectedItems: groupItems,
       siblingItems: orderedItems.filter((entry) => !groupLeafIds.has(entry.id)),
       activeSelectionFrame: groupRenderBounds ? { bounds: groupRenderBounds, rotation: 0 } : null,
-    });
+    }, source);
   }, [document.nodes, orderedItems, renderedItems]);
+
+  const createSelectedDragSession = useCallback((
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
+    const selectedGroupNodeId =
+      selectedItemIds.length === 1 &&
+      (() => {
+        const selectedNode = getNodeById(document.nodes, selectedItemIds[0]);
+        return selectedNode && isGroupNode(selectedNode) ? selectedNode.id : null;
+      })();
+    const clickedRenderable = renderableByLeafId.get(item.id);
+    if (
+      selectedGroupNodeId &&
+      clickedRenderable?.groupPath.includes(selectedGroupNodeId)
+    ) {
+      if (selectedItems.length > 1) {
+        return createGroupDragSession(pointer, {
+          selectedItems,
+          siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
+          activeSelectionFrame,
+        }, source);
+      }
+      return createDragSession(
+        item,
+        pointer,
+        orderedItems.filter((entry) => entry.id !== item.id),
+        source,
+      );
+    }
+
+    if (!selectedIdSet.has(selectionNodeId)) {
+      return null;
+    }
+
+    if (selectedItems.length > 1) {
+      return createGroupDragSession(pointer, {
+        selectedItems,
+        siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
+        activeSelectionFrame,
+      }, source);
+    }
+
+    if (selectionNodeId === item.id) {
+      return createDragSession(
+        item,
+        pointer,
+        orderedItems.filter((entry) => entry.id !== item.id),
+        source,
+      );
+    }
+
+    return createGroupDragSessionForNode(selectionNodeId, pointer, source);
+  }, [
+    activeSelectionFrame,
+    createGroupDragSessionForNode,
+    document.nodes,
+    orderedItems,
+    renderableByLeafId,
+    selectedIdSet,
+    selectedItemIds,
+    selectedItems,
+    selectedLeafIdSet,
+  ]);
+
+  const createSelectableNodeDragSession = useCallback((
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
+    if (selectionNodeId === item.id) {
+      return createDragSession(
+        item,
+        pointer,
+        orderedItems.filter((entry) => entry.id !== item.id),
+        source,
+      );
+    }
+
+    return createGroupDragSessionForNode(selectionNodeId, pointer, source);
+  }, [createGroupDragSessionForNode, orderedItems]);
+
+  const createPendingItemSession = useCallback((pending: PendingItemGesture) => (
+    pending.kind === 'shift-toggle'
+      ? createSelectedDragSession(
+          pending.item,
+          pending.selectionNodeId,
+          pending.pointerStart,
+          pending.source,
+        )
+      : createSelectableNodeDragSession(
+          pending.item,
+          pending.selectionNodeId,
+          pending.pointerStart,
+          pending.source,
+        )
+  ), [createSelectableNodeDragSession, createSelectedDragSession]);
 
   const startImageCropSession = useCallback((item: ImageCanvasItem) => {
     updateSession(null);
     clearPendingMarquee();
-    clearPendingPickupDrag();
+    clearPendingItemGesture();
     onGuidesChange([]);
     updateCropSession({
       itemId: item.id,
@@ -451,7 +557,7 @@ export function useCanvasInteractionSession({
       crop: item.crop,
       activeInteraction: null,
     });
-  }, [clearPendingMarquee, clearPendingPickupDrag, onGuidesChange, updateCropSession, updateSession]);
+  }, [clearPendingItemGesture, clearPendingMarquee, onGuidesChange, updateCropSession, updateSession]);
 
   const commitCropSession = useCallback(() => {
     const current = cropSessionRef.current;
@@ -497,7 +603,11 @@ export function useCanvasInteractionSession({
     };
   }, [cancelCropSession, cropSession]);
 
-  const beginCropResize = useCallback((handle: ResizeHandle, pointer: Point) => {
+  const beginCropResize = useCallback((
+    handle: ResizeHandle,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
     const current = cropSessionRef.current;
     if (!current) {
       return;
@@ -513,11 +623,12 @@ export function useCanvasInteractionSession({
           y: pointer.y - handlePoint.y,
         },
         initialPreviewItem: current.previewItem,
+        source,
       },
     });
   }, [updateCropSession]);
 
-  const beginCropPan = useCallback((pointer: Point) => {
+  const beginCropPan = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
     const current = cropSessionRef.current;
     if (!current) {
       return;
@@ -528,11 +639,16 @@ export function useCanvasInteractionSession({
         kind: 'image-pan',
         pointerStart: pointer,
         initialPreviewItem: current.previewItem,
+        source,
       },
     });
   }, [updateCropSession]);
 
-  const beginCropFullResize = useCallback((handle: ResizeHandle, pointer: Point) => {
+  const beginCropFullResize = useCallback((
+    handle: ResizeHandle,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
     const current = cropSessionRef.current;
     if (!current) {
       return;
@@ -546,13 +662,15 @@ export function useCanvasInteractionSession({
           handle,
           pointer,
           orderedItems.filter((entry) => entry.id !== current.itemId),
+          source,
         ),
         initialPreviewItem: current.previewItem,
+        source,
       },
     });
   }, [orderedItems, updateCropSession]);
 
-  const beginCropFullRotate = useCallback((pointer: Point) => {
+  const beginCropFullRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
     const current = cropSessionRef.current;
     if (!current) {
       return;
@@ -565,8 +683,10 @@ export function useCanvasInteractionSession({
           current.fullImageItem,
           pointer,
           orderedItems.filter((entry) => entry.id !== current.itemId),
+          source,
         ),
         initialPreviewItem: current.previewItem,
+        source,
       },
     });
   }, [orderedItems, updateCropSession]);
@@ -616,7 +736,7 @@ export function useCanvasInteractionSession({
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
     const resolvedPointer = pointer ?? current?.pointerStart ?? null;
-    clearPendingPickupDrag();
+    clearPendingItemGesture();
     if (!current || !resolvedPointer) {
       updateSession(null);
       onGuidesChange([]);
@@ -624,7 +744,7 @@ export function useCanvasInteractionSession({
     }
     finishSession(current, resolvedPointer);
     updateSession(null);
-  }, [clearPendingPickupDrag, finishSession, onGuidesChange, updateSession]);
+  }, [clearPendingItemGesture, finishSession, onGuidesChange, updateSession]);
 
   const advanceSessionAtPointer = useCallback(
     (pointer: Point | null, modifiers: { ctrlKey: boolean; shiftKey: boolean }) => {
@@ -633,16 +753,16 @@ export function useCanvasInteractionSession({
       }
 
       let current = sessionRef.current;
-      if (pendingPickupDragRef.current) {
-        const pending = pendingPickupDragRef.current;
+      if (pendingItemGestureRef.current) {
+        const pending = pendingItemGestureRef.current;
         const distance = Math.hypot(
           pointer.x - pending.pointerStart.x,
           pointer.y - pending.pointerStart.y,
         );
         if (distance >= PICKUP_DRAG_THRESHOLD) {
-          clearPendingPickupDrag();
+          clearPendingItemGesture();
           if (!current) {
-            current = createPendingPickupSession(pending);
+            current = createPendingItemSession(pending);
           }
         } else {
           return;
@@ -652,6 +772,7 @@ export function useCanvasInteractionSession({
         current = {
           kind: 'marquee',
           pointerStart: pendingMarqueeRef.current.pointerStart,
+          pointerSource: 'stage',
           currentPointer: pointer,
           toggleMode: pendingMarqueeRef.current.toggleMode,
           guides: [],
@@ -676,7 +797,7 @@ export function useCanvasInteractionSession({
       onGuidesChange(next.guides);
       updateSession(next);
     },
-    [clearPendingMarquee, clearPendingPickupDrag, createPendingPickupSession, onGuidesChange, resolveSession, updateSession],
+    [clearPendingItemGesture, clearPendingMarquee, createPendingItemSession, onGuidesChange, resolveSession, updateSession],
   );
 
   const advanceCropInteractionAtPointer = useCallback((
@@ -793,33 +914,38 @@ export function useCanvasInteractionSession({
   }, [onGuidesChange, updateCropSession]);
 
   const handleWindowMouseMove = useEffectEvent((event: MouseEvent) => {
-    if (cropSessionRef.current?.activeInteraction) {
-      const pointer = getCurrentPointer(event);
-      advanceCropInteractionAtPointer(pointer, {
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      });
-      return;
-    }
-    if (isClientPointInsideStage(event.clientX, event.clientY)) {
-      return;
-    }
-    const pointer = getCurrentPointer(event);
-    advanceSessionAtPointer(pointer, {
+    const modifiers = resolveModifierKeys({
       ctrlKey: event.ctrlKey,
       shiftKey: event.shiftKey,
     });
+    const shouldUseInsideStageWindowFallback =
+      cropSessionRef.current?.activeInteraction?.source === 'overlay' ||
+      sessionRef.current?.pointerSource === 'overlay' ||
+      pendingItemGestureRef.current?.source === 'overlay';
+    if (!shouldUseInsideStageWindowFallback && isClientPointInsideStage(event.clientX, event.clientY)) {
+      return;
+    }
+    if (cropSessionRef.current?.activeInteraction) {
+      const pointer = getCurrentPointer(event);
+      advanceCropInteractionAtPointer(pointer, modifiers);
+      return;
+    }
+    const pointer = getCurrentPointer(event);
+    advanceSessionAtPointer(pointer, modifiers);
   });
 
-  const commitPendingPickupDrag = useCallback(
+  const commitPendingItemGesture = useCallback(
     (pointer: Point | null) => {
-      if (!pendingPickupDragRef.current) {
+      if (!pendingItemGestureRef.current) {
         return false;
       }
 
-      const pending = pendingPickupDragRef.current;
-      clearPendingPickupDrag();
+      const pending = pendingItemGestureRef.current;
+      clearPendingItemGesture();
       if (!pointer) {
+        if (pending.kind === 'shift-toggle') {
+          onToggleSelectItem?.(pending.selectionNodeId);
+        }
         updateSession(null);
         onGuidesChange([]);
         return true;
@@ -830,44 +956,49 @@ export function useCanvasInteractionSession({
         pointer.y - pending.pointerStart.y,
       );
       if (distance < PICKUP_DRAG_THRESHOLD) {
+        if (pending.kind === 'shift-toggle') {
+          onToggleSelectItem?.(pending.selectionNodeId);
+        }
         updateSession(null);
         onGuidesChange([]);
         return true;
       }
 
-      const pickupSession = sessionRef.current ?? createPendingPickupSession(pending);
-      if (!pickupSession) {
+      const pendingSession = sessionRef.current ?? createPendingItemSession(pending);
+      if (!pendingSession) {
         updateSession(null);
         onGuidesChange([]);
         return true;
       }
 
-      finishSession(pickupSession, pointer);
+      finishSession(pendingSession, pointer);
       updateSession(null);
       return true;
     },
     [
-      clearPendingPickupDrag,
-      createPendingPickupSession,
+      clearPendingItemGesture,
+      createPendingItemSession,
       finishSession,
       onGuidesChange,
+      onToggleSelectItem,
       updateSession,
     ],
   );
 
   const handleWindowMouseUp = useEffectEvent((event: MouseEvent) => {
+    const modifiers = resolveModifierKeys({
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+    });
     if (cropSessionRef.current?.activeInteraction) {
       const pointer = getCurrentPointer(event);
-      advanceCropInteractionAtPointer(pointer, {
-        ctrlKey: event.ctrlKey,
-        shiftKey: event.shiftKey,
-      });
+      advanceCropInteractionAtPointer(pointer, modifiers);
       endCropInteraction();
       return;
     }
-    if (pendingPickupDragRef.current) {
+    if (pendingItemGestureRef.current) {
       const pointer = getCurrentPointer(event);
-      if (commitPendingPickupDrag(pointer)) {
+      if (commitPendingItemGesture(pointer)) {
         return;
       }
     }
@@ -880,7 +1011,7 @@ export function useCanvasInteractionSession({
   });
 
   useEffect(() => {
-    if (!session && !hasPendingMarquee && !hasPendingPickupDrag && !cropSession?.activeInteraction) {
+    if (!session && !hasPendingMarquee && !hasPendingItemGesture && !cropSession?.activeInteraction) {
       return;
     }
 
@@ -898,66 +1029,81 @@ export function useCanvasInteractionSession({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp, true);
     };
-  }, [cropSession?.activeInteraction, handleWindowMouseMove, handleWindowMouseUp, hasPendingMarquee, hasPendingPickupDrag, session]);
+  }, [cropSession?.activeInteraction, handleWindowMouseMove, handleWindowMouseUp, hasPendingItemGesture, hasPendingMarquee, session]);
 
   const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
     updateSession(createCreateSession(tool, pointer));
   }, [updateSession]);
 
-  const beginDrag = useCallback((item: CanvasItem, pointer: Point) => {
-    updateSession(createDragSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id)));
+  const beginDrag = useCallback((item: CanvasItem, pointer: Point, source: PointerGestureSource = 'stage') => {
+    updateSession(createDragSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
-  const beginGroupDrag = useCallback((pointer: Point) => {
+  const beginGroupDrag = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
     const nextSession = createGroupDragSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
       activeSelectionFrame,
-    });
+    }, source);
     if (nextSession) {
       updateSession(nextSession);
     }
   }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
-  const beginResize = useCallback((item: ShapeItem, handle: ResizeHandle, pointer: Point) => {
+  const beginResize = useCallback((
+    item: ShapeItem,
+    handle: ResizeHandle,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
     updateSession(
-      createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id))
+      createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id), source)
     );
   }, [orderedItems, updateSession]);
 
-  const beginGroupResize = useCallback((handle: ResizeHandle, pointer: Point) => {
+  const beginGroupResize = useCallback((
+    handle: ResizeHandle,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
     const nextSession = createGroupResizeSession(handle, pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
       activeSelectionFrame,
-    });
+    }, source);
     if (nextSession) {
       updateSession(nextSession);
     }
   }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
-  const beginRotate = useCallback((item: ShapeItem, pointer: Point) => {
-    updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id)));
+  const beginRotate = useCallback((item: ShapeItem, pointer: Point, source: PointerGestureSource = 'stage') => {
+    updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
-  const beginGroupRotate = useCallback((pointer: Point) => {
+  const beginGroupRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
     const nextSession = createGroupRotateSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
       activeSelectionFrame,
-    });
+    }, source);
     if (nextSession) {
       updateSession(nextSession);
     }
   }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
 
-  const beginLineHandle = useCallback((item: LineCanvasItem, handle: 'start' | 'end', pointer: Point) => {
+  const beginLineHandle = useCallback((
+    item: LineCanvasItem,
+    handle: 'start' | 'end',
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
     updateSession(
       createLineHandleSession(
         item,
         handle,
         pointer,
-        orderedItems.filter((entry) => entry.id !== item.id)
+        orderedItems.filter((entry) => entry.id !== item.id),
+        source,
       )
     );
   }, [orderedItems, updateSession]);
@@ -979,7 +1125,10 @@ export function useCanvasInteractionSession({
     pointer: Point,
     shiftKey: boolean,
     nativeEvent?: MouseEvent,
+    source: PointerGestureSource = 'stage',
   ) => {
+    const shiftPressed = resolveModifierKeys({ ctrlKey: false, shiftKey }).shiftKey;
+    const selectedSession = createSelectedDragSession(item, selectionNodeId, pointer, source);
     if (nativeEvent) {
       lastHandledItemPointerEventRef.current = {
         nativeEvent,
@@ -994,73 +1143,53 @@ export function useCanvasInteractionSession({
     if (cropSessionRef.current && cropSessionRef.current.itemId !== item.id) {
       commitCropSession();
     }
-    if (shiftKey && onToggleSelectItem) {
-      clearPendingPickupDrag();
+    if (selectedSession) {
+      clearPendingItemGesture();
+      setLastDrilldownSource(null);
+      if (shiftPressed && onToggleSelectItem && selectedIdSet.has(selectionNodeId)) {
+        // Defer the toggle until mouseup so shift-drag can still constrain movement.
+        setPendingItemGesture({
+          kind: 'shift-toggle',
+          pointerStart: pointer,
+          selectionNodeId,
+          item,
+          source,
+        });
+        updateSession(null);
+        return;
+      }
+      updateSession(selectedSession);
+      return;
+    }
+    if (shiftPressed && onToggleSelectItem && !selectedIdSet.has(selectionNodeId)) {
+      clearPendingItemGesture();
       setLastDrilldownSource(null);
       onToggleSelectItem(selectionNodeId);
       return;
     }
-    const selectedGroupNodeId =
-      selectedItemIds.length === 1 &&
-      (() => {
-        const selectedNode = getNodeById(document.nodes, selectedItemIds[0]);
-        return selectedNode && isGroupNode(selectedNode) ? selectedNode.id : null;
-      })();
-    const clickedRenderable = renderableByLeafId.get(item.id);
-    if (
-      selectedGroupNodeId &&
-      clickedRenderable?.groupPath.includes(selectedGroupNodeId)
-    ) {
-      clearPendingPickupDrag();
-      setLastDrilldownSource(null);
-      if (selectedItems.length > 1) {
-        beginGroupDrag(pointer);
-      } else {
-        beginDrag(item, pointer);
-      }
-      return;
-    }
-    if (selectedIdSet.has(selectionNodeId)) {
-      clearPendingPickupDrag();
-      setLastDrilldownSource(null);
-      if (selectedItems.length > 1) {
-        beginGroupDrag(pointer);
-        return;
-      }
-      if (selectionNodeId === item.id) {
-        beginDrag(item, pointer);
-      }
-      return;
-    }
-    setPendingPickupDrag({
+    setPendingItemGesture({
+      kind: 'pickup-drag',
       pointerStart: pointer,
       selectionNodeId,
       item,
+      source,
     });
-    const pickupSession = createPendingPickupSession({
-      pointerStart: pointer,
-      selectionNodeId,
-      item,
-    });
+    const pickupSession = createSelectableNodeDragSession(item, selectionNodeId, pointer, source);
     if (pickupSession) {
       updateSession(pickupSession);
     }
     setLastDrilldownSource(null);
     onSelectItem(selectionNodeId);
   }, [
-    beginDrag,
-    beginGroupDrag,
+    clearPendingItemGesture,
     commitCropSession,
-    createPendingPickupSession,
-    document.nodes,
+    createSelectableNodeDragSession,
+    createSelectedDragSession,
+    resolveModifierKeys,
     onSelectItem,
     onToggleSelectItem,
-    clearPendingPickupDrag,
-    renderableByLeafId,
     selectedIdSet,
-    selectedItems.length,
-    setPendingPickupDrag,
-    selectedItemIds,
+    setPendingItemGesture,
     updateSession,
   ]);
 
@@ -1128,7 +1257,7 @@ export function useCanvasInteractionSession({
       }
       return;
     }
-    if (pendingPickupDragRef.current || sessionRef.current) {
+    if (pendingItemGestureRef.current || sessionRef.current) {
       return;
     }
     const handledItemEvent = lastHandledItemPointerEventRef.current;
@@ -1163,7 +1292,7 @@ export function useCanvasInteractionSession({
           ? getNextDrilldownNodeId(document.nodes, selectedNodeId, drilledItem.id)
           : null;
         if (drilledItem && nextNodeId && nextNodeId !== selectedNodeId) {
-          clearPendingPickupDrag();
+          clearPendingItemGesture();
           onGuidesChange([]);
           const recordedAtMs = Date.now();
           const lastDescendantClick = lastStageDescendantClickRef.current;
@@ -1201,7 +1330,11 @@ export function useCanvasInteractionSession({
       }
     }
     if (!pointer || !isCanvasSurface) return;
-    clearPendingPickupDrag();
+    clearPendingItemGesture();
+    const modifiers = resolveModifierKeys({
+      ctrlKey: Boolean(event.evt?.ctrlKey),
+      shiftKey: Boolean(event.evt?.shiftKey),
+    });
     if (isCreateTool(activeTool)) {
       setLastDrilldownSource(null);
       beginCreate(activeTool, pointer);
@@ -1211,7 +1344,7 @@ export function useCanvasInteractionSession({
       setLastDrilldownSource(null);
       onGuidesChange([]);
       onSelectItem(undefined);
-      setPendingMarquee({ pointerStart: pointer, toggleMode: Boolean(event.evt?.shiftKey) });
+      setPendingMarquee({ pointerStart: pointer, toggleMode: modifiers.shiftKey });
       updateSession(null);
       return;
     }
@@ -1221,21 +1354,22 @@ export function useCanvasInteractionSession({
   }, [
     activeTool,
     beginCreate,
+    clearPendingItemGesture,
     commitCropSession,
     document.nodes,
     getCanvasPointerFromStageEvent,
     onGuidesChange,
     onSelectItem,
+    resolveModifierKeys,
     renderedItems,
     selectedItemIds,
-    clearPendingPickupDrag,
     setPendingMarquee,
     updateSession,
   ]);
 
   const handleStageMouseUp = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
     const pointer = getCanvasPointerFromStageEvent(event);
-    if (pendingPickupDragRef.current && commitPendingPickupDrag(pointer)) {
+    if (pendingItemGestureRef.current && commitPendingItemGesture(pointer)) {
       return;
     }
     if (!sessionRef.current && pendingMarqueeRef.current) {
@@ -1245,17 +1379,17 @@ export function useCanvasInteractionSession({
     }
     if (!sessionRef.current) return;
     commitActiveSession(pointer);
-  }, [clearPendingMarquee, commitActiveSession, commitPendingPickupDrag, getCanvasPointerFromStageEvent, onGuidesChange]);
+  }, [clearPendingMarquee, commitActiveSession, commitPendingItemGesture, getCanvasPointerFromStageEvent, onGuidesChange]);
 
   const handleStagePointerMove = useCallback(
     (event: Konva.KonvaEventObject<MouseEvent>) => {
       const pointer = getCanvasPointerFromStageEvent(event);
-      advanceSessionAtPointer(pointer, {
+      advanceSessionAtPointer(pointer, resolveModifierKeys({
         ctrlKey: event.evt.ctrlKey,
         shiftKey: event.evt.shiftKey,
-      });
+      }));
     },
-    [advanceSessionAtPointer, getCanvasPointerFromStageEvent],
+    [advanceSessionAtPointer, getCanvasPointerFromStageEvent, resolveModifierKeys],
   );
 
   return {

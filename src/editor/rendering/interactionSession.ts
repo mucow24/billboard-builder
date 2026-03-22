@@ -28,6 +28,7 @@ import type {
 } from '../document/documentTypes';
 
 export type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
+export type PointerGestureSource = 'stage' | 'overlay';
 
 export interface SelectionFrame {
   bounds: RenderBox;
@@ -46,6 +47,7 @@ interface InteractionSessionBase {
     | 'group-resize'
     | 'group-rotate';
   pointerStart: Point;
+  pointerSource: PointerGestureSource;
   guides: GuideLine[];
   snapDisabled?: boolean;
 }
@@ -377,12 +379,14 @@ function getGroupResizePointer(
 
 export function createCreateSession(
   tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
-  pointer: Point
+  pointer: Point,
+  pointerSource: PointerGestureSource = 'stage',
 ): CreateSession {
   return {
     kind: 'create',
     tool,
     pointerStart: pointer,
+    pointerSource,
     previewItem: null,
     guides: [],
     snapDisabled: false,
@@ -392,7 +396,8 @@ export function createCreateSession(
 export function createDragSession(
   item: CanvasItem,
   pointer: Point,
-  siblingItems: CanvasItem[]
+  siblingItems: CanvasItem[],
+  pointerSource: PointerGestureSource = 'stage',
 ): DragSession {
   return {
     kind: 'drag',
@@ -401,6 +406,7 @@ export function createDragSession(
     previewItem: item,
     siblingItems,
     pointerStart: pointer,
+    pointerSource,
     guides: [],
     snapDisabled: false,
     axisLock: undefined,
@@ -411,7 +417,8 @@ export function createResizeSession(
   item: ShapeItem,
   handle: ResizeHandle,
   pointer: Point,
-  siblingItems: CanvasItem[]
+  siblingItems: CanvasItem[],
+  pointerSource: PointerGestureSource = 'stage',
 ): ResizeSession {
   const handlePoint = getShapeHandlePoints(item)[handle];
   return {
@@ -421,6 +428,7 @@ export function createResizeSession(
     previewItem: item,
     siblingItems,
     pointerStart: pointer,
+    pointerSource,
     pointerOffset: { x: pointer.x - handlePoint.x, y: pointer.y - handlePoint.y },
     handle,
     guides: [],
@@ -431,7 +439,8 @@ export function createResizeSession(
 export function createRotateSession(
   item: ShapeItem,
   pointer: Point,
-  siblingItems: CanvasItem[]
+  siblingItems: CanvasItem[],
+  pointerSource: PointerGestureSource = 'stage',
 ): RotateSession {
   return {
     kind: 'rotate',
@@ -440,6 +449,7 @@ export function createRotateSession(
     previewItem: item,
     siblingItems,
     pointerStart: pointer,
+    pointerSource,
     handle: 'rotater',
     guides: [],
     snapDisabled: false,
@@ -450,7 +460,8 @@ export function createLineHandleSession(
   item: LineCanvasItem,
   handle: 'start' | 'end',
   pointer: Point,
-  siblingItems: CanvasItem[]
+  siblingItems: CanvasItem[],
+  pointerSource: PointerGestureSource = 'stage',
 ): LineHandleSession {
   const rect = getLineHandleRects(item)[handle];
   return {
@@ -460,6 +471,7 @@ export function createLineHandleSession(
     previewItem: item,
     siblingItems,
     pointerStart: pointer,
+    pointerSource,
     pointerOffset: {
       x: pointer.x - (rect.x + rect.width / 2),
       y: pointer.y - (rect.y + rect.height / 2),
@@ -478,7 +490,8 @@ interface GroupSessionArgs {
 
 export function createGroupDragSession(
   pointer: Point,
-  args: GroupSessionArgs
+  args: GroupSessionArgs,
+  pointerSource: PointerGestureSource = 'stage',
 ): GroupDragSession | null {
   const { activeSelectionFrame, selectedItems, siblingItems } = args;
   if (!activeSelectionFrame || selectedItems.length <= 1) {
@@ -493,6 +506,7 @@ export function createGroupDragSession(
     bounds: activeSelectionFrame.bounds,
     frameRotation: activeSelectionFrame.rotation,
     pointerStart: pointer,
+    pointerSource,
     currentPointer: pointer,
     guides: [],
     snapDisabled: false,
@@ -502,7 +516,8 @@ export function createGroupDragSession(
 export function createGroupResizeSession(
   handle: ResizeHandle,
   pointer: Point,
-  args: GroupSessionArgs
+  args: GroupSessionArgs,
+  pointerSource: PointerGestureSource = 'stage',
 ): GroupResizeSession | null {
   const { activeSelectionFrame, selectedItems, siblingItems } = args;
   if (!activeSelectionFrame || selectedItems.length <= 1) {
@@ -517,6 +532,7 @@ export function createGroupResizeSession(
     bounds: activeSelectionFrame.bounds,
     frameRotation: activeSelectionFrame.rotation,
     pointerStart: pointer,
+    pointerSource,
     currentPointer: pointer,
     handle,
     guides: [],
@@ -526,7 +542,8 @@ export function createGroupResizeSession(
 
 export function createGroupRotateSession(
   pointer: Point,
-  args: GroupSessionArgs
+  args: GroupSessionArgs,
+  pointerSource: PointerGestureSource = 'stage',
 ): GroupRotateSession | null {
   const { activeSelectionFrame, selectedItems, siblingItems } = args;
   if (!activeSelectionFrame || selectedItems.length <= 1) {
@@ -541,6 +558,7 @@ export function createGroupRotateSession(
     bounds: activeSelectionFrame.bounds,
     frameRotation: activeSelectionFrame.rotation,
     pointerStart: pointer,
+    pointerSource,
     currentPointer: pointer,
     handle: 'rotater',
     guides: [],

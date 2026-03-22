@@ -761,7 +761,7 @@ describe('useCanvasInteractionSession', () => {
     );
   });
 
-  it('ignores window mousemove while the pointer remains inside the stage bounds', () => {
+  it('ignores window mousemove while the pointer remains inside the stage bounds for stage-owned drags', () => {
     const stageRef = makeStageRef();
     stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
     const item = createRectangleItem({
@@ -946,6 +946,97 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
+  it('prefers explicit pointer-move modifier state over previously tracked keyboard state', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 120,
+      height: 80,
+    });
+    const params = createHookParams({
+      document: createDocument([item]),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Shift',
+          shiftKey: true,
+        }),
+      );
+    });
+    act(() => {
+      result.current.beginDrag(item, { x: 220, y: 140 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 320,
+          clientY: 200,
+          shiftKey: false,
+        }),
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('drag');
+    if (result.current.session?.kind !== 'drag') {
+      throw new Error('Expected drag session.');
+    }
+    expect(result.current.session.axisLock).toBeUndefined();
+    expect(result.current.session.previewItem).toMatchObject({
+      x: 300,
+      y: 180,
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keyup', {
+          key: 'Shift',
+        }),
+      );
+    });
+  });
+
+  it('updates overlay-owned drags from window mousemove events that stay inside the stage', () => {
+    const stageRef = makeStageRef();
+    stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 120,
+      height: 80,
+    });
+    const params = createHookParams({
+      document: createDocument([item]),
+      stageRef: stageRef.ref,
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginDrag(item, { x: 220, y: 140 }, 'overlay');
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 320,
+          clientY: 200,
+          shiftKey: true,
+        }),
+      );
+    });
+
+    expect(result.current.session?.kind).toBe('drag');
+    if (result.current.session?.kind !== 'drag') {
+      throw new Error('Expected drag session.');
+    }
+    expect(result.current.session.axisLock).toBe('x');
+    expect(result.current.session.previewItem).toMatchObject({
+      x: 300,
+      y: 120,
+    });
+  });
+
   it('disables snapping while ctrl-dragging', () => {
     const item = createRectangleItem({
       x: 200,
@@ -997,6 +1088,62 @@ describe('useCanvasInteractionSession', () => {
 
     act(() => {
       result.current.handleItemPointerDown(item, item.id, { x: 10, y: 20 }, true);
+    });
+
+    expect(params.onToggleSelectItem).toHaveBeenCalledWith(item.id);
+    expect(result.current.session).toBeNull();
+  });
+
+  it('starts dragging instead of toggling when shift is held on an already-selected item', () => {
+    const item = createRectangleItem({ id: 'selected-item', x: 200, y: 120, width: 120, height: 80 });
+    const params = createHookParams({
+      document: createDocument([item]),
+      selectedItemIds: [item.id],
+      onToggleSelectItem: vi.fn(),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(item, item.id, { x: 220, y: 140 }, true);
+    });
+
+    expect(params.onToggleSelectItem).not.toHaveBeenCalled();
+    expect(result.current.session).toBeNull();
+
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mousemove', {
+          clientX: 320,
+          clientY: 200,
+          shiftKey: true,
+        }),
+      );
+    });
+
+    expect(params.onToggleSelectItem).not.toHaveBeenCalled();
+    expect(result.current.session?.kind).toBe('drag');
+
+  });
+
+  it('toggles selection on mouseup when shift-clicking an already-selected item without dragging', () => {
+    const item = createRectangleItem({ id: 'selected-item', x: 200, y: 120, width: 120, height: 80 });
+    const params = createHookParams({
+      document: createDocument([item]),
+      selectedItemIds: [item.id],
+      onToggleSelectItem: vi.fn(),
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemPointerDown(item, item.id, { x: 220, y: 140 }, true);
+    });
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          clientX: 220,
+          clientY: 140,
+        }),
+      );
     });
 
     expect(params.onToggleSelectItem).toHaveBeenCalledWith(item.id);

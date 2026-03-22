@@ -1,36 +1,44 @@
 import type { CanvasItem } from '../../document/documentTypes';
 import { type Point, type ResizeHandle } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { toOverlayStyle } from './viewportMath';
+
+const OVERLAY_POINTER_SOURCE = 'overlay' as const;
 
 interface CanvasTestHooksProps {
   beginCropFullResize?: (
     handle: ResizeHandle,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
-  beginCropFullRotate?: (pointer: Point) => void;
-  beginCropPan?: (pointer: Point) => void;
-  beginCropResize?: (handle: ResizeHandle, pointer: Point) => void;
-  beginGroupDrag: (pointer: Point) => void;
+  beginCropFullRotate?: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropPan?: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropResize?: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupDrag: (pointer: Point, source?: PointerGestureSource) => void;
   beginGroupResize: (
     handle: ResizeHandle,
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
-  beginGroupRotate: (pointer: Point) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
   beginLineHandle: (
     item: Extract<CanvasItem, { kind: 'line' }>,
     handle: 'start' | 'end',
     pointer: Point,
+    source?: PointerGestureSource,
   ) => void;
   beginResize: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     handle: ResizeHandle,
     pointer: { x: number; y: number },
+    source?: PointerGestureSource,
   ) => void;
   beginRotate: (
     item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
     pointer: { x: number; y: number },
+    source?: PointerGestureSource,
   ) => void;
   cropFullImageHandleViewportPoints?: Record<string, { x: number; y: number }> | null;
   cropFullImageRotaterViewportPoint?: { x: number; y: number } | null;
@@ -50,6 +58,7 @@ interface CanvasTestHooksProps {
     pointer: { x: number; y: number },
     shiftKey: boolean,
     nativeEvent?: MouseEvent,
+    source?: PointerGestureSource,
   ) => void;
   marqueeViewportRect: { left: number; top: number; width: number; height: number } | null;
   onTestEvent: (eventName: string) => void;
@@ -168,7 +177,7 @@ export function CanvasTestHooks({
                 if (!pointer || event.button !== 0) {
                   return;
                 }
-                beginCropPan(toCanvasPointer(pointer));
+                beginCropPan(toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
               }}
               style={{
                 position: 'absolute',
@@ -196,7 +205,7 @@ export function CanvasTestHooks({
                       if (!pointer || event.button !== 0) {
                         return;
                       }
-                      beginCropResize(handle as ResizeHandle, toCanvasPointer(pointer));
+                      beginCropResize(handle as ResizeHandle, toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
                     }}
                     style={{
                       position: 'absolute',
@@ -220,7 +229,7 @@ export function CanvasTestHooks({
                       if (!pointer || event.button !== 0) {
                         return;
                       }
-                      beginCropFullResize(handle as ResizeHandle, toCanvasPointer(pointer));
+                      beginCropFullResize(handle as ResizeHandle, toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
                     }}
                     style={{
                       position: 'absolute',
@@ -242,7 +251,7 @@ export function CanvasTestHooks({
                   if (!pointer || event.button !== 0) {
                     return;
                   }
-                  beginCropFullRotate(toCanvasPointer(pointer));
+                  beginCropFullRotate(toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
                 }}
                 style={{
                   position: 'absolute',
@@ -277,8 +286,9 @@ export function CanvasTestHooks({
                 selectedRenderedItem,
                 selectedRenderedItem.selectableNodeId,
                 toCanvasPointer(pointer),
-                false,
+                event.shiftKey,
                 event.nativeEvent,
+                OVERLAY_POINTER_SOURCE,
               );
             }}
             style={{
@@ -316,13 +326,14 @@ export function CanvasTestHooks({
                     return;
                   }
                   if (handle === 'rotater') {
-                    beginRotate(selectedRenderedItem, toCanvasPointer(pointer));
+                    beginRotate(selectedRenderedItem, toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
                     return;
                   }
                   beginResize(
                     selectedRenderedItem,
                     handle as ResizeHandle,
                     toCanvasPointer(pointer),
+                    OVERLAY_POINTER_SOURCE,
                   );
                 }}
                 style={{
@@ -362,6 +373,7 @@ export function CanvasTestHooks({
                     selectedRenderedItem,
                     handle as 'start' | 'end',
                     toCanvasPointer(pointer),
+                    OVERLAY_POINTER_SOURCE,
                   );
                 }}
                 style={{
@@ -389,7 +401,7 @@ export function CanvasTestHooks({
               if (!pointer) {
                 return;
               }
-              beginGroupDrag(toCanvasPointer(pointer));
+              beginGroupDrag(toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
             }}
             style={{
               position: 'absolute',
@@ -419,7 +431,7 @@ export function CanvasTestHooks({
                   if (!pointer) {
                     return;
                   }
-                  beginGroupResize(handle as ResizeHandle, toCanvasPointer(pointer));
+                  beginGroupResize(handle as ResizeHandle, toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
                 }}
                 style={{
                   position: 'absolute',
@@ -449,7 +461,7 @@ export function CanvasTestHooks({
               if (!pointer) {
                 return;
               }
-              beginGroupRotate(toCanvasPointer(pointer));
+              beginGroupRotate(toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
             }}
             style={{
               position: 'absolute',
