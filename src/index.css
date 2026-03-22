@@ -75,10 +75,19 @@ button {
   margin: 0;
   padding: 0.75rem 0.9rem;
   border-radius: 0;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.app-status-error {
   border: 1px solid rgba(248, 113, 113, 0.4);
   background: rgba(127, 29, 29, 0.36);
   color: #fee2e2;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.app-status-success {
+  border: 1px solid rgba(74, 222, 128, 0.36);
+  background: rgba(20, 83, 45, 0.42);
+  color: #dcfce7;
 }
 
 .top-toolbar {
@@ -2006,7 +2015,7 @@ button {
   overflow: hidden;
 }
 
-.rail-tab-body-templates {
+.rail-tab-body-favorites {
   padding-right: 0.05rem;
 }
 
@@ -2018,13 +2027,13 @@ button {
   flex: 1 1 auto;
 }
 
-.template-library-list {
+.favorite-library-list {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
 }
 
-.template-card {
+.favorite-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.5rem;
@@ -2034,7 +2043,7 @@ button {
   background: rgba(10, 15, 28, 0.7);
 }
 
-.template-card-button {
+.favorite-card-button {
   display: grid;
   grid-template-columns: 4.2rem minmax(0, 1fr);
   gap: 0.75rem;
@@ -2048,7 +2057,7 @@ button {
   text-align: left;
 }
 
-.template-card-preview {
+.favorite-card-preview {
   display: flex;
   align-items: stretch;
   min-height: 4.1rem;
@@ -2061,7 +2070,7 @@ button {
   overflow: hidden;
 }
 
-.template-card-swatch-strip {
+.favorite-card-swatch-strip {
   display: grid;
   flex: 1 1 auto;
   min-width: 0;
@@ -2069,30 +2078,30 @@ button {
   gap: 0.2rem;
 }
 
-.template-card-swatch {
+.favorite-card-swatch {
   min-width: 0;
   min-height: 100%;
   border-radius: 9px;
 }
 
-.template-card-copy {
+.favorite-card-copy {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 0.16rem;
 }
 
-.template-card-copy strong,
-.template-card-copy small {
+.favorite-card-copy strong,
+.favorite-card-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.template-card-copy small {
+.favorite-card-copy small {
   color: #8fa4c8;
 }
 
-.template-card-delete {
+.favorite-card-delete {
   align-self: flex-start;
   min-width: 2rem;
   min-height: 2rem;

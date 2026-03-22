@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { LayersInspectorTab } from './inspector/LayersInspectorTab';
 import { SelectionInspector } from './inspector/SelectionInspector';
-import { TemplatesInspectorTab } from './inspector/TemplatesInspectorTab';
+import { FavoritesInspectorTab } from './inspector/FavoritesInspectorTab';
 import type { PropertiesPanelProps } from './inspector/types';
 
 export type { PropertiesPanelProps } from './inspector/types';
@@ -14,7 +14,7 @@ export function PropertiesPanel({
   items,
   layerRows,
   missingFontFamilies,
-  onDeleteTemplate = () => {},
+  onDeleteFavorite = () => {},
   selectedGroup,
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
@@ -23,22 +23,22 @@ export function PropertiesPanel({
   onGroupOpacityChange,
   onDeleteSelection,
   onItemChange,
-  onInsertTemplate = () => {},
+  onInsertFavorite = () => {},
   onReorder,
   onSelectNode,
-  templates = [],
+  favorites = [],
 }: PropertiesPanelProps) {
-  const [activeTab, setActiveTab] = useState<'properties' | 'layers' | 'templates'>('properties');
+  const [activeTab, setActiveTab] = useState<'properties' | 'layers' | 'favorites'>('properties');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const layersScrollRef = useRef<HTMLDivElement | null>(null);
   const propertiesScrollRef = useRef<HTMLDivElement | null>(null);
-  const templatesScrollRef = useRef<HTMLDivElement | null>(null);
-  const scrollPositionsRef = useRef({ layers: 0, properties: 0, templates: 0 });
+  const favoritesScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollPositionsRef = useRef({ layers: 0, properties: 0, favorites: 0 });
   const isMultiSelection = selectedItems.length > 1;
 
   useEffect(() => {
     const nextTab = selectedItem || selectedGroup || isMultiSelection ? 'properties' : activeTab;
-    setActiveTab((current) => (current === 'layers' || current === 'templates' ? current : nextTab));
+    setActiveTab((current) => (current === 'layers' || current === 'favorites' ? current : nextTab));
   }, [activeTab, isMultiSelection, selectedGroup, selectedItem]);
 
   useEffect(() => {
@@ -69,23 +69,23 @@ export function PropertiesPanel({
     const target =
       activeTab === 'layers'
         ? layersScrollRef.current
-        : activeTab === 'templates'
-          ? templatesScrollRef.current
+        : activeTab === 'favorites'
+          ? favoritesScrollRef.current
           : propertiesScrollRef.current;
     if (target) {
       target.scrollTop = scrollPositionsRef.current[activeTab];
     }
   }, [activeTab]);
 
-  function handleTabChange(nextTab: 'properties' | 'layers' | 'templates') {
+  function handleTabChange(nextTab: 'properties' | 'layers' | 'favorites') {
     scrollPositionsRef.current.layers =
       layersScrollRef.current?.scrollTop ?? scrollPositionsRef.current.layers;
     scrollPositionsRef.current.properties =
       propertiesScrollRef.current?.scrollTop ??
       scrollPositionsRef.current.properties;
-    scrollPositionsRef.current.templates =
-      templatesScrollRef.current?.scrollTop ??
-      scrollPositionsRef.current.templates;
+    scrollPositionsRef.current.favorites =
+      favoritesScrollRef.current?.scrollTop ??
+      scrollPositionsRef.current.favorites;
     setActiveTab(nextTab);
   }
 
@@ -137,12 +137,12 @@ export function PropertiesPanel({
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'templates'}
-            className={activeTab === 'templates' ? 'rail-tab active' : 'rail-tab'}
-            onClick={() => handleTabChange('templates')}
+            aria-selected={activeTab === 'favorites'}
+            className={activeTab === 'favorites' ? 'rail-tab active' : 'rail-tab'}
+            onClick={() => handleTabChange('favorites')}
           >
-            Templates
-            <span className="panel-badge">{templates.length}</span>
+            Favorites
+            <span className="panel-badge">{favorites.length}</span>
           </button>
         </div>
 
@@ -166,16 +166,16 @@ export function PropertiesPanel({
               selectedNodeIds={selectedNodeIds}
             />
           </div>
-        ) : activeTab === 'templates' ? (
+        ) : activeTab === 'favorites' ? (
           <div
-            ref={templatesScrollRef}
-            className="rail-tab-body rail-tab-body-templates"
-            data-testid="templates-tab-body"
+            ref={favoritesScrollRef}
+            className="rail-tab-body rail-tab-body-favorites"
+            data-testid="favorites-tab-body"
           >
-            <TemplatesInspectorTab
-              onDeleteTemplate={onDeleteTemplate}
-              onInsertTemplate={onInsertTemplate}
-              templates={templates}
+            <FavoritesInspectorTab
+              favorites={favorites}
+              onDeleteFavorite={onDeleteFavorite}
+              onInsertFavorite={onInsertFavorite}
             />
           </div>
         ) : (

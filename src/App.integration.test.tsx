@@ -13,9 +13,9 @@ const {
   mockReadProjectFile,
   mockRegisterFontFile,
   mockRegisterUploadedFontBytes,
-  mockTemplateLibraryClear,
-  mockTemplateLibraryLoad,
-  mockTemplateLibrarySave,
+  mockFavoriteLibraryClear,
+  mockFavoriteLibraryLoad,
+  mockFavoriteLibrarySave,
   mockUploadedFontPersistenceClear,
   mockUploadedFontPersistenceLoadByReferences,
   mockUploadedFontPersistencePruneUnreferenced,
@@ -31,9 +31,9 @@ const {
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
   mockRegisterUploadedFontBytes: vi.fn(),
-  mockTemplateLibraryClear: vi.fn(),
-  mockTemplateLibraryLoad: vi.fn(),
-  mockTemplateLibrarySave: vi.fn(),
+  mockFavoriteLibraryClear: vi.fn(),
+  mockFavoriteLibraryLoad: vi.fn(),
+  mockFavoriteLibrarySave: vi.fn(),
   mockUploadedFontPersistenceClear: vi.fn(),
   mockUploadedFontPersistenceLoadByReferences: vi.fn(),
   mockUploadedFontPersistencePruneUnreferenced: vi.fn(),
@@ -137,11 +137,11 @@ vi.mock('./editor/persistence/canvasPersistenceService', () => ({
   },
 }));
 
-vi.mock('./editor/persistence/templateLibraryService', () => ({
-  defaultTemplateLibraryService: {
-    clear: (...args: unknown[]) => mockTemplateLibraryClear(...args),
-    load: (...args: unknown[]) => mockTemplateLibraryLoad(...args),
-    save: (...args: unknown[]) => mockTemplateLibrarySave(...args),
+vi.mock('./editor/persistence/favoriteLibraryService', () => ({
+  defaultFavoriteLibraryService: {
+    clear: (...args: unknown[]) => mockFavoriteLibraryClear(...args),
+    load: (...args: unknown[]) => mockFavoriteLibraryLoad(...args),
+    save: (...args: unknown[]) => mockFavoriteLibrarySave(...args),
   },
 }));
 
@@ -196,9 +196,9 @@ describe('App integration', () => {
     mockPersistenceLoad.mockResolvedValue(null);
     mockPersistenceSave.mockResolvedValue(undefined);
     mockRegisterUploadedFontBytes.mockReset();
-    mockTemplateLibraryClear.mockReset();
-    mockTemplateLibraryLoad.mockReturnValue([]);
-    mockTemplateLibrarySave.mockReset();
+    mockFavoriteLibraryClear.mockReset();
+    mockFavoriteLibraryLoad.mockReturnValue([]);
+    mockFavoriteLibrarySave.mockReset();
     mockUploadedFontPersistenceClear.mockReset();
     mockUploadedFontPersistenceLoadByReferences.mockResolvedValue([]);
     mockUploadedFontPersistencePruneUnreferenced.mockResolvedValue(undefined);

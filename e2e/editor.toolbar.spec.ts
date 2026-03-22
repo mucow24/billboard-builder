@@ -33,7 +33,7 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Save as template' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Canvas', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Load...', exact: true })).toBeVisible();
@@ -151,11 +151,11 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Delete' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Save as template' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
 
     await clickCanvas(page, { x: 220, y: 200 });
     await expect(page.getByRole('button', { name: 'Delete' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Save as template' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
 
     await dragCanvas(page, { x: 100, y: 100 }, { x: 620, y: 420 });

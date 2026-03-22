@@ -5,20 +5,20 @@ import type {
 } from './documentTypes';
 import { collectLeafItems, isGroupNode } from './sceneGraph';
 
-export interface TemplateSelectionPayload {
+export interface FavoriteSelectionPayload {
   fonts: DocumentFontReference[];
   nodes: CanvasNode[];
 }
 
-export interface TemplateNodeSummary {
+export interface FavoriteNodeSummary {
   itemCount: number;
   kindCounts: Map<string, number>;
   previewColors: string[];
 }
 
-const MAX_TEMPLATE_PREVIEW_COLORS = 4;
+const MAX_FAVORITE_PREVIEW_COLORS = 4;
 
-export function getTemplateSelectionRoots(
+export function getFavoriteSelectionRoots(
   nodes: CanvasNode[],
   selectedNodeIds: readonly string[],
 ): CanvasNode[] {
@@ -41,7 +41,7 @@ export function getTemplateSelectionRoots(
   return selectionRoots;
 }
 
-export function collectTemplateFontReferences(
+export function collectFavoriteFontReferences(
   nodes: CanvasNode[],
   fonts: readonly DocumentFontReference[],
 ): DocumentFontReference[] {
@@ -56,26 +56,26 @@ export function collectTemplateFontReferences(
   return fonts.filter((font) => referencedFamilies.has(font.family));
 }
 
-export function buildTemplateSelectionPayload(
+export function buildFavoriteSelectionPayload(
   document: Pick<ProjectDocument, 'fonts' | 'nodes'>,
   selectedNodeIds: readonly string[],
-): TemplateSelectionPayload {
-  const nodes = getTemplateSelectionRoots(document.nodes, selectedNodeIds);
+): FavoriteSelectionPayload {
+  const nodes = getFavoriteSelectionRoots(document.nodes, selectedNodeIds);
 
   return {
-    fonts: collectTemplateFontReferences(nodes, document.fonts),
+    fonts: collectFavoriteFontReferences(nodes, document.fonts),
     nodes,
   };
 }
 
-export function summarizeTemplateNodes(nodes: readonly CanvasNode[]): TemplateNodeSummary {
+export function summarizeFavoriteNodes(nodes: readonly CanvasNode[]): FavoriteNodeSummary {
   const leafItems = nodes.flatMap(collectLeafItems);
   const kindCounts = new Map<string, number>();
   const previewColors: string[] = [];
   const seenColors = new Set<string>();
 
   function pushPreviewColor(color: string | undefined) {
-    if (!color || previewColors.length >= MAX_TEMPLATE_PREVIEW_COLORS) {
+    if (!color || previewColors.length >= MAX_FAVORITE_PREVIEW_COLORS) {
       return;
     }
     const normalizedColor = color.trim().toLowerCase();

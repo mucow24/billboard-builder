@@ -8,25 +8,25 @@ import {
   createTextItem,
 } from '../../document/documentDefaults';
 
-import { TemplatesInspectorTab } from './TemplatesInspectorTab';
+import { FavoritesInspectorTab } from './FavoritesInspectorTab';
 
-describe('TemplatesInspectorTab', () => {
-  it('renders an empty state when no templates have been saved', () => {
+describe('FavoritesInspectorTab', () => {
+  it('renders an empty state when no favorites have been saved', () => {
     render(
-      <TemplatesInspectorTab
-        onDeleteTemplate={vi.fn()}
-        onInsertTemplate={vi.fn()}
-        templates={[]}
+      <FavoritesInspectorTab
+        onDeleteFavorite={vi.fn()}
+        onInsertFavorite={vi.fn()}
+        favorites={[]}
       />,
     );
 
-    expect(screen.getByText('No templates yet')).toBeInTheDocument();
+    expect(screen.getByText('No favorites yet')).toBeInTheDocument();
   });
 
-  it('renders saved templates and wires insert and delete actions', async () => {
+  it('renders saved favorites and wires insert and delete actions', async () => {
     const user = userEvent.setup();
-    const onDeleteTemplate = vi.fn();
-    const onInsertTemplate = vi.fn();
+    const onDeleteFavorite = vi.fn();
+    const onInsertFavorite = vi.fn();
     const rectangle = createRectangleItem({
       id: 'rectangle-node',
       fill: '#123456',
@@ -41,13 +41,13 @@ describe('TemplatesInspectorTab', () => {
     group.id = 'group-node';
 
     render(
-      <TemplatesInspectorTab
-        onDeleteTemplate={onDeleteTemplate}
-        onInsertTemplate={onInsertTemplate}
-        templates={[
+      <FavoritesInspectorTab
+        onDeleteFavorite={onDeleteFavorite}
+        onInsertFavorite={onInsertFavorite}
+        favorites={[
           {
-            id: 'template-1',
-            name: 'Hero template',
+            id: 'favorite-1',
+            name: 'Hero favorite',
             nodes: [group],
             fonts: [],
             createdAt: '2026-03-19T12:00:00.000Z',
@@ -57,25 +57,25 @@ describe('TemplatesInspectorTab', () => {
       />,
     );
 
-    expect(screen.getByText('Hero template')).toBeInTheDocument();
+    expect(screen.getByText('Hero favorite')).toBeInTheDocument();
     expect(screen.getByText('2 items')).toBeInTheDocument();
-    const preview = screen.getByTestId('template-preview-template-1');
+    const preview = screen.getByTestId('favorite-preview-favorite-1');
     expect(preview).toHaveAttribute(
       'style',
       expect.stringContaining('repeat(3, minmax(0, 1fr))'),
     );
-    const swatches = preview.querySelectorAll('.template-card-swatch');
+    const swatches = preview.querySelectorAll('.favorite-card-swatch');
     expect(swatches).toHaveLength(3);
     expect(swatches[0]).toHaveStyle({ background: 'rgb(18, 52, 86)' });
     expect(swatches[1]).toHaveStyle({ background: 'rgb(171, 205, 239)' });
     expect(swatches[2]).toHaveStyle({ background: 'rgb(254, 220, 186)' });
 
-    await user.click(screen.getByRole('button', { name: 'Insert Hero template' }));
-    expect(onInsertTemplate).toHaveBeenCalledWith('template-1');
+    await user.click(screen.getByRole('button', { name: 'Insert Hero favorite' }));
+    expect(onInsertFavorite).toHaveBeenCalledWith('favorite-1');
 
     await user.click(
-      screen.getByRole('button', { name: 'Delete template Hero template' }),
+      screen.getByRole('button', { name: 'Delete favorite Hero favorite' }),
     );
-    expect(onDeleteTemplate).toHaveBeenCalledWith('template-1');
+    expect(onDeleteFavorite).toHaveBeenCalledWith('favorite-1');
   });
 });

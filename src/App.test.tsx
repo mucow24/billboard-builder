@@ -20,7 +20,7 @@ const {
   mockCanvasPersistenceService,
   mockImportImageFile,
   mockRegisterUploadedFontBytes,
-  mockTemplateLibraryService,
+  mockFavoriteLibraryService,
   mockUploadedFontPersistenceService,
 } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
@@ -30,7 +30,7 @@ const {
   },
   mockImportImageFile: vi.fn(),
   mockRegisterUploadedFontBytes: vi.fn(),
-  mockTemplateLibraryService: {
+  mockFavoriteLibraryService: {
     load: vi.fn(() => []),
     save: vi.fn(),
     clear: vi.fn(),
@@ -60,8 +60,8 @@ vi.mock('./editor/persistence/canvasPersistenceService', () => ({
   defaultCanvasPersistenceService: mockCanvasPersistenceService,
 }));
 
-vi.mock('./editor/persistence/templateLibraryService', () => ({
-  defaultTemplateLibraryService: mockTemplateLibraryService,
+vi.mock('./editor/persistence/favoriteLibraryService', () => ({
+  defaultFavoriteLibraryService: mockFavoriteLibraryService,
 }));
 
 vi.mock('./editor/persistence/uploadedFontPersistenceService', async () => {
@@ -146,9 +146,9 @@ describe('App shell', () => {
     mockCanvasPersistenceService.clear.mockResolvedValue(undefined);
     mockImportImageFile.mockReset();
     mockRegisterUploadedFontBytes.mockReset();
-    mockTemplateLibraryService.clear.mockReset();
-    mockTemplateLibraryService.load.mockReturnValue([]);
-    mockTemplateLibraryService.save.mockReset();
+    mockFavoriteLibraryService.clear.mockReset();
+    mockFavoriteLibraryService.load.mockReturnValue([]);
+    mockFavoriteLibraryService.save.mockReset();
     mockUploadedFontPersistenceService.clear.mockReset();
     mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([]);
     mockUploadedFontPersistenceService.pruneUnreferenced.mockResolvedValue(undefined);
@@ -194,6 +194,62 @@ describe('App shell', () => {
     await waitFor(() => {
       expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
     });
+  });
+
+  it('shows and dismisses the favorite-added status after successful saves', async () => {
+    await renderApp();
+    vi.useFakeTimers();
+    const rectangle = createRectangleItem({ id: 'favorite-status-rectangle' });
+
+    act(() => {
+      useEditorStore.getState().loadDocument({
+        ...createDefaultProjectDocument(),
+        items: [rectangle],
+      });
+      useEditorStore.getState().selectSingleItem(rectangle.id);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('does not show the favorite-added status when favorite persistence fails', async () => {
+    mockFavoriteLibraryService.save.mockImplementation(() => {
+      throw new Error('quota nope');
+    });
+    await renderApp();
+    const rectangle = createRectangleItem({ id: 'favorite-error-rectangle' });
+
+    act(() => {
+      useEditorStore.getState().loadDocument({
+        ...createDefaultProjectDocument(),
+        items: [rectangle],
+      });
+      useEditorStore.getState().selectSingleItem(rectangle.id);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to save favorite: quota nope');
   });
 
   it('does not show a missing-font warning while uploaded font restoration is still pending', async () => {

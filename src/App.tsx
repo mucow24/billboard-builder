@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
 import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
@@ -10,6 +10,8 @@ import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode } from './editor/document/sceneGraph';
 
+const FAVORITE_STATUS_DURATION_MS = 1800;
+
 export default function App() {
   const runtimeFlags = readEditorRuntimeFlags();
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -18,12 +20,14 @@ export default function App() {
   const openInputRef = useRef<HTMLInputElement | null>(null);
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [showExportBoundsCue, setShowExportBoundsCue] = useState(false);
+  const [favoriteStatusMessage, setFavoriteStatusMessage] = useState<string | null>(null);
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
+  const favoriteStatusTimeoutRef = useRef<number | null>(null);
 
   const {
     actions: {
-      deleteTemplate,
+      deleteFavorite,
       deleteSelectedItems,
       dispatch,
       groupSelectedNodes,
@@ -35,11 +39,11 @@ export default function App() {
       handleSave,
       redo,
       reorderSelectedItem,
-      saveSelectionAsTemplate,
+      saveSelectionAsFavorite,
       selectSingleItem,
       setActiveTool,
       setCanvasSize,
-      insertTemplate,
+      insertFavorite,
       toggleSelectedItem,
       toggleSelectedItems,
       undo,
@@ -63,7 +67,7 @@ export default function App() {
       selectedItems,
       selectedNode,
       selectedNodeIds,
-      templates,
+      favorites,
     },
   } = useEditorController();
 
@@ -91,6 +95,25 @@ export default function App() {
   const handleExportIntentChange = useCallback((active: boolean) => {
     setShowExportBoundsCue(active);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (favoriteStatusTimeoutRef.current !== null) {
+        window.clearTimeout(favoriteStatusTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function showFavoriteStatus(message: string) {
+    if (favoriteStatusTimeoutRef.current !== null) {
+      window.clearTimeout(favoriteStatusTimeoutRef.current);
+    }
+    setFavoriteStatusMessage(message);
+    favoriteStatusTimeoutRef.current = window.setTimeout(() => {
+      setFavoriteStatusMessage(null);
+      favoriteStatusTimeoutRef.current = null;
+    }, FAVORITE_STATUS_DURATION_MS);
+  }
 
   return (
     <div className="app-shell">
@@ -128,7 +151,7 @@ export default function App() {
               canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
               canUndo={canUndo}
               canRedo={canRedo}
-              canSaveTemplate={selectedNodeIds.length > 0}
+              canSaveFavorite={selectedNodeIds.length > 0}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedItems}
               onExport={() => handleExport(stageRef.current)}
@@ -144,11 +167,21 @@ export default function App() {
               }}
               onRedo={redo}
               onSave={handleSave}
-              onSaveTemplate={saveSelectionAsTemplate}
+              onSaveFavorite={() => {
+                if (saveSelectionAsFavorite()) {
+                  showFavoriteStatus('Favorite added');
+                }
+              }}
               onUndo={undo}
               onUngroup={ungroupSelectedNode}
             />
           </div>
+
+          {favoriteStatusMessage ? (
+            <div className="app-status app-status-success overlay-status" role="status">
+              {favoriteStatusMessage}
+            </div>
+          ) : null}
 
           {errorMessage ? (
             <div className="app-status app-status-error overlay-status" role="alert">
@@ -169,7 +202,7 @@ export default function App() {
                 items={document.items}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
-                onDeleteTemplate={deleteTemplate}
+                onDeleteFavorite={deleteFavorite}
                 selectedGroup={selectedGroup ?? undefined}
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
@@ -198,10 +231,10 @@ export default function App() {
 
                   updateSelectedItem(resolveChanges(targetItem));
                 }}
-                onInsertTemplate={insertTemplate}
+                onInsertFavorite={insertFavorite}
                 onSelectNode={selectSingleItem}
                 onReorder={reorderSelectedItem}
-                templates={templates}
+                favorites={favorites}
               />
             </div>
           </div>

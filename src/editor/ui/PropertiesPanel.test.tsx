@@ -40,9 +40,9 @@ describe('PropertiesPanel', () => {
     expect(screen.getByTestId('layers-tab-body')).toHaveClass('rail-tab-body');
     expect(screen.getByRole('button', { name: 'Canvas background' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: /Templates/i }));
-    expect(screen.getByTestId('templates-tab-body')).toHaveClass('rail-tab-body');
-    expect(screen.getByText('No templates yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
+    expect(screen.getByTestId('favorites-tab-body')).toHaveClass('rail-tab-body');
+    expect(screen.getByText('No favorites yet')).toBeInTheDocument();
   });
 
   it('routes a layer double-click back to the properties tab', async () => {
@@ -202,10 +202,10 @@ describe('PropertiesPanel', () => {
       value: 84,
     });
 
-    await user.click(screen.getByRole('tab', { name: /Templates/i }));
+    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
 
-    const templatesBody = screen.getByTestId('templates-tab-body');
-    Object.defineProperty(templatesBody, 'scrollTop', {
+    const favoritesBody = screen.getByTestId('favorites-tab-body');
+    Object.defineProperty(favoritesBody, 'scrollTop', {
       configurable: true,
       writable: true,
       value: 32,
@@ -217,16 +217,16 @@ describe('PropertiesPanel', () => {
     await user.click(screen.getByRole('tab', { name: /Layers/i }));
     expect(screen.getByTestId('layers-tab-body').scrollTop).toBe(84);
 
-    await user.click(screen.getByRole('tab', { name: /Templates/i }));
-    expect(screen.getByTestId('templates-tab-body').scrollTop).toBe(32);
+    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
+    expect(screen.getByTestId('favorites-tab-body').scrollTop).toBe(32);
   });
 
-  it('keeps the templates tab active after template insertion-style rerenders', async () => {
+  it('keeps the favorites tab active after favorite insertion-style rerenders', async () => {
     const user = userEvent.setup();
     const item = createTextItem({ zIndex: 1 });
-    const template = {
-      id: 'template-1',
-      name: 'Text template',
+    const favorite = {
+      id: 'favorite-1',
+      name: 'Text favorite',
       nodes: [item],
       fonts: [],
       createdAt: '2026-03-19T12:00:00.000Z',
@@ -242,19 +242,19 @@ describe('PropertiesPanel', () => {
         missingFontFamilies={[]}
         selectedItem={item}
         selectedNodeIds={[item.id]}
-        templates={[template]}
+        favorites={[favorite]}
         onBackgroundChange={vi.fn()}
         onGroupOpacityChange={vi.fn()}
         onDeleteSelection={vi.fn()}
         onItemChange={vi.fn()}
-        onInsertTemplate={vi.fn()}
+        onInsertFavorite={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Templates/i }));
-    expect(screen.getByRole('tab', { name: /Templates/i })).toHaveAttribute(
+    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
+    expect(screen.getByRole('tab', { name: /Favorites/i })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -269,18 +269,18 @@ describe('PropertiesPanel', () => {
         missingFontFamilies={[]}
         selectedItem={item}
         selectedNodeIds={[item.id]}
-        templates={[template]}
+        favorites={[favorite]}
         onBackgroundChange={vi.fn()}
         onGroupOpacityChange={vi.fn()}
         onDeleteSelection={vi.fn()}
         onItemChange={vi.fn()}
-        onInsertTemplate={vi.fn()}
+        onInsertFavorite={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole('tab', { name: /Templates/i })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: /Favorites/i })).toHaveAttribute(
       'aria-selected',
       'true',
     );

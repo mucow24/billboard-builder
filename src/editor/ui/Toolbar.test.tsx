@@ -11,7 +11,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     canDelete: false,
     canGroup: false,
     canRedo: false,
-    canSaveTemplate: false,
+    canSaveFavorite: false,
     canUndo: false,
     canUngroup: false,
     onCanvasSizeChange: vi.fn(),
@@ -24,7 +24,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onNewProject: vi.fn(),
     onRedo: vi.fn(),
     onSave: vi.fn(),
-    onSaveTemplate: vi.fn(),
+    onSaveFavorite: vi.fn(),
     onUndo: vi.fn(),
     onUngroup: vi.fn(),
     ...overrides,
@@ -50,7 +50,7 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Group' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save as template' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
   });
 
   it('routes canvas and upload popover actions through the existing callbacks', async () => {
@@ -118,7 +118,7 @@ describe('Toolbar', () => {
     renderToolbar({
       canDelete: true,
       canRedo: true,
-      canSaveTemplate: true,
+      canSaveFavorite: true,
       canUndo: true,
       onCanvasSizeChange,
     });

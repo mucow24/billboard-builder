@@ -3,7 +3,7 @@ import type {
   DocumentFontReference,
   UploadedFont,
 } from '../editor/document/documentTypes';
-import type { StoredTemplate } from '../editor/persistence/templateLibraryService';
+import type { StoredFavorite } from '../editor/persistence/favoriteLibraryService';
 import {
   defaultUploadedFontPersistenceService,
   toUploadedFontPersistenceKey,
@@ -41,11 +41,11 @@ function dedupeUploadedFontReferences(
 
 export function collectRetainedUploadedFontReferences(
   documentFonts: DocumentFontReference[],
-  templates: StoredTemplate[],
+  favorites: StoredFavorite[],
 ): DocumentFontReference[] {
   return dedupeUploadedFontReferences([
     ...documentFonts,
-    ...templates.flatMap((template) => template.fonts),
+    ...favorites.flatMap((favorite) => favorite.fonts),
   ]);
 }
 

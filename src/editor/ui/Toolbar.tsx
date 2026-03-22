@@ -15,7 +15,7 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   canGroup: boolean;
-  canSaveTemplate: boolean;
+  canSaveFavorite: boolean;
   canUngroup: boolean;
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
@@ -28,7 +28,7 @@ interface ToolbarProps {
   onNewProject: () => void;
   onRedo: () => void;
   onSave: () => void;
-  onSaveTemplate: () => void;
+  onSaveFavorite: () => void;
   onUndo: () => void;
   onUngroup: () => void;
 }
@@ -108,7 +108,7 @@ export function Toolbar({
   canUndo,
   canRedo,
   canGroup,
-  canSaveTemplate,
+  canSaveFavorite,
   canUngroup,
   onCanvasSizeChange,
   onDelete,
@@ -121,7 +121,7 @@ export function Toolbar({
   onNewProject,
   onRedo,
   onSave,
-  onSaveTemplate,
+  onSaveFavorite,
   onUndo,
   onUngroup,
 }: ToolbarProps) {
@@ -422,9 +422,9 @@ export function Toolbar({
             <path d="M9.5 10h1" />
           </ToolbarActionButton>
           <ToolbarActionButton
-            label="Save as template"
-            onClick={onSaveTemplate}
-            disabled={!canSaveTemplate}
+            label="Save as favorite"
+            onClick={onSaveFavorite}
+            disabled={!canSaveFavorite}
           >
             <path d="m10 3.5 2.1 4.25 4.7.68-3.4 3.31.8 4.68L10 14.2l-4.2 2.22.8-4.68-3.4-3.31 4.7-.68Z" />
           </ToolbarActionButton>

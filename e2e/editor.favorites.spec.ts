@@ -12,7 +12,7 @@ import {
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
-  openTemplatesTab,
+  openFavoritesTab,
   startToolbarFileChooser,
   waitForEditor,
   uploadProject,
@@ -121,12 +121,12 @@ async function expectPersistedCanvasToReferenceFontFamily(
     });
 }
 
-test.describe('editor template library flows', () => {
-  test('TL-01 TL-02 TL-03 TL-04 saves, inserts, persists, and deletes templates from the real inspector flow', async ({
+test.describe('editor favorite library flows', () => {
+  test('TL-01 TL-02 TL-03 TL-04 saves, inserts, persists, and deletes favorites from the real inspector flow', async ({
     page,
   }) => {
     const rectangle = createRectangleFixture({
-      id: 'template-rectangle',
+      id: 'favorite-rectangle',
       x: 180,
       y: 180,
       width: 220,
@@ -137,17 +137,18 @@ test.describe('editor template library flows', () => {
     await uploadProject(
       page,
       createGroupedProjectDocument([rectangle]),
-      'template-library.json',
+      'favorite-library.json',
     );
 
     await clickCanvas(page, { x: 240, y: 220 });
-    await page.getByRole('button', { name: 'Save as template' }).click();
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await expect(page.getByRole('status')).toHaveText('Favorite added');
 
-    await openTemplatesTab(page);
-    await expect(page.getByRole('button', { name: 'Insert Rectangle template' })).toBeVisible();
+    await openFavoritesTab(page);
+    await expect(page.getByRole('button', { name: 'Insert Rectangle favorite' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Insert Rectangle template' }).click();
-    await expect(page.getByRole('tab', { name: /Templates/i })).toHaveAttribute(
+    await page.getByRole('button', { name: 'Insert Rectangle favorite' }).click();
+    await expect(page.getByRole('tab', { name: /Favorites/i })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -157,24 +158,24 @@ test.describe('editor template library flows', () => {
 
     await page.reload();
     await waitForEditor(page);
-    await openTemplatesTab(page);
-    await expect(page.getByRole('button', { name: 'Insert Rectangle template' })).toBeVisible();
+    await openFavoritesTab(page);
+    await expect(page.getByRole('button', { name: 'Insert Rectangle favorite' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Delete template Rectangle template' }).click();
-    await expect(page.getByText('No templates yet')).toBeVisible();
+    await page.getByRole('button', { name: 'Delete favorite Rectangle favorite' }).click();
+    await expect(page.getByText('No favorites yet')).toBeVisible();
 
     await page.reload();
     await waitForEditor(page);
-    await openTemplatesTab(page);
-    await expect(page.getByText('No templates yet')).toBeVisible();
+    await openFavoritesTab(page);
+    await expect(page.getByText('No favorites yet')).toBeVisible();
   });
 
-  test('TL-05 lazily restores a template-only uploaded font after reload', async ({ page }) => {
+  test('TL-05 lazily restores a favorite-only uploaded font after reload', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(
       page,
-      createProjectDocument([createTextFixture({ id: 'template-font-text' })]),
-      'template-font-library.json',
+      createProjectDocument([createTextFixture({ id: 'favorite-font-text' })]),
+      'favorite-font-library.json',
     );
 
     await openLayersTab(page);
@@ -182,13 +183,13 @@ test.describe('editor template library flows', () => {
     await openPropertiesTab(page);
 
     const fontPath = path.join(process.cwd(), 'src/assets/fonts/CalSans-Regular.ttf');
-    await uploadNamedFontFromPath(page, fontPath, 'Uploaded-Template-Regular.ttf');
+    await uploadNamedFontFromPath(page, fontPath, 'Uploaded-Favorite-Regular.ttf');
     await page.getByTestId('font-family-picker-trigger').click();
-    await page.getByRole('option', { name: 'Uploaded Template' }).first().click();
-    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Template');
+    await page.getByRole('option', { name: 'Uploaded Favorite' }).first().click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Favorite');
 
-    await page.getByRole('button', { name: 'Save as template' }).click();
-    await openTemplatesTab(page);
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await openFavoritesTab(page);
     await expect(
       page.getByRole('button', { name: 'Insert Text:Integration text' }),
     ).toBeVisible();
@@ -208,12 +209,12 @@ test.describe('editor template library flows', () => {
     await openPropertiesTab(page);
     await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Arial');
     await page.getByTestId('font-family-picker-trigger').click();
-    await expect(page.getByRole('option', { name: 'Uploaded Template' })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: 'Uploaded Favorite' })).toHaveCount(0);
 
-    await openTemplatesTab(page);
+    await openFavoritesTab(page);
     await page.getByRole('button', { name: 'Insert Text:Integration text' }).click();
     await openPropertiesTab(page);
     await expect(page.getByText('Missing fonts')).toHaveCount(0);
-    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Template');
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Favorite');
   });
 });

@@ -6,12 +6,12 @@ import {
   createTextItem,
 } from './documentDefaults';
 import {
-  buildTemplateSelectionPayload,
-  getTemplateSelectionRoots,
-  summarizeTemplateNodes,
-} from './templateLibrary';
+  buildFavoriteSelectionPayload,
+  getFavoriteSelectionRoots,
+  summarizeFavoriteNodes,
+} from './favoriteLibrary';
 
-describe('template library document helpers', () => {
+describe('favorite library document helpers', () => {
   it('keeps only the highest selected ancestor while preserving traversal order', () => {
     const nestedChild = createRectangleItem({ id: 'nested-child' });
     const nestedGroup = createGroupNode([nestedChild], 'Nested Group');
@@ -22,7 +22,7 @@ describe('template library document helpers', () => {
     const sibling = createRectangleItem({ id: 'sibling' });
 
     expect(
-      getTemplateSelectionRoots([outerGroup, sibling], [
+      getFavoriteSelectionRoots([outerGroup, sibling], [
         nestedChild.id,
         outerGroup.id,
         sibling.id,
@@ -42,7 +42,7 @@ describe('template library document helpers', () => {
     const group = createGroupNode([brandedText, systemText], 'Headline Group');
     group.id = 'headline-group';
 
-    const payload = buildTemplateSelectionPayload(
+    const payload = buildFavoriteSelectionPayload(
       {
         nodes: [group],
         fonts: [
@@ -71,7 +71,7 @@ describe('template library document helpers', () => {
     ]);
   });
 
-  it('summarizes saved template colors and kinds for lightweight cards', () => {
+  it('summarizes saved favorite colors and kinds for lightweight cards', () => {
     const first = createRectangleItem({
       id: 'first',
       fill: '#123456',
@@ -87,9 +87,9 @@ describe('template library document helpers', () => {
       fill: '#654321',
       stroke: '#123456',
     });
-    const group = createGroupNode([first, second, third], 'Template Group');
+    const group = createGroupNode([first, second, third], 'Favorite Group');
 
-    expect(summarizeTemplateNodes([group])).toEqual({
+    expect(summarizeFavoriteNodes([group])).toEqual({
       itemCount: 3,
       kindCounts: new Map([
         ['rectangle', 2],
@@ -114,7 +114,7 @@ describe('template library document helpers', () => {
       x: 320,
     });
 
-    expect(summarizeTemplateNodes([orangeRect, secondOrangeRect]).previewColors).toEqual([
+    expect(summarizeFavoriteNodes([orangeRect, secondOrangeRect]).previewColors).toEqual([
       '#f97316',
     ]);
   });

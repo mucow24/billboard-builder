@@ -7,13 +7,13 @@ import {
 } from '../editor/document/documentDefaults';
 
 import {
-  buildDefaultTemplateName,
-  instantiateTemplateNodes,
-  uniquifyTemplateName,
-} from './templateLibrary';
+  buildDefaultFavoriteName,
+  instantiateFavoriteNodes,
+  uniquifyFavoriteName,
+} from './favoriteLibrary';
 
-describe('template library helpers', () => {
-  it('builds default names for single-node and multi-node templates', () => {
+describe('favorite library helpers', () => {
+  it('builds default names for single-node and multi-node favorites', () => {
     const rectangle = createRectangleItem();
     const first = createRectangleItem({ id: 'first' });
     const second = createTextItem({ id: 'second' });
@@ -22,27 +22,27 @@ describe('template library helpers', () => {
       text: 'Headline   with\nspacing',
     });
 
-    expect(buildDefaultTemplateName([rectangle])).toBe('Rectangle template');
-    expect(buildDefaultTemplateName([text])).toBe('Text:Headline with spacing');
-    expect(buildDefaultTemplateName([first, second])).toBe('2 items template');
+    expect(buildDefaultFavoriteName([rectangle])).toBe('Rectangle favorite');
+    expect(buildDefaultFavoriteName([text])).toBe('Text:Headline with spacing');
+    expect(buildDefaultFavoriteName([first, second])).toBe('2 items favorite');
   });
 
-  it('adds numeric suffixes for duplicate template names', () => {
+  it('adds numeric suffixes for duplicate favorite names', () => {
     expect(
-      uniquifyTemplateName('Rectangle template', [
-        { name: 'Rectangle template' },
-        { name: 'Rectangle template (2)' },
+      uniquifyFavoriteName('Rectangle favorite', [
+        { name: 'Rectangle favorite' },
+        { name: 'Rectangle favorite (2)' },
       ]),
-    ).toBe('Rectangle template (3)');
+    ).toBe('Rectangle favorite (3)');
   });
 
-  it('clones inserted template nodes with fresh ids while preserving order and structure', () => {
+  it('clones inserted favorite nodes with fresh ids while preserving order and structure', () => {
     const child = createRectangleItem({ id: 'child-node' });
-    const group = createGroupNode([child], 'Template Group');
+    const group = createGroupNode([child], 'Favorite Group');
     group.id = 'group-node';
     const sibling = createTextItem({ id: 'sibling-node' });
 
-    const clones = instantiateTemplateNodes([group, sibling], 2);
+    const clones = instantiateFavoriteNodes([group, sibling], 2);
 
     expect(clones).toHaveLength(2);
     expect(clones[0]?.id).not.toBe(group.id);

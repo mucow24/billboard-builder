@@ -2,21 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
 import {
-  buildDefaultTemplateName,
-  instantiateTemplateNodes,
-  uniquifyTemplateName,
-} from './templateLibrary';
+  buildDefaultFavoriteName,
+  instantiateFavoriteNodes,
+  uniquifyFavoriteName,
+} from './favoriteLibrary';
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { restoreUploadedFontsForReferences } from './uploadedFontPersistence';
 import { useUploadedFontPersistence } from './useUploadedFontPersistence';
-import { buildTemplateSelectionPayload } from '../editor/document/templateLibrary';
+import { buildFavoriteSelectionPayload } from '../editor/document/favoriteLibrary';
 import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
-import { defaultTemplateLibraryService, type StoredTemplate } from '../editor/persistence/templateLibraryService';
+import { defaultFavoriteLibraryService, type StoredFavorite } from '../editor/persistence/favoriteLibraryService';
 import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
 import {
   selectCanRedo,
@@ -52,9 +52,9 @@ async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
 
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<StoredTemplate[]>([]);
-  const [templatesReady, setTemplatesReady] = useState(false);
-  const templateInsertCountsRef = useRef<Record<string, number>>({});
+  const [favorites, setFavorites] = useState<StoredFavorite[]>([]);
+  const [favoritesReady, setFavoritesReady] = useState(false);
+  const favoriteInsertCountsRef = useRef<Record<string, number>>({});
 
   const {
     editor,
@@ -109,13 +109,13 @@ export function useEditorController() {
 
   useEffect(() => {
     try {
-      setTemplates(defaultTemplateLibraryService.load());
+      setFavorites(defaultFavoriteLibraryService.load());
     } catch (error) {
       setErrorMessage(
-        `Failed to load template library: ${getErrorMessage(error, 'Unknown error.')}`,
+        `Failed to load favorites library: ${getErrorMessage(error, 'Unknown error.')}`,
       );
     } finally {
-      setTemplatesReady(true);
+      setFavoritesReady(true);
     }
   }, []);
 
@@ -129,9 +129,9 @@ export function useEditorController() {
   useCanvasPersistence({ document, persistenceReady });
   useUploadedFontPersistence({
     documentFonts: document.fonts,
+    favorites,
+    favoritesReady,
     persistenceReady,
-    templates,
-    templatesReady,
   });
 
   useEditorShortcuts({
@@ -273,23 +273,23 @@ export function useEditorController() {
     downloadProject(document);
   }
 
-  function persistTemplates(nextTemplates: StoredTemplate[]) {
-    defaultTemplateLibraryService.save(nextTemplates);
-    setTemplates(nextTemplates);
+  function persistFavorites(nextFavorites: StoredFavorite[]) {
+    defaultFavoriteLibraryService.save(nextFavorites);
+    setFavorites(nextFavorites);
   }
 
-  function saveSelectionAsTemplate() {
-    const payload = buildTemplateSelectionPayload(document, selectedNodeIds);
+  function saveSelectionAsFavorite(): boolean {
+    const payload = buildFavoriteSelectionPayload(document, selectedNodeIds);
     if (payload.nodes.length === 0) {
-      return;
+      return false;
     }
 
     const now = new Date().toISOString();
-    const name = uniquifyTemplateName(
-      buildDefaultTemplateName(payload.nodes),
-      templates,
+    const name = uniquifyFavoriteName(
+      buildDefaultFavoriteName(payload.nodes),
+      favorites,
     );
-    const nextTemplate: StoredTemplate = {
+    const nextFavorite: StoredFavorite = {
       id: crypto.randomUUID(),
       name,
       nodes: payload.nodes,
@@ -299,37 +299,39 @@ export function useEditorController() {
     };
 
     try {
-      persistTemplates([...templates, nextTemplate]);
+      persistFavorites([...favorites, nextFavorite]);
       setErrorMessage(null);
+      return true;
     } catch (error) {
       setErrorMessage(
-        `Failed to save template: ${getErrorMessage(error, 'Unknown error.')}`,
+        `Failed to save favorite: ${getErrorMessage(error, 'Unknown error.')}`,
       );
+      return false;
     }
   }
 
-  async function insertTemplate(templateId: string) {
-    const template = templates.find((entry) => entry.id === templateId);
-    if (!template) {
+  async function insertFavorite(favoriteId: string) {
+    const favorite = favorites.find((entry) => entry.id === favoriteId);
+    if (!favorite) {
       return;
     }
 
     await restoreUploadedFontsForReferences({
-      references: template.fonts,
+      references: favorite.fonts,
       availableFonts,
       registerAvailableFont,
     });
 
-    const nextInsertCount = (templateInsertCountsRef.current[templateId] ?? 0) + 1;
-    templateInsertCountsRef.current[templateId] = nextInsertCount;
-    const insertedNodes = instantiateTemplateNodes(template.nodes, nextInsertCount);
+    const nextInsertCount = (favoriteInsertCountsRef.current[favoriteId] ?? 0) + 1;
+    favoriteInsertCountsRef.current[favoriteId] = nextInsertCount;
+    const insertedNodes = instantiateFavoriteNodes(favorite.nodes, nextInsertCount);
 
     applyTransaction([
       {
         family: 'document' as const,
         command: { type: 'insert_nodes' as const, nodes: insertedNodes },
       },
-      ...template.fonts.map((font) => ({
+      ...favorite.fonts.map((font) => ({
         family: 'document' as const,
         command: { type: 'register_font' as const, font },
       })),
@@ -344,19 +346,19 @@ export function useEditorController() {
     setErrorMessage(null);
   }
 
-  function deleteTemplate(templateId: string) {
-    const nextTemplates = templates.filter((template) => template.id !== templateId);
-    if (nextTemplates.length === templates.length) {
+  function deleteFavorite(favoriteId: string) {
+    const nextFavorites = favorites.filter((favorite) => favorite.id !== favoriteId);
+    if (nextFavorites.length === favorites.length) {
       return;
     }
 
     try {
-      persistTemplates(nextTemplates);
-      delete templateInsertCountsRef.current[templateId];
+      persistFavorites(nextFavorites);
+      delete favoriteInsertCountsRef.current[favoriteId];
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
-        `Failed to delete template: ${getErrorMessage(error, 'Unknown error.')}`,
+        `Failed to delete favorite: ${getErrorMessage(error, 'Unknown error.')}`,
       );
     }
   }
@@ -365,7 +367,7 @@ export function useEditorController() {
     actions: {
       applyTransaction,
       deleteItem: deleteNode,
-      deleteTemplate,
+      deleteFavorite,
       deleteNode,
       deleteSelectedItems: deleteSelectedNodes,
       deleteSelectedNodes,
@@ -384,7 +386,7 @@ export function useEditorController() {
       redo,
       reorderSelectedItem: reorderSelectedNode,
       reorderSelectedNode,
-      saveSelectionAsTemplate,
+      saveSelectionAsFavorite,
       selectAllItems: selectAllNodes,
       selectParentNode,
       selectAllNodes,
@@ -392,7 +394,7 @@ export function useEditorController() {
       selectSingleNode,
       setActiveTool,
       setCanvasSize,
-      insertTemplate,
+      insertFavorite,
       toggleSelectedItem: toggleSelectedNode,
       toggleSelectedNode,
       toggleSelectedItems: toggleSelectedNodes,
@@ -419,7 +421,7 @@ export function useEditorController() {
       selectedNode,
       selectedNodeIds,
       selectedNodes,
-      templates,
+      favorites,
     },
   };
 }

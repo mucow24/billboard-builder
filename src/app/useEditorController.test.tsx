@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useEditorController } from './useEditorController';
-import type { StoredTemplate } from '../editor/persistence/templateLibraryService';
+import type { StoredFavorite } from '../editor/persistence/favoriteLibraryService';
 import {
   createDefaultProjectDocument,
   createRectangleItem,
@@ -19,7 +19,7 @@ const {
   mockReadProjectFile,
   mockRegisterFontFile,
   mockRegisterUploadedFontBytes,
-  mockTemplateLibraryService,
+  mockFavoriteLibraryService,
   mockUploadedFontPersistenceService,
 } = vi.hoisted(() => ({
   mockCanvasPersistenceService: {
@@ -33,7 +33,7 @@ const {
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
   mockRegisterUploadedFontBytes: vi.fn(),
-  mockTemplateLibraryService: {
+  mockFavoriteLibraryService: {
     load: vi.fn(() => []),
     save: vi.fn(),
     clear: vi.fn(),
@@ -50,8 +50,8 @@ vi.mock('../editor/persistence/canvasPersistenceService', () => ({
   defaultCanvasPersistenceService: mockCanvasPersistenceService,
 }));
 
-vi.mock('../editor/persistence/templateLibraryService', () => ({
-  defaultTemplateLibraryService: mockTemplateLibraryService,
+vi.mock('../editor/persistence/favoriteLibraryService', () => ({
+  defaultFavoriteLibraryService: mockFavoriteLibraryService,
 }));
 
 vi.mock('../editor/persistence/uploadedFontPersistenceService', async () => {
@@ -123,9 +123,9 @@ describe('useEditorController', () => {
     mockReadProjectFile.mockReset();
     mockRegisterFontFile.mockReset();
     mockRegisterUploadedFontBytes.mockReset();
-    mockTemplateLibraryService.clear.mockReset();
-    mockTemplateLibraryService.load.mockReturnValue([]);
-    mockTemplateLibraryService.save.mockReset();
+    mockFavoriteLibraryService.clear.mockReset();
+    mockFavoriteLibraryService.load.mockReturnValue([]);
+    mockFavoriteLibraryService.save.mockReset();
     mockUploadedFontPersistenceService.clear.mockReset();
     mockUploadedFontPersistenceService.loadByReferences.mockReset();
     mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([]);
@@ -422,9 +422,9 @@ describe('useEditorController', () => {
     expect(result.current.state.missingFontFamilies).toEqual([]);
   });
 
-  it('saves a selected node as a template and inserts it with cumulative offsets', async () => {
+  it('saves a selected node as a favorite and inserts it with cumulative offsets', async () => {
     const rectangle = createRectangleItem({
-      id: 'template-rectangle',
+      id: 'favorite-rectangle',
       x: 180,
       y: 240,
     });
@@ -444,22 +444,24 @@ describe('useEditorController', () => {
       expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
     });
 
+    let wasSaved = false;
     act(() => {
-      result.current.actions.saveSelectionAsTemplate();
+      wasSaved = result.current.actions.saveSelectionAsFavorite();
     });
 
-    expect(mockTemplateLibraryService.save).toHaveBeenCalledOnce();
-    expect(result.current.state.templates).toHaveLength(1);
-    expect(result.current.state.templates[0]).toMatchObject({
-      name: 'Rectangle template',
+    expect(wasSaved).toBe(true);
+    expect(mockFavoriteLibraryService.save).toHaveBeenCalledOnce();
+    expect(result.current.state.favorites).toHaveLength(1);
+    expect(result.current.state.favorites[0]).toMatchObject({
+      name: 'Rectangle favorite',
       nodes: [expect.objectContaining({ id: rectangle.id })],
     });
 
-    const savedTemplateId = result.current.state.templates[0]!.id;
+    const savedFavoriteId = result.current.state.favorites[0]!.id;
 
     await act(async () => {
-      await result.current.actions.insertTemplate(savedTemplateId);
-      await result.current.actions.insertTemplate(savedTemplateId);
+      await result.current.actions.insertFavorite(savedFavoriteId);
+      await result.current.actions.insertFavorite(savedFavoriteId);
     });
 
     const insertedRectangles = result.current.state.document.items.filter(
@@ -469,7 +471,7 @@ describe('useEditorController', () => {
     expect(insertedRectangles.map((item) => item.x)).toEqual([180, 204, 228]);
   });
 
-  it('merges stored font references when inserting a text template into a reset document', async () => {
+  it('merges stored font references when inserting a text favorite into a reset document', async () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
@@ -505,23 +507,23 @@ describe('useEditorController', () => {
         ],
         items: [
           createTextItem({
-            id: 'template-text',
+            id: 'favorite-text',
             fontFamily: 'Poster Sans',
           }),
         ],
       });
-      useEditorStore.getState().selectSingleNode('template-text');
+      useEditorStore.getState().selectSingleNode('favorite-text');
     });
 
     act(() => {
-      result.current.actions.saveSelectionAsTemplate();
+      result.current.actions.saveSelectionAsFavorite();
       result.current.actions.handleNewProject();
     });
 
-    const savedTemplateId = result.current.state.templates[0]!.id;
+    const savedFavoriteId = result.current.state.favorites[0]!.id;
 
     await act(async () => {
-      await result.current.actions.insertTemplate(savedTemplateId);
+      await result.current.actions.insertFavorite(savedFavoriteId);
     });
 
     expect(result.current.state.document.fonts).toContainEqual({
@@ -536,14 +538,14 @@ describe('useEditorController', () => {
     ).toBe(true);
   });
 
-  it('restores missing uploaded fonts before inserting a template', async () => {
-    const persistedTemplates: StoredTemplate[] = [
+  it('restores missing uploaded fonts before inserting a favorite', async () => {
+    const persistedFavorites: StoredFavorite[] = [
       {
-        id: 'persisted-template',
-        name: 'Persisted template',
+        id: 'persisted-favorite',
+        name: 'Persisted favorite',
         nodes: [
           createTextItem({
-            id: 'template-text',
+            id: 'favorite-text',
             fontFamily: 'Poster Sans',
           }),
         ],
@@ -558,7 +560,7 @@ describe('useEditorController', () => {
         updatedAt: '2025-01-01T00:00:00.000Z',
       },
     ];
-    mockTemplateLibraryService.load.mockReturnValue(persistedTemplates as never);
+    mockFavoriteLibraryService.load.mockReturnValue(persistedFavorites as never);
     mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([
       {
         family: 'Poster Sans',
@@ -580,11 +582,11 @@ describe('useEditorController', () => {
     const { result } = renderHook(() => useEditorController());
 
     await waitFor(() => {
-      expect(result.current.state.templates).toHaveLength(1);
+      expect(result.current.state.favorites).toHaveLength(1);
     });
 
     await act(async () => {
-      await result.current.actions.insertTemplate('persisted-template');
+      await result.current.actions.insertFavorite('persisted-favorite');
     });
 
     expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenCalledWith([
@@ -609,7 +611,7 @@ describe('useEditorController', () => {
     ).toBe(true);
   });
 
-  it('prunes persisted uploaded fonts using canvas and template references as the retention set', async () => {
+  it('prunes persisted uploaded fonts using canvas and favorite references as the retention set', async () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
@@ -628,15 +630,15 @@ describe('useEditorController', () => {
         ],
       },
     });
-    const retainedTemplates: StoredTemplate[] = [
+    const retainedFavorites: StoredFavorite[] = [
       {
-        id: 'retained-template',
-        name: 'Retained template',
+        id: 'retained-favorite',
+        name: 'Retained favorite',
         nodes: [],
         fonts: [
           {
-            family: 'Template Font',
-            sourceName: 'TemplateFont-Regular.ttf',
+            family: 'Favorite Font',
+            sourceName: 'FavoriteFont-Regular.ttf',
             kind: 'uploaded' as const,
           },
         ],
@@ -644,7 +646,7 @@ describe('useEditorController', () => {
         updatedAt: '2025-01-01T00:00:00.000Z',
       },
     ];
-    mockTemplateLibraryService.load.mockReturnValue(retainedTemplates as never);
+    mockFavoriteLibraryService.load.mockReturnValue(retainedFavorites as never);
 
     renderHook(() => useEditorController());
 
@@ -660,16 +662,27 @@ describe('useEditorController', () => {
           kind: 'uploaded',
         },
         {
-          family: 'Template Font',
-          sourceName: 'TemplateFont-Regular.ttf',
+          family: 'Favorite Font',
+          sourceName: 'FavoriteFont-Regular.ttf',
           kind: 'uploaded',
         },
       ]),
     );
   });
 
-  it('surfaces template library persistence errors', async () => {
-    const rectangle = createRectangleItem({ id: 'template-error-rectangle' });
+  it('returns false when no nodes are selected', async () => {
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+    });
+
+    expect(result.current.actions.saveSelectionAsFavorite()).toBe(false);
+    expect(mockFavoriteLibraryService.save).not.toHaveBeenCalled();
+  });
+
+  it('surfaces favorite library persistence errors', async () => {
+    const rectangle = createRectangleItem({ id: 'favorite-error-rectangle' });
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
@@ -679,7 +692,7 @@ describe('useEditorController', () => {
         selectedNodeIds: [rectangle.id],
       },
     });
-    mockTemplateLibraryService.save.mockImplementation(() => {
+    mockFavoriteLibraryService.save.mockImplementation(() => {
       throw new Error('quota nope');
     });
 
@@ -689,12 +702,14 @@ describe('useEditorController', () => {
       expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
     });
 
+    let wasSaved = true;
     act(() => {
-      result.current.actions.saveSelectionAsTemplate();
+      wasSaved = result.current.actions.saveSelectionAsFavorite();
     });
 
+    expect(wasSaved).toBe(false);
     expect(result.current.state.errorMessage).toBe(
-      'Failed to save template: quota nope',
+      'Failed to save favorite: quota nope',
     );
   });
 });

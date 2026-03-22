@@ -234,15 +234,15 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | PI-10 | Properties | Any item selected | Edit geometry fields | Values update | Item geometry updates | user-flow | Chromium | Covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
 | PI-11 | Properties | Any item selected | Edit shadow fields | Values update | Item shadow updates | user-flow | Chromium | Covered in [e2e/editor.properties.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.properties.spec.ts) |
 
-## 10. Template Library Flows
+## 10. Favorite Library Flows
 
 | ID | Entry | Preconditions | Steps | Visible Result | State Result | Class | Scope | Current Coverage |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TL-01 | Properties | Any node selected | Click Save as template | Template card appears in Templates | Template stored in local library | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
-| TL-02 | Templates | Saved template exists | Open Templates tab | Saved template card visible | No document mutation | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
-| TL-03 | Templates | Saved template exists | Click template card | New content appears on canvas and in Layers | Template nodes inserted and selected | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
-| TL-04 | Templates + Browser reload | Saved template exists | Reload, delete template, reload | Template persists across reload and then disappears after deletion | Local template library round-trips | user-flow | Chromium | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
-| TL-05 | Templates + Browser reload | Saved template references an uploaded font but current canvas no longer does | Reload, verify current canvas font menu, then insert template | Uploaded family is absent before insertion, then inserted text shows the uploaded family with no missing-font warning | Template insertion lazily rehydrates the retained uploaded font from local storage | user-flow | Cross-browser subset | Covered in [e2e/editor.templates.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.templates.spec.ts) |
+| TL-01 | Properties | Any node selected | Click Save as favorite | `Favorite added` pop-up appears and favorite card appears in Favorites | Favorite stored in local library | user-flow | Chromium | Covered in [e2e/editor.favorites.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.favorites.spec.ts) |
+| TL-02 | Favorites | Saved favorite exists | Open Favorites tab | Saved favorite card visible | No document mutation | user-flow | Chromium | Covered in [e2e/editor.favorites.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.favorites.spec.ts) |
+| TL-03 | Favorites | Saved favorite exists | Click favorite card | New content appears on canvas and in Layers | Favorite nodes inserted and selected | user-flow | Chromium | Covered in [e2e/editor.favorites.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.favorites.spec.ts) |
+| TL-04 | Favorites + Browser reload | Saved favorite exists | Reload, delete favorite, reload | Favorite persists across reload and then disappears after deletion | Local favorite library round-trips | user-flow | Chromium | Covered in [e2e/editor.favorites.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.favorites.spec.ts) |
+| TL-05 | Favorites + Browser reload | Saved favorite references an uploaded font but current canvas no longer does | Reload, verify current canvas font menu, then insert favorite | Uploaded family is absent before insertion, then inserted text shows the uploaded family with no missing-font warning | Favorite insertion lazily rehydrates the retained uploaded font from local storage | user-flow | Cross-browser subset | Covered in [e2e/editor.favorites.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.favorites.spec.ts) |
 
 ## 11. Keyboard Flows
 

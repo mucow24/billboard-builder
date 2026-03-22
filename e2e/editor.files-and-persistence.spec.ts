@@ -219,7 +219,7 @@ test.describe('editor file and persistence flows', () => {
     await expectUploadedFontRecordCount(page, 1);
   });
 
-  test('reload purges persisted uploaded fonts once neither canvas nor templates reference them', async ({ page }) => {
+  test('reload purges persisted uploaded fonts once neither canvas nor favorites reference them', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(
       page,

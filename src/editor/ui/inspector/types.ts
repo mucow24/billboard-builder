@@ -6,7 +6,7 @@ import type {
   UploadedFont,
 } from '../../document/documentTypes';
 import type { LayerRow } from '../../document/sceneGraph';
-import type { StoredTemplate } from '../../persistence/templateLibraryService';
+import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 
 export type SelectionItemChange =
   | Partial<CanvasItem>
@@ -19,7 +19,8 @@ export interface PropertiesPanelProps {
   items: CanvasItem[];
   layerRows: LayerRow[];
   missingFontFamilies: string[];
-  onDeleteTemplate?: (templateId: string) => void;
+  favorites?: StoredFavorite[];
+  onDeleteFavorite?: (favoriteId: string) => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedItems?: CanvasItem[];
@@ -27,11 +28,10 @@ export interface PropertiesPanelProps {
   onBackgroundChange: (background: string) => void;
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;
-  onInsertTemplate?: (templateId: string) => void;
+  onInsertFavorite?: (favoriteId: string) => void;
   onDeleteSelection: () => void;
   onSelectNode: (nodeId: string) => void;
   onReorder: (mode: ReorderMode) => void;
-  templates?: StoredTemplate[];
 }
 
 export interface LayersInspectorTabProps {
@@ -59,8 +59,8 @@ export interface SelectionInspectorProps {
   selectedItems: CanvasItem[];
 }
 
-export interface TemplatesInspectorTabProps {
-  onDeleteTemplate: (templateId: string) => void;
-  onInsertTemplate: (templateId: string) => void;
-  templates: StoredTemplate[];
+export interface FavoritesInspectorTabProps {
+  favorites: StoredFavorite[];
+  onDeleteFavorite: (favoriteId: string) => void;
+  onInsertFavorite: (favoriteId: string) => void;
 }

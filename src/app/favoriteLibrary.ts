@@ -1,9 +1,9 @@
 import { DUPLICATE_ITEM_OFFSET } from '../editor/document/documentDefaults';
 import { cloneCanvasNode, isGroupNode } from '../editor/document/sceneGraph';
 import type { CanvasNode } from '../editor/document/documentTypes';
-import type { StoredTemplate } from '../editor/persistence/templateLibraryService';
+import type { StoredFavorite } from '../editor/persistence/favoriteLibraryService';
 
-function normalizeTemplateTextContent(text: string): string {
+function normalizeFavoriteTextContent(text: string): string {
   const compactText = text.trim().replace(/\s+/g, ' ');
   if (!compactText) {
     return 'Empty text';
@@ -11,7 +11,7 @@ function normalizeTemplateTextContent(text: string): string {
   return compactText.length > 40 ? `${compactText.slice(0, 40)}...` : compactText;
 }
 
-function getSingleNodeTemplateLabel(node: CanvasNode): string {
+function getSingleNodeFavoriteLabel(node: CanvasNode): string {
   if (isGroupNode(node)) {
     return node.name || 'Group';
   }
@@ -24,25 +24,25 @@ function getSingleNodeTemplateLabel(node: CanvasNode): string {
     case 'line':
       return 'Line';
     case 'text':
-      return `Text:${normalizeTemplateTextContent(node.text)}`;
+      return `Text:${normalizeFavoriteTextContent(node.text)}`;
     case 'image':
       return 'Image';
   }
 }
 
-export function buildDefaultTemplateName(nodes: readonly CanvasNode[]): string {
+export function buildDefaultFavoriteName(nodes: readonly CanvasNode[]): string {
   if (nodes.length === 1) {
-    const label = getSingleNodeTemplateLabel(nodes[0]!);
-    return label.startsWith('Text:') ? label : `${label} template`;
+    const label = getSingleNodeFavoriteLabel(nodes[0]!);
+    return label.startsWith('Text:') ? label : `${label} favorite`;
   }
-  return `${nodes.length} items template`;
+  return `${nodes.length} items favorite`;
 }
 
-export function uniquifyTemplateName(
+export function uniquifyFavoriteName(
   baseName: string,
-  templates: readonly Pick<StoredTemplate, 'name'>[],
+  favorites: readonly Pick<StoredFavorite, 'name'>[],
 ): string {
-  const existingNames = new Set(templates.map((template) => template.name));
+  const existingNames = new Set(favorites.map((favorite) => favorite.name));
   if (!existingNames.has(baseName)) {
     return baseName;
   }
@@ -57,7 +57,7 @@ export function uniquifyTemplateName(
   return nextName;
 }
 
-export function instantiateTemplateNodes(
+export function instantiateFavoriteNodes(
   nodes: readonly CanvasNode[],
   repeatCount: number,
 ): CanvasNode[] {

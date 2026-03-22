@@ -24,25 +24,25 @@ import {
   uploadProject,
 } from './support/editor';
 
-async function seedMockTemplates(page: Page) {
+async function seedMockFavorites(page: Page) {
   await page.addInitScript(() => {
     const timestamp = '2026-03-20T12:00:00.000Z';
     window.localStorage.setItem(
-      'billboard-builder:templates:v1',
+      'billboard-builder:favorites:v1',
       JSON.stringify({
         version: 1,
-        templates: [
+        favorites: [
           {
-            id: 'mock-template-1',
-            name: 'Mock Template 1',
+            id: 'mock-favorite-1',
+            name: 'Mock Favorite 1',
             nodes: [],
             fonts: [],
             createdAt: timestamp,
             updatedAt: timestamp,
           },
           {
-            id: 'mock-template-2',
-            name: 'Mock Template 2',
+            id: 'mock-favorite-2',
+            name: 'Mock Favorite 2',
             nodes: [],
             fonts: [],
             createdAt: timestamp,
@@ -55,7 +55,7 @@ async function seedMockTemplates(page: Page) {
 }
 
 async function prepareLayersPanelMockParity(page: Page) {
-  await seedMockTemplates(page);
+  await seedMockFavorites(page);
   await openFreshEditor(page);
   await uploadProject(page, createLayersPanelMockParityFixture(), 'layers-panel-mock-parity.json');
 
