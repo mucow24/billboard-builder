@@ -210,23 +210,30 @@ describe('App shell', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+    expect(screen.getByRole('status')).toHaveTextContent('Added to favorites');
 
     act(() => {
-      vi.advanceTimersByTime(1700);
+      vi.advanceTimersByTime(729);
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+    expect(screen.getByRole('status')).not.toHaveClass('fading');
+
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Added to favorites');
+    expect(screen.getByRole('status')).toHaveClass('fading');
 
     fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
-    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+    expect(screen.getByRole('status')).toHaveTextContent('Added to favorites');
+    expect(screen.getByRole('status')).not.toHaveClass('fading');
 
     act(() => {
-      vi.advanceTimersByTime(1700);
+      vi.advanceTimersByTime(729);
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Favorite added');
+    expect(screen.getByRole('status')).not.toHaveClass('fading');
 
     act(() => {
-      vi.advanceTimersByTime(200);
+      vi.advanceTimersByTime(721);
     });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });

@@ -10,7 +10,8 @@ import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode } from './editor/document/sceneGraph';
 
-const FAVORITE_STATUS_DURATION_MS = 1800;
+const FAVORITE_STATUS_DURATION_MS = 1450;
+const FAVORITE_STATUS_FADE_DURATION_MS = 720;
 
 export default function App() {
   const runtimeFlags = readEditorRuntimeFlags();
@@ -21,9 +22,11 @@ export default function App() {
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [showExportBoundsCue, setShowExportBoundsCue] = useState(false);
   const [favoriteStatusMessage, setFavoriteStatusMessage] = useState<string | null>(null);
+  const [favoriteStatusFading, setFavoriteStatusFading] = useState(false);
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
-  const favoriteStatusTimeoutRef = useRef<number | null>(null);
+  const favoriteStatusFadeTimeoutRef = useRef<number | null>(null);
+  const favoriteStatusDismissTimeoutRef = useRef<number | null>(null);
 
   const {
     actions: {
@@ -98,20 +101,32 @@ export default function App() {
 
   useEffect(() => {
     return () => {
-      if (favoriteStatusTimeoutRef.current !== null) {
-        window.clearTimeout(favoriteStatusTimeoutRef.current);
+      if (favoriteStatusFadeTimeoutRef.current !== null) {
+        window.clearTimeout(favoriteStatusFadeTimeoutRef.current);
+      }
+      if (favoriteStatusDismissTimeoutRef.current !== null) {
+        window.clearTimeout(favoriteStatusDismissTimeoutRef.current);
       }
     };
   }, []);
 
   function showFavoriteStatus(message: string) {
-    if (favoriteStatusTimeoutRef.current !== null) {
-      window.clearTimeout(favoriteStatusTimeoutRef.current);
+    if (favoriteStatusFadeTimeoutRef.current !== null) {
+      window.clearTimeout(favoriteStatusFadeTimeoutRef.current);
     }
+    if (favoriteStatusDismissTimeoutRef.current !== null) {
+      window.clearTimeout(favoriteStatusDismissTimeoutRef.current);
+    }
+    setFavoriteStatusFading(false);
     setFavoriteStatusMessage(message);
-    favoriteStatusTimeoutRef.current = window.setTimeout(() => {
+    favoriteStatusFadeTimeoutRef.current = window.setTimeout(() => {
+      setFavoriteStatusFading(true);
+    }, FAVORITE_STATUS_DURATION_MS - FAVORITE_STATUS_FADE_DURATION_MS);
+    favoriteStatusDismissTimeoutRef.current = window.setTimeout(() => {
       setFavoriteStatusMessage(null);
-      favoriteStatusTimeoutRef.current = null;
+      setFavoriteStatusFading(false);
+      favoriteStatusFadeTimeoutRef.current = null;
+      favoriteStatusDismissTimeoutRef.current = null;
     }, FAVORITE_STATUS_DURATION_MS);
   }
 
@@ -152,6 +167,8 @@ export default function App() {
               canUndo={canUndo}
               canRedo={canRedo}
               canSaveFavorite={selectedNodeIds.length > 0}
+              favoriteStatusFading={favoriteStatusFading}
+              favoriteStatusMessage={favoriteStatusMessage}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedItems}
               onExport={() => handleExport(stageRef.current)}
@@ -169,19 +186,13 @@ export default function App() {
               onSave={handleSave}
               onSaveFavorite={() => {
                 if (saveSelectionAsFavorite()) {
-                  showFavoriteStatus('Favorite added');
+                  showFavoriteStatus('Added to favorites');
                 }
               }}
               onUndo={undo}
               onUngroup={ungroupSelectedNode}
             />
           </div>
-
-          {favoriteStatusMessage ? (
-            <div className="app-status app-status-success overlay-status" role="status">
-              {favoriteStatusMessage}
-            </div>
-          ) : null}
 
           {errorMessage ? (
             <div className="app-status app-status-error overlay-status" role="alert">

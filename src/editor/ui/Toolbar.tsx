@@ -17,6 +17,8 @@ interface ToolbarProps {
   canGroup: boolean;
   canSaveFavorite: boolean;
   canUngroup: boolean;
+  favoriteStatusFading?: boolean;
+  favoriteStatusMessage?: string | null;
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
@@ -110,6 +112,8 @@ export function Toolbar({
   canGroup,
   canSaveFavorite,
   canUngroup,
+  favoriteStatusFading = false,
+  favoriteStatusMessage = null,
   onCanvasSizeChange,
   onDelete,
   onExport,
@@ -421,13 +425,27 @@ export function Toolbar({
             <rect x="11" y="4.5" width="5.5" height="11" rx="1" />
             <path d="M9.5 10h1" />
           </ToolbarActionButton>
-          <ToolbarActionButton
-            label="Save as favorite"
-            onClick={onSaveFavorite}
-            disabled={!canSaveFavorite}
-          >
-            <path d="m10 3.5 2.1 4.25 4.7.68-3.4 3.31.8 4.68L10 14.2l-4.2 2.22.8-4.68-3.4-3.31 4.7-.68Z" />
-          </ToolbarActionButton>
+          <div className="top-toolbar-status-anchor">
+            <ToolbarActionButton
+              label="Save as favorite"
+              onClick={onSaveFavorite}
+              disabled={!canSaveFavorite}
+            >
+              <path d="m10 3.5 2.1 4.25 4.7.68-3.4 3.31.8 4.68L10 14.2l-4.2 2.22.8-4.68-3.4-3.31 4.7-.68Z" />
+            </ToolbarActionButton>
+            {favoriteStatusMessage ? (
+              <div
+                className={
+                  favoriteStatusFading
+                    ? 'top-toolbar-status-bubble fading'
+                    : 'top-toolbar-status-bubble'
+                }
+                role="status"
+              >
+                {favoriteStatusMessage}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </header>

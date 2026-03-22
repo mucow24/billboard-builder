@@ -151,6 +151,22 @@ describe('Toolbar', () => {
     });
   });
 
+  it('renders the favorite status bubble beside the save action when present', () => {
+    renderToolbar({ favoriteStatusMessage: 'Added to favorites' });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Added to favorites');
+    expect(screen.getByRole('status')).toHaveClass('top-toolbar-status-bubble');
+  });
+
+  it('applies the fading state to the favorite status bubble', () => {
+    renderToolbar({
+      favoriteStatusFading: true,
+      favoriteStatusMessage: 'Added to favorites',
+    });
+
+    expect(screen.getByRole('status')).toHaveClass('fading');
+  });
+
   it('keeps the size menu open while editing custom fields and closes popovers on outside click, escape, and tab', async () => {
     const user = userEvent.setup();
     renderToolbar();
