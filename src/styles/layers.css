@@ -8,8 +8,6 @@
   min-height: 0;
   padding: 4px 0 0;
   gap: 0;
-  border: 0;
-  border-radius: 0;
   background: transparent;
 }
 
@@ -23,7 +21,7 @@
   min-height: 100%;
 }
 
-/* SVG tree-line overlay — sits above rows, never catches pointer events */
+/* SVG tree-line overlay — drawn above rows, never catches pointer events */
 .layer-tree-overlay {
   position: absolute;
   inset: 0 0 auto;
@@ -33,8 +31,8 @@
 }
 
 .layer-tree-overlay line {
-  stroke: #34507a;
-  stroke-width: 1;
+  stroke: #4a7ab0;
+  stroke-width: 1.5;
 }
 
 .layer-list-rows {
@@ -58,16 +56,16 @@
   margin-top: 1px;
 }
 
-/* ── Row select (the clickable surface) ──────────────────────────────────── */
+/* ── Row select (clickable surface) ──────────────────────────────────────── */
 
 .layer-row-select {
   display: flex;
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 6px;
-  min-height: 30px;
-  padding: 2px 4px;
+  gap: 8px;
+  min-height: 38px;
+  padding: 2px 6px;
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
@@ -77,33 +75,38 @@
 }
 
 .layer-row-group .layer-row-select {
-  background: rgba(15, 23, 38, 0.44);
-  border-color: rgba(45, 63, 97, 0.16);
+  background: rgba(12, 20, 42, 0.82);
+  border-color: rgba(40, 65, 110, 0.3);
 }
 
 .layer-row:hover .layer-row-select {
-  background: rgba(22, 35, 57, 0.7);
-  border-color: rgba(54, 80, 122, 0.24);
+  background: rgba(22, 35, 60, 0.75);
+  border-color: rgba(60, 90, 140, 0.3);
 }
 
 .layer-row.active .layer-row-select {
-  background: rgba(37, 54, 83, 0.58);
+  background: rgba(37, 54, 90, 0.65);
   border-color: rgba(86, 118, 171, 0.56);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .layer-row.contains-selection .layer-row-select {
-  background: rgba(20, 31, 49, 0.44);
-  border-color: rgba(54, 80, 122, 0.16);
+  background: rgba(20, 31, 55, 0.5);
+  border-color: rgba(54, 80, 122, 0.2);
 }
 
 .layer-row.in-selected-group .layer-row-select {
-  background: rgba(23, 34, 54, 0.42);
+  background: rgba(18, 30, 54, 0.45);
   border-color: rgba(54, 80, 122, 0.16);
 }
 
 /* ── Type icon (shape preview / group toggle) ────────────────────────────── */
 
+/*
+ * background and border-color are set by getLayerPreviewStyle() as inline styles.
+ * CSS sets only border-width/style and a fallback border-color.
+ * Inline styles always win over the stylesheet, so the item fill/stroke colors show through.
+ */
 .layer-row-type {
   position: relative;
   overflow: hidden;
@@ -111,32 +114,34 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  border: 1px solid currentColor;
-  border-radius: 2px;
+  width: 18px;
+  height: 18px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgba(100, 140, 190, 0.35);
+  border-radius: 3px;
   background: rgba(12, 19, 32, 0.92);
-  color: rgba(147, 168, 201, 0.6);
   font-size: 0;
   line-height: 1;
 }
 
-/* Shape-specific border radius */
 .layer-row-type-ellipse {
   border-radius: 999px;
 }
 
-/* Diagonal line across the icon box */
+/* Rotated bar forms the diagonal line */
 .layer-row-type-line::after {
   content: '';
   position: absolute;
-  inset: 0;
+  left: 2px;
+  right: 2px;
+  top: calc(50% - 1px);
+  height: 1.5px;
   background: currentColor;
-  clip-path: polygon(0 45%, 100% 55%, 100% 65%, 0 55%);
-  transform: rotate(-18deg);
+  transform: rotate(-35deg);
+  transform-origin: center;
 }
 
-/* Image thumbnails fill the icon box */
 .layer-row-type-image .layer-row-thumbnail {
   display: block;
   width: 100%;
@@ -145,31 +150,31 @@
   object-position: center;
 }
 
-/* Group toggle button (+/-) */
+/* Group expand/collapse toggle */
 .layer-row-type-group {
-  background: rgba(22, 35, 57, 0.96);
-  border-color: rgba(108, 139, 187, 0.5);
-  color: #f8fbff;
+  background: rgba(18, 28, 52, 0.98);
+  border-color: rgba(100, 140, 200, 0.5);
+  color: #e8f0ff;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .layer-row-type-group:hover {
-  border-color: rgba(147, 168, 201, 0.6);
-  background: rgba(29, 47, 76, 0.98);
+  border-color: rgba(140, 180, 240, 0.7);
+  background: rgba(26, 42, 76, 0.98);
 }
 
-/* ── Copy (label + secondary text) ──────────────────────────────────────── */
+/* ── Copy (label + secondary) ────────────────────────────────────────────── */
 
 .layer-row-copy {
   display: flex;
   align-items: center;
   flex: 1 1 auto;
   min-width: 0;
-  gap: 5px;
+  gap: 6px;
 }
 
 .layer-row-copy strong {
@@ -177,8 +182,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #f8fbff;
-  font-size: 11px;
+  color: #edf2ff;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1;
   margin: 0;
@@ -190,23 +195,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #8fa2c4;
-  font-size: 10px;
-  font-weight: 500;
+  color: #7a9ac4;
+  font-size: 11px;
+  font-weight: 400;
   line-height: 1;
+  flex-shrink: 1;
+  min-width: 0;
   margin: 0;
   padding: 0;
-  flex-shrink: 0;
 }
 
-/* Groups get a bolder primary label */
 .layer-row-group .layer-row-copy strong {
   font-weight: 700;
-  color: #f6f9ff;
+  color: #f0f5ff;
 }
 
 .layer-row-group .layer-row-copy small {
-  color: #9ab0d2;
+  color: #8aabce;
 }
 
 /* ── Layers footer toolbar ───────────────────────────────────────────────── */
@@ -239,8 +244,8 @@
 }
 
 /*
- * Shared button shell: layers footer toolbar buttons, compact color picker
- * trigger, and delete button. Color-picker shape overrides live in pickers.css.
+ * Shared shell: order toolbar buttons, compact color picker trigger, delete button.
+ * Color-picker shape overrides live in pickers.css.
  */
 .toolbar-button,
 .color-picker-trigger-compact,
@@ -390,7 +395,7 @@
   border-top: 1px solid rgba(148, 163, 184, 0.08);
 }
 
-/* ── Layers panel meta (bottom item count strip) ─────────────────────────── */
+/* ── Layers panel meta (item count strip) ────────────────────────────────── */
 
 .layers-panel-meta {
   margin: 0 -8px;
