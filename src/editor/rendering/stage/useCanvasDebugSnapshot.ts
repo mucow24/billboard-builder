@@ -4,13 +4,13 @@ import type Konva from 'konva';
 import type { CanvasItem } from '../../document/documentTypes';
 import {
   getLineHandleRects,
-  getShapeHandlePoints,
   getShapeHandleRects,
   localToStage,
   RESIZE_HANDLE_NAMES,
   type Point,
 } from '../interactionGeometry';
 import { getRenderBox } from '../transformGeometry';
+import { getShapeOverlayHandlePoints } from './overlayGeometry';
 
 declare global {
   interface Window {
@@ -193,11 +193,11 @@ export function useCanvasDebugSnapshot({
             },
             cropHandlePoints:
               cropSession.previewItem.kind !== 'line'
-                ? getShapeHandlePoints(cropSession.previewItem)
+                ? getShapeOverlayHandlePoints(cropSession.previewItem, zoom)
                 : null,
             fullImageHandlePoints:
               cropSession.fullImageItem.kind !== 'line'
-                ? getShapeHandlePoints(cropSession.fullImageItem)
+                ? getShapeOverlayHandlePoints(cropSession.fullImageItem, zoom)
                 : null,
             cropHandleViewportPoints,
             fullImageHandleViewportPoints: cropFullImageHandleViewportPoints,

@@ -136,6 +136,7 @@ export function CanvasStage({
     selectedRenderedItem,
     session: session as never,
     cropSession: cropSession as never,
+    zoom: viewport.zoom,
     viewport,
   });
 

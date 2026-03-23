@@ -147,6 +147,50 @@ const leafPickupCases: LeafPickupCase[] = [
 ];
 
 test.describe('editor canvas entrypoints', () => {
+  test('keeps single-selection handle hooks a constant viewport size while zoom changes', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'zoom-stable-rect',
+      x: 180,
+      y: 180,
+      width: 220,
+      height: 140,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'zoom-stable-selection.json');
+
+    await clickCanvas(page, { x: 260, y: 250 });
+    await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(true);
+
+    const handleBefore = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
+    const rotaterBefore = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
+    const overlayBefore = await page.getByTestId('canvas-selected-item-overlay').boundingBox();
+    if (!handleBefore || !rotaterBefore || !overlayBefore) {
+      throw new Error('Expected selection hooks before zoom change.');
+    }
+
+    await page.getByRole('button', { name: 'Set zoom to 100%' }).click();
+    await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 100%');
+
+    const handleAfter = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
+    const rotaterAfter = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
+    const overlayAfter = await page.getByTestId('canvas-selected-item-overlay').boundingBox();
+    if (!handleAfter || !rotaterAfter || !overlayAfter) {
+      throw new Error('Expected selection hooks after zoom change.');
+    }
+
+    expect(handleAfter.width).toBeCloseTo(handleBefore.width, 1);
+    expect(handleAfter.height).toBeCloseTo(handleBefore.height, 1);
+    expect(
+      overlayAfter.y - (rotaterAfter.y + rotaterAfter.height / 2),
+    ).toBeCloseTo(
+      overlayBefore.y - (rotaterBefore.y + rotaterBefore.height / 2),
+      1,
+    );
+  });
+
   test('CS-02 CS-03 CS-04 CS-05 CS-06 CS-08 CS-09 CS-11 CS-12 CS-13 selects visible item kinds and honors toggle, marquee, locked, and hidden behavior', async ({
     page,
   }) => {

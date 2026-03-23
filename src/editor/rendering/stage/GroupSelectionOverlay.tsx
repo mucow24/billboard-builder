@@ -15,6 +15,7 @@ import {
   HANDLE_STROKE,
   SELECTION_STROKE,
 } from './renderConstants';
+import { getCanvasOverlayMetrics } from './overlayGeometry';
 import { ShapeItemView } from './ShapeItemView';
 
 interface GroupSelectionOverlayProps {
@@ -53,6 +54,7 @@ interface GroupSelectionOverlayProps {
   renderedSelectedItems: RenderableCanvasItem[];
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  zoom: number;
 }
 
 export function GroupSelectionOverlay({
@@ -68,7 +70,10 @@ export function GroupSelectionOverlay({
   renderedSelectedItems,
   startPanDrag,
   toCanvasPointer,
+  zoom,
 }: GroupSelectionOverlayProps) {
+  const overlayMetrics = getCanvasOverlayMetrics(zoom);
+
   return (
     <>
       {renderedSelectedItems.map((selectedRenderedItem) =>
@@ -85,6 +90,7 @@ export function GroupSelectionOverlay({
             renderContent={false}
             renderHandles={false}
             toCanvasPointer={toCanvasPointer}
+            zoom={zoom}
           />
         ) : (
           <ShapeItemView
@@ -100,6 +106,7 @@ export function GroupSelectionOverlay({
             renderContent={false}
             renderHandles={false}
             toCanvasPointer={toCanvasPointer}
+            zoom={zoom}
           />
         ),
       )}
@@ -115,8 +122,8 @@ export function GroupSelectionOverlay({
             width={groupOverlayFrame.bounds.width}
             height={groupOverlayFrame.bounds.height}
             stroke={SELECTION_STROKE}
-            strokeWidth={2}
-            dash={[8, 4]}
+            strokeWidth={overlayMetrics.selectionStrokeWidth}
+            dash={overlayMetrics.selectionDash}
             fillEnabled={false}
             listening={false}
           />
@@ -125,10 +132,10 @@ export function GroupSelectionOverlay({
               0,
               -groupOverlayFrame.bounds.height / 2,
               0,
-              -(groupOverlayFrame.bounds.height / 2) - 50,
+              -(groupOverlayFrame.bounds.height / 2) - overlayMetrics.rotateHandleOffset,
             ]}
             stroke={SELECTION_STROKE}
-            strokeWidth={2}
+            strokeWidth={overlayMetrics.selectionStrokeWidth}
             listening={false}
           />
           {RESIZE_HANDLE_NAMES.map((handle) => {
@@ -149,10 +156,10 @@ export function GroupSelectionOverlay({
                 key={`group-${handle}`}
                 x={x}
                 y={y}
-                radius={8}
+                radius={overlayMetrics.handleRadius}
                 fill={HANDLE_FILL}
                 stroke={HANDLE_STROKE}
-                strokeWidth={2}
+                strokeWidth={overlayMetrics.handleStrokeWidth}
                 onMouseDown={(event) => {
                   const pointer = event.target.getStage()?.getPointerPosition();
                   if (!pointer) {
@@ -171,11 +178,11 @@ export function GroupSelectionOverlay({
           })}
           <Circle
             x={0}
-            y={-(groupOverlayFrame.bounds.height / 2) - 50}
-            radius={8}
+            y={-(groupOverlayFrame.bounds.height / 2) - overlayMetrics.rotateHandleOffset}
+            radius={overlayMetrics.handleRadius}
             fill={HANDLE_FILL}
             stroke={HANDLE_STROKE}
-            strokeWidth={2}
+            strokeWidth={overlayMetrics.handleStrokeWidth}
             onMouseDown={(event) => {
               const pointer = event.target.getStage()?.getPointerPosition();
               if (!pointer) {

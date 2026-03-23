@@ -1,8 +1,5 @@
 import type { CanvasItem } from '../../document/documentTypes';
 import {
-  getLineHandleRects,
-  getShapeHandlePoints,
-  getShapeHandleRects,
   localToStage,
   RESIZE_HANDLE_NAMES,
 } from '../interactionGeometry';
@@ -12,6 +9,12 @@ import {
   getRenderBox,
   getSelectionFrameForRotation,
 } from '../transformGeometry';
+import {
+  getCanvasOverlayMetrics,
+  getResizeHandleViewportRects,
+  getShapeOverlayHandlePoints,
+  getViewportHandleRect,
+} from './overlayGeometry';
 
 interface RotationSession {
   bounds: { x: number; y: number; width: number; height: number };
@@ -129,9 +132,11 @@ export function buildStageDerivedState(params: {
     tool?: string;
     bounds?: { x: number; y: number; width: number; height: number };
   } | null;
+  zoom: number;
   viewport: StageViewportAdapter;
 }) {
   const cropSession = params.cropSession ?? null;
+  const overlayMetrics = getCanvasOverlayMetrics(params.zoom);
   const groupOverlayFrame = getGroupOverlayFrame({
     renderedGroupBounds: params.renderedGroupBounds,
     renderedSelectionFrame: params.renderedSelectionFrame,
@@ -142,21 +147,29 @@ export function buildStageDerivedState(params: {
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem &&
     params.selectedRenderedItem.kind !== 'line'
-      ? Object.fromEntries(
-          Object.entries(getShapeHandleRects(params.selectedRenderedItem)).map(
-            ([handle, rect]) => [handle, params.viewport.toViewportRect(rect)],
-          ),
+      ? getResizeHandleViewportRects(
+          getShapeOverlayHandlePoints(params.selectedRenderedItem, params.zoom),
+          params.viewport.toViewportPoint,
         )
       : null;
   const selectedLineHandleRects =
     !cropSession &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem?.kind === 'line'
-      ? Object.fromEntries(
-          Object.entries(getLineHandleRects(params.selectedRenderedItem)).map(
-            ([handle, rect]) => [handle, params.viewport.toViewportRect(rect)],
+      ? {
+          start: getViewportHandleRect(
+            params.viewport.toViewportPoint({
+              x: params.selectedRenderedItem.startX,
+              y: params.selectedRenderedItem.startY,
+            }),
           ),
-        )
+          end: getViewportHandleRect(
+            params.viewport.toViewportPoint({
+              x: params.selectedRenderedItem.endX,
+              y: params.selectedRenderedItem.endY,
+            }),
+          ),
+        }
       : null;
   const marqueeViewportRect =
     params.session?.kind === 'marquee' &&
@@ -210,7 +223,7 @@ export function buildStageDerivedState(params: {
   const groupRotaterViewportPoint = groupOverlayFrame
     ? params.viewport.toViewportPoint(
         localToStage(
-          { x: 0, y: -(groupOverlayFrame.bounds.height / 2) - 50 },
+          { x: 0, y: -(groupOverlayFrame.bounds.height / 2) - overlayMetrics.rotateHandleOffset },
           {
             x: groupOverlayFrame.bounds.x + groupOverlayFrame.bounds.width / 2,
             y: groupOverlayFrame.bounds.y + groupOverlayFrame.bounds.height / 2,
@@ -223,7 +236,12 @@ export function buildStageDerivedState(params: {
     ? Object.fromEntries(
         RESIZE_HANDLE_NAMES.map((handle) => [
           handle,
-          params.viewport.toViewportPoint(getShapeHandlePoints(cropSession.previewItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>)[handle]),
+          params.viewport.toViewportPoint(
+            getShapeOverlayHandlePoints(
+              cropSession.previewItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+              params.zoom,
+            )[handle],
+          ),
         ]),
       )
     : null;
@@ -231,20 +249,21 @@ export function buildStageDerivedState(params: {
     ? Object.fromEntries(
         RESIZE_HANDLE_NAMES.map((handle) => [
           handle,
-          params.viewport.toViewportPoint(getShapeHandlePoints(cropSession.fullImageItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>)[handle]),
+          params.viewport.toViewportPoint(
+            getShapeOverlayHandlePoints(
+              cropSession.fullImageItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+              params.zoom,
+            )[handle],
+          ),
         ]),
       )
     : null;
   const cropFullImageRotaterViewportPoint = cropSession
     ? params.viewport.toViewportPoint(
-        localToStage(
-          { x: 0, y: -(cropSession.fullImageItem.height / 2) - 50 },
-          {
-            x: cropSession.fullImageItem.x + cropSession.fullImageItem.width / 2,
-            y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
-          },
-          cropSession.fullImageItem.rotation,
-        ),
+        getShapeOverlayHandlePoints(
+          cropSession.fullImageItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+          params.zoom,
+        ).rotater,
       )
     : null;
 

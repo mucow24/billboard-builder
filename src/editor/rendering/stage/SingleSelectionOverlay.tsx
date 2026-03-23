@@ -37,6 +37,7 @@ interface SingleSelectionOverlayProps {
   selectedRenderedItem: RenderableCanvasItem;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  zoom: number;
 }
 
 export function SingleSelectionOverlay({
@@ -50,6 +51,7 @@ export function SingleSelectionOverlay({
   selectedRenderedItem,
   startPanDrag,
   toCanvasPointer,
+  zoom,
 }: SingleSelectionOverlayProps) {
   return selectedRenderedItem.kind === 'line' ? (
     <LineItemView
@@ -64,6 +66,7 @@ export function SingleSelectionOverlay({
       renderContent={false}
       startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
+      zoom={zoom}
     />
   ) : (
     <ShapeItemView
@@ -79,6 +82,7 @@ export function SingleSelectionOverlay({
       renderContent={false}
       startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
+      zoom={zoom}
     />
   );
 }

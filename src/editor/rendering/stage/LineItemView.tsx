@@ -11,6 +11,7 @@ import {
   HANDLE_STROKE,
   SHADOW_MIN_ALPHA_STROKE,
 } from './renderConstants';
+import { getCanvasOverlayMetrics } from './overlayGeometry';
 
 interface LineItemViewProps {
   activeTool: CanvasTool;
@@ -37,6 +38,7 @@ interface LineItemViewProps {
   registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  zoom?: number;
 }
 
 const NOOP_REGISTER_SHAPE_REF = () => {};
@@ -55,9 +57,11 @@ export const LineItemView = memo(function LineItemView({
   registerShapeRef = NOOP_REGISTER_SHAPE_REF,
   startPanDrag,
   toCanvasPointer,
+  zoom = 1,
 }: LineItemViewProps) {
   const lineHandleRects = getLineHandleRects(item);
   const interactionEnabled = activeTool === 'select';
+  const overlayMetrics = getCanvasOverlayMetrics(zoom);
   const handleShapeRef = useCallback(
     (node: Konva.Node | null) => {
       registerShapeRef(item.id, node);
@@ -129,8 +133,11 @@ export const LineItemView = memo(function LineItemView({
           <Line
             points={[item.startX, item.startY, item.endX, item.endY]}
             stroke={SHADOW_MIN_ALPHA_STROKE}
-            strokeWidth={Math.max(item.strokeWidth, 18)}
-            hitStrokeWidth={Math.max(item.strokeWidth + 18, 24)}
+            strokeWidth={Math.max(item.strokeWidth, overlayMetrics.lineSelectionStrokeWidth)}
+            hitStrokeWidth={Math.max(
+              item.strokeWidth + overlayMetrics.lineSelectionStrokeWidth,
+              overlayMetrics.lineSelectionHitStrokeWidth,
+            )}
             onMouseDown={(event) => {
               if (item.locked) {
                 return;
@@ -171,10 +178,10 @@ export const LineItemView = memo(function LineItemView({
                     key={`${item.id}-${handle}`}
                     x={rect.x + rect.width / 2}
                     y={rect.y + rect.height / 2}
-                    radius={8}
+                    radius={overlayMetrics.handleRadius}
                     fill={HANDLE_FILL}
                     stroke={HANDLE_STROKE}
-                    strokeWidth={2}
+                    strokeWidth={overlayMetrics.handleStrokeWidth}
                     onMouseDown={(event) => {
                       if (item.locked) {
                         return;

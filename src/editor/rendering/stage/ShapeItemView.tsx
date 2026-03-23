@@ -6,7 +6,6 @@ import type { CanvasTool, LineCanvasItem, CanvasItem } from '../../document/docu
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import {
   getSelectionOutlinePoints,
-  getShapeHandlePoints,
   RESIZE_HANDLE_NAMES,
   type Point,
   type ResizeHandle,
@@ -22,6 +21,10 @@ import {
   SELECTION_STROKE,
   SHADOW_MIN_ALPHA_STROKE,
 } from './renderConstants';
+import {
+  getCanvasOverlayMetrics,
+  getShapeOverlayHandlePoints,
+} from './overlayGeometry';
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
 
@@ -55,6 +58,7 @@ interface ShapeItemViewProps {
   registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  zoom?: number;
 }
 
 const NOOP_REGISTER_SHAPE_REF = () => {};
@@ -74,12 +78,14 @@ export const ShapeItemView = memo(function ShapeItemView({
   registerShapeRef = NOOP_REGISTER_SHAPE_REF,
   startPanDrag,
   toCanvasPointer,
+  zoom = 1,
 }: ShapeItemViewProps) {
   const imageElement = useImageElement(item.kind === 'image' ? item.src : '');
   const renderBox = getRenderBox(item);
-  const handlePoints = getShapeHandlePoints(item);
+  const handlePoints = getShapeOverlayHandlePoints(item, zoom);
   const outlinePoints = getSelectionOutlinePoints(item);
   const interactionEnabled = activeTool === 'select';
+  const overlayMetrics = getCanvasOverlayMetrics(zoom);
   const handleShapeRef = useCallback(
     (node: Konva.Node | null) => {
       registerShapeRef(item.id, node);
@@ -264,8 +270,8 @@ export const ShapeItemView = memo(function ShapeItemView({
           <Line
             points={[...outlinePoints, outlinePoints[0], outlinePoints[1]]}
             stroke={SELECTION_STROKE}
-            strokeWidth={2}
-            dash={[8, 4]}
+            strokeWidth={overlayMetrics.selectionStrokeWidth}
+            dash={overlayMetrics.selectionDash}
             listening={false}
           />
           {renderHandles ? (
@@ -278,7 +284,7 @@ export const ShapeItemView = memo(function ShapeItemView({
                   handlePoints.rotater.y,
                 ]}
                 stroke={SELECTION_STROKE}
-                strokeWidth={2}
+                strokeWidth={overlayMetrics.selectionStrokeWidth}
                 listening={false}
               />
               {RESIZE_HANDLE_NAMES.map((handle) => {
@@ -288,10 +294,10 @@ export const ShapeItemView = memo(function ShapeItemView({
                     key={`${item.id}-${handle}`}
                     x={point.x}
                     y={point.y}
-                    radius={8}
+                    radius={overlayMetrics.handleRadius}
                     fill={HANDLE_FILL}
                     stroke={HANDLE_STROKE}
-                    strokeWidth={2}
+                    strokeWidth={overlayMetrics.handleStrokeWidth}
                     onMouseDown={(event) => {
                       if (item.locked) {
                         return;
@@ -317,10 +323,10 @@ export const ShapeItemView = memo(function ShapeItemView({
               <Circle
                 x={handlePoints.rotater.x}
                 y={handlePoints.rotater.y}
-                radius={8}
+                radius={overlayMetrics.handleRadius}
                 fill={HANDLE_FILL}
                 stroke={HANDLE_STROKE}
-                strokeWidth={2}
+                strokeWidth={overlayMetrics.handleStrokeWidth}
                 onMouseDown={(event) => {
                   if (item.locked) {
                     return;

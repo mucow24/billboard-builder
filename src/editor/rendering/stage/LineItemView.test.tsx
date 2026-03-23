@@ -113,4 +113,27 @@ describe('LineItemView', () => {
 
     expect(container.querySelector('[data-prop-itemid="line"]')).toBeNull();
   });
+
+  it('keeps line endpoint handles a constant viewport size across zoom levels', () => {
+    const line = createLineItem({ id: 'line', startX: 20, startY: 30, endX: 120, endY: 80 });
+
+    const { container } = render(
+      <LineItemView
+        activeTool="select"
+        isSelected
+        item={line}
+        onBeginLineHandle={vi.fn()}
+        onItemPointerDown={vi.fn()}
+        registerShapeRef={vi.fn()}
+        toCanvasPointer={(pointer) => pointer}
+        zoom={2}
+      />,
+    );
+
+    const handleNode = container.querySelector('[data-konva-node="Circle"]');
+
+    expect(handleNode).not.toBeNull();
+    expect(handleNode).toHaveAttribute('data-prop-radius', '4');
+    expect(handleNode).toHaveAttribute('data-prop-strokewidth', '1');
+  });
 });

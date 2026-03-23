@@ -411,7 +411,7 @@ describe('CanvasStage viewport controls', () => {
       />,
     );
 
-    const dashedLines = container.querySelectorAll('[data-konva-node="Line"][data-prop-dash="[8,4]"]');
+    const dashedLines = container.querySelectorAll('[data-konva-node="Line"][data-prop-dash]');
     expect(dashedLines.length).toBeGreaterThanOrEqual(2);
 
     const rotatedGroups = Array.from(container.querySelectorAll('[data-konva-node="Group"][data-prop-rotation]'));
@@ -480,31 +480,33 @@ describe('CanvasStage viewport controls', () => {
       />,
     );
 
-    expect(
-      container.querySelector(
-        '[data-konva-node="Line"][data-prop-name="crop-selection-outline-underlay"][data-prop-stroke="#ffffff"][data-prop-strokewidth="10"]',
-      ),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(
-        '[data-konva-node="Line"][data-prop-name="crop-selection-outline"][data-prop-stroke="#111111"][data-prop-strokewidth="6"]',
-      ),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(
-        '[data-konva-node="Line"][data-prop-name="crop-handle-visual-underlay top-center"][data-prop-stroke="#ffffff"][data-prop-strokewidth="13"]',
-      ),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(
-        '[data-konva-node="Line"][data-prop-name="crop-handle-visual top-left"][data-prop-stroke="#111111"][data-prop-strokewidth="8"]',
-      ),
-    ).not.toBeNull();
-    expect(
-      container.querySelector(
-        '[data-konva-node="Rect"][data-prop-name="crop-handle-hit middle-right"][data-prop-width="24"][data-prop-height="24"]',
-      ),
-    ).not.toBeNull();
+    const outlineUnderlay = container.querySelector(
+      '[data-konva-node="Line"][data-prop-name="crop-selection-outline-underlay"][data-prop-stroke="#ffffff"]',
+    );
+    const outline = container.querySelector(
+      '[data-konva-node="Line"][data-prop-name="crop-selection-outline"][data-prop-stroke="#111111"]',
+    );
+    const handleUnderlay = container.querySelector(
+      '[data-konva-node="Line"][data-prop-name="crop-handle-visual-underlay top-center"][data-prop-stroke="#ffffff"]',
+    );
+    const handleVisual = container.querySelector(
+      '[data-konva-node="Line"][data-prop-name="crop-handle-visual top-left"][data-prop-stroke="#111111"]',
+    );
+    const hitTarget = container.querySelector(
+      '[data-konva-node="Rect"][data-prop-name="crop-handle-hit middle-right"]',
+    );
+
+    expect(outlineUnderlay).not.toBeNull();
+    expect(outline).not.toBeNull();
+    expect(handleUnderlay).not.toBeNull();
+    expect(handleVisual).not.toBeNull();
+    expect(hitTarget).not.toBeNull();
+    expect(Number(outlineUnderlay?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(10);
+    expect(Number(outline?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(6);
+    expect(Number(handleUnderlay?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(13);
+    expect(Number(handleVisual?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(8);
+    expect(Number(hitTarget?.getAttribute('data-prop-width'))).toBeGreaterThan(24);
+    expect(Number(hitTarget?.getAttribute('data-prop-height'))).toBeGreaterThan(24);
   });
 
   it('renders zoom controls and updates the readout', async () => {
@@ -571,7 +573,7 @@ describe('CanvasStage viewport controls', () => {
     );
 
     const groupOutline = container.querySelector(
-      '[data-konva-node="Rect"][data-prop-dash="[8,4]"]'
+      '[data-konva-node="Rect"][data-prop-stroke="#7dd3fc"]'
     ) as HTMLElement | null;
     const rightHandle = container.querySelector(
       '[data-konva-node="Circle"][data-prop-x="90"][data-prop-y="0"]'
@@ -1144,15 +1146,17 @@ describe('CanvasStage viewport controls', () => {
     const shapeGroups = container.querySelectorAll(
       `[data-konva-node="Group"][data-prop-x="${rectangle.x}"][data-prop-y="${rectangle.y}"]`
     );
-    const rotaterHandle = container.querySelector(
-      `[data-konva-node="Circle"][data-prop-x="${handlePoints.rotater.x}"][data-prop-y="${handlePoints.rotater.y}"]`
-    ) as HTMLElement | null;
+    const rotaterHandle = Array.from(container.querySelectorAll('[data-konva-node="Circle"]')).find(
+      (node) =>
+        node.getAttribute('data-prop-x') === String(handlePoints.rotater.x) &&
+        Number(node.getAttribute('data-prop-y')) < rectangle.y,
+    ) as HTMLElement | undefined;
     const rightResizeHandle = container.querySelector(
       `[data-konva-node="Circle"][data-prop-x="${handlePoints['middle-right'].x}"][data-prop-y="${handlePoints['middle-right'].y}"]`
     ) as HTMLElement | null;
 
     expect(shapeGroups.length).toBeGreaterThan(0);
-    expect(rotaterHandle).not.toBeNull();
+    expect(rotaterHandle).toBeDefined();
     expect(rightResizeHandle).not.toBeNull();
 
     fireEvent.mouseDown(shapeGroups[0]!, { button: 0, shiftKey: true, clientX: 300, clientY: 240 });

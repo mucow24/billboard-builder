@@ -152,6 +152,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | ST-13 | Canvas | Selected item, snap candidate exists | Ctrl-drag | No snapping guides | Snapping disabled | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-14 | Canvas | Selected item | Shift-drag | Constrained preview visible | Axis-constrained drag where implemented | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-15 | Canvas | Rectangle selected, resize handle is off-canvas but visible in the unclipped workspace | Drag the off-canvas resize handle | Resize affordance stays live | Off-canvas handle resize commits like the on-canvas case | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
+| ST-16 | Canvas | Single item selected | Change zoom with the HUD | Selection hooks keep the same visible size and rotater offset | Overlay geometry stays viewport-invariant across zoom changes | support/debug | Chromium + Firefox | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 
 ## 5. Image Crop Flows
 
@@ -169,6 +170,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | IC-10 | Canvas | Crop mode active | Drag the blue full-image rotater | Blue full-image frame rotates while the black crop frame stays fixed | Committed source rotation persists under a fixed crop frame | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 | IC-11 | Canvas | Crop mode active | Double-click anywhere on the image, inside or outside the crop | Crop affordance disappears while the image remains selected | Crop session commits and exits without clearing selection | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 | IC-12 | Canvas | Crop mode active, snap candidate visible | Drag a crop boundary near a guide, then repeat with Ctrl held | Guides appear for the snapped drag and stay absent for the Ctrl drag | Crop boundary snapping matches normal guide behavior and Ctrl disables it | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-13 | Canvas | Crop mode active | Change zoom with the HUD | Crop hooks keep the same visible size and full-image rotater offset | Crop overlay geometry stays viewport-invariant across zoom changes | support/debug | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 
 ## 6. Group and Multi-Selection Transform Flows
 

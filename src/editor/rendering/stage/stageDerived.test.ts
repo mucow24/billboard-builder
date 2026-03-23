@@ -29,6 +29,7 @@ describe('stageDerived', () => {
         pointerStart: { x: 10, y: 15 },
         currentPointer: { x: 70, y: 65 },
       },
+      zoom: 1,
       viewport: {
         toViewportPoint: (point) => point,
         toViewportRect: (rect) => ({
@@ -75,6 +76,7 @@ describe('stageDerived', () => {
         pointerStart: { x: 110, y: 70 },
         currentPointer: { x: 150, y: 110 },
       },
+      zoom: 1,
       viewport: {
         toViewportPoint: (point) => point,
         toViewportRect: (rect) => ({
@@ -99,6 +101,7 @@ describe('stageDerived', () => {
       renderedSelectionFrame: null,
       selectedRenderedItem: line,
       session: null,
+      zoom: 1,
       viewport: {
         toViewportPoint: (point) => point,
         toViewportRect: (rect) => ({
@@ -126,6 +129,7 @@ describe('stageDerived', () => {
         pointerStart: { x: -160, y: 120 },
         currentPointer: { x: 120, y: 260 },
       },
+      zoom: 1,
       viewport: {
         toViewportPoint: (point) => point,
         toViewportRect: (rect) => ({
@@ -142,6 +146,48 @@ describe('stageDerived', () => {
       top: 120,
       width: 280,
       height: 140,
+    });
+  });
+
+  it('keeps viewport hook handle sizes and rotater offset stable across zoom', () => {
+    const rectangle = createRectangleItem({
+      x: 20,
+      y: 30,
+      width: 80,
+      height: 40,
+      rotation: 0,
+    });
+
+    const derived = buildStageDerivedState({
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [rectangle],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: rectangle,
+      session: null,
+      zoom: 2,
+      viewport: {
+        toViewportPoint: (point) => ({ x: point.x * 2, y: point.y * 2 }),
+        toViewportRect: (rect) => ({
+          left: rect.x * 2,
+          top: rect.y * 2,
+          width: rect.width * 2,
+          height: rect.height * 2,
+        }),
+      },
+    });
+
+    expect(derived.selectedShapeHandleRects?.['middle-right']).toEqual({
+      left: 192,
+      top: 92,
+      width: 16,
+      height: 16,
+    });
+    expect(derived.selectedShapeHandleRects?.rotater).toEqual({
+      left: 112,
+      top: 2,
+      width: 16,
+      height: 16,
     });
   });
 });

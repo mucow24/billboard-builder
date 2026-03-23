@@ -219,6 +219,7 @@ export function CanvasScene({
                 renderedSelectedItems={renderedSelectedItems}
                 startPanDrag={startPanDrag}
                 toCanvasPointer={toCanvasPointer}
+                zoom={zoom}
               />
             ) : null}
             {cropSession ? (
@@ -232,6 +233,7 @@ export function CanvasScene({
                 previewItem={cropSession.previewItem}
                 registerShapeRef={registerShapeRef}
                 toCanvasPointer={toCanvasPointer}
+                zoom={zoom}
               />
             ) : null}
             {!cropSession && !showGroupSelection && selectedRenderedItem ? (
@@ -246,6 +248,7 @@ export function CanvasScene({
                 selectedRenderedItem={selectedRenderedItem}
                 startPanDrag={startPanDrag}
                 toCanvasPointer={toCanvasPointer}
+                zoom={zoom}
               />
             ) : null}
           </Group>

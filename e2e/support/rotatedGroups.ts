@@ -175,7 +175,7 @@ export function assertGroupOverlayGeometry(debug: StageDebugInfo, label: string)
   };
   const halfWidth = overlay.width / 2;
   const halfHeight = overlay.height / 2;
-  const rotaterOffset = (frame.height / 2 + 50) * debug.viewport.zoom;
+  const rotaterOffset = (frame.height / 2) * debug.viewport.zoom + 50;
 
   expectPointClose(
     handles['middle-right'],

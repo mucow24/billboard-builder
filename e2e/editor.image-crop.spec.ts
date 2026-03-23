@@ -48,6 +48,57 @@ async function expectCropMode(page: Page) {
 }
 
 test.describe('editor image crop', () => {
+  test('keeps crop affordance hook sizing stable while zoom changes', async ({ page }) => {
+    const image = createImageFixture({
+      id: 'crop-zoom-stable-image',
+      name: 'Crop Zoom Stable Image',
+      x: 520,
+      y: 320,
+      width: 160,
+      height: 90,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-zoom-stable.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 600, y: 365 });
+    await waitForDoubleClickCadence(page);
+    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await expect.poll(async () => (await readStageDebug(page)).cropSession !== null).toBe(true);
+    await setCanvasTestHooksEnabled(page, true);
+
+    const cropHandleBefore = await page.getByTestId('canvas-crop-handle-middle-right').boundingBox();
+    const rotaterBefore = await page.getByTestId('canvas-crop-full-rotater').boundingBox();
+    const fullOverlayBefore = await page.getByTestId('canvas-crop-pan-overlay').boundingBox();
+    if (!cropHandleBefore || !rotaterBefore || !fullOverlayBefore) {
+      throw new Error('Expected crop hooks before zoom change.');
+    }
+
+    await page.evaluate(() => {
+      const button = document.querySelector<HTMLButtonElement>('button[aria-label="Set zoom to 100%"]');
+      button?.click();
+    });
+    await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 100%');
+
+    const cropHandleAfter = await page.getByTestId('canvas-crop-handle-middle-right').boundingBox();
+    const rotaterAfter = await page.getByTestId('canvas-crop-full-rotater').boundingBox();
+    const fullOverlayAfter = await page.getByTestId('canvas-crop-pan-overlay').boundingBox();
+    if (!cropHandleAfter || !rotaterAfter || !fullOverlayAfter) {
+      throw new Error('Expected crop hooks after zoom change.');
+    }
+
+    expect(cropHandleAfter.width).toBeCloseTo(cropHandleBefore.width, 1);
+    expect(cropHandleAfter.height).toBeCloseTo(cropHandleBefore.height, 1);
+    expect(
+      fullOverlayAfter.y - (rotaterAfter.y + rotaterAfter.height / 2),
+    ).toBeCloseTo(
+      fullOverlayBefore.y - (rotaterBefore.y + rotaterBefore.height / 2),
+      1,
+    );
+  });
+
   test('double-clicking an unselected image enters crop mode in one browser gesture', async ({
     page,
   }) => {
