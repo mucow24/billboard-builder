@@ -1,21 +1,20 @@
-import { useMemo, type CSSProperties, type KeyboardEvent } from 'react';
+import { useMemo, type KeyboardEvent } from 'react';
 
 import { ColorPickerControl } from '../ColorPickerControl';
 import { isCanvasItemNode } from '../../document/sceneGraph';
 
 import {
-  getItemGlyph,
   getLayerPreviewStyle,
   getLayerPrimaryLabel,
   getLayerSecondaryLabel,
 } from './inspectorModel';
 import {
+  computeRowConnectors,
   formatImmediateChildCount,
   getLayerRowVisualState,
   getLayersMetaItemCount,
   getVisibleLayerRows,
 } from './layersTabModel';
-import { useLayerTreeOverlay } from './useLayerTreeOverlay';
 import type { LayersInspectorTabProps } from './types';
 
 export function LayersInspectorTab({
@@ -36,13 +35,11 @@ export function LayersInspectorTab({
     () => getVisibleLayerRows(rows, collapsedGroupIds),
     [rows, collapsedGroupIds],
   );
+  const connectorMap = useMemo(
+    () => computeRowConnectors(visibleRows),
+    [visibleRows],
+  );
   const layersMetaItemCount = useMemo(() => getLayersMetaItemCount(rows), [rows]);
-  const {
-    containerRef,
-    overlayHeight,
-    overlaySegments,
-    registerJunction,
-  } = useLayerTreeOverlay(visibleRows);
   const deleteSelectionLabel =
     selectedNodeIds.length > 0
       ? `Delete selected (${selectedNodeIds.length})`
@@ -150,36 +147,10 @@ export function LayersInspectorTab({
         <div className="footer-rule" />
       </div>
       <div
-        ref={containerRef}
         className="layer-list layer-list-tabbed"
         data-testid="layers-layer-list"
       >
         <div className="layer-list-content">
-          {overlaySegments.length > 0 ? (
-            <svg
-              aria-hidden="true"
-              className="layer-tree-overlay"
-              style={{ height: `${overlayHeight}px` }}
-              width="100%"
-            >
-              {overlaySegments.map((segment, index) => (
-                <line
-                  key={`${segment.x1}:${segment.y1}:${segment.x2}:${segment.y2}:${index}`}
-                  data-child-node-id={segment.childNodeId}
-                  data-parent-node-id={segment.parentNodeId}
-                  data-testid={
-                    segment.kind === 'trunk'
-                      ? `layers-tree-trunk-${segment.parentNodeId}`
-                      : `layers-tree-branch-${segment.parentNodeId}-${segment.childNodeId}`
-                  }
-                  x1={segment.x1}
-                  x2={segment.x2}
-                  y1={segment.y1}
-                  y2={segment.y2}
-                />
-              ))}
-            </svg>
-          ) : null}
           <div className="layer-list-rows">
             {visibleRows.map((row) => {
               const isGroup = row.node.kind === 'group';
@@ -197,10 +168,6 @@ export function LayersInspectorTab({
                   : row.node.name;
               const imagePreviewItem =
                 isCanvasItemNode(row.node) && row.node.kind === 'image' ? row.node : null;
-              const rowGlyph =
-                isCanvasItemNode(row.node) && !imagePreviewItem
-                  ? getItemGlyph(row.node.kind)
-                  : null;
               const rowPreviewStyle = isCanvasItemNode(row.node)
                 ? getLayerPreviewStyle(row.node)
                 : undefined;
@@ -227,80 +194,101 @@ export function LayersInspectorTab({
                 onSelectNode(row.selectableNodeId);
               }
 
+              const connector = connectorMap.get(row.node.id) ?? { columnHasLine: [], isLastChild: true };
+
               return (
                 <div
                   key={row.node.id}
                   className={rowClassNames.join(' ')}
-                  style={{ '--depth': row.depth } as CSSProperties}
+                  data-depth={row.depth}
+                  aria-label={rowLabel}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={rowVisualState === 'active'}
+                  onClick={() => {
+                    onSelectNode(row.selectableNodeId);
+                  }}
+                  onDoubleClick={() => {
+                    onSelectNode(row.selectableNodeId);
+                    onOpenProperties();
+                  }}
+                  onKeyDown={handleRowKeyDown}
+                  data-testid={`layers-row-${row.node.id}`}
                 >
-                  <div
-                    aria-label={rowLabel}
-                    className="layer-row-select"
-                    data-testid={`layers-row-${row.node.id}`}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={rowVisualState === 'active'}
-                    onClick={() => {
-                      onSelectNode(row.selectableNodeId);
-                    }}
-                    onDoubleClick={() => {
-                      onSelectNode(row.selectableNodeId);
-                      onOpenProperties();
-                    }}
-                    onKeyDown={handleRowKeyDown}
-                  >
-                    {isGroup ? (
-                      <button
-                        ref={registerJunction(row.node.id)}
-                        type="button"
-                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`}
-                        className="layer-row-type layer-row-type-group layer-row-type-toggle"
-                        data-testid={`layers-preview-anchor-${row.node.id}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onToggleGroupCollapse(row.node.id);
-                        }}
-                      >
-                        {isCollapsed ? '+' : '-'}
-                      </button>
-                    ) : (
-                      <span
-                        ref={registerJunction(row.node.id)}
-                        className={`layer-row-type layer-row-type-${row.node.kind}`}
-                        data-testid={`layers-preview-anchor-${row.node.id}`}
-                        aria-hidden="true"
-                        style={rowPreviewStyle}
-                      >
-                        {imagePreviewItem ? (
-                          <img
-                            className="layer-row-thumbnail"
-                            data-testid={`layers-thumbnail-${row.node.id}`}
-                            src={imagePreviewItem.src}
-                            alt=""
-                            draggable={false}
-                          />
-                        ) : (
-                          rowGlyph
-                        )}
-                      </span>
-                    )}
+                  {/* One column cell per ancestor depth level (k = 0..depth-2) */}
+                  {connector.columnHasLine.map((hasLine, k) => (
+                    <div
+                      key={k}
+                      className={`layer-tree-col${hasLine ? ' layer-tree-col-line' : ''}`}
+                    />
+                  ))}
+                  {/* Junction cell for depth > 0 (L-shape = last child, T-shape = more siblings below) */}
+                  {row.depth > 0 && (
+                    <div
+                      className={`layer-tree-junc ${connector.isLastChild ? 'layer-tree-junc-l' : 'layer-tree-junc-t'}`}
+                    />
+                  )}
+                  {/* Downward-start line behind the toggle button for expanded groups.
+                      left = depth*20+9 matches the left edge of junction ::before/::after lines. */}
+                  {isGroup && !isCollapsed && row.hasChildren && (
                     <span
-                      className="layer-row-copy compact richer"
-                      data-testid={`layers-row-copy-${row.node.id}`}
+                      className="layer-tree-down"
+                      style={{ left: `${row.depth * 20 + 9}px` }}
+                    />
+                  )}
+                  {/* Icon */}
+                  {isGroup ? (
+                    <button
+                      type="button"
+                      aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`}
+                      className="layer-row-type layer-row-type-group layer-row-type-toggle"
+                      data-testid={`layers-preview-anchor-${row.node.id}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onToggleGroupCollapse(row.node.id);
+                      }}
                     >
-                      <strong
-                        className="layer-row-label"
-                        data-testid={`layers-primary-label-${row.node.id}`}
-                      >
-                        {rowLabel}
-                      </strong>
-                      {secondary ? (
-                        <small data-testid={`layers-secondary-label-${row.node.id}`}>
-                          {secondary}
-                        </small>
+                      {isCollapsed ? (
+                        <svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1 4h6M4 1v6" /></svg>
+                      ) : (
+                        <svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1 4h6" /></svg>
+                      )}
+                    </button>
+                  ) : (
+                    <span
+                      className={`layer-row-type layer-row-type-${row.node.kind}`}
+                      data-testid={`layers-preview-anchor-${row.node.id}`}
+                      aria-hidden="true"
+                      style={rowPreviewStyle}
+                    >
+                      {imagePreviewItem ? (
+                        <img
+                          className="layer-row-thumbnail"
+                          data-testid={`layers-thumbnail-${row.node.id}`}
+                          src={imagePreviewItem.src}
+                          alt=""
+                          draggable={false}
+                        />
                       ) : null}
                     </span>
-                  </div>
+                  )}
+                  {/* Label */}
+                  <span
+                    className="layer-row-copy compact richer"
+                    data-testid={`layers-row-copy-${row.node.id}`}
+                  >
+                    <strong
+                      className="layer-row-label"
+                      data-testid={`layers-primary-label-${row.node.id}`}
+                    >
+                      {rowLabel}
+                    </strong>
+                    {secondary ? (
+                      <small data-testid={`layers-secondary-label-${row.node.id}`}>
+                        {secondary}
+                      </small>
+                    ) : null}
+                  </span>
                 </div>
               );
             })}

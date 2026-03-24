@@ -3,146 +3,226 @@
 .layer-list {
   position: relative;
   display: flex;
-  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  flex-direction: column;
   padding: 4px 0 0;
-  gap: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
 }
 
 .layer-list-tabbed {
-  flex: 1 1 auto;
   overflow: auto;
 }
 
 .layer-list-content {
-  position: relative;
-  min-height: 100%;
-}
-
-/* SVG tree-line overlay — drawn above rows, never catches pointer events */
-.layer-tree-overlay {
-  position: absolute;
-  inset: 0 0 auto;
-  pointer-events: none;
-  overflow: visible;
-  z-index: 2;
-}
-
-.layer-tree-overlay line {
-  stroke: #4a7ab0;
-  stroke-width: 1.5;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .layer-list-rows {
   position: relative;
-  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 /* ── Layer row ───────────────────────────────────────────────────────────── */
 
+/* No margin between rows — lines must be continuous, gaps break them.
+   Use box-shadow for the selection/hover border so it takes no layout space. */
+
 .layer-row {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   width: 100%;
   min-width: 0;
-  padding-left: calc(var(--depth, 0) * 20px);
-  position: relative;
-  z-index: 1;
-}
-
-.layer-row + .layer-row {
-  margin-top: 1px;
-}
-
-/* ── Row select (clickable surface) ──────────────────────────────────────── */
-
-.layer-row-select {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
-  gap: 8px;
-  min-height: 38px;
-  padding: 2px 6px;
-  border: 1px solid transparent;
-  border-radius: 3px;
   background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: default;
+  --tree-line-color: rgba(52, 80, 122, 0.78);
+  cursor: pointer;
 }
 
-.layer-row-group .layer-row-select {
-  background: rgba(12, 20, 42, 0.82);
-  border-color: rgba(40, 65, 110, 0.3);
+.layer-row {
+  min-height: 22px;
+  padding: 0 4px 0 0;
 }
 
-.layer-row:hover .layer-row-select {
-  background: rgba(22, 35, 60, 0.75);
-  border-color: rgba(60, 90, 140, 0.3);
+.layer-row:hover {
+  background: rgba(22, 35, 57, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(54, 80, 122, 0.24);
+  border-radius: 2px;
 }
 
-.layer-row.active .layer-row-select {
-  background: rgba(37, 54, 90, 0.65);
-  border-color: rgba(86, 118, 171, 0.56);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+.layer-row.contains-selection {
+  background: rgba(20, 31, 49, 0.44);
+  box-shadow: inset 0 0 0 1px rgba(54, 80, 122, 0.16);
+  border-radius: 2px;
 }
 
-.layer-row.contains-selection .layer-row-select {
-  background: rgba(20, 31, 55, 0.5);
-  border-color: rgba(54, 80, 122, 0.2);
+.layer-row.in-selected-group {
+  background: rgba(23, 34, 54, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(54, 80, 122, 0.16);
+  border-radius: 2px;
 }
 
-.layer-row.in-selected-group .layer-row-select {
-  background: rgba(18, 30, 54, 0.45);
-  border-color: rgba(54, 80, 122, 0.16);
+.layer-row.active {
+  background: rgba(37, 54, 83, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(86, 118, 171, 0.56);
+  border-radius: 2px;
+}
+
+.layer-row-group {
+  min-height: 24px;
+  background: rgba(15, 23, 38, 0.44);
+}
+
+.layer-row-group:hover {
+  background: rgba(22, 35, 57, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(54, 80, 122, 0.32);
+}
+
+.layer-row-group.contains-selection {
+  background: rgba(22, 33, 52, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(63, 92, 136, 0.2);
+}
+
+.layer-row-group.in-selected-group {
+  background: rgba(21, 33, 54, 0.68);
+  box-shadow: inset 0 0 0 1px rgba(54, 80, 122, 0.24);
+}
+
+.layer-row-group.active {
+  background: rgba(34, 50, 78, 0.74);
+  box-shadow: inset 0 0 0 1px rgba(86, 118, 171, 0.48);
+}
+
+/* ── Tree connector cells ─────────────────────────────────────────────────── */
+
+/* Shared base: fixed 20px-wide cell, stretches to full row height */
+.layer-tree-col,
+.layer-tree-junc {
+  flex: 0 0 20px;
+  width: 20px;
+  align-self: stretch;
+  position: relative;
+  pointer-events: none;
+}
+
+/* Column cell: full-height vertical line. Extends 1px downward only —
+   downward over-reach bridges any subpixel gap; upward over-reach into
+   the previous row can appear on top of that row's icon. */
+.layer-tree-col-line::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 0;
+  bottom: -1px;
+  width: 2px;
+  background: var(--tree-line-color);
+}
+
+/* Junction vertical — top of cell to midpoint (L-shape) */
+.layer-tree-junc::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 0;
+  height: 50%;
+  width: 2px;
+  background: var(--tree-line-color);
+}
+
+/* T-shape: drop the height constraint so top+bottom fully determine the
+   extent — this gives 100% cell height + the 1px downward over-reach. */
+.layer-tree-junc-t::before {
+  height: auto;
+  bottom: -1px;
+}
+
+/* Junction horizontal — midpoint out to right edge */
+.layer-tree-junc::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--tree-line-color);
+}
+
+/* Downward-start piece — behind an expanded group's toggle, from row
+   midpoint to bottom + 1px to bridge any subpixel gap. No translateX
+   needed: left is set to depth*20+9 in inline style, matching the
+   left edge of the junction ::before/::after lines exactly. */
+.layer-tree-down {
+  position: absolute;
+  top: 50%;
+  bottom: -1px;
+  width: 2px;
+  background: var(--tree-line-color);
+  pointer-events: none;
 }
 
 /* ── Type icon (shape preview / group toggle) ────────────────────────────── */
 
-/*
- * background and border-color are set by getLayerPreviewStyle() as inline styles.
- * CSS sets only border-width/style and a fallback border-color.
- * Inline styles always win over the stylesheet, so the item fill/stroke colors show through.
- */
 .layer-row-type {
   position: relative;
-  overflow: hidden;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: rgba(100, 140, 190, 0.35);
-  border-radius: 3px;
+  align-self: center;
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  border: 1px solid rgba(147, 168, 201, 0.26);
+  border-radius: 2px;
   background: rgba(12, 19, 32, 0.92);
-  font-size: 0;
+  color: #93a8c9;
   line-height: 1;
+}
+
+.layer-row-type-group {
+  background: rgba(22, 35, 57, 0.96);
+  border-color: rgba(108, 139, 187, 0.5);
+  color: #f8fbff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.layer-row-type-toggle {
+  cursor: pointer;
+  padding: 0;
+}
+
+.layer-row-type-toggle:hover {
+  border-color: rgba(147, 168, 201, 0.6);
+  background: rgba(29, 47, 76, 0.98);
+}
+
+.layer-row-type-toggle svg {
+  width: 8px;
+  height: 8px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  fill: none;
 }
 
 .layer-row-type-ellipse {
   border-radius: 999px;
 }
 
-/* Rotated bar forms the diagonal line */
-.layer-row-type-line::after {
-  content: '';
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  top: calc(50% - 1px);
-  height: 1.5px;
-  background: currentColor;
-  transform: rotate(-35deg);
-  transform-origin: center;
-}
-
-.layer-row-type-image .layer-row-thumbnail {
+.layer-row-thumbnail {
   display: block;
   width: 100%;
   height: 100%;
@@ -150,68 +230,68 @@
   object-position: center;
 }
 
-/* Group expand/collapse toggle */
-.layer-row-type-group {
-  background: rgba(18, 28, 52, 0.98);
-  border-color: rgba(100, 140, 200, 0.5);
-  color: #e8f0ff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+.layer-row-type-line::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 6px;
+  height: 1px;
+  background: currentColor;
+  transform: rotate(-28deg);
+  transform-origin: center;
 }
 
-.layer-row-type-group:hover {
-  border-color: rgba(140, 180, 240, 0.7);
-  background: rgba(26, 42, 76, 0.98);
-}
-
-/* ── Copy (label + secondary) ────────────────────────────────────────────── */
+/* ── Row copy (label + secondary) ────────────────────────────────────────── */
 
 .layer-row-copy {
   display: flex;
-  align-items: center;
-  flex: 1 1 auto;
   min-width: 0;
+  flex: 1 1 auto;
+  align-self: center;
+  align-items: baseline;
   gap: 6px;
+  margin-left: 6px;
+}
+
+.layer-row-copy.compact.richer {
+  flex-direction: row;
 }
 
 .layer-row-copy strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #edf2ff;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  margin: 0;
-  padding: 0;
+  color: #f8fbff;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .layer-row-copy small {
   display: block;
+  color: #93a8c9;
+  font-size: 9px;
+  line-height: 1.25;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #7a9ac4;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1;
-  flex-shrink: 1;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
+  padding-bottom: 1px;
 }
 
 .layer-row-group .layer-row-copy strong {
   font-weight: 700;
-  color: #f0f5ff;
+  color: #f6f9ff;
 }
 
 .layer-row-group .layer-row-copy small {
-  color: #8aabce;
+  color: #9ab0d2;
+}
+
+.layer-row-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Layers footer toolbar ───────────────────────────────────────────────── */
