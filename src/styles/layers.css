@@ -295,6 +295,62 @@
   white-space: nowrap;
 }
 
+/* ── Row actions (lock / visibility) ────────────────────────────────────── */
+
+.layer-row-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  gap: 1px;
+}
+
+.layer-row-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.25;
+  transition: opacity 0.12s;
+}
+
+.layer-row-action-btn svg {
+  width: 11px;
+  height: 11px;
+  stroke: #b8cceb;
+  stroke-width: 1.2;
+  fill: none;
+}
+
+.layer-row-action-btn.active {
+  opacity: 0.85;
+}
+
+.layer-row-action-btn.active svg {
+  stroke: #e0eaff;
+}
+
+.layer-row:hover .layer-row-action-btn {
+  opacity: 0.4;
+}
+
+.layer-row:hover .layer-row-action-btn.active {
+  opacity: 0.9;
+}
+
+.layer-row-action-btn:hover {
+  opacity: 0.65;
+}
+
+.layer-row-action-btn.active:hover {
+  opacity: 1;
+}
+
 /* ── Layers footer toolbar ───────────────────────────────────────────────── */
 
 .footer-rule {

@@ -8,7 +8,7 @@ import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
-import { canGroupNodes, canUngroupNode } from './editor/document/sceneGraph';
+import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
 const FAVORITE_STATUS_DURATION_MS = 1450;
 const FAVORITE_STATUS_FADE_DURATION_MS = 720;
@@ -245,6 +245,24 @@ export default function App() {
                 onInsertFavorite={insertFavorite}
                 onSelectNode={selectSingleItem}
                 onToggleNode={toggleSelectedItem}
+                onToggleNodeLocked={(nodeId) => {
+                  const node = getNodeById(document.nodes, nodeId);
+                  if (!node) return;
+                  if (isGroupNode(node)) {
+                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: !node.locked } });
+                  } else {
+                    dispatch({ type: 'update_item', itemId: nodeId, changes: { locked: !node.locked } });
+                  }
+                }}
+                onToggleNodeHidden={(nodeId) => {
+                  const node = getNodeById(document.nodes, nodeId);
+                  if (!node) return;
+                  if (isGroupNode(node)) {
+                    dispatch({ type: 'update_group', groupId: nodeId, changes: { hidden: !node.hidden } });
+                  } else {
+                    dispatch({ type: 'update_item', itemId: nodeId, changes: { hidden: !node.hidden } });
+                  }
+                }}
                 onReorder={reorderSelectedItem}
                 favorites={favorites}
               />

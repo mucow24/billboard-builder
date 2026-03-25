@@ -273,6 +273,8 @@ function normalizeCanvasNode(node: CanvasNode): CanvasNode {
       id: typeof node.id === 'string' && node.id.length > 0 ? node.id : crypto.randomUUID(),
       kind: 'group',
       name: typeof node.name === 'string' && node.name.length > 0 ? node.name : 'Group',
+      locked: Boolean(node.locked),
+      hidden: Boolean(node.hidden),
       opacity: clampOpacity(node.opacity),
       children: Array.isArray(node.children) ? node.children.map(normalizeCanvasNode) : [],
     };

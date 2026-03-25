@@ -27,6 +27,8 @@ export function PropertiesPanel({
   onReorder,
   onSelectNode,
   onToggleNode,
+  onToggleNodeLocked,
+  onToggleNodeHidden,
   favorites = [],
 }: PropertiesPanelProps) {
   const [activeTab, setActiveTab] = useState<'properties' | 'layers' | 'favorites'>('properties');
@@ -164,6 +166,8 @@ export function PropertiesPanel({
               onReorder={onReorder}
               onSelectNode={onSelectNode}
               onToggleNode={onToggleNode}
+              onToggleNodeLocked={onToggleNodeLocked}
+              onToggleNodeHidden={onToggleNodeHidden}
               onToggleGroupCollapse={handleToggleGroupCollapse}
               selectedNodeIds={selectedNodeIds}
             />

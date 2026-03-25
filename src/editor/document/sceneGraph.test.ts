@@ -170,6 +170,20 @@ describe('scene graph helpers', () => {
     expect(entry?.ancestors.map((ancestor) => ancestor.id)).toEqual(['group']);
   });
 
+  it('creates groups with locked and hidden defaulting to false', () => {
+    const group = createGroupNode([]);
+    expect(group.locked).toBe(false);
+    expect(group.hidden).toBe(false);
+  });
+
+  it('excludes all children of a hidden group from visible leaf nodes', () => {
+    const child = createRectangleItem({ opacity: 1 });
+    const group = createGroupNode([child]);
+    group.hidden = true;
+
+    expect(flattenVisibleLeafNodes([group])).toHaveLength(0);
+  });
+
   it('resolves the parent group and next drilldown target for nested selections', () => {
     const leaf = createRectangleItem({ id: 'leaf' });
     const innerGroup = createGroupNode([leaf], 'Inner');

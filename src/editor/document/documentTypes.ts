@@ -156,6 +156,8 @@ export interface GroupNode {
   id: string;
   kind: 'group';
   name: string;
+  locked: boolean;
+  hidden: boolean;
   opacity: number;
   children: CanvasNode[];
 }
@@ -194,7 +196,7 @@ export type EditorCommand =
   | { type: 'select_nodes'; nodeIds: string[] }
   | { type: 'clear_selection' }
   | { type: 'update_item'; itemId: string; changes: Partial<CanvasItem> }
-  | { type: 'update_group'; groupId: string; changes: Partial<Pick<GroupNode, 'name' | 'opacity'>> }
+  | { type: 'update_group'; groupId: string; changes: Partial<Pick<GroupNode, 'name' | 'opacity' | 'locked' | 'hidden'>> }
   | { type: 'group_nodes'; nodeIds: string[] }
   | { type: 'ungroup_node'; groupId: string }
   | { type: 'set_canvas_size'; canvas: CanvasSize }

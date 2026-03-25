@@ -44,6 +44,8 @@ export function createGroupNode(children: CanvasNode[] = [], name = 'Group'): Gr
     id: crypto.randomUUID(),
     kind: 'group',
     name,
+    locked: false,
+    hidden: false,
     opacity: 1,
     children,
   };
@@ -112,6 +114,7 @@ export function flattenVisibleLeafNodes(
 
   for (const node of nodes) {
     if (isGroupNode(node)) {
+      if (node.hidden) continue;
       flattened.push(
         ...flattenVisibleLeafNodes(
           node.children,
@@ -238,7 +241,7 @@ export function updateItemNode(
 export function updateGroupNode(
   nodes: CanvasNode[],
   groupId: string,
-  changes: Partial<Pick<GroupNode, 'name' | 'opacity'>>
+  changes: Partial<Pick<GroupNode, 'name' | 'opacity' | 'locked' | 'hidden'>>
 ): CanvasNode[] {
   return nodes.map((node) => {
     if (!isGroupNode(node)) {

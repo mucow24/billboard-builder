@@ -1040,6 +1040,7 @@ export function useCanvasInteractionSession({
   }, [orderedItems, updateSession]);
 
   const beginGroupDrag = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
+    if (selectedNodes.length === 1 && isGroupNode(selectedNodes[0]) && selectedNodes[0].locked) return;
     const nextSession = createGroupDragSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -1048,7 +1049,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
 
   const beginResize = useCallback((
     item: ShapeItem,
@@ -1066,6 +1067,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (selectedNodes.length === 1 && isGroupNode(selectedNodes[0]) && selectedNodes[0].locked) return;
     const nextSession = createGroupResizeSession(handle, pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -1074,13 +1076,14 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point, source: PointerGestureSource = 'stage') => {
     updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
+    if (selectedNodes.length === 1 && isGroupNode(selectedNodes[0]) && selectedNodes[0].locked) return;
     const nextSession = createGroupRotateSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -1089,7 +1092,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
 
   const beginLineHandle = useCallback((
     item: LineCanvasItem,

@@ -31,6 +31,8 @@ describe('LayersInspectorTab', () => {
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
         onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[frontItem.id]}
@@ -69,6 +71,8 @@ describe('LayersInspectorTab', () => {
         onReorder={onReorder}
         onSelectNode={onSelectNode}
         onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[item.id]}
@@ -99,6 +103,8 @@ describe('LayersInspectorTab', () => {
         onReorder={vi.fn()}
         onSelectNode={vi.fn()}
         onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[]}
@@ -137,6 +143,8 @@ describe('LayersInspectorTab', () => {
         onReorder={vi.fn()}
         onSelectNode={vi.fn()}
         onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={vi.fn()}
         selectedNodeIds={[]}
@@ -169,6 +177,8 @@ describe('LayersInspectorTab', () => {
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
         onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={onToggleGroupCollapse}
         selectedNodeIds={[]}
@@ -193,6 +203,9 @@ describe('LayersInspectorTab', () => {
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set([group.id])}
         onToggleGroupCollapse={onToggleGroupCollapse}
         selectedNodeIds={[]}
@@ -213,6 +226,8 @@ describe('LayersInspectorTab', () => {
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
         onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={onToggleGroupCollapse}
         selectedNodeIds={[child.id]}
@@ -221,5 +236,65 @@ describe('LayersInspectorTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Rectangle' }));
     expect(onSelectNode).toHaveBeenCalledWith(child.id);
+  });
+
+  it('calls onToggleNodeLocked when clicking the lock button without selecting the row', async () => {
+    const user = userEvent.setup();
+    const onSelectNode = vi.fn();
+    const onToggleNodeLocked = vi.fn();
+    const item = createRectangleItem();
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([item])}
+        onBackgroundChange={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={onSelectNode}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={onToggleNodeLocked}
+        onToggleNodeHidden={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Lock layer' }));
+    expect(onToggleNodeLocked).toHaveBeenCalledWith(item.id);
+    expect(onSelectNode).not.toHaveBeenCalled();
+  });
+
+  it('calls onToggleNodeHidden when clicking the visibility button without selecting the row', async () => {
+    const user = userEvent.setup();
+    const onSelectNode = vi.fn();
+    const onToggleNodeHidden = vi.fn();
+    const item = createRectangleItem();
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([item])}
+        onBackgroundChange={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={onSelectNode}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={onToggleNodeHidden}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Hide layer' }));
+    expect(onToggleNodeHidden).toHaveBeenCalledWith(item.id);
+    expect(onSelectNode).not.toHaveBeenCalled();
   });
 });

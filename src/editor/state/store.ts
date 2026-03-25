@@ -25,6 +25,7 @@ import {
   getNodeById,
   getNodeEntry,
   getSelectionParentInfo,
+  isGroupNode,
 } from '../document/sceneGraph';
 import type {
   CanvasItem,
@@ -266,6 +267,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         .map((nodeId) => getNodeById(get().editor.document.nodes, nodeId))
         .filter((node): node is CanvasNode => Boolean(node));
       const updates = selectedNodes
+        .filter((node) => !(isGroupNode(node) && node.locked))
         .flatMap(collectLeafItems)
         .filter((item) => !item.locked)
         .map((item) => ({

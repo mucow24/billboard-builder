@@ -28,6 +28,8 @@ export function LayersInspectorTab({
   onReorder,
   onSelectNode,
   onToggleNode,
+  onToggleNodeLocked,
+  onToggleNodeHidden,
   onToggleGroupCollapse,
   selectedNodeIds,
 }: LayersInspectorTabProps) {
@@ -293,6 +295,52 @@ export function LayersInspectorTab({
                         {secondary}
                       </small>
                     ) : null}
+                  </span>
+                  {/* Lock & Visibility */}
+                  <span className="layer-row-actions">
+                    <button
+                      type="button"
+                      className={`layer-row-action-btn${row.node.locked ? ' active' : ''}`}
+                      aria-label={row.node.locked ? 'Unlock layer' : 'Lock layer'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleNodeLocked(row.node.id);
+                      }}
+                    >
+                      {row.node.locked ? (
+                        <svg viewBox="0 0 12 12" aria-hidden="true">
+                          <rect x="2.5" y="5.5" width="7" height="5" rx="1" />
+                          <path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" fill="none" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 12 12" aria-hidden="true">
+                          <rect x="2.5" y="5.5" width="7" height="5" rx="1" />
+                          <path d="M4 5.5V4a2 2 0 0 1 4 0" fill="none" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className={`layer-row-action-btn${row.node.hidden ? ' active' : ''}`}
+                      aria-label={row.node.hidden ? 'Show layer' : 'Hide layer'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleNodeHidden(row.node.id);
+                      }}
+                    >
+                      {row.node.hidden ? (
+                        <svg viewBox="0 0 12 12" aria-hidden="true">
+                          <path d="M1 6s2-3.5 5-3.5S11 6 11 6s-2 3.5-5 3.5S1 6 1 6z" fill="none" />
+                          <circle cx="6" cy="6" r="1.5" fill="none" />
+                          <path d="M2 10L10 2" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 12 12" aria-hidden="true">
+                          <path d="M1 6s2-3.5 5-3.5S11 6 11 6s-2 3.5-5 3.5S1 6 1 6z" fill="none" />
+                          <circle cx="6" cy="6" r="1.5" fill="none" />
+                        </svg>
+                      )}
+                    </button>
                   </span>
                 </div>
               );
