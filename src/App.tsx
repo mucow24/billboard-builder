@@ -220,6 +220,11 @@ export default function App() {
                 selectedNodeIds={selectedNodeIds}
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onGroupOpacityChange={updateSelectedGroup}
+                onSelectGroupChildren={() => {
+                  if (selectedGroup) {
+                    dispatch({ type: 'select_nodes', nodeIds: selectedGroup.children.map((c) => c.id) });
+                  }
+                }}
                 onDeleteSelection={deleteSelectedItems}
                 onItemChange={(changes) => {
                   const resolveChanges = (item: CanvasItem) =>

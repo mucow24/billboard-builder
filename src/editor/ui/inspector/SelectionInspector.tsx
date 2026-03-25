@@ -135,6 +135,7 @@ export function SelectionInspector({
   fonts,
   onGroupOpacityChange,
   onItemChange,
+  onSelectGroupChildren,
   selectedGroup,
   selectedItem,
   selectedNodeCount,
@@ -158,6 +159,15 @@ export function SelectionInspector({
             value={selectedGroup.opacity}
             onChange={onGroupOpacityChange}
           />
+          {onSelectGroupChildren ? (
+            <button
+              type="button"
+              className="inspector-action-button"
+              onClick={onSelectGroupChildren}
+            >
+              Select children
+            </button>
+          ) : null}
         </SectionBlock>
       </div>
     );

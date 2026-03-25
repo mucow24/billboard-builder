@@ -31,6 +31,7 @@ export interface PropertiesPanelProps {
   onInsertFavorite?: (favoriteId: string) => void;
   onDeleteSelection: () => void;
   onSelectNode: (nodeId: string) => void;
+  onSelectGroupChildren?: () => void;
   onToggleNode: (nodeId: string) => void;
   onToggleNodeLocked: (nodeId: string) => void;
   onToggleNodeHidden: (nodeId: string) => void;
@@ -59,6 +60,7 @@ export interface SelectionInspectorProps {
   fonts: DocumentFontReference[];
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;
+  onSelectGroupChildren?: () => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedNodeCount: number;

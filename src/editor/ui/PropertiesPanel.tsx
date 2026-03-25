@@ -26,6 +26,7 @@ export function PropertiesPanel({
   onInsertFavorite = () => {},
   onReorder,
   onSelectNode,
+  onSelectGroupChildren,
   onToggleNode,
   onToggleNodeLocked,
   onToggleNodeHidden,
@@ -195,6 +196,7 @@ export function PropertiesPanel({
               fonts={fonts}
               onGroupOpacityChange={onGroupOpacityChange}
               onItemChange={onItemChange}
+              onSelectGroupChildren={onSelectGroupChildren}
               selectedGroup={selectedGroup}
               selectedItem={selectedItem}
               selectedNodeCount={selectedNodeIds.length}
