@@ -4,6 +4,7 @@ import { parseCanvasNodes } from '../document/documentSchema';
 import type { CanvasNode, DocumentFontReference } from '../document/documentTypes';
 
 export interface StoredFavorite {
+  color?: string;
   createdAt: string;
   fonts: DocumentFontReference[];
   id: string;
@@ -35,6 +36,7 @@ const fontReferenceSchema = z.object({
 const storedFavoriteSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  color: z.string().optional(),
   nodes: z.unknown(),
   fonts: z.array(fontReferenceSchema),
   createdAt: z.string(),
@@ -55,6 +57,7 @@ function normalizeStoredFavorite(input: z.infer<typeof storedFavoriteSchema>): S
   return {
     id: input.id,
     name: input.name,
+    color: input.color,
     nodes: parseCanvasNodes(input.nodes),
     fonts: input.fonts,
     createdAt: input.createdAt,
@@ -66,6 +69,7 @@ function serializeStoredFavorite(favorite: StoredFavorite) {
   return {
     id: favorite.id,
     name: favorite.name,
+    color: favorite.color,
     nodes: favorite.nodes,
     fonts: favorite.fonts,
     createdAt: favorite.createdAt,

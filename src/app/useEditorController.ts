@@ -11,7 +11,7 @@ import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { restoreUploadedFontsForReferences } from './uploadedFontPersistence';
 import { useUploadedFontPersistence } from './useUploadedFontPersistence';
-import { buildFavoriteSelectionPayload } from '../editor/document/favoriteLibrary';
+import { buildFavoriteSelectionPayload, summarizeFavoriteNodes } from '../editor/document/favoriteLibrary';
 import { downloadStageAsPng } from '../editor/io/exportPng';
 import { findMissingFonts, registerFontFile, toFontReference } from '../editor/fonts';
 import { importImageFile } from '../editor/io/images';
@@ -289,9 +289,11 @@ export function useEditorController() {
       buildDefaultFavoriteName(payload.nodes),
       favorites,
     );
+    const { previewColors } = summarizeFavoriteNodes(payload.nodes);
     const nextFavorite: StoredFavorite = {
       id: crypto.randomUUID(),
       name,
+      color: previewColors[0] || '#334155',
       nodes: payload.nodes,
       fonts: payload.fonts,
       createdAt: now,
@@ -363,12 +365,48 @@ export function useEditorController() {
     }
   }
 
+  function renameFavorite(favoriteId: string, name: string) {
+    const nextFavorites = favorites.map((fav) =>
+      fav.id === favoriteId
+        ? { ...fav, name, updatedAt: new Date().toISOString() }
+        : fav,
+    );
+
+    try {
+      persistFavorites(nextFavorites);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        `Failed to rename favorite: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }
+
+  function recolorFavorite(favoriteId: string, color: string) {
+    const nextFavorites = favorites.map((fav) =>
+      fav.id === favoriteId
+        ? { ...fav, color, updatedAt: new Date().toISOString() }
+        : fav,
+    );
+
+    try {
+      persistFavorites(nextFavorites);
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        `Failed to update favorite color: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }
+
   return {
     actions: {
       applyTransaction,
       deleteItem: deleteNode,
       deleteFavorite,
       deleteNode,
+      renameFavorite,
+      recolorFavorite,
       deleteSelectedItems: deleteSelectedNodes,
       deleteSelectedNodes,
       dispatch,

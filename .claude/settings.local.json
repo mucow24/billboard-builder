@@ -25,7 +25,8 @@
       "Bash(git push:*)",
       "Bash(npx playwright:*)",
       "Bash(ls -la /c/Users/mikek/src/billboard-builder/e2e/*.spec.ts)",
-      "Bash(cmd //c \"mklink /J node_modules C:\\\\Users\\\\mikek\\\\src\\\\billboard-builder\\\\node_modules\")"
+      "Bash(git -C \"C:\\\\Users\\\\mikek\\\\src\\\\billboard-builder\" show HEAD:mockup-favorites.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)"
     ]
   }
 }

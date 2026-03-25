@@ -16,6 +16,8 @@ describe('FavoritesInspectorTab', () => {
       <FavoritesInspectorTab
         onDeleteFavorite={vi.fn()}
         onInsertFavorite={vi.fn()}
+        onRenameFavorite={vi.fn()}
+        onRecolorFavorite={vi.fn()}
         favorites={[]}
       />,
     );
@@ -44,10 +46,13 @@ describe('FavoritesInspectorTab', () => {
       <FavoritesInspectorTab
         onDeleteFavorite={onDeleteFavorite}
         onInsertFavorite={onInsertFavorite}
+        onRenameFavorite={vi.fn()}
+        onRecolorFavorite={vi.fn()}
         favorites={[
           {
             id: 'favorite-1',
             name: 'Hero favorite',
+            color: '#123456',
             nodes: [group],
             fonts: [],
             createdAt: '2026-03-19T12:00:00.000Z',
@@ -59,18 +64,12 @@ describe('FavoritesInspectorTab', () => {
 
     expect(screen.getByText('Hero favorite')).toBeInTheDocument();
     expect(screen.getByText('2 items')).toBeInTheDocument();
-    const preview = screen.getByTestId('favorite-preview-favorite-1');
-    expect(preview).toHaveAttribute(
-      'style',
-      expect.stringContaining('repeat(3, minmax(0, 1fr))'),
-    );
-    const swatches = preview.querySelectorAll('.favorite-card-swatch');
-    expect(swatches).toHaveLength(3);
-    expect(swatches[0]).toHaveStyle({ background: 'rgb(18, 52, 86)' });
-    expect(swatches[1]).toHaveStyle({ background: 'rgb(171, 205, 239)' });
-    expect(swatches[2]).toHaveStyle({ background: 'rgb(254, 220, 186)' });
 
-    await user.click(screen.getByRole('button', { name: 'Insert Hero favorite' }));
+    const swatch = screen.getByRole('button', { name: 'Swatch color for Hero favorite' });
+    expect(swatch).toHaveStyle({ background: '#123456' });
+
+    // Clicking the row body inserts the favorite
+    await user.click(screen.getByText('Hero favorite'));
     expect(onInsertFavorite).toHaveBeenCalledWith('favorite-1');
 
     await user.click(
