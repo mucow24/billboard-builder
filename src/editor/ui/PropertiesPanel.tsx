@@ -15,6 +15,8 @@ export function PropertiesPanel({
   layerRows,
   missingFontFamilies,
   onDeleteFavorite = () => {},
+  onRenameFavorite = () => {},
+  onRecolorFavorite = () => {},
   selectedGroup,
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
@@ -183,6 +185,8 @@ export function PropertiesPanel({
               favorites={favorites}
               onDeleteFavorite={onDeleteFavorite}
               onInsertFavorite={onInsertFavorite}
+              onRenameFavorite={onRenameFavorite}
+              onRecolorFavorite={onRecolorFavorite}
             />
           </div>
         ) : (

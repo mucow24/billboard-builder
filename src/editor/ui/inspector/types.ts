@@ -21,6 +21,8 @@ export interface PropertiesPanelProps {
   missingFontFamilies: string[];
   favorites?: StoredFavorite[];
   onDeleteFavorite?: (favoriteId: string) => void;
+  onRenameFavorite?: (favoriteId: string, name: string) => void;
+  onRecolorFavorite?: (favoriteId: string, color: string) => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedItems?: CanvasItem[];
@@ -71,4 +73,6 @@ export interface FavoritesInspectorTabProps {
   favorites: StoredFavorite[];
   onDeleteFavorite: (favoriteId: string) => void;
   onInsertFavorite: (favoriteId: string) => void;
+  onRenameFavorite: (favoriteId: string, name: string) => void;
+  onRecolorFavorite: (favoriteId: string, color: string) => void;
 }

@@ -32,6 +32,8 @@ export default function App() {
     actions: {
       deleteFavorite,
       deleteSelectedItems,
+      renameFavorite,
+      recolorFavorite,
       dispatch,
       groupSelectedNodes,
       handleExport,
@@ -214,6 +216,8 @@ export default function App() {
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
                 onDeleteFavorite={deleteFavorite}
+                onRenameFavorite={renameFavorite}
+                onRecolorFavorite={recolorFavorite}
                 selectedGroup={selectedGroup ?? undefined}
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
