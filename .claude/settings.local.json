@@ -12,7 +12,20 @@
       "Bash(where node:*)",
       "Bash(where npm:*)",
       "Bash(cmd.exe /c \"where node\")",
-      "Bash(export PATH=\"$PATH:/c/Program Files/nodejs:/c/Users/mikek/AppData/Roaming/npm\")"
+      "Bash(export PATH=\"$PATH:/c/Program Files/nodejs:/c/Users/mikek/AppData/Roaming/npm\")",
+      "Bash(npm --version)",
+      "Bash(export PATH=\"/c/Program Files/nodejs:$PATH\")",
+      "Bash(node node_modules/.bin/vitest run src/editor/document/sceneGraph.test.ts)",
+      "Bash(node node_modules/vitest/vitest.mjs run src/editor/document/sceneGraph.test.ts)",
+      "Bash(node node_modules/vitest/vitest.mjs run)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(npx playwright:*)",
+      "Bash(ls -la /c/Users/mikek/src/billboard-builder/e2e/*.spec.ts)",
+      "Bash(cmd //c \"mklink /J node_modules C:\\\\Users\\\\mikek\\\\src\\\\billboard-builder\\\\node_modules\")"
     ]
   }
 }

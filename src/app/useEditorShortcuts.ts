@@ -5,21 +5,11 @@ import {
   readSelectionFromClipboardData,
   writeSelectionToClipboardData,
 } from './clipboard';
+import { isEditableTarget } from './domUtils';
 import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import { cloneCanvasNode } from '../editor/document/sceneGraph';
 import type { CanvasNode, CanvasTool } from '../editor/document/documentTypes';
 import type { EditorStoreState } from '../editor/state/store';
-
-function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  return (
-    target.isContentEditable ||
-    Boolean(target.closest('[data-editor-interactive="true"]')) ||
-    ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-  );
-}
 
 interface UseEditorShortcutsArgs {
   applyTransaction: EditorStoreState['applyTransaction'];
