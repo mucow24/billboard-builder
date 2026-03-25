@@ -27,6 +27,7 @@ export function LayersInspectorTab({
   onOpenProperties,
   onReorder,
   onSelectNode,
+  onToggleNode,
   onToggleGroupCollapse,
   selectedNodeIds,
 }: LayersInspectorTabProps) {
@@ -205,8 +206,12 @@ export function LayersInspectorTab({
                   role="button"
                   tabIndex={0}
                   aria-pressed={rowVisualState === 'active'}
-                  onClick={() => {
-                    onSelectNode(row.selectableNodeId);
+                  onClick={(e) => {
+                    if (e.shiftKey) {
+                      onToggleNode(row.selectableNodeId);
+                    } else {
+                      onSelectNode(row.selectableNodeId);
+                    }
                   }}
                   onDoubleClick={() => {
                     onSelectNode(row.selectableNodeId);

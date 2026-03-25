@@ -44,6 +44,7 @@
   background: transparent;
   --tree-line-color: rgba(52, 80, 122, 0.78);
   cursor: pointer;
+  user-select: none;
 }
 
 .layer-row {

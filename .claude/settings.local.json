@@ -6,7 +6,13 @@
       "Bash(wsl -e bash -lc \"cd ~/src/billboard-builder && git status --short\")",
       "Bash(wsl -e bash -lc \"head -20 ~/src/billboard-builder/src/main.tsx\")",
       "mcp__Claude_Preview__preview_start",
-      "Bash(ls C:/Users/mikek/src/billboard-builder/node_modules/.bin/vite*)"
+      "Bash(ls C:/Users/mikek/src/billboard-builder/node_modules/.bin/vite*)",
+      "Bash(npx vitest:*)",
+      "Bash(node_modules/.bin/vitest run:*)",
+      "Bash(where node:*)",
+      "Bash(where npm:*)",
+      "Bash(cmd.exe /c \"where node\")",
+      "Bash(export PATH=\"$PATH:/c/Program Files/nodejs:/c/Users/mikek/AppData/Roaming/npm\")"
     ]
   }
 }

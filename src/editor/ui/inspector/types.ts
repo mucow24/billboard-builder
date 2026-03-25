@@ -31,6 +31,7 @@ export interface PropertiesPanelProps {
   onInsertFavorite?: (favoriteId: string) => void;
   onDeleteSelection: () => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNode: (nodeId: string) => void;
   onReorder: (mode: ReorderMode) => void;
 }
 
@@ -44,6 +45,7 @@ export interface LayersInspectorTabProps {
   onOpenProperties: () => void;
   onReorder: (mode: ReorderMode) => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNode: (nodeId: string) => void;
   onToggleGroupCollapse: (groupId: string) => void;
   selectedNodeIds: string[];
 }

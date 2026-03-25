@@ -244,6 +244,7 @@ export default function App() {
                 }}
                 onInsertFavorite={insertFavorite}
                 onSelectNode={selectSingleItem}
+                onToggleNode={toggleSelectedItem}
                 onReorder={reorderSelectedItem}
                 favorites={favorites}
               />
