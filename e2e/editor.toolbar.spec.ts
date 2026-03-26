@@ -196,7 +196,7 @@ test.describe('editor toolbar flows', () => {
     });
 
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(1);
+    await expect(page.locator('.layer-row')).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeVisible();
 
     const imageChooser = await startToolbarFileChooser(page, 'Upload', 'Image...');
@@ -210,7 +210,7 @@ test.describe('editor toolbar flows', () => {
     });
 
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(2);
+    await expect(page.locator('.layer-row')).toHaveCount(2);
     await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible();
 
     const fontChooser = await startToolbarFileChooser(page, 'Upload', 'Font...');

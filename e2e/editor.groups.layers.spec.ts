@@ -42,7 +42,7 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, document, 'layers-front-to-back.json');
 
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select strong')).toHaveText([
+    await expect(page.locator('.layer-row-label')).toHaveText([
       'Front Layer',
       'Middle Layer',
       'Back Layer',
@@ -304,10 +304,10 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, groupedDocument, 'layers-immediate-child-counts.json');
 
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select').filter({ hasText: 'Outer Group' })).toContainText(
+    await expect(page.locator('.layer-row').filter({ hasText: 'Outer Group' })).toContainText(
       '2 items',
     );
-    await expect(page.locator('.layer-row-select').filter({ hasText: 'Nested Group' })).toContainText(
+    await expect(page.locator('.layer-row').filter({ hasText: 'Nested Group' })).toContainText(
       '1 item',
     );
     await expect(page.locator('.layers-panel-meta-copy')).toHaveText('2 items');
@@ -339,7 +339,7 @@ test.describe('editor group layers and inspector flows', () => {
     await openLayersTab(page);
     await clickLayerRow(page, 'Delete Group');
     await page.getByRole('button', { name: 'Delete selected (1)' }).click();
-    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([]);

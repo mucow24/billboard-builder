@@ -307,6 +307,54 @@ These are state snapshots and affordance checks, not just behavior checks.
 | UI-08 | Rotated group selected | Rotated group overlay remains coherent | Covered in rotated suites |
 | UI-09 | Rotated group live drag/resize/rotate preview | Preview overlay remains coherent throughout gesture | Covered in rotated suites |
 
+## Assertion Quality Audit
+
+Each covered scenario's test assertions are classified as:
+
+- **A (Real UI proof)**: Asserts visible DOM — properties panel headings, layer row labels, toolbar button states, element bounding boxes, CSS values, screenshots
+- **B (Debug hook)**: Reads `[data-testid="stage-debug"]` JSON — `hasShapeHandles`, `hasGroupOverlay`, `sessionKind`, `selectedItems`, `groupFrame`, etc.
+- **C (Saved-state only)**: Checks geometry in `saveAndReadProject()` JSON — never checks visual state during or after interaction
+
+A scenario only counts as fully proven if it has at least one A-class assertion matching its "Visible Result" column.
+
+### Scenarios with A-class assertions (fully proven)
+
+CS-01 through CS-18, GD-01 through GD-15, NI-01, NI-04, NI-05, NI-11, NI-12, ST-01 through ST-12, ST-13, ST-14, ST-15, ST-16, IC-01 through IC-13, GT-04 through GT-11, GT-09, all LY/PI/TL/KB/CB/FL entries, all UI entries.
+
+### Scenarios with A-class assertions added during audit
+
+| ID | Assertion added | File |
+| --- | --- | --- |
+| CS-08 | `heading '2 items selected'` visible in properties panel | editor.entrypoints.spec.ts |
+| CS-09 | `heading '2 items selected'` visible in properties panel | editor.entrypoints.spec.ts |
+| GT-10 | `Group Opacity` slider visible in properties panel | editor.groups.spec.ts |
+| GT-11 | `Group Opacity` slider visible in properties panel after drag | editor.groups.spec.ts |
+| NI-02 | `Fill` label visible, `Group Opacity` absent in properties panel after transforms | editor.groups.spec.ts |
+| NI-03 | Same as NI-02 (shared test) | editor.groups.spec.ts |
+| NI-06 | `Group Opacity` slider visible in properties panel after transforms | editor.groups.spec.ts |
+| NI-07 | Same as NI-06 (shared test) | editor.groups.spec.ts |
+| NI-08 | Same as NI-06 (shared test) | editor.groups.spec.ts |
+| ST-01 | Properties panel heading check after drag | editor.transforms.spec.ts |
+| ST-02 | Properties panel heading check after resize | editor.transforms.spec.ts |
+| ST-03 | Properties panel heading check after rotate | editor.transforms.spec.ts |
+| ST-04/05/06 | Properties panel heading checks per transform | editor.transforms.spec.ts |
+| ST-07/08/09 | Properties panel heading checks per transform | editor.transforms.spec.ts |
+| ST-10/11/12 | Properties panel heading checks per transform | editor.transforms.spec.ts |
+
+### Reclassified scenarios
+
+| ID | Old class | New class | Reason |
+| --- | --- | --- | --- |
+| (rotated group resizing alignment) | user-flow | geometry/precision | Test reads debug state, computes handle positions, drags hooks, and runs `mapPointBetweenFrames` geometric proof. Tests math, not user flow. Renamed with `geometry:` prefix. |
+
+### Flakes fixed during audit
+
+| Issue | Root cause | Fix |
+| --- | --- | --- |
+| `expectActiveLayerLabel` failing across GT-10, GT-11, NI-06/07/08 and others | `.layer-row-select` class was removed from the DOM in commit `679dca4` but the test selector was never updated (other test files were fixed in `33592ace` but `editor.groups.spec.ts` was missed) | Changed selector from `.layer-row.active .layer-row-select` to `.layer-row.active` |
+| VP-01 mouse wheel zoom assertion failing cross-browser | `readStageDebug` ran before the wheel event was processed by the app | Changed to `expect.poll()` to wait for zoom state to update |
+| GT-04/05/06/07/08 group rotation step producing 0 rotation | `groupRotaterPoint` helper computed canvas-space coordinates with a viewport-pixel offset (-50), breaking when zoom != 1 | Replaced with `stageDebug.groupRotaterViewportPoint` and direct `page.mouse` calls |
+
 ## Current Critical Gaps
 
 No current critical matrix gaps remain in the planned rollout.

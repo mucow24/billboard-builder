@@ -29,6 +29,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[]}
       />,
     );
@@ -64,6 +67,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[item.id]}
       />,
     );
@@ -100,6 +106,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[]}
       />,
     );
@@ -128,6 +137,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[]}
       />,
     );
@@ -154,6 +166,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedItem={child}
         selectedNodeIds={[child.id]}
       />,
@@ -182,6 +197,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[item.id]}
       />,
     );
@@ -250,6 +268,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[]}
       />,
     );
@@ -291,6 +312,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         onRenameFavorite={onRenameFavorite}
         selectedNodeIds={[]}
       />,
@@ -337,6 +361,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         onRenameFavorite={onRenameFavorite}
         selectedNodeIds={[]}
       />,
@@ -379,6 +406,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         onRenameFavorite={onRenameFavorite}
         selectedNodeIds={[]}
       />,
@@ -427,6 +457,9 @@ describe('PropertiesPanel', () => {
         onItemChange={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
         onDeleteFavorite={onDeleteFavorite}
         onInsertFavorite={onInsertFavorite}
         selectedNodeIds={[]}
@@ -469,6 +502,9 @@ describe('PropertiesPanel', () => {
         onInsertFavorite={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
       />,
     );
 
@@ -496,6 +532,9 @@ describe('PropertiesPanel', () => {
         onInsertFavorite={vi.fn()}
         onSelectNode={vi.fn()}
         onReorder={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
       />,
     );
 

@@ -296,18 +296,25 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.hasLineHandles).toBe(true);
     expect(stageDebug.hasShapeHandles).toBe(false);
 
+    // CS-08: Shift-click second item to multi-select
     await clickCanvas(page, { x: 180, y: 165 });
     await page.keyboard.down('Shift');
     await clickCanvas(page, { x: 420, y: 175 });
     await page.keyboard.up('Shift');
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(true);
 
+    // Clear selection
     await clickCanvas(page, { x: 920, y: 920 });
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
 
+    // CS-09: Marquee across items to multi-select
     await dragCanvas(page, { x: 80, y: 80 }, { x: 560, y: 280 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(true);
 
@@ -563,9 +570,9 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.viewport.panX).not.toBe(middlePanStart.viewport.panX);
     expect(stageDebug.viewport.panY).not.toBe(middlePanStart.viewport.panY);
 
+    const preWheelZoom = stageDebug.viewport.zoom;
     await page.mouse.wheel(0, -240);
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.viewport.zoom).toBeGreaterThan(0.5);
+    await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBeGreaterThan(preWheelZoom);
   });
 
   for (const pickupCase of leafPickupCases) {

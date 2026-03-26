@@ -276,7 +276,7 @@ test.describe('editor file and persistence flows', () => {
 
     await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
 
     const savedPath = await projectDownload.path();
     if (!savedPath) {
@@ -285,7 +285,7 @@ test.describe('editor file and persistence flows', () => {
     const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
     await chooser.setFiles(savedPath);
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(2);
+    await expect(page.locator('.layer-row')).toHaveCount(2);
 
     const pngSize = await readDownloadedPngSize(
       await captureDownload(page, async () => {
@@ -305,7 +305,7 @@ test.describe('editor file and persistence flows', () => {
 
     await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
     await openPropertiesTab(page);
     await expect(page.getByText('Nothing selected')).toBeVisible();
 
@@ -327,14 +327,14 @@ test.describe('editor file and persistence flows', () => {
     await page.reload();
     await waitForEditor(page);
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(1);
+    await expect(page.locator('.layer-row')).toHaveCount(1);
 
     await clearPersistence(page);
     await seedPersistence(page, '{not-valid-json');
     await page.reload();
     await waitForEditor(page);
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
   });
 
   test('round-trips grouped documents through save/open and restores grouped persistence on reload', async ({ page }) => {

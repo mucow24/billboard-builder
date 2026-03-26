@@ -43,7 +43,7 @@ type SavedNode = {
 };
 
 async function expectActiveLayerLabel(page: Page, label: string) {
-  await expect(page.locator('.layer-row.active .layer-row-select')).toContainText(label);
+  await expect(page.locator('.layer-row.active')).toContainText(label);
 }
 
 async function waitForDoubleClickCadence(page: Page) {
@@ -198,6 +198,9 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
 
+    await openPropertiesTab(page);
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toBeVisible();
+
     const stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(true);
     expect(stageDebug.hasShapeHandles).toBe(false);
@@ -235,6 +238,8 @@ test.describe('editor groups', () => {
     await dragCanvas(page, { x: 260, y: 230 }, { x: 380, y: 310 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
+    await openPropertiesTab(page);
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toBeVisible();
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(true);
     expect(stageDebug.hasShapeHandles).toBe(false);
@@ -705,12 +710,17 @@ test.describe('editor groups', () => {
     const siblingBefore = expectSavedNode(preManipulationProject, 'sibling-child');
 
     await setCanvasTestHooksEnabled(page, true);
-    await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 420, y: 220 });
-    await dragCanvasHookToPoint(page, 'canvas-shape-handle-rotater', { x: 420, y: 360 });
+    await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 420, y: 220 }); // hook-ok: child handles inside group are hard to target by coordinate
+    await dragCanvasHookToPoint(page, 'canvas-shape-handle-rotater', { x: 420, y: 360 }); // hook-ok: child handles inside group are hard to target by coordinate
 
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
     expect(stageDebug.hasShapeHandles).toBe(true);
+
+    // Visible assertion: properties panel still shows the drilled-in child (not group) after transforms
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
     expect(expectSavedNode(savedProject, 'precision-group')).toEqual(
@@ -810,13 +820,17 @@ test.describe('editor groups', () => {
     expect(stageDebug.hasShapeHandles).toBe(false);
 
     await setCanvasTestHooksEnabled(page, true);
-    await dragCanvasHookToPoint(page, 'canvas-group-overlay', { x: 470, y: 330 });
-    await dragCanvasHookToPoint(page, 'canvas-group-handle-middle-right', { x: 560, y: 330 });
-    await dragCanvasHookToPoint(page, 'canvas-group-rotater', { x: 560, y: 440 });
+    await dragCanvasHookToPoint(page, 'canvas-group-overlay', { x: 470, y: 330 }); // hook-ok: inner group overlay inside outer group
+    await dragCanvasHookToPoint(page, 'canvas-group-handle-middle-right', { x: 560, y: 330 }); // hook-ok: inner group handle inside outer group
+    await dragCanvasHookToPoint(page, 'canvas-group-rotater', { x: 560, y: 440 }); // hook-ok: inner group rotater inside outer group
 
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(true);
     expect(stageDebug.hasShapeHandles).toBe(false);
+
+    // Visible assertion: properties panel still shows the inner group (not a child shape) after transforms
+    await openPropertiesTab(page);
+    await expect(page.getByRole('slider', { name: 'Group Opacity' })).toBeVisible();
 
     const savedProject = await saveAndReadProject(page);
     expect(expectSavedNode(savedProject, 'outer-anchor')).toEqual(
@@ -1086,8 +1100,14 @@ test.describe('editor groups', () => {
     }
     expect(resizedFrame.width).toBeGreaterThan(draggedFrame.width + 40);
 
-    const rotaterStart = groupRotaterPoint(resizedFrame);
-    await dragCanvas(page, rotaterStart, { x: resizedFrame.x + resizedFrame.width + 80, y: resizedFrame.y + resizedFrame.height / 2 });
+    const rotaterViewport = stageDebug.groupRotaterViewportPoint;
+    if (!rotaterViewport) {
+      throw new Error('Expected a group rotater viewport point after resize.');
+    }
+    await page.mouse.move(rotaterViewport.x, rotaterViewport.y);
+    await page.mouse.down();
+    await page.mouse.move(rotaterViewport.x + 150, rotaterViewport.y + 100, { steps: 18 });
+    await page.mouse.up();
 
     stageDebug = await readStageDebug(page);
     const rotatedFrame = stageDebug.groupFrame;

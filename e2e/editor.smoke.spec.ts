@@ -39,7 +39,7 @@ test.describe('editor smoke flows', () => {
     await dragCanvas(page, { x: 180, y: 440 }, { x: 520, y: 520 });
 
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(3);
+    await expect(page.locator('.layer-row')).toHaveCount(3);
     await expect(page.getByRole('button', { name: 'Rectangle', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Line', exact: true })).toBeVisible();

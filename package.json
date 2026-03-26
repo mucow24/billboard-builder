@@ -9,9 +9,11 @@
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "lint:e2e-hooks": "node scripts/check-e2e-hook-usage.mjs",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
     "e2e:update-snapshots": "playwright test --update-snapshots"

@@ -91,16 +91,16 @@ test.describe('editor shortcuts', () => {
 
     await page.keyboard.press(`${modifier}+D`);
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(2);
+    await expect(page.locator('.layer-row')).toHaveCount(2);
 
     await page.keyboard.press('Delete');
-    await expect(page.locator('.layer-row-select')).toHaveCount(1);
+    await expect(page.locator('.layer-row')).toHaveCount(1);
 
     await page.keyboard.press(`${modifier}+Z`);
-    await expect(page.locator('.layer-row-select')).toHaveCount(2);
+    await expect(page.locator('.layer-row')).toHaveCount(2);
 
     await page.keyboard.press(`${modifier}+Shift+Z`);
-    await expect(page.locator('.layer-row-select')).toHaveCount(1);
+    await expect(page.locator('.layer-row')).toHaveCount(1);
   });
 
   test('selects all and clears selection through keyboard commands', async ({ page }) => {
@@ -456,6 +456,6 @@ test.describe('editor shortcuts', () => {
 
     await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
   });
 });

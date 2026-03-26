@@ -13,8 +13,10 @@ import {
   middleDragCanvas,
   openFreshEditor,
   openLayersTab,
+  openPropertiesTab,
   readStageDebug,
   saveAndReadProject,
+  setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
 
@@ -70,9 +72,9 @@ function mapPointBetweenFrames(
 }
 
 test.describe('editor transforms', () => {
-  test('supports single-item drag, resize, rotate, and delete flows', async ({ page }) => {
+  test('ST-01 drags a rectangle through a real canvas interaction', async ({ page }) => {
     const rectangle = createRectangleFixture({
-      id: 'shape-under-test',
+      id: 'drag-rect',
       x: 140,
       y: 140,
       width: 200,
@@ -80,32 +82,125 @@ test.describe('editor transforms', () => {
     });
 
     await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([rectangle]));
+    await uploadProject(page, createProjectDocument([rectangle]), 'drag-rect.json');
+    await setCanvasTestHooksEnabled(page, false);
 
+    // Select by clicking the item body
+    await clickCanvas(page, { x: 240, y: 200 });
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+
+    // Drag the item body
+    await dragCanvas(page, { x: 240, y: 200 }, { x: 360, y: 300 });
+
+    // Verify selection survived the drag
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+
+    // Verify saved geometry changed
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'drag-rect'
+    );
+    expect(savedItem).toBeDefined();
+    expect(Number(savedItem?.x)).toBeGreaterThan(200);
+    expect(Number(savedItem?.y)).toBeGreaterThan(200);
+    expect(Number(savedItem?.width)).toBe(200);
+    expect(Number(savedItem?.height)).toBe(120);
+  });
+
+  test('ST-02 resizes a rectangle through a real canvas interaction', async ({ page }) => {
+    const rectangle = createRectangleFixture({
+      id: 'resize-rect',
+      x: 140,
+      y: 140,
+      width: 200,
+      height: 120,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'resize-rect.json');
+
+    // Select by clicking the item body
     await clickCanvas(page, { x: 240, y: 200 });
     await expect(page.getByTestId('canvas-shape-handle-middle-right')).toBeAttached();
 
-    await dragCanvasHookToPoint(page, 'canvas-selected-item-overlay', { x: 340, y: 300 });
-    await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 520, y: 300 });
-    await dragCanvasHookToPoint(page, 'canvas-shape-handle-rotater', { x: 520, y: 420 });
+    // Use debug state to locate the middle-right handle position, then drag it
+    // with a real mouse interaction at that canvas coordinate
+    const debug = await readStageDebug(page);
+    const rect = debug.selectedItemViewportRect;
+    if (!rect) {
+      throw new Error('Expected a selected item viewport rect after selection.');
+    }
+    // middle-right handle is at the right edge, vertically centered
+    const handleX = 140 + 200; // item right edge in canvas space
+    const handleY = 140 + 60;  // item vertical center in canvas space
 
+    await dragCanvas(page, { x: handleX, y: handleY }, { x: handleX + 120, y: handleY });
+
+    // Verify selection still active
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+
+    // Verify saved geometry changed — width should have increased
     const savedProject = await saveAndReadProject(page);
-
     const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
-      (item) => item.id === 'shape-under-test'
+      (item) => item.id === 'resize-rect'
     );
     expect(savedItem).toBeDefined();
-    expect(Number(savedItem?.x)).toBeGreaterThan(140);
-    expect(Number(savedItem?.y)).toBeGreaterThan(140);
-    expect(Number(savedItem?.width)).toBeGreaterThan(200);
-    expect(Math.abs(Number(savedItem?.rotation))).toBeGreaterThan(10);
-
-    await page.keyboard.press('Delete');
-    await openLayersTab(page);
-    await expect(page.locator('.layer-row-select')).toHaveCount(0);
+    expect(Number(savedItem?.width)).toBeGreaterThan(280);
+    expect(Number(savedItem?.rotation)).toBe(0);
   });
 
-  test('ST-04 ST-05 ST-06 ST-10 ST-11 ST-12 supports text and line transform flows', async ({
+  test('ST-03 rotates a rectangle through a real canvas interaction', async ({ page }) => {
+    const rectangle = createRectangleFixture({
+      id: 'rotate-rect',
+      x: 140,
+      y: 140,
+      width: 200,
+      height: 120,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'rotate-rect.json');
+
+    // Select by clicking the item body
+    await clickCanvas(page, { x: 240, y: 200 });
+    await expect(page.getByTestId('canvas-shape-handle-rotater')).toBeAttached();
+
+    // Locate the rotater handle via its bounding box, then drag with real mouse
+    const rotaterBox = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
+    if (!rotaterBox) {
+      throw new Error('Expected rotater handle to have a bounding box.');
+    }
+    const rotaterCenter = {
+      x: rotaterBox.x + rotaterBox.width / 2,
+      y: rotaterBox.y + rotaterBox.height / 2,
+    };
+    await page.mouse.move(rotaterCenter.x, rotaterCenter.y);
+    await page.mouse.down();
+    await page.mouse.move(rotaterCenter.x + 150, rotaterCenter.y + 100, { steps: 18 });
+    await page.mouse.up();
+
+    // Verify selection still active
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+
+    // Verify saved geometry changed — rotation should be non-zero
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'rotate-rect'
+    );
+    expect(savedItem).toBeDefined();
+    expect(Math.abs(Number(savedItem?.rotation))).toBeGreaterThan(10);
+
+    // Verify delete still works after rotation
+    await page.keyboard.press('Delete');
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
+  });
+
+  test('ST-04 ST-05 ST-06 drags, resizes, and rotates a text item through real canvas interactions', async ({
     page,
   }) => {
     const text = createTextFixture({
@@ -117,6 +212,76 @@ test.describe('editor transforms', () => {
       text: 'Transform text',
       zIndex: 0,
     });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([text]), 'transform-text.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    // ST-04: Select and drag
+    await clickCanvas(page, { x: 250, y: 180 });
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Text content')).toBeVisible();
+
+    await dragCanvas(page, { x: 250, y: 180 }, { x: 370, y: 260 });
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Text content')).toBeVisible();
+
+    let savedProject = await saveAndReadProject(page);
+    let savedText = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-text'
+    );
+    expect(Number(savedText?.x)).toBeGreaterThan(250);
+    expect(Number(savedText?.y)).toBeGreaterThan(200);
+
+    // ST-05: Resize via middle-right handle (enable hooks to locate it, then use real drag)
+    await setCanvasTestHooksEnabled(page, true);
+    const handleBox = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
+    if (!handleBox) {
+      throw new Error('Expected shape handle to be visible for resize.');
+    }
+    await setCanvasTestHooksEnabled(page, false);
+    // Drag from the handle's bounding box center in page coordinates
+    const handlePageCenter = {
+      x: handleBox.x + handleBox.width / 2,
+      y: handleBox.y + handleBox.height / 2,
+    };
+    await page.mouse.move(handlePageCenter.x, handlePageCenter.y);
+    await page.mouse.down();
+    await page.mouse.move(handlePageCenter.x + 100, handlePageCenter.y, { steps: 18 });
+    await page.mouse.up();
+
+    savedProject = await saveAndReadProject(page);
+    savedText = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-text'
+    );
+    expect(Number(savedText?.width)).toBeGreaterThan(320);
+
+    // ST-06: Rotate via rotater handle
+    await setCanvasTestHooksEnabled(page, true);
+    const rotaterBox = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
+    if (!rotaterBox) {
+      throw new Error('Expected rotater handle to be visible for rotation.');
+    }
+    await setCanvasTestHooksEnabled(page, false);
+    const rotaterPageCenter = {
+      x: rotaterBox.x + rotaterBox.width / 2,
+      y: rotaterBox.y + rotaterBox.height / 2,
+    };
+    await page.mouse.move(rotaterPageCenter.x, rotaterPageCenter.y);
+    await page.mouse.down();
+    await page.mouse.move(rotaterPageCenter.x + 120, rotaterPageCenter.y + 80, { steps: 18 });
+    await page.mouse.up();
+
+    savedProject = await saveAndReadProject(page);
+    savedText = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-text'
+    );
+    expect(Math.abs(Number(savedText?.rotation))).toBeGreaterThan(10);
+  });
+
+  test('ST-10 ST-11 ST-12 drags a line body and its endpoints through real canvas interactions', async ({
+    page,
+  }) => {
     const line = createLineFixture({
       id: 'transform-line',
       x: 140,
@@ -127,39 +292,51 @@ test.describe('editor transforms', () => {
       endY: 560,
       width: 240,
       height: 40,
-      zIndex: 1,
+      zIndex: 0,
     });
 
     await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([text, line]), 'transforms-mixed.json');
+    await uploadProject(page, createProjectDocument([line]), 'transform-line.json');
+    await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 250, y: 180 });
-    await dragCanvasHookToPoint(page, 'canvas-selected-item-overlay', { x: 340, y: 250 });
-    await dragCanvasHookToPoint(page, 'canvas-shape-handle-middle-right', { x: 520, y: 250 });
-    await dragCanvasHookToPoint(page, 'canvas-shape-handle-rotater', { x: 520, y: 360 });
+    // ST-10: Select and drag the line body
+    await clickCanvas(page, { x: 260, y: 540 });
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasLineHandles).toBe(true);
 
-    await clickCanvas(page, { x: 230, y: 540 });
-    await dragCanvasHookToPoint(page, 'canvas-selected-item-overlay', { x: 330, y: 620 });
-    await dragCanvasHookToPoint(page, 'canvas-line-handle-start', { x: 260, y: 600 });
-    await dragCanvasHookToPoint(page, 'canvas-line-handle-end', { x: 520, y: 660 });
+    await dragCanvas(page, { x: 260, y: 540 }, { x: 360, y: 620 });
 
-    const savedProject = await saveAndReadProject(page);
+    let savedProject = await saveAndReadProject(page);
+    let savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-line'
+    );
+    expect(Number(savedLine?.startX)).toBeGreaterThan(200);
+    expect(Number(savedLine?.startY)).toBeGreaterThan(580);
+    expect(Number(savedLine?.endX)).toBeGreaterThan(440);
+    expect(Number(savedLine?.endY)).toBeGreaterThan(620);
 
-    const savedItems = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>);
-    const savedText = savedItems.find((item) => item.id === 'transform-text');
-    const savedLine = savedItems.find((item) => item.id === 'transform-line');
+    // ST-11: Drag start endpoint
+    // The start handle should be near the saved startX/startY
+    const startX = Number(savedLine?.startX);
+    const startY = Number(savedLine?.startY);
+    await dragCanvas(page, { x: startX, y: startY }, { x: startX - 80, y: startY + 40 });
 
-    expect(savedText).toEqual(expect.objectContaining({ id: 'transform-text' }));
-    expect(Number(savedText?.x)).toBeGreaterThan(160);
-    expect(Number(savedText?.y)).toBeGreaterThan(140);
-    expect(Math.abs(Number(savedText?.width) - 260)).toBeGreaterThan(40);
-    expect(Math.abs(Number(savedText?.rotation))).toBeGreaterThan(10);
+    savedProject = await saveAndReadProject(page);
+    savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-line'
+    );
+    expect(Number(savedLine?.startX)).toBeLessThan(startX - 40);
 
-    expect(savedLine).toEqual(expect.objectContaining({ id: 'transform-line' }));
-    expect(Number(savedLine?.startX)).toBeGreaterThan(140);
-    expect(Number(savedLine?.startY)).toBeGreaterThan(520);
-    expect(Number(savedLine?.endX)).toBeGreaterThan(380);
-    expect(Number(savedLine?.endY)).toBeGreaterThan(560);
+    // ST-12: Drag end endpoint
+    const endX = Number(savedLine?.endX);
+    const endY = Number(savedLine?.endY);
+    await dragCanvas(page, { x: endX, y: endY }, { x: endX + 80, y: endY - 30 });
+
+    savedProject = await saveAndReadProject(page);
+    savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'transform-line'
+    );
+    expect(Number(savedLine?.endX)).toBeGreaterThan(endX + 40);
   });
 
   test('ST-07 ST-08 ST-09 supports image transform flows through real canvas interaction', async ({
@@ -177,10 +354,36 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([image]), 'transform-image.json');
 
+    // ST-07: Select and drag
     await clickCanvas(page, { x: 600, y: 325 });
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Preserve aspect ratio')).toBeVisible();
+
     await dragCanvas(page, { x: 600, y: 325 }, { x: 720, y: 405 });
-    await dragCanvas(page, { x: 800, y: 405 }, { x: 940, y: 405 });
-    await dragCanvas(page, { x: 790, y: 310 }, { x: 930, y: 450 });
+
+    // ST-08: Resize via real handle bounding box
+    const resizeBox = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
+    if (!resizeBox) {
+      throw new Error('Expected shape resize handle to have a bounding box.');
+    }
+    await page.mouse.move(resizeBox.x + resizeBox.width / 2, resizeBox.y + resizeBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(resizeBox.x + resizeBox.width / 2 + 120, resizeBox.y + resizeBox.height / 2, { steps: 18 });
+    await page.mouse.up();
+
+    // ST-09: Rotate via real rotater bounding box
+    const rotaterBox = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
+    if (!rotaterBox) {
+      throw new Error('Expected rotater handle to have a bounding box.');
+    }
+    await page.mouse.move(rotaterBox.x + rotaterBox.width / 2, rotaterBox.y + rotaterBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(rotaterBox.x + rotaterBox.width / 2 + 140, rotaterBox.y + rotaterBox.height / 2 + 80, { steps: 18 });
+    await page.mouse.up();
+
+    // Verify selection survived all transforms
+    await openPropertiesTab(page);
+    await expect(page.getByLabel('Preserve aspect ratio')).toBeVisible();
 
     const savedProject = await saveAndReadProject(page);
 
@@ -399,7 +602,7 @@ test.describe('editor transforms', () => {
     expect(Number(savedRectangle?.y)).toBe(120);
   });
 
-  test('keeps rotated group resizing aligned to the rotated frame across repeated transforms', async ({ page }) => {
+  test('geometry: keeps rotated group resizing aligned to the rotated frame across repeated transforms', async ({ page }) => {
     const first = createRectangleFixture({
       id: 'first',
       x: 100,

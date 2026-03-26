@@ -907,6 +907,98 @@ export async function uploadFont(page: Page, filePath: string) {
   await chooser.setFiles(filePath);
 }
 
+/**
+ * Locates a handle by its test ID bounding box, then drags it with real mouse
+ * events. This avoids the dragCanvasHookToPoint pattern (synthetic mousedown on
+ * invisible overlay) while still using test hooks to *find* the handle position.
+ *
+ * @param handle - test ID of the handle element (e.g. 'canvas-shape-handle-middle-right')
+ * @param destination - canvas-space target point for the drag endpoint
+ */
+export async function dragRealHandle(
+  page: Page,
+  handle: string,
+  destination: CanvasPoint,
+  steps = 18,
+) {
+  const box = await page.getByTestId(handle).boundingBox();
+  if (!box) {
+    throw new Error(`Expected handle "${handle}" to have a bounding box.`);
+  }
+  const center = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  const end = await canvasPointToPage(page, destination);
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps });
+  await page.mouse.up();
+}
+
+/**
+ * Locates a handle by its test ID bounding box, then drags it to a viewport-
+ * space offset from the handle center. Use this when the destination is easier
+ * to express as a pixel delta rather than a canvas-space point.
+ *
+ * @param handle - test ID of the handle element
+ * @param delta - viewport pixel offset from the handle center
+ */
+export async function dragRealHandleByDelta(
+  page: Page,
+  handle: string,
+  delta: { dx: number; dy: number },
+  steps = 18,
+) {
+  const box = await page.getByTestId(handle).boundingBox();
+  if (!box) {
+    throw new Error(`Expected handle "${handle}" to have a bounding box.`);
+  }
+  const center = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  await page.mouse.move(center.x, center.y);
+  await page.mouse.down();
+  await page.mouse.move(center.x + delta.dx, center.y + delta.dy, { steps });
+  await page.mouse.up();
+}
+
+/**
+ * Opens the Properties tab and asserts that a specific property field has
+ * changed relative to a baseline value. Uses expect.poll for async stability.
+ *
+ * @param field - accessible name or label of the property input
+ * @param compare - comparison function receiving the current numeric value
+ * @param description - description for the assertion (shown on failure)
+ */
+export async function expectPropertyValue(
+  page: Page,
+  field: string,
+  compare: (value: number) => boolean,
+  description?: string,
+) {
+  await openPropertiesTab(page);
+  const locator = page.getByLabel(field);
+  await expect(locator).toBeVisible();
+  const assertion = expect.poll(
+    async () => {
+      const raw = await locator.inputValue();
+      return parseFloat(raw);
+    },
+    { message: description ?? `Expected property "${field}" to satisfy condition` },
+  );
+  await assertion.toBeTruthy();
+  // Re-check with the actual compare function
+  const raw = await locator.inputValue();
+  const value = parseFloat(raw);
+  if (!compare(value)) {
+    throw new Error(
+      `${description ?? `Property "${field}"`}: got ${value}, which did not satisfy the condition`,
+    );
+  }
+}
+
 export async function captureDownload(page: Page, action: () => Promise<void>) {
   const [download] = await Promise.all([
     page.waitForEvent('download'),
