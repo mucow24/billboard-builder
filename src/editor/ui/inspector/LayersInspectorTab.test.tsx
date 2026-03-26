@@ -47,7 +47,6 @@ describe('LayersInspectorTab', () => {
     expect(onSelectNode).toHaveBeenCalledWith(frontItem.id);
 
     expect(screen.queryByRole('button', { name: 'Delete Rectangle' })).not.toBeInTheDocument();
-    expect(screen.getByText('2 items')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Delete selected (1)' }));
     expect(onDeleteSelection).toHaveBeenCalledTimes(1);
@@ -83,7 +82,7 @@ describe('LayersInspectorTab', () => {
     expect(onSelectNode).toHaveBeenCalledWith(item.id);
     expect(onOpenProperties).toHaveBeenCalledTimes(1);
 
-    await user.click(screen.getByRole('button', { name: 'Bring front' }));
+    await user.click(screen.getByRole('button', { name: 'Move to top' }));
     expect(onReorder).toHaveBeenCalledWith('front');
   });
 
@@ -111,7 +110,7 @@ describe('LayersInspectorTab', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Bring front' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move to top' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete selected' })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Canvas background' }));

@@ -12,7 +12,10 @@ export type SelectionItemChange =
   | Partial<CanvasItem>
   | ((item: CanvasItem) => Partial<CanvasItem>);
 
+export type InspectorTab = 'properties' | 'layers' | 'favorites';
+
 export interface PropertiesPanelProps {
+  activeTab: InspectorTab;
   availableFonts: UploadedFont[];
   background: string;
   fonts: DocumentFontReference[];
@@ -32,6 +35,7 @@ export interface PropertiesPanelProps {
   onItemChange: (changes: SelectionItemChange) => void;
   onInsertFavorite?: (favoriteId: string) => void;
   onDeleteSelection: () => void;
+  onOpenProperties?: () => void;
   onSelectNode: (nodeId: string) => void;
   onSelectGroupChildren?: () => void;
   onToggleNode: (nodeId: string) => void;

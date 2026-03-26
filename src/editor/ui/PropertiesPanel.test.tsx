@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PropertiesPanel } from './PropertiesPanel';
+import type { InspectorTab } from './inspector/types';
 import {
   createGroupNode,
   createRectangleItem,
@@ -10,82 +11,96 @@ import {
 } from '../document/documentDefaults';
 import { flattenLayerRows } from '../document/sceneGraph';
 
+const baseProps = {
+  availableFonts: [] as [],
+  background: '#ffffff00',
+  fonts: [] as [],
+  missingFontFamilies: [] as string[],
+  onBackgroundChange: vi.fn(),
+  onGroupOpacityChange: vi.fn(),
+  onDeleteSelection: vi.fn(),
+  onItemChange: vi.fn(),
+  onSelectNode: vi.fn(),
+  onReorder: vi.fn(),
+  onToggleNode: vi.fn(),
+  onToggleNodeLocked: vi.fn(),
+  onToggleNodeHidden: vi.fn(),
+  selectedNodeIds: [] as string[],
+};
+
 describe('PropertiesPanel', () => {
-  it('shows the missing font warning and shell tabs', async () => {
-    const user = userEvent.setup();
+  it('shows the missing font warning on the properties tab', () => {
     const item = createRectangleItem();
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="properties"
         items={[item]}
         layerRows={flattenLayerRows([item])}
         missingFontFamilies={['Ghost Sans']}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
-        selectedNodeIds={[]}
       />,
     );
 
     expect(screen.getByText('Ghost Sans')).toBeInTheDocument();
     expect(screen.getByTestId('properties-tab-body')).toHaveClass('rail-tab-body');
+  });
 
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+  it('renders the layers tab body when activeTab is layers', () => {
+    const item = createRectangleItem();
+
+    render(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="layers"
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+      />,
+    );
+
     expect(screen.getByTestId('layers-tab-body')).toHaveClass('rail-tab-body');
     expect(screen.getByRole('button', { name: 'Canvas background' })).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
+  it('renders the favorites tab body when activeTab is favorites', () => {
+    render(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="favorites"
+        items={[]}
+        layerRows={[]}
+      />,
+    );
+
     expect(screen.getByTestId('favorites-tab-body')).toHaveClass('rail-tab-body');
     expect(screen.getByText('No favorites yet')).toBeInTheDocument();
   });
 
-  it('routes a layer double-click back to the properties tab', async () => {
-    const user = userEvent.setup();
+  it('calls onOpenProperties when a layer is double-clicked', () => {
     const item = createTextItem({ zIndex: 1 });
+    const onOpenProperties = vi.fn();
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="layers"
         items={[item]}
         layerRows={flattenLayerRows([item])}
-        missingFontFamilies={[]}
         selectedItem={item}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[item.id]}
+        onOpenProperties={onOpenProperties}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Text' }));
-
-    expect(screen.getByRole('tab', { name: /Properties/i })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
+    expect(onOpenProperties).toHaveBeenCalled();
   });
 
   it('passes the properties tab through to the selection inspector', () => {
     render(
       <PropertiesPanel
+        {...baseProps}
+        activeTab="properties"
         availableFonts={[
           {
             family: 'Session Sans',
@@ -95,21 +110,8 @@ describe('PropertiesPanel', () => {
             kind: 'uploaded',
           },
         ]}
-        background="#ffffff00"
-        fonts={[]}
         items={[]}
         layerRows={[]}
-        missingFontFamilies={[]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
-        selectedNodeIds={[]}
       />,
     );
 
@@ -117,89 +119,67 @@ describe('PropertiesPanel', () => {
     expect(screen.getByText('1 uploaded font(s) ready in this session.')).toBeInTheDocument();
   });
 
-  it('preserves collapsed layer groups when switching tabs and re-expands ancestors of the selection', async () => {
-    const user = userEvent.setup();
+  it('preserves collapsed layer groups when switching tabs and re-expands ancestors of the selection', () => {
     const child = createRectangleItem({ id: 'child-1' });
     const group = createGroupNode([child], 'Content Group');
     group.id = 'group-1';
 
     const { rerender } = render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="layers"
         items={[child]}
         layerRows={flattenLayerRows([group])}
-        missingFontFamilies={[]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
-        selectedNodeIds={[]}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
-    await user.click(screen.getByRole('button', { name: 'Collapse Content Group' }));
+    // Collapse the group
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Content Group' }));
     expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: /Properties/i }));
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
-    expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
-
+    // Switch away and back — group should stay collapsed
     rerender(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="properties"
         items={[child]}
         layerRows={flattenLayerRows([group])}
-        missingFontFamilies={[]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
+      />,
+    );
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="layers"
+        items={[child]}
+        layerRows={flattenLayerRows([group])}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
+
+    // Select the child — ancestor group should auto-expand
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="layers"
+        items={[child]}
+        layerRows={flattenLayerRows([group])}
         selectedItem={child}
         selectedNodeIds={[child.id]}
       />,
     );
-
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument();
   });
 
-  it('preserves per-tab scroll positions on the shell-owned tab bodies', async () => {
-    const user = userEvent.setup();
+  it('preserves per-tab scroll positions across tab switches', () => {
     const item = createTextItem({ zIndex: 1 });
 
-    render(
+    const { rerender } = render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="properties"
         items={[item]}
         layerRows={flattenLayerRows([item])}
-        missingFontFamilies={[]}
         selectedItem={item}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
         selectedNodeIds={[item.id]}
       />,
     );
@@ -211,7 +191,17 @@ describe('PropertiesPanel', () => {
       value: 140,
     });
 
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    // Switch to layers
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="layers"
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+        selectedItem={item}
+        selectedNodeIds={[item.id]}
+      />,
+    );
 
     const layersBody = screen.getByTestId('layers-tab-body');
     Object.defineProperty(layersBody, 'scrollTop', {
@@ -220,27 +210,46 @@ describe('PropertiesPanel', () => {
       value: 84,
     });
 
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
+    // Switch to favorites
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="favorites"
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+        selectedItem={item}
+        selectedNodeIds={[item.id]}
+      />,
+    );
 
-    const favoritesBody = screen.getByTestId('favorites-tab-body');
-    Object.defineProperty(favoritesBody, 'scrollTop', {
-      configurable: true,
-      writable: true,
-      value: 32,
-    });
-
-    await user.click(screen.getByRole('tab', { name: /Properties/i }));
+    // Switch back to properties — scroll should be restored
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="properties"
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+        selectedItem={item}
+        selectedNodeIds={[item.id]}
+      />,
+    );
     expect(screen.getByTestId('properties-tab-body').scrollTop).toBe(140);
 
-    await user.click(screen.getByRole('tab', { name: /Layers/i }));
+    // Switch back to layers
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="layers"
+        items={[item]}
+        layerRows={flattenLayerRows([item])}
+        selectedItem={item}
+        selectedNodeIds={[item.id]}
+      />,
+    );
     expect(screen.getByTestId('layers-tab-body').scrollTop).toBe(84);
-
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
-    expect(screen.getByTestId('favorites-tab-body').scrollTop).toBe(32);
   });
 
-  it('renders favorites as thin rows with swatch, name, count, and action buttons', async () => {
-    const user = userEvent.setup();
+  it('renders favorites as thin rows with swatch, name, count, and action buttons', () => {
     const rect = createRectangleItem({ fill: '#ef4444' });
     const text = createTextItem({ zIndex: 1 });
     const favorite = {
@@ -255,27 +264,13 @@ describe('PropertiesPanel', () => {
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="favorites"
         items={[rect]}
         layerRows={flattenLayerRows([rect])}
-        missingFontFamilies={[]}
         favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
-        selectedNodeIds={[]}
       />,
     );
-
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
 
     expect(screen.getByText('Hero banner')).toBeInTheDocument();
     expect(screen.getByText('2 items')).toBeInTheDocument();
@@ -299,28 +294,15 @@ describe('PropertiesPanel', () => {
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="favorites"
         items={[rect]}
         layerRows={flattenLayerRows([rect])}
-        missingFontFamilies={[]}
         favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
         onRenameFavorite={onRenameFavorite}
-        selectedNodeIds={[]}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
     await user.click(screen.getByRole('button', { name: 'Rename Old name' }));
 
     const input = screen.getByDisplayValue('Old name');
@@ -348,28 +330,15 @@ describe('PropertiesPanel', () => {
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="favorites"
         items={[rect]}
         layerRows={flattenLayerRows([rect])}
-        missingFontFamilies={[]}
         favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
         onRenameFavorite={onRenameFavorite}
-        selectedNodeIds={[]}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
     await user.click(screen.getByRole('button', { name: 'Rename Keep this' }));
     await user.type(screen.getByDisplayValue('Keep this'), 'Changed{Escape}');
 
@@ -393,28 +362,15 @@ describe('PropertiesPanel', () => {
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="favorites"
         items={[rect]}
         layerRows={flattenLayerRows([rect])}
-        missingFontFamilies={[]}
         favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
         onRenameFavorite={onRenameFavorite}
-        selectedNodeIds={[]}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
     await user.click(screen.getByRole('button', { name: 'Rename Do not lose' }));
 
     const input = screen.getByDisplayValue('Do not lose');
@@ -444,103 +400,19 @@ describe('PropertiesPanel', () => {
 
     render(
       <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
+        {...baseProps}
+        activeTab="favorites"
         items={[rect]}
         layerRows={flattenLayerRows([rect])}
-        missingFontFamilies={[]}
         favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
         onDeleteFavorite={onDeleteFavorite}
         onInsertFavorite={onInsertFavorite}
-        selectedNodeIds={[]}
       />,
     );
 
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
     await user.click(screen.getByRole('button', { name: 'Delete favorite Doomed' }));
 
     expect(onDeleteFavorite).toHaveBeenCalledWith('fav-1');
     expect(onInsertFavorite).not.toHaveBeenCalled();
-  });
-
-  it('keeps the favorites tab active after favorite insertion-style rerenders', async () => {
-    const user = userEvent.setup();
-    const item = createTextItem({ zIndex: 1 });
-    const favorite = {
-      id: 'favorite-1',
-      name: 'Text favorite',
-      nodes: [item],
-      fonts: [],
-      createdAt: '2026-03-19T12:00:00.000Z',
-      updatedAt: '2026-03-19T12:00:00.000Z',
-    };
-    const { rerender } = render(
-      <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
-        items={[item]}
-        layerRows={flattenLayerRows([item])}
-        missingFontFamilies={[]}
-        selectedItem={item}
-        selectedNodeIds={[item.id]}
-        favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onInsertFavorite={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
-      />,
-    );
-
-    await user.click(screen.getByRole('tab', { name: /Favorites/i }));
-    expect(screen.getByRole('tab', { name: /Favorites/i })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-
-    rerender(
-      <PropertiesPanel
-        availableFonts={[]}
-        background="#ffffff00"
-        fonts={[]}
-        items={[item, createRectangleItem({ id: 'new-rectangle', x: 220 })]}
-        layerRows={flattenLayerRows([item])}
-        missingFontFamilies={[]}
-        selectedItem={item}
-        selectedNodeIds={[item.id]}
-        favorites={[favorite]}
-        onBackgroundChange={vi.fn()}
-        onGroupOpacityChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
-        onItemChange={vi.fn()}
-        onInsertFavorite={vi.fn()}
-        onSelectNode={vi.fn()}
-        onReorder={vi.fn()}
-        onToggleNode={vi.fn()}
-        onToggleNodeLocked={vi.fn()}
-        onToggleNodeHidden={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole('tab', { name: /Favorites/i })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
   });
 });

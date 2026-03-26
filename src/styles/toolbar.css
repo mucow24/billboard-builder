@@ -360,3 +360,81 @@
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ── Inspector tabs (right-aligned in toolbar) ─────────────────────────── */
+
+.top-toolbar-spacer {
+  flex: 1 0 0;
+}
+
+.top-toolbar-inspector-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  align-self: stretch;
+  /* Bleed to toolbar right + bottom edges so tabs connect to panel below */
+  margin: -6px -6px -7px 0;
+  padding: 6px 0 0;
+}
+
+.top-toolbar .top-toolbar-inspector-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.55rem;
+  border: none;
+  border-left: 1px solid var(--toolbar-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--toolbar-text);
+  font-size: 11px;
+  font-weight: 700;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 150ms ease;
+}
+
+.top-toolbar .top-toolbar-inspector-tab:hover {
+  background: var(--toolbar-surface-hover);
+}
+
+/* Active tab: highlighted but not connected to panel */
+.top-toolbar .top-toolbar-inspector-tab.active {
+  background: var(--toolbar-surface-hover);
+}
+
+/* Connected tab: active + panel open — forms top of unified tab+panel shape */
+.top-toolbar .top-toolbar-inspector-tab.connected {
+  position: relative;
+  border: 1px solid var(--toolbar-border-active);
+  border-bottom: none;
+  background: var(--toolbar-surface-hover);
+  z-index: 22;
+}
+
+/* Bridge: covers the junction between tab and panel */
+.top-toolbar .top-toolbar-inspector-tab.connected::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--toolbar-surface-hover);
+  z-index: 22;
+}
+
+.top-toolbar-inspector-badge {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  background: #273754;
+  color: #f8fbff;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

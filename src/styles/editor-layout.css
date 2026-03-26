@@ -30,8 +30,9 @@
   z-index: 15;
   --overlay-gap: 0.4rem;
   --overlay-edge: 0.45rem;
-  --overlay-topbar-height: 56px;
+  --overlay-topbar-height: calc(1.8rem + 14px);
   --overlay-below-topbar: calc(var(--overlay-edge) + var(--overlay-topbar-height) + var(--overlay-gap));
+  --toolbar-border-active: rgba(125, 211, 252, 0.9);
 }
 
 .overlay-topbar {
@@ -68,7 +69,7 @@
 
 .overlay-properties {
   position: absolute;
-  top: var(--overlay-below-topbar);
+  top: calc(var(--overlay-edge) + var(--overlay-topbar-height));
   right: var(--overlay-edge);
   bottom: var(--overlay-edge);
   width: min(340px, calc(100vw - 1.3rem));

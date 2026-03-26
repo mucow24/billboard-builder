@@ -8,6 +8,7 @@ import { CanvasStage } from './editor/rendering/CanvasStage';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
+import type { InspectorTab } from './editor/ui/PropertiesPanel';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
@@ -28,8 +29,11 @@ export default function App() {
   const [favoriteStatusFading, setFavoriteStatusFading] = useState(false);
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
+  const overlaysRef = useRef<HTMLDivElement | null>(null);
   const favoriteStatusFadeTimeoutRef = useRef<number | null>(null);
   const favoriteStatusDismissTimeoutRef = useRef<number | null>(null);
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('properties');
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   const {
     actions: {
@@ -85,24 +89,66 @@ export default function App() {
       return;
     }
 
-    const updateHeight = () => {
-      setTopbarHeight(Math.ceil(element.getBoundingClientRect().height));
-    };
-
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      // Use borderBoxSize (layout size, unaffected by CSS transforms) with offsetHeight fallback
+      const height = entry.borderBoxSize?.[0]?.blockSize ?? element.offsetHeight;
+      setTopbarHeight(height);
+    });
     observer.observe(element);
-    window.addEventListener('resize', updateHeight);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener('resize', updateHeight);
     };
   }, []);
+
+  // Measure the connected tab's position relative to the panel so CSS can draw the gapped top border
+  useLayoutEffect(() => {
+    const overlays = overlaysRef.current;
+    if (!overlays || panelCollapsed) {
+      if (overlays) {
+        overlays.style.removeProperty('--connected-tab-right-offset');
+        overlays.style.removeProperty('--connected-tab-width');
+        const pc = overlays.querySelector('.overlay-properties') as HTMLElement | null;
+        if (pc) pc.style.transform = '';
+      }
+      return;
+    }
+    const tab = overlays.querySelector('.top-toolbar-inspector-tab.connected');
+    const panelContainer = overlays.querySelector('.overlay-properties') as HTMLElement | null;
+    const tabsContainer = overlays.querySelector('.top-toolbar-inspector-tabs');
+    if (!tab || !panelContainer || !tabsContainer) return;
+    // Reset any previous nudge before measuring so we get clean values
+    panelContainer.style.transform = '';
+    const tabRect = tab.getBoundingClientRect();
+    const panelRect = panelContainer.getBoundingClientRect();
+    const tabsRight = tabsContainer.getBoundingClientRect().right;
+    // Nudge the panel so its right edge aligns with the tabs container's right edge
+    // (compensates for sub-pixel toolbar border rendering at varying DPRs)
+    const rightDrift = panelRect.right - tabsRight;
+    if (Math.abs(rightDrift) > 0.01) {
+      panelContainer.style.transform = `translateX(${-rightDrift}px)`;
+    }
+    // Gap position: after the nudge, panel right == tabs right.
+    // Inset the gap by 1px on each side so the panel top border meets the tab's side borders cleanly.
+    const rightOffset = tabsRight - tabRect.right + 1;
+    const width = tabRect.width - 2;
+    overlays.style.setProperty('--connected-tab-right-offset', `${rightOffset}px`);
+    overlays.style.setProperty('--connected-tab-width', `${width}px`);
+  }, [inspectorTab, panelCollapsed]);
 
   const handleExportIntentChange = useCallback((active: boolean) => {
     setExportButtonHovered(active);
   }, []);
+
+  function handleInspectorTabChange(tab: InspectorTab) {
+    if (tab === inspectorTab) {
+      setPanelCollapsed((c) => !c);
+    } else {
+      setInspectorTab(tab);
+      setPanelCollapsed(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -160,6 +206,7 @@ export default function App() {
         />
 
         <div
+          ref={overlaysRef}
           className="editor-overlays"
           style={{ ['--overlay-topbar-height' as string]: `${topbarHeight}px` }}
         >
@@ -196,6 +243,11 @@ export default function App() {
               }}
               onUndo={undo}
               onUngroup={ungroupSelectedNode}
+              activeInspectorTab={inspectorTab}
+              panelCollapsed={panelCollapsed}
+              onInspectorTabChange={handleInspectorTabChange}
+              itemCount={document.items.length}
+              favoriteCount={favorites.length}
             />
           </div>
 
@@ -209,9 +261,10 @@ export default function App() {
             <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
           </div>
 
-          <div className="overlay-properties">
+          <div className="overlay-properties" style={{ display: panelCollapsed ? 'none' : undefined }}>
             <div className="overlay-properties-panel">
               <PropertiesPanel
+                activeTab={inspectorTab}
                 availableFonts={availableFonts}
                 background={document.background}
                 fonts={document.fonts}
@@ -233,6 +286,7 @@ export default function App() {
                   }
                 }}
                 onDeleteSelection={deleteSelectedItems}
+                onOpenProperties={() => handleInspectorTabChange('properties')}
                 onItemChange={(changes) => {
                   const resolveChanges = (item: CanvasItem) =>
                     typeof changes === 'function' ? changes(item) : changes;

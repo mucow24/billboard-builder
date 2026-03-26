@@ -245,20 +245,43 @@
   position: relative;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 0 0 3px 3px;
   background: linear-gradient(180deg, #0d1526 0%, #0a1120 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.015);
+    0 24px 44px rgba(2, 6, 23, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-.panel-section-tabbed-rail::after {
+/* Left, right, bottom borders (no top — the top is drawn separately with a gap) */
+.panel-section-tabbed-rail::before {
   content: '';
   position: absolute;
   inset: 0;
-  border: 1px solid rgba(72, 92, 127, 0.88);
+  border: 1px solid var(--toolbar-border-active, rgba(125, 211, 252, 0.9));
+  border-top: none;
+  border-radius: 0 0 3px 3px;
   pointer-events: none;
   z-index: 20;
+}
+
+/* Top border with a transparent gap where the connected tab sits */
+.panel-section-tabbed-rail::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  pointer-events: none;
+  z-index: 20;
+  background: linear-gradient(
+    to left,
+    var(--toolbar-border-active, rgba(125, 211, 252, 0.9)) 0,
+    var(--toolbar-border-active, rgba(125, 211, 252, 0.9)) var(--connected-tab-right-offset, 0px),
+    transparent var(--connected-tab-right-offset, 0px),
+    transparent calc(var(--connected-tab-right-offset, 0px) + var(--connected-tab-width, 0px)),
+    var(--toolbar-border-active, rgba(125, 211, 252, 0.9)) calc(var(--connected-tab-right-offset, 0px) + var(--connected-tab-width, 0px))
+  );
 }
 
 .panel-section-tabbed-rail .panel-badge {
@@ -272,52 +295,7 @@
   font-size: 10px;
 }
 
-.rail-tab-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  margin: 0;
-  border-bottom: 1px solid rgba(66, 87, 124, 0.62);
-  background: linear-gradient(180deg, rgba(15, 23, 39, 0.96), rgba(11, 18, 32, 0.96));
-  box-shadow: inset 0 -1px 0 rgba(5, 9, 16, 0.58);
-}
-
-.rail-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 0;
-  min-height: 38px;
-  padding: 0 10px;
-  border: 0;
-  border-right: 1px solid rgba(27, 38, 61, 1);
-  background: transparent;
-  color: #93a8c9;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.rail-tab:last-child {
-  border-right: 0;
-}
-
-.rail-tab.active {
-  color: #f8fbff;
-  background: rgba(31, 46, 74, 0.9);
-}
-
-.rail-tab.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 1px;
-  background: rgba(126, 160, 214, 0.38);
-}
+/* Rail tab strip styles removed — tabs now live in the Toolbar */
 
 .rail-tab-body {
   display: flex;

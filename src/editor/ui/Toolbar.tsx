@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } 
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
+import type { InspectorTab } from './inspector/types';
 
 type ToolbarMenuName = 'canvas' | 'size' | 'upload';
 
@@ -33,6 +34,11 @@ interface ToolbarProps {
   onSaveFavorite: () => void;
   onUndo: () => void;
   onUngroup: () => void;
+  activeInspectorTab: InspectorTab;
+  panelCollapsed: boolean;
+  onInspectorTabChange: (tab: InspectorTab) => void;
+  itemCount: number;
+  favoriteCount: number;
 }
 
 interface ToolbarIconProps {
@@ -128,6 +134,11 @@ export function Toolbar({
   onSaveFavorite,
   onUndo,
   onUngroup,
+  activeInspectorTab,
+  panelCollapsed,
+  onInspectorTabChange,
+  itemCount,
+  favoriteCount,
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
   const canvasTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -446,6 +457,33 @@ export function Toolbar({
               </div>
             ) : null}
           </div>
+        </div>
+
+        <div className="top-toolbar-spacer" />
+
+        <div className="top-toolbar-inspector-tabs" role="tablist" aria-label="Inspector panels">
+          {(['properties', 'layers', 'favorites'] as const).map((tab) => {
+            const isActive = activeInspectorTab === tab;
+            const isConnected = isActive && !panelCollapsed;
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={isConnected}
+                className={joinClassNames(
+                  'top-toolbar-inspector-tab',
+                  isActive && 'active',
+                  isConnected && 'connected',
+                )}
+                onClick={() => onInspectorTabChange(tab)}
+              >
+                <span>{tab === 'properties' ? 'Properties' : tab === 'layers' ? 'Layers' : 'Favorites'}</span>
+                {tab === 'layers' && <span className="top-toolbar-inspector-badge">{itemCount}</span>}
+                {tab === 'favorites' && <span className="top-toolbar-inspector-badge">{favoriteCount}</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
     </header>

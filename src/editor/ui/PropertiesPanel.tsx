@@ -3,11 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import { LayersInspectorTab } from './inspector/LayersInspectorTab';
 import { SelectionInspector } from './inspector/SelectionInspector';
 import { FavoritesInspectorTab } from './inspector/FavoritesInspectorTab';
-import type { PropertiesPanelProps } from './inspector/types';
+import type { InspectorTab, PropertiesPanelProps } from './inspector/types';
 
 export type { PropertiesPanelProps } from './inspector/types';
+export type { InspectorTab } from './inspector/types';
 
 export function PropertiesPanel({
+  activeTab,
   availableFonts,
   background,
   fonts,
@@ -24,6 +26,7 @@ export function PropertiesPanel({
   onBackgroundChange,
   onGroupOpacityChange,
   onDeleteSelection,
+  onOpenProperties = () => {},
   onItemChange,
   onInsertFavorite = () => {},
   onReorder,
@@ -34,18 +37,12 @@ export function PropertiesPanel({
   onToggleNodeHidden,
   favorites = [],
 }: PropertiesPanelProps) {
-  const [activeTab, setActiveTab] = useState<'properties' | 'layers' | 'favorites'>('properties');
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const layersScrollRef = useRef<HTMLDivElement | null>(null);
   const propertiesScrollRef = useRef<HTMLDivElement | null>(null);
   const favoritesScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollPositionsRef = useRef({ layers: 0, properties: 0, favorites: 0 });
-  const isMultiSelection = selectedItems.length > 1;
-
-  useEffect(() => {
-    const nextTab = selectedItem || selectedGroup || isMultiSelection ? 'properties' : activeTab;
-    setActiveTab((current) => (current === 'layers' || current === 'favorites' ? current : nextTab));
-  }, [activeTab, isMultiSelection, selectedGroup, selectedItem]);
+  const prevTabRef = useRef<InspectorTab>(activeTab);
 
   useEffect(() => {
     if (selectedNodeIds.length === 0) {
@@ -71,6 +68,22 @@ export function PropertiesPanel({
     });
   }, [layerRows, selectedNodeIds]);
 
+  // Save scroll position of the outgoing tab before it unmounts.
+  // We track this via prevTabRef so we know which tab was active before the prop changed.
+  if (prevTabRef.current !== activeTab) {
+    const prevTarget =
+      prevTabRef.current === 'layers'
+        ? layersScrollRef.current
+        : prevTabRef.current === 'favorites'
+          ? favoritesScrollRef.current
+          : propertiesScrollRef.current;
+    if (prevTarget) {
+      scrollPositionsRef.current[prevTabRef.current] = prevTarget.scrollTop;
+    }
+    prevTabRef.current = activeTab;
+  }
+
+  // Restore scroll position of the incoming tab after it mounts
   useEffect(() => {
     const target =
       activeTab === 'layers'
@@ -82,18 +95,6 @@ export function PropertiesPanel({
       target.scrollTop = scrollPositionsRef.current[activeTab];
     }
   }, [activeTab]);
-
-  function handleTabChange(nextTab: 'properties' | 'layers' | 'favorites') {
-    scrollPositionsRef.current.layers =
-      layersScrollRef.current?.scrollTop ?? scrollPositionsRef.current.layers;
-    scrollPositionsRef.current.properties =
-      propertiesScrollRef.current?.scrollTop ??
-      scrollPositionsRef.current.properties;
-    scrollPositionsRef.current.favorites =
-      favoritesScrollRef.current?.scrollTop ??
-      scrollPositionsRef.current.favorites;
-    setActiveTab(nextTab);
-  }
 
   function handleToggleGroupCollapse(groupId: string) {
     setCollapsedGroupIds((current) => {
@@ -120,38 +121,6 @@ export function PropertiesPanel({
         className="panel-section panel-section-tabbed-rail"
         data-testid="layers-panel-rail"
       >
-        <div className="rail-tab-strip" role="tablist" aria-label="Inspector panels">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'properties'}
-            className={activeTab === 'properties' ? 'rail-tab active' : 'rail-tab'}
-            onClick={() => handleTabChange('properties')}
-          >
-            Properties
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'layers'}
-            className={activeTab === 'layers' ? 'rail-tab active' : 'rail-tab'}
-            onClick={() => handleTabChange('layers')}
-          >
-            Layers
-            <span className="panel-badge">{items.length}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'favorites'}
-            className={activeTab === 'favorites' ? 'rail-tab active' : 'rail-tab'}
-            onClick={() => handleTabChange('favorites')}
-          >
-            Favorites
-            <span className="panel-badge">{favorites.length}</span>
-          </button>
-        </div>
-
         {activeTab === 'layers' ? (
           <div
             ref={layersScrollRef}
@@ -165,7 +134,7 @@ export function PropertiesPanel({
               rows={layerRows}
               onBackgroundChange={onBackgroundChange}
               onDeleteSelection={onDeleteSelection}
-              onOpenProperties={() => handleTabChange('properties')}
+              onOpenProperties={onOpenProperties}
               onReorder={onReorder}
               onSelectNode={onSelectNode}
               onToggleNode={onToggleNode}
