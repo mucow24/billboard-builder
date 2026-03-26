@@ -7,7 +7,7 @@ import { Toolbar } from './Toolbar';
 
 function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) {
   const props: ComponentProps<typeof Toolbar> = {
-    canvas: { width: 1024, height: 512, presetId: 'landscape' },
+    canvas: { width: 2048, height: 1024, presetId: 'landscape' },
     canDelete: false,
     canGroup: false,
     canRedo: false,
@@ -124,7 +124,7 @@ describe('Toolbar', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Size' }));
-    await user.click(screen.getByRole('button', { name: '512 x 512' }));
+    await user.click(screen.getByRole('button', { name: '1024 x 1024' }));
 
     await user.click(screen.getByRole('button', { name: 'Size' }));
     fireEvent.change(screen.getByLabelText('Canvas width'), {
@@ -135,17 +135,17 @@ describe('Toolbar', () => {
     });
 
     expect(onCanvasSizeChange).toHaveBeenCalledWith({
-      width: 512,
-      height: 512,
+      width: 1024,
+      height: 1024,
       presetId: 'square-sm',
     });
     expect(onCanvasSizeChange).toHaveBeenCalledWith({
       width: 640,
-      height: 512,
+      height: 1024,
       presetId: undefined,
     });
     expect(onCanvasSizeChange).toHaveBeenCalledWith({
-      width: 1024,
+      width: 2048,
       height: 480,
       presetId: undefined,
     });
@@ -197,6 +197,6 @@ describe('Toolbar', () => {
     const widthField = screen.getByLabelText('Canvas width');
     await user.click(widthField);
     expect(widthField).toHaveFocus();
-    expect(screen.getByRole('button', { name: '512 x 512' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '1024 x 1024' })).toBeVisible();
   });
 });

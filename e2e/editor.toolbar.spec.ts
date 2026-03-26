@@ -58,17 +58,17 @@ test.describe('editor toolbar flows', () => {
   test('updates visible canvas dimensions from presets and clears preset selection after manual edits', async ({ page }) => {
     await openFreshEditor(page);
 
-    await chooseCanvasPreset(page, '512 x 512');
+    await chooseCanvasPreset(page, '1024 x 1024');
     await page.getByRole('button', { name: 'Size' }).click();
-    await expect(page.getByLabel('Canvas width')).toHaveValue('512');
-    await expect(page.getByLabel('Canvas height')).toHaveValue('512');
+    await expect(page.getByLabel('Canvas width')).toHaveValue('1024');
+    await expect(page.getByLabel('Canvas height')).toHaveValue('1024');
 
-    await expect(page.getByRole('button', { name: '512 x 512', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '1024 x 1024', exact: true })).toHaveAttribute('aria-pressed', 'true');
 
     await page.getByLabel('Canvas width').fill('640');
     await page.getByLabel('Canvas height').fill('480');
 
-    await expect(page.getByRole('button', { name: '512 x 512', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: '1024 x 1024', exact: true })).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByLabel('Canvas width')).toHaveValue('640');
     await expect(page.getByLabel('Canvas height')).toHaveValue('480');
   });

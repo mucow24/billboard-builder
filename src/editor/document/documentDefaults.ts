@@ -21,10 +21,10 @@ import { cloneCanvasNode, createGroupNode } from './sceneGraph';
 export const DEFAULT_FONT_FAMILY = 'Arial';
 
 export const CANVAS_PRESETS: CanvasPreset[] = [
-  { id: 'square-lg', label: '1024 x 1024', width: 1024, height: 1024 },
-  { id: 'landscape', label: '1024 x 512', width: 1024, height: 512 },
-  { id: 'portrait', label: '512 x 1024', width: 512, height: 1024 },
-  { id: 'square-sm', label: '512 x 512', width: 512, height: 512 },
+  { id: 'square-lg', label: '2048 x 2048', width: 2048, height: 2048 },
+  { id: 'landscape', label: '2048 x 1024', width: 2048, height: 1024 },
+  { id: 'portrait', label: '1024 x 2048', width: 1024, height: 2048 },
+  { id: 'square-sm', label: '1024 x 1024', width: 1024, height: 1024 },
 ];
 
 export const WEB_SAFE_FONTS = [
@@ -61,8 +61,8 @@ export function createFullImageCropRect(
 }
 
 const DEFAULT_CANVAS: CanvasSize = {
-  width: 1024,
-  height: 1024,
+  width: 2048,
+  height: 2048,
   presetId: 'square-lg',
 };
 

@@ -26,8 +26,8 @@ describe('document defaults', () => {
       fonts: [],
     });
     expect(document.canvas).toEqual({
-      width: 1024,
-      height: 1024,
+      width: 2048,
+      height: 2048,
       presetId: 'square-lg',
     });
   });
@@ -128,10 +128,10 @@ describe('document defaults', () => {
 
   it('defines the expected preset sizes', () => {
     expect(CANVAS_PRESETS.map(({ width, height }) => [width, height])).toEqual([
+      [2048, 2048],
+      [2048, 1024],
+      [1024, 2048],
       [1024, 1024],
-      [1024, 512],
-      [512, 1024],
-      [512, 512],
     ]);
   });
 });

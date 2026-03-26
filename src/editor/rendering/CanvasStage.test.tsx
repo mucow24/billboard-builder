@@ -287,8 +287,8 @@ describe('CanvasStage viewport controls', () => {
     expect(glowRect).not.toBeNull();
     expect(glowRect).toHaveAttribute('data-prop-x', '0');
     expect(glowRect).toHaveAttribute('data-prop-y', '0');
-    expect(glowRect).toHaveAttribute('data-prop-width', '1024');
-    expect(glowRect).toHaveAttribute('data-prop-height', '1024');
+    expect(glowRect).toHaveAttribute('data-prop-width', '2048');
+    expect(glowRect).toHaveAttribute('data-prop-height', '2048');
     expect(glowRect).toHaveAttribute('data-prop-cornerradius', '0');
     expect(glowRect).toHaveAttribute('data-prop-stroke', 'rgba(128, 176, 255, 0.18)');
     expect(glowRect).toHaveAttribute('data-prop-shadowcolor', 'rgba(110, 160, 255, 0.14)');
@@ -299,8 +299,8 @@ describe('CanvasStage viewport controls', () => {
     expect(checkerboardGroup).not.toBeNull();
     expect(checkerboardGroup).toHaveAttribute('data-prop-clipx', '0');
     expect(checkerboardGroup).toHaveAttribute('data-prop-clipy', '0');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipwidth', '1024');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipheight', '1024');
+    expect(checkerboardGroup).toHaveAttribute('data-prop-clipwidth', '2048');
+    expect(checkerboardGroup).toHaveAttribute('data-prop-clipheight', '2048');
 
     const canvasRect = container.querySelector(
       '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
@@ -528,7 +528,7 @@ describe('CanvasStage viewport controls', () => {
 
     expect(screen.getByRole('button', { name: 'Fit canvas to viewport' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Set zoom to 100%' })).toBeInTheDocument();
-    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 63%');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 32%');
 
     await user.click(screen.getByRole('button', { name: 'Set zoom to 100%' }));
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 100%');
@@ -540,7 +540,7 @@ describe('CanvasStage viewport controls', () => {
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 100%');
 
     await user.click(screen.getByRole('button', { name: 'Fit canvas to viewport' }));
-    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 63%');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 32%');
   });
 
   it('keeps the group frame visual-only while still forwarding group resize handles', () => {
