@@ -79,10 +79,11 @@ button {
 
 .app-shell {
   min-height: 100vh;
+  min-width: 900px;
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .app-status {
