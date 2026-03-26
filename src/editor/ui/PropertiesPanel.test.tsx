@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PropertiesPanel } from './PropertiesPanel';
-import type { InspectorTab } from './inspector/types';
 import {
   createGroupNode,
   createRectangleItem,

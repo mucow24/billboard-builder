@@ -13,7 +13,6 @@ export function PropertiesPanel({
   availableFonts,
   background,
   fonts,
-  items,
   layerRows,
   missingFontFamilies,
   onDeleteFavorite = () => {},
