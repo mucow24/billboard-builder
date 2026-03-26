@@ -41,6 +41,7 @@
 .inspector-toggle-button:hover,
 .segmented-control-button:hover {
   border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(28, 40, 66, 0.98);
 }
 
 .top-toolbar .top-toolbar-button:focus-visible,

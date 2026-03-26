@@ -243,7 +243,7 @@
 
 .top-toolbar .top-toolbar-menu-item:hover,
 .top-toolbar .top-toolbar-menu-item:focus-visible {
-  background: rgba(68, 143, 224, 0.16);
+  background: rgba(68, 143, 224, 0.24);
   outline: none;
 }
 

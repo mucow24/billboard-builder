@@ -12,7 +12,6 @@ import {
   computeRowConnectors,
   formatImmediateChildCount,
   getLayerRowVisualState,
-  getLayersMetaItemCount,
   getVisibleLayerRows,
 } from './layersTabModel';
 import type { LayersInspectorTabProps } from './types';
@@ -42,7 +41,6 @@ export function LayersInspectorTab({
     () => computeRowConnectors(visibleRows),
     [visibleRows],
   );
-  const layersMetaItemCount = useMemo(() => getLayersMetaItemCount(rows), [rows]);
   const deleteSelectionLabel =
     selectedNodeIds.length > 0
       ? `Delete selected (${selectedNodeIds.length})`
@@ -93,7 +91,8 @@ export function LayersInspectorTab({
               <button
                 type="button"
                 className="toolbar-button"
-                aria-label="Bring front"
+                aria-label="Move to top"
+                title="Move to top"
                 disabled={!canReorder}
                 onClick={() => onReorder('front')}
               >
@@ -102,7 +101,8 @@ export function LayersInspectorTab({
               <button
                 type="button"
                 className="toolbar-button"
-                aria-label="Forward"
+                aria-label="Move up"
+                title="Move up"
                 disabled={!canReorder}
                 onClick={() => onReorder('forward')}
               >
@@ -111,7 +111,8 @@ export function LayersInspectorTab({
               <button
                 type="button"
                 className="toolbar-button"
-                aria-label="Backward"
+                aria-label="Move down"
+                title="Move down"
                 disabled={!canReorder}
                 onClick={() => onReorder('backward')}
               >
@@ -120,7 +121,8 @@ export function LayersInspectorTab({
               <button
                 type="button"
                 className="toolbar-button"
-                aria-label="Send back"
+                aria-label="Move to bottom"
+                title="Move to bottom"
                 disabled={!canReorder}
                 onClick={() => onReorder('back')}
               >
@@ -129,6 +131,7 @@ export function LayersInspectorTab({
             </div>
             <ColorPickerControl
               label="Canvas background"
+              title="Canvas background color"
               value={background}
               onChange={onBackgroundChange}
               variant="compact"
@@ -137,6 +140,7 @@ export function LayersInspectorTab({
           <button
             type="button"
             aria-label={deleteSelectionLabel}
+            title="Delete"
             className="delete-button layers-panel-delete-selection"
             disabled={selectedNodeIds.length === 0}
             onClick={onDeleteSelection}
@@ -236,11 +240,11 @@ export function LayersInspectorTab({
                     />
                   )}
                   {/* Downward-start line behind the toggle button for expanded groups.
-                      left = depth*20+9 matches the left edge of junction ::before/::after lines. */}
+                      left = depth*24+11 matches the left edge of junction ::before/::after lines. */}
                   {isGroup && !isCollapsed && row.hasChildren && (
                     <span
                       className="layer-tree-down"
-                      style={{ left: `${row.depth * 20 + 9}px` }}
+                      style={{ left: `${row.depth * 24 + 11}px` }}
                     />
                   )}
                   {/* Icon */}
@@ -248,6 +252,7 @@ export function LayersInspectorTab({
                     <button
                       type="button"
                       aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${rowLabel}`}
+                      title={isCollapsed ? 'Expand group' : 'Close group'}
                       className="layer-row-type layer-row-type-group layer-row-type-toggle"
                       data-testid={`layers-preview-anchor-${row.node.id}`}
                       onClick={(event) => {
@@ -302,6 +307,7 @@ export function LayersInspectorTab({
                       type="button"
                       className={`layer-row-action-btn${row.node.locked ? ' active' : ''}`}
                       aria-label={row.node.locked ? 'Unlock layer' : 'Lock layer'}
+                      title="Lock"
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleNodeLocked(row.node.id);
@@ -323,6 +329,7 @@ export function LayersInspectorTab({
                       type="button"
                       className={`layer-row-action-btn${row.node.hidden ? ' active' : ''}`}
                       aria-label={row.node.hidden ? 'Show layer' : 'Hide layer'}
+                      title="Toggle visibility"
                       onClick={(e) => {
                         e.stopPropagation();
                         onToggleNodeHidden(row.node.id);
@@ -347,10 +354,6 @@ export function LayersInspectorTab({
             })}
           </div>
         </div>
-      </div>
-      <div className="layers-panel-meta" aria-hidden="true">
-        <div className="layers-panel-meta-rule" />
-        <div className="layers-panel-meta-copy">{layersMetaItemCount}</div>
       </div>
     </>
   );

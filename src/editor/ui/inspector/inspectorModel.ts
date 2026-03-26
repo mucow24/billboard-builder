@@ -174,10 +174,14 @@ export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
     };
   }
   if ('fill' in item) {
-    const previewStroke = 'stroke' in item ? item.stroke : item.fill;
+    const hasVisibleStroke =
+      (item.kind === 'rectangle' || item.kind === 'ellipse') &&
+      item.strokeWidth > 0;
+    const previewStroke = hasVisibleStroke ? item.stroke : item.fill;
     return {
       background: item.fill,
       borderColor: previewStroke,
+      borderWidth: hasVisibleStroke ? '2px' : '',
       color: previewStroke,
     };
   }

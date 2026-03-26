@@ -15,6 +15,7 @@ interface ColorPickerControlProps {
   disabled?: boolean;
   label: string;
   mixed?: boolean;
+  title?: string;
   value: string;
   onChange: (value: string) => void;
   variant?: 'default' | 'compact';
@@ -28,6 +29,7 @@ export function ColorPickerControl({
   disabled = false,
   label,
   mixed = false,
+  title,
   value,
   onChange,
   variant = 'default',
@@ -115,6 +117,7 @@ export function ColorPickerControl({
         aria-controls={panelId}
         aria-expanded={isOpen}
         aria-label={label}
+        title={title}
         className={
           variant === 'compact'
           ? 'color-picker-trigger color-picker-trigger-compact'

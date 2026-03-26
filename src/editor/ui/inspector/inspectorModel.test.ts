@@ -154,8 +154,9 @@ describe('inspectorModel', () => {
     expect(getLayerSecondaryLabel(frontItem)).toContain('Headline goes here');
     expect(getLayerPreviewStyle(backItem)).toEqual({
       background: '#ff0000ff',
-      borderColor: backItem.stroke,
-      color: backItem.stroke,
+      borderColor: '#ff0000ff',
+      borderWidth: '',
+      color: '#ff0000ff',
     });
     expect(getLayerPreviewStyle(imageItem)).toEqual({});
     expect(getSortedLayerItems([backItem, frontItem, imageItem]).map((item) => item.id)).toEqual([
