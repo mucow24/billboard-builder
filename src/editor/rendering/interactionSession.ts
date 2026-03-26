@@ -663,6 +663,9 @@ export function resolveInteractionSession(
       };
     }
     case 'group-resize': {
+      // Guide snapping is intentionally disabled for rotated group resize.
+      // Computing snap targets for rotated bounding boxes requires projecting
+      // rotated corners onto axis-aligned guides, which is not yet implemented.
       if (current.snapDisabled || Math.abs(current.frameRotation) >= 0.001) {
         return {
           ...current,
@@ -765,7 +768,7 @@ export function buildInteractionCommit(
             resolved.bounds,
             resolved.pointerStart,
             resolved.currentPointer,
-            false
+            Boolean((resolved as SessionWithModifiers).shiftConstrain)
           ),
       };
     } else if (resolved.kind === 'group-resize') {

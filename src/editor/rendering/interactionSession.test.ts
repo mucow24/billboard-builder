@@ -7,6 +7,7 @@ import {
   createCreateSession,
   createGroupDragSession,
   createGroupResizeSession,
+  createGroupRotateSession,
   resolveInteractionSession,
   type SelectionFrame,
 } from './interactionSession';
@@ -304,5 +305,43 @@ describe('interactionSession', () => {
       bounds: { x: 100, y: 100, width: 260, height: 40 },
       rotation: 0,
     });
+  });
+
+  it('snaps committed group-rotate frame rotation when shiftConstrain is true', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const frame: SelectionFrame = {
+      bounds: { x: 100, y: 100, width: 200, height: 40 },
+      rotation: 0,
+    };
+    const session = createGroupRotateSession({ x: 300, y: 120 }, {
+      selectedItems: [first, second],
+      siblingItems: [],
+      activeSelectionFrame: frame,
+    });
+
+    if (!session) {
+      throw new Error('Expected group rotate session.');
+    }
+
+    // Apply shiftConstrain and resolve with a pointer that produces a non-15° angle
+    const withShift = { ...session, shiftConstrain: true };
+    const resolved = resolveInteractionSession(withShift, { x: 250, y: 50 }, {
+      stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+    });
+    const commit = buildInteractionCommit(resolved, {
+      orderedItems: [first, second],
+      pointer: { x: 250, y: 50 },
+      canvasBounds,
+    });
+
+    expect(commit.kind).toBe('group');
+    if (commit.kind !== 'group') {
+      throw new Error('Expected group commit.');
+    }
+
+    // The committed frame rotation must be a multiple of 15°
+    expect(commit.selectionFrame?.rotation).not.toBeUndefined();
+    expect(Math.abs(commit.selectionFrame!.rotation % 15)).toBe(0);
   });
 });

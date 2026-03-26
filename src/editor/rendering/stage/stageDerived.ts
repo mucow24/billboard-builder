@@ -3,7 +3,7 @@ import {
   localToStage,
   RESIZE_HANDLE_NAMES,
 } from '../interactionGeometry';
-import { normalizeRectFromPoints } from '../interactionSession';
+import { normalizeRectFromPoints, rotateGroupPointerDelta } from '../interactionSession';
 import {
   getGroupResizeFrame,
   getRenderBox,
@@ -52,6 +52,7 @@ function getGroupOverlayFrame(params: {
     handle?: string;
     pointerStart?: { x: number; y: number };
     previewItems?: CanvasItem[];
+    shiftConstrain?: boolean;
   } | null;
 }) {
   const baseGroupFrame =
@@ -72,20 +73,12 @@ function getGroupOverlayFrame(params: {
     return getSelectionFrameForRotation(
       rotationSession.previewItems,
       rotationSession.frameRotation +
-        (((Math.atan2(
-          rotationSession.currentPointer.y -
-            (rotationSession.bounds.y + rotationSession.bounds.height / 2),
-          rotationSession.currentPointer.x -
-            (rotationSession.bounds.x + rotationSession.bounds.width / 2),
-        ) -
-          Math.atan2(
-            rotationSession.pointerStart.y -
-              (rotationSession.bounds.y + rotationSession.bounds.height / 2),
-            rotationSession.pointerStart.x -
-              (rotationSession.bounds.x + rotationSession.bounds.width / 2),
-          )) *
-          180) /
-          Math.PI),
+        rotateGroupPointerDelta(
+          rotationSession.bounds,
+          rotationSession.pointerStart,
+          rotationSession.currentPointer,
+          Boolean(params.session?.shiftConstrain),
+        ),
     );
   }
 
@@ -109,6 +102,7 @@ function getGroupOverlayFrame(params: {
 }
 
 export function buildStageDerivedState(params: {
+  activeTool?: string;
   canvasBounds: { x: number; y: number; width: number; height: number };
   renderedGroupBounds: { x: number; y: number; width: number; height: number } | null;
   renderedSelectedItems: CanvasItem[];
@@ -279,6 +273,6 @@ export function buildStageDerivedState(params: {
     selectedItemViewportRect,
     selectedLineHandleRects,
     selectedShapeHandleRects,
-    showGroupInteractionHooks: params.renderedSelectedItems.length > 1,
+    showGroupInteractionHooks: params.renderedSelectedItems.length > 1 && params.activeTool === 'select',
   };
 }

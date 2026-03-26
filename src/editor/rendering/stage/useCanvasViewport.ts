@@ -85,8 +85,12 @@ export function useCanvasViewport({
     return () => observer.disconnect();
   }, []);
 
+  const hasFittedRef = useRef(false);
   useEffect(() => {
-    fitCanvasToViewport();
+    if (!hasFittedRef.current) {
+      fitCanvasToViewport();
+      hasFittedRef.current = true;
+    }
   }, [fitCanvasToViewport]);
 
   useEffect(() => {

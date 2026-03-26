@@ -2197,4 +2197,20 @@ describe('useCanvasInteractionSession', () => {
     expect(panParams.onSelectItem).toHaveBeenCalledWith(undefined);
     expect(nonCanvasParams.onSelectItem).not.toHaveBeenCalled();
   });
+
+  it('blocks group drag when any selected item is locked', () => {
+    const unlocked = createRectangleItem({ id: 'unlocked', x: 100, y: 100, width: 80, height: 40 });
+    const locked = createRectangleItem({ id: 'locked', x: 220, y: 100, width: 80, height: 40, locked: true });
+    const params = createHookParams({
+      document: createDocument([unlocked, locked]),
+      selectedItemIds: [unlocked.id, locked.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.beginGroupDrag({ x: 200, y: 120 });
+    });
+
+    expect(result.current.session).toBeNull();
+  });
 });

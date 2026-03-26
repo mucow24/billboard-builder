@@ -63,6 +63,7 @@ describe('stageDerived', () => {
     const line = createLineItem({ id: 'line', startX: 10, startY: 20, endX: 100, endY: 50 });
 
     const grouped = buildStageDerivedState({
+      activeTool: 'select',
       canvasBounds,
       renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
       renderedSelectedItems: [first, second],
@@ -147,6 +148,33 @@ describe('stageDerived', () => {
       width: 280,
       height: 140,
     });
+  });
+
+  it('hides group interaction hooks when activeTool is not select', () => {
+    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+
+    const derived = buildStageDerivedState({
+      activeTool: 'pan',
+      canvasBounds,
+      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
+      renderedSelectedItems: [first, second],
+      renderedSelectionFrame: { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 0 },
+      selectedRenderedItem: first,
+      session: null,
+      zoom: 1,
+      viewport: {
+        toViewportPoint: (point) => point,
+        toViewportRect: (rect) => ({
+          left: rect.x,
+          top: rect.y,
+          width: rect.width,
+          height: rect.height,
+        }),
+      },
+    });
+
+    expect(derived.showGroupInteractionHooks).toBe(false);
   });
 
   it('keeps viewport hook handle sizes and rotater offset stable across zoom', () => {
