@@ -1406,6 +1406,7 @@ describe('CanvasStage viewport controls', () => {
 
     fireEvent.keyUp(window, { key: 'Shift' });
 
+    const onSetActiveTool = vi.fn();
     rerender(
       <CanvasStage
         activeTool="zoom"
@@ -1416,7 +1417,7 @@ describe('CanvasStage viewport controls', () => {
         onSelectItem={vi.fn()}
         onUpdateItem={vi.fn()}
         onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
+        onSetActiveTool={onSetActiveTool}
         stageRef={createRef<Konva.Stage>()}
       />,
     );
@@ -1426,6 +1427,7 @@ describe('CanvasStage viewport controls', () => {
     expect(readCursor()).toBe('zoom-out');
     fireEvent.mouseDown(stage!, { button: 0, altKey: true, clientX: 640, clientY: 360 });
     expect(handleStageMouseDown).toHaveBeenCalledOnce();
+    expect(onSetActiveTool).toHaveBeenCalledWith('select');
     fireEvent.keyUp(window, { key: 'Alt' });
   });
 });

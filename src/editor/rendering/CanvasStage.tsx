@@ -143,7 +143,10 @@ export function CanvasStage({
 
   const sceneHandlers = buildStageSceneHandlers({
     activeTool,
-    applyZoomToolClick: viewport.applyZoomToolClick,
+    applyZoomToolClick: (point, zoomOut) => {
+      viewport.applyZoomToolClick(point, zoomOut);
+      onSetActiveTool('select');
+    },
     handleScenePointerMove: viewport.handleStagePointerMove,
     handleScenePointerUp: viewport.handleStagePointerUp,
     handleStageMouseDown,

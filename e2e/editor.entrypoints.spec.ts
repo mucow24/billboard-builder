@@ -538,13 +538,19 @@ test.describe('editor canvas entrypoints', () => {
     await clickCanvas(page, { x: 300, y: 300 });
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.viewport.zoom).toBeGreaterThan(initialDebug.viewport.zoom);
+    // Zoom tool auto-reverts to select after click
+    await expect(stageSurface).toHaveCSS('cursor', 'default');
 
+    // Re-activate zoom for alt-click (zoom out) test
+    await selectTool(page, 'Zoom');
     await page.keyboard.down('Alt');
     await expect(stageSurface).toHaveCSS('cursor', 'zoom-out');
     await clickCanvas(page, { x: 300, y: 300 });
     await page.keyboard.up('Alt');
     stageDebug = await readStageDebug(page);
     expect(stageDebug.viewport.zoom).toBeLessThanOrEqual(initialDebug.viewport.zoom * 1.01);
+    // Auto-reverts again
+    await expect(stageSurface).toHaveCSS('cursor', 'default');
 
     await page.getByRole('button', { name: 'Set zoom to 100%' }).click();
     await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 100%');
