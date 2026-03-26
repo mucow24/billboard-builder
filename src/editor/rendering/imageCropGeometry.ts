@@ -118,6 +118,7 @@ export function resizeImageCrop(params: {
   siblingItems: CanvasItem[];
   snapEnabled?: boolean;
   stageRect: SnapRect;
+  threshold?: number;
 }) {
   const {
     baseItem,
@@ -127,6 +128,7 @@ export function resizeImageCrop(params: {
     siblingItems,
     snapEnabled = true,
     stageRect,
+    threshold,
   } = params;
   const adjustedPointer = {
     x: pointer.x - pointerOffset.x,
@@ -175,6 +177,7 @@ export function resizeImageCrop(params: {
       siblingItems,
       stageRect,
       handle,
+      threshold,
     );
     left = snapped.rect.x - baseItem.x;
     top = snapped.rect.y - baseItem.y;

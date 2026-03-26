@@ -1,6 +1,6 @@
 import type { CanvasItem, GuideLine, SnapRect } from '../document/documentTypes';
 
-const SNAP_THRESHOLD = 8;
+export const SNAP_THRESHOLD = 8;
 
 type ResizeEdgeKey = 'start' | 'end';
 

@@ -13,7 +13,7 @@ import type {
   SnapRect,
 } from '../document/documentTypes';
 import { getRenderBox } from './transformGeometry';
-import { getItemRect, getSnappedRect } from './snapping';
+import { getItemRect, getSnappedRect, SNAP_THRESHOLD } from './snapping';
 import { measureWordWrappedTextHeight } from './textMeasurement';
 
 export interface Point {
@@ -235,7 +235,8 @@ function snapValue(
   value: number,
   orientation: 'vertical' | 'horizontal',
   siblingItems: CanvasItem[],
-  stageRect: SnapRect
+  stageRect: SnapRect,
+  threshold = SNAP_THRESHOLD
 ) {
   const candidates = buildSnapCandidates(siblingItems, stageRect)[orientation];
   let bestDelta: number | null = null;
@@ -243,7 +244,7 @@ function snapValue(
 
   for (const candidate of candidates) {
     const delta = candidate - value;
-    if (Math.abs(delta) > SNAP_THRESHOLD) {
+    if (Math.abs(delta) > threshold) {
       continue;
     }
     if (bestDelta === null || Math.abs(delta) < Math.abs(bestDelta)) {
@@ -332,7 +333,8 @@ export function solveDragSession(
   currentPointer: Point,
   siblingItems: CanvasItem[],
   stageRect: SnapRect,
-  snapEnabled = true
+  snapEnabled = true,
+  threshold?: number
 ): InteractionItemPreview {
   const deltaX = currentPointer.x - startPointer.x;
   const deltaY = currentPointer.y - startPointer.y;
@@ -348,7 +350,7 @@ export function solveDragSession(
       width: Math.max(1, Math.abs(rawEndX - rawStartX)),
       height: Math.max(1, Math.abs(rawEndY - rawStartY)),
     };
-    const snapped = snapEnabled ? getSnappedRect(rawRect, siblingItems, stageRect) : { rect: rawRect, guides: [] };
+    const snapped = snapEnabled ? getSnappedRect(rawRect, siblingItems, stageRect, threshold) : { rect: rawRect, guides: [] };
     const offsetX = snapped.rect.x - rawRect.x;
     const offsetY = snapped.rect.y - rawRect.y;
 
@@ -371,7 +373,7 @@ export function solveDragSession(
     width: renderBox.width,
     height: renderBox.height,
   };
-  const snapped = snapEnabled ? getSnappedRect(rawRect, siblingItems, stageRect) : { rect: rawRect, guides: [] };
+  const snapped = snapEnabled ? getSnappedRect(rawRect, siblingItems, stageRect, threshold) : { rect: rawRect, guides: [] };
 
   return {
     item: {
@@ -426,7 +428,8 @@ export function solveResizeSession(
   pointerOffset: Point,
   siblingItems: CanvasItem[],
   stageRect: SnapRect,
-  snapEnabled = true
+  snapEnabled = true,
+  threshold?: number
 ): InteractionItemPreview {
   const renderBox = getRenderBox(item);
   const adjustedPointer = {
@@ -482,7 +485,8 @@ export function solveResizeSession(
         renderBox.x + ratioEdges.left,
         'vertical',
         siblingItems,
-        stageRect
+        stageRect,
+        threshold
       );
       if (snapped) {
         ratioEdges.left = snapped.value - renderBox.x;
@@ -494,7 +498,8 @@ export function solveResizeSession(
         renderBox.x + ratioEdges.right,
         'vertical',
         siblingItems,
-        stageRect
+        stageRect,
+        threshold
       );
       if (snapped) {
         ratioEdges.right = snapped.value - renderBox.x;
@@ -506,7 +511,8 @@ export function solveResizeSession(
         renderBox.y + ratioEdges.top,
         'horizontal',
         siblingItems,
-        stageRect
+        stageRect,
+        threshold
       );
       if (snapped) {
         ratioEdges.top = snapped.value - renderBox.y;
@@ -518,7 +524,8 @@ export function solveResizeSession(
         renderBox.y + ratioEdges.bottom,
         'horizontal',
         siblingItems,
-        stageRect
+        stageRect,
+        threshold
       );
       if (snapped) {
         ratioEdges.bottom = snapped.value - renderBox.y;
@@ -589,7 +596,8 @@ export function solveLineHandleSession(
   pointerOffset: Point,
   siblingItems: CanvasItem[],
   stageRect: SnapRect,
-  snapEnabled = true
+  snapEnabled = true,
+  threshold = SNAP_THRESHOLD
 ): InteractionItemPreview {
   const adjustedPointer = {
     x: pointer.x - pointerOffset.x,
@@ -603,7 +611,8 @@ export function solveLineHandleSession(
       height: 2,
     },
     siblingItems,
-    stageRect
+    stageRect,
+    threshold
   ) : { rect: { x: adjustedPointer.x - 1, y: adjustedPointer.y - 1, width: 2, height: 2 }, guides: [] };
   const nextPoint = {
     x: snapped.rect.x + 1,
@@ -611,11 +620,11 @@ export function solveLineHandleSession(
   };
   const anchorPoint = handle === 'start' ? { x: item.endX, y: item.endY } : { x: item.startX, y: item.startY };
   const guides = [...snapped.guides];
-  if (Math.abs(nextPoint.y - anchorPoint.y) <= SNAP_THRESHOLD) {
+  if (Math.abs(nextPoint.y - anchorPoint.y) <= threshold) {
     nextPoint.y = anchorPoint.y;
     guides.push({ orientation: 'horizontal', position: anchorPoint.y });
   }
-  if (Math.abs(nextPoint.x - anchorPoint.x) <= SNAP_THRESHOLD) {
+  if (Math.abs(nextPoint.x - anchorPoint.x) <= threshold) {
     nextPoint.x = anchorPoint.x;
     guides.push({ orientation: 'vertical', position: anchorPoint.x });
   }

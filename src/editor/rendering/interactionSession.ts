@@ -18,7 +18,7 @@ import {
   itemIntersectsSelectionRect,
   type RenderBox,
 } from './transformGeometry';
-import { getResizeSnappedRect, getSnappedRect } from './snapping';
+import { getResizeSnappedRect, getSnappedRect, SNAP_THRESHOLD } from './snapping';
 import type { RenderableCanvasItem } from './renderAdapter';
 import type {
   CanvasItem,
@@ -568,9 +568,10 @@ export function createGroupRotateSession(
 export function resolveInteractionSession(
   current: InteractionSession,
   pointer: Point,
-  context: { stageBounds: RenderBox }
+  context: { stageBounds: RenderBox; zoom?: number }
 ): InteractionSession {
-  const { stageBounds } = context;
+  const { stageBounds, zoom = 1 } = context;
+  const threshold = SNAP_THRESHOLD / zoom;
   const currentWithModifiers = current as SessionWithModifiers;
 
   switch (current.kind) {
@@ -598,7 +599,8 @@ export function resolveInteractionSession(
         resolvedPointer,
         current.siblingItems,
         stageBounds,
-        !current.snapDisabled
+        !current.snapDisabled,
+        threshold
       );
       return { ...current, axisLock, previewItem: next.item, guides: next.guides };
     }
@@ -610,7 +612,8 @@ export function resolveInteractionSession(
         current.pointerOffset,
         current.siblingItems,
         stageBounds,
-        !current.snapDisabled
+        !current.snapDisabled,
+        threshold
       );
       return { ...current, previewItem: next.item, guides: next.guides };
     }
@@ -631,7 +634,8 @@ export function resolveInteractionSession(
         current.pointerOffset,
         current.siblingItems,
         stageBounds,
-        !current.snapDisabled
+        !current.snapDisabled,
+        threshold
       );
       return { ...current, previewItem: next.item, guides: next.guides };
     }
@@ -646,7 +650,7 @@ export function resolveInteractionSession(
       };
       const snapped = current.snapDisabled
         ? { rect: rawRect, guides: [] }
-        : getSnappedRect(rawRect, current.siblingItems, stageBounds);
+        : getSnappedRect(rawRect, current.siblingItems, stageBounds, threshold);
       const resolvedPointer = {
         x: current.pointerStart.x + (snapped.rect.x - current.bounds.x),
         y: current.pointerStart.y + (snapped.rect.y - current.bounds.y),
@@ -685,7 +689,8 @@ export function resolveInteractionSession(
         rawRect,
         current.siblingItems,
         stageBounds,
-        current.handle
+        current.handle,
+        threshold
       );
       const resolvedPointer = getGroupResizePointer(
         snapped.rect,

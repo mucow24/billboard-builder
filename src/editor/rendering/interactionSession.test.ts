@@ -307,6 +307,41 @@ describe('interactionSession', () => {
     });
   });
 
+  it('widens snap threshold when zoomed out', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const frame: SelectionFrame = {
+      bounds: { x: 100, y: 100, width: 200, height: 40 },
+      rotation: 0,
+    };
+    const session = createGroupDragSession({ x: 200, y: 120 }, {
+      selectedItems: [first, second],
+      siblingItems: [],
+      activeSelectionFrame: frame,
+    });
+
+    if (!session) {
+      throw new Error('Expected group drag session.');
+    }
+
+    // Move group 12 canvas-pixels away from stage center (512).
+    // At zoom=1, threshold=8 so 12px is too far — no snap.
+    // At zoom=0.5, threshold=16 so 12px should snap.
+    const noSnap = resolveInteractionSession(session, { x: 424, y: 120 }, {
+      stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+      zoom: 1,
+    });
+    expect(noSnap.guides).toEqual([]);
+
+    const snapped = resolveInteractionSession(session, { x: 424, y: 120 }, {
+      stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+      zoom: 0.5,
+    });
+    expect(snapped.guides).toEqual(
+      expect.arrayContaining([{ orientation: 'vertical', position: 512 }])
+    );
+  });
+
   it('snaps committed group-rotate frame rotation when shiftConstrain is true', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });

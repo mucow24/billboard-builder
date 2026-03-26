@@ -41,6 +41,7 @@ import {
   resizeImageCrop,
 } from './imageCropGeometry';
 import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
+import { SNAP_THRESHOLD } from './snapping';
 import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
@@ -415,8 +416,8 @@ export function useCanvasInteractionSession({
 
   const resolveSession = useCallback(
     (current: InteractionSession, pointer: Point): InteractionSession =>
-      resolveInteractionSession(current as SessionWithModifiers, pointer, { stageBounds }),
-    [stageBounds]
+      resolveInteractionSession(current as SessionWithModifiers, pointer, { stageBounds, zoom: viewport.zoom }),
+    [stageBounds, viewport.zoom]
   );
 
   const createGroupDragSessionForNode = useCallback((
@@ -819,6 +820,7 @@ export function useCanvasInteractionSession({
           siblingItems: orderedItems.filter((entry) => entry.id !== current.itemId),
           snapEnabled: !modifiers.ctrlKey,
           stageRect: stageBounds,
+          threshold: SNAP_THRESHOLD / viewport.zoom,
         });
         onGuidesChange(next.guides);
         updateCropSession({

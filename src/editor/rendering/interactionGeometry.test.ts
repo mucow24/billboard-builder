@@ -415,6 +415,65 @@ describe('interaction geometry', () => {
     );
   });
 
+  it('snaps dragged rectangles at wider range when given a larger threshold', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const sibling = createRectangleItem({
+      x: 480,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    // 12px away from sibling edge — too far for default threshold (8), but within 16
+    const result = solveDragSession(
+      item,
+      { x: 300, y: 180 },
+      { x: 588, y: 180 },
+      [sibling],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      16
+    );
+
+    expect(result.item.x).toBeCloseTo(480, 0);
+    expect(result.guides).toEqual(
+      expect.arrayContaining([{ orientation: 'vertical', position: 480 }])
+    );
+  });
+
+  it('snaps line handle to anchor axis at wider range when given a larger threshold', () => {
+    const item = createLineItem({
+      startX: 100,
+      startY: 120,
+      endX: 240,
+      endY: 260,
+    });
+    // 12px away from anchor Y — too far for default threshold (8), but within 16
+    const result = solveLineHandleSession(
+      item,
+      'end',
+      { x: 200, y: 132 },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      16
+    );
+
+    expect(result.item).toMatchObject({
+      endY: 120,
+    });
+    expect(result.guides).toEqual(
+      expect.arrayContaining([
+        { orientation: 'horizontal', position: 120 },
+      ])
+    );
+  });
+
   it('identifies the supported creation tools explicitly', () => {
     expect(isCreateTool('text')).toBe(true);
     expect(isCreateTool('rectangle')).toBe(true);
