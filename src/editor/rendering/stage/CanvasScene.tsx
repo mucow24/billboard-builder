@@ -186,7 +186,7 @@ export function CanvasScene({
               toCanvasPointer={toCanvasPointer}
             />
             <CanvasPreviewLayer session={session} />
-            <CanvasGuidesLayer document={document} guides={guides} />
+            <CanvasGuidesLayer document={document} guides={guides} zoom={zoom} />
           </Group>
           <Group name="selection-overlay export-exclude">
             {subgroupOutlineFrames.map((frame) => (

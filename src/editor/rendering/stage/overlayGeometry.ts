@@ -10,6 +10,8 @@ import {
 } from '../interactionGeometry';
 import { getRenderBox } from '../transformGeometry';
 
+const BASE_GUIDE_STROKE_WIDTH = 1;
+const BASE_GUIDE_DASH = [8, 4] as const;
 const BASE_HANDLE_RADIUS = 8;
 const BASE_HANDLE_STROKE_WIDTH = 2;
 const BASE_SELECTION_STROKE_WIDTH = 2;
@@ -39,6 +41,8 @@ export function getCanvasOverlayMetrics(zoom: number) {
   return {
     cropCornerLength: scaleOverlayValue(BASE_CROP_CORNER_LENGTH, zoom),
     cropHandleHitSize: scaleOverlayValue(BASE_CROP_HANDLE_HIT_SIZE, zoom),
+    guideDash: BASE_GUIDE_DASH.map((value) => scaleOverlayValue(value, zoom)),
+    guideStrokeWidth: scaleOverlayValue(BASE_GUIDE_STROKE_WIDTH, zoom),
     cropHandleStrokeWidth: scaleOverlayValue(BASE_CROP_HANDLE_STROKE_WIDTH, zoom),
     cropHandleUnderlayWidth: scaleOverlayValue(BASE_CROP_HANDLE_UNDERLAY_WIDTH, zoom),
     cropOutlineStrokeWidth: scaleOverlayValue(BASE_CROP_OUTLINE_STROKE_WIDTH, zoom),

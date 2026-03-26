@@ -1313,12 +1313,12 @@ describe('CanvasStage viewport controls', () => {
     ).not.toBeNull();
     expect(
       container.querySelector(
-        `[data-konva-node="Line"][data-prop-points="[120,0,120,${document.canvas.height}]"]`
+        `[data-konva-node="Line"][data-prop-points="[120,-100000,120,${document.canvas.height + 100000}]"]`
       )
     ).not.toBeNull();
     expect(
       container.querySelector(
-        `[data-konva-node="Line"][data-prop-points="[0,90,${document.canvas.width},90]"]`
+        `[data-konva-node="Line"][data-prop-points="[-100000,90,${document.canvas.width + 100000},90]"]`
       )
     ).not.toBeNull();
 

@@ -18,6 +18,8 @@ describe('overlayGeometry', () => {
       cropOutlineStrokeWidth: 3,
       cropOutlineUnderlayWidth: 5,
       fullHandleRadius: 4,
+      guideDash: [4, 2],
+      guideStrokeWidth: 0.5,
       handleRadius: 4,
       handleStrokeWidth: 1,
       lineSelectionHitStrokeWidth: 12,
