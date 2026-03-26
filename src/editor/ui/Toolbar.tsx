@@ -473,7 +473,7 @@ export function Toolbar({
                 aria-selected={isConnected}
                 className={joinClassNames(
                   'top-toolbar-inspector-tab',
-                  isActive && 'active',
+                  isConnected && 'active',
                   isConnected && 'connected',
                 )}
                 onClick={() => onInspectorTabChange(tab)}
