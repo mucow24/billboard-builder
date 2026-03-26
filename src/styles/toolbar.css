@@ -372,8 +372,8 @@
   align-items: stretch;
   gap: 2px;
   align-self: stretch;
-  /* Bleed to toolbar right + bottom edges so tabs connect to panel below */
-  margin: -6px -6px -7px 0;
+  /* Bleed past toolbar padding + border so tabs align with panel below */
+  margin: -6px -7px -7px 0;
   padding: 6px 0 0;
 }
 
