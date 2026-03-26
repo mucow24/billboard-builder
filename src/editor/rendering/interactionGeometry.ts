@@ -41,7 +41,6 @@ export interface InteractionItemPreview {
 const HANDLE_SIZE = 16;
 const ROTATE_HANDLE_OFFSET = 50;
 const CREATE_CLICK_THRESHOLD = 4;
-const SNAP_THRESHOLD = 8;
 
 export const RESIZE_HANDLE_NAMES: ResizeHandle[] = [
   'top-left',
