@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ColorPickerControl } from './ColorPickerControl';
+import { ColorPickerControl, computePickerPosition } from './ColorPickerControl';
 
 vi.mock('@uiw/react-color', async () => {
   const actual =
@@ -147,5 +147,29 @@ describe('ColorPickerControl', () => {
 
     await user.click(screen.getByRole('button', { name: 'Outside' }));
     expect(screen.queryByLabelText('Fill hex')).not.toBeInTheDocument();
+  });
+});
+
+describe('computePickerPosition', () => {
+  const trigger = { top: 100, bottom: 130, left: 700, right: 800 };
+
+  it('opens below the trigger when there is room', () => {
+    const pos = computePickerPosition(trigger, 400, 1200, 900);
+    expect(pos).toEqual({ top: 130, right: 400 });
+  });
+
+  it('opens to the left when the panel would overflow the bottom', () => {
+    const pos = computePickerPosition(trigger, 400, 1200, 500);
+    expect(pos).toEqual({ top: 100, right: 504 });
+  });
+
+  it('opens below when the panel exactly fits', () => {
+    const pos = computePickerPosition(trigger, 770, 1200, 900);
+    expect(pos).toEqual({ top: 130, right: 400 });
+  });
+
+  it('clamps top to 0 when the panel is taller than the viewport', () => {
+    const pos = computePickerPosition(trigger, 600, 1200, 500);
+    expect(pos).toEqual({ top: 0, right: 504 });
   });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { Wheel, type ColorResult } from '@uiw/react-color';
 
@@ -25,6 +26,21 @@ function clampSliderValue(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+export function computePickerPosition(
+  triggerRect: { top: number; bottom: number; left: number; right: number },
+  panelHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): { top: number; right: number } {
+  if (triggerRect.bottom + panelHeight <= viewportHeight) {
+    return { top: triggerRect.bottom, right: viewportWidth - triggerRect.right };
+  }
+  return {
+    top: Math.max(0, viewportHeight - panelHeight),
+    right: viewportWidth - triggerRect.left + 4,
+  };
+}
+
 export function ColorPickerControl({
   disabled = false,
   label,
@@ -36,11 +52,14 @@ export function ColorPickerControl({
 }: ColorPickerControlProps) {
   const panelId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const storedValue = toStoredHexColor(value);
   const hsva = hexColorToHsva(storedValue);
   const hsla = hexColorToHsla(storedValue);
   const [isOpen, setIsOpen] = useState(false);
   const [draftHex, setDraftHex] = useState(storedValue);
+  const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
 
   useEffect(() => {
     setDraftHex(storedValue);
@@ -51,10 +70,22 @@ export function ColorPickerControl({
       return;
     }
 
+    // Compute position when panel opens
+    const btn = triggerRef.current;
+    const panel = panelRef.current;
+    if (btn && panel) {
+      setPanelStyle(computePickerPosition(
+        btn.getBoundingClientRect(),
+        panel.offsetHeight,
+        document.documentElement.clientWidth,
+        window.innerHeight,
+      ));
+    }
+
     function handlePointerDown(event: PointerEvent) {
-      if (!(event.target instanceof Node) || rootRef.current?.contains(event.target)) {
-        return;
-      }
+      if (!(event.target instanceof Node)) return;
+      if (rootRef.current?.contains(event.target)) return;
+      if (panelRef.current?.contains(event.target)) return;
       setIsOpen(false);
     }
 
@@ -114,6 +145,7 @@ export function ColorPickerControl({
         .join(' ')}
     >
       <button
+        ref={triggerRef}
         aria-controls={panelId}
         aria-expanded={isOpen}
         aria-label={label}
@@ -149,137 +181,142 @@ export function ColorPickerControl({
         )}
       </button>
 
-      {isOpen && !disabled ? (
-        <div
-          className={
-            variant === 'compact'
-              ? 'color-picker-panel color-picker-panel-compact'
-              : 'color-picker-panel'
-          }
-          id={panelId}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              setIsOpen(false);
-            }
-          }}
-        >
-          <div className="color-picker-wheel">
-            <Wheel
-              color={hsva}
-              onChange={handleWheelChange}
-              width={216}
-              height={216}
-            />
-          </div>
-
-          <label className="color-picker-field">
-            <span>{label} hex</span>
-            <input
-              aria-label={`${label} hex`}
-              spellCheck={false}
-              type="text"
-              value={draftHex}
-              onBlur={() => commitDraftHex(true)}
-              onChange={(event) => setDraftHex(event.target.value)}
+      {isOpen && !disabled
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className={
+                variant === 'compact'
+                  ? 'properties-panel color-picker-panel color-picker-panel-compact'
+                  : 'properties-panel color-picker-panel'
+              }
+              id={panelId}
+              style={panelStyle}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  commitDraftHex(true);
-                }
                 if (event.key === 'Escape') {
-                  event.preventDefault();
-                  setDraftHex(storedValue);
                   setIsOpen(false);
                 }
               }}
-            />
-          </label>
+            >
+              <div className="color-picker-wheel">
+                <Wheel
+                  color={hsva}
+                  onChange={handleWheelChange}
+                  width={216}
+                  height={216}
+                />
+              </div>
 
-          <label className="color-picker-field">
-            <span>{label} hue</span>
-            <div className="color-picker-slider-row">
-              <input
-                aria-label={`${label} hue`}
-                max={360}
-                min={0}
-                step={1}
-                type="range"
-                value={Math.round(hsla.h)}
-                onChange={(event) =>
-                  updateHsla('h', Number(event.target.value), {
-                    min: 0,
-                    max: 360,
-                  })
-                }
-              />
-              <output>{Math.round(hsla.h)}deg</output>
-            </div>
-          </label>
+              <label className="color-picker-field">
+                <span>{label} hex</span>
+                <input
+                  aria-label={`${label} hex`}
+                  spellCheck={false}
+                  type="text"
+                  value={draftHex}
+                  onBlur={() => commitDraftHex(true)}
+                  onChange={(event) => setDraftHex(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      commitDraftHex(true);
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setDraftHex(storedValue);
+                      setIsOpen(false);
+                    }
+                  }}
+                />
+              </label>
 
-          <label className="color-picker-field">
-            <span>{label} saturation</span>
-            <div className="color-picker-slider-row">
-              <input
-                aria-label={`${label} saturation`}
-                max={100}
-                min={0}
-                step={1}
-                type="range"
-                value={Math.round(hsla.s)}
-                onChange={(event) =>
-                  updateHsla('s', Number(event.target.value), {
-                    min: 0,
-                    max: 100,
-                  })
-                }
-              />
-              <output>{Math.round(hsla.s)}%</output>
-            </div>
-          </label>
+              <label className="color-picker-field">
+                <span>{label} hue</span>
+                <div className="color-picker-slider-row">
+                  <input
+                    aria-label={`${label} hue`}
+                    max={360}
+                    min={0}
+                    step={1}
+                    type="range"
+                    value={Math.round(hsla.h)}
+                    onChange={(event) =>
+                      updateHsla('h', Number(event.target.value), {
+                        min: 0,
+                        max: 360,
+                      })
+                    }
+                  />
+                  <output>{Math.round(hsla.h)}deg</output>
+                </div>
+              </label>
 
-          <label className="color-picker-field">
-            <span>{label} lightness</span>
-            <div className="color-picker-slider-row">
-              <input
-                aria-label={`${label} lightness`}
-                max={100}
-                min={0}
-                step={1}
-                type="range"
-                value={Math.round(hsla.l)}
-                onChange={(event) =>
-                  updateHsla('l', Number(event.target.value), {
-                    min: 0,
-                    max: 100,
-                  })
-                }
-              />
-              <output>{Math.round(hsla.l)}%</output>
-            </div>
-          </label>
+              <label className="color-picker-field">
+                <span>{label} saturation</span>
+                <div className="color-picker-slider-row">
+                  <input
+                    aria-label={`${label} saturation`}
+                    max={100}
+                    min={0}
+                    step={1}
+                    type="range"
+                    value={Math.round(hsla.s)}
+                    onChange={(event) =>
+                      updateHsla('s', Number(event.target.value), {
+                        min: 0,
+                        max: 100,
+                      })
+                    }
+                  />
+                  <output>{Math.round(hsla.s)}%</output>
+                </div>
+              </label>
 
-          <label className="color-picker-field">
-            <span>{label} alpha</span>
-            <div className="color-picker-slider-row">
-              <input
-                aria-label={`${label} alpha`}
-                max={100}
-                min={0}
-                step={1}
-                type="range"
-                value={Math.round(hsva.a * 100)}
-                onChange={(event) =>
-                  updateHsla('a', Number(event.target.value) / 100, {
-                    min: 0,
-                    max: 1,
-                  })
-                }
-              />
-              <output>{Math.round(hsva.a * 100)}%</output>
-            </div>
-          </label>
-        </div>
-      ) : null}
+              <label className="color-picker-field">
+                <span>{label} lightness</span>
+                <div className="color-picker-slider-row">
+                  <input
+                    aria-label={`${label} lightness`}
+                    max={100}
+                    min={0}
+                    step={1}
+                    type="range"
+                    value={Math.round(hsla.l)}
+                    onChange={(event) =>
+                      updateHsla('l', Number(event.target.value), {
+                        min: 0,
+                        max: 100,
+                      })
+                    }
+                  />
+                  <output>{Math.round(hsla.l)}%</output>
+                </div>
+              </label>
+
+              <label className="color-picker-field">
+                <span>{label} alpha</span>
+                <div className="color-picker-slider-row">
+                  <input
+                    aria-label={`${label} alpha`}
+                    max={100}
+                    min={0}
+                    step={1}
+                    type="range"
+                    value={Math.round(hsva.a * 100)}
+                    onChange={(event) =>
+                      updateHsla('a', Number(event.target.value) / 100, {
+                        min: 0,
+                        max: 1,
+                      })
+                    }
+                  />
+                  <output>{Math.round(hsva.a * 100)}%</output>
+                </div>
+              </label>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

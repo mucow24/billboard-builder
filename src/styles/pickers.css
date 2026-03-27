@@ -183,13 +183,18 @@
 }
 
 .color-picker-panel {
-  margin-top: 0.65rem;
+  position: fixed;
+  z-index: 10000;
+  display: block;
+  height: auto;
+  min-width: 0;
+  gap: 0;
   padding: 0.95rem;
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 8px;
   background: rgba(17, 26, 42, 0.98);
+  box-shadow: 0 24px 44px rgba(2, 6, 23, 0.42);
   /* Compact rail mode */
-  margin-top: 0.28rem;
   padding: 0.55rem;
 }
 
@@ -263,12 +268,7 @@
 }
 
 .color-picker-panel-compact {
-  position: absolute;
-  top: calc(100% - 1px);
-  left: 0;
-  z-index: 14;
   min-width: 244px;
-  transform-origin: top left;
 }
 
 .color-picker-panel-compact::before,
