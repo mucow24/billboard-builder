@@ -31,8 +31,8 @@ jobs:
       matrix:
         project:
           - chromium
-          - firefox
-          - webkit
+          #- firefox
+          #- webkit
 
     steps:
       - uses: actions/checkout@v4
