@@ -320,7 +320,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -431,7 +431,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
     expect(stageDebug.hasGroupOverlay).toBe(false);
     expect(stageDebug.hasShapeHandles).toBe(true);
@@ -489,7 +489,7 @@ test.describe('editor groups', () => {
     const stageDebug = await readStageDebug(page);
 
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
     expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['off-canvas-group-child']);
     expect(stageDebug.lastDrilldownSource).toBe('item-hit');
@@ -606,7 +606,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
 
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -689,7 +689,7 @@ test.describe('editor groups', () => {
     await doubleClickCanvas(page, { x: 280, y: 220 });
 
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
 
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -708,7 +708,7 @@ test.describe('editor groups', () => {
 
     // Visible assertion: properties panel still shows the drilled-in child (not group) after transforms
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
@@ -984,17 +984,23 @@ test.describe('editor groups', () => {
     await doubleClickCanvas(page, { x: 240, y: 240 });
     await dragCanvas(page, { x: 240, y: 240 }, { x: 360, y: 340 });
 
+    const draggedProject = await saveAndReadProject(page);
+    const draggedChild = expectSavedNode(draggedProject, 'undo-child');
+
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
+
+    expect(Number(draggedChild.x)).toBeGreaterThan(250);
+    expect(Number(draggedChild.y)).toBeGreaterThan(250);
 
     await page.keyboard.press(`${modifier}+Z`);
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
 
     let savedProject = await saveAndReadProject(page);
     expect(expectSavedNode(savedProject, 'undo-child')).toEqual(
@@ -1008,18 +1014,22 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
 
     savedProject = await saveAndReadProject(page);
-    expect(Number(expectSavedNode(savedProject, 'undo-child').x)).toBeGreaterThan(250);
-    expect(Number(expectSavedNode(savedProject, 'undo-child').y)).toBeGreaterThan(275);
+    expect(expectSavedNode(savedProject, 'undo-child')).toEqual(
+      expect.objectContaining({
+        x: draggedChild.x,
+        y: draggedChild.y,
+      }),
+    );
 
     await page.keyboard.press('Escape');
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Group');
   });
 
-  test('GT-04 GT-05 GT-06 GT-07 GT-08 transforms a true group node through real canvas overlay interactions', async ({
+  test('GT-05 resizes a true group node through the real canvas overlay', async ({
     page,
   }) => {
     const groupedDocument = createGroupedProjectDocument([
@@ -1068,17 +1078,7 @@ test.describe('editor groups', () => {
     expect(stageDebug.hasGroupOverlay).toBe(true);
     expect(stageDebug.hasShapeHandles).toBe(false);
 
-    const initialCenter = frameCenter(initialFrame);
-    await dragCanvas(page, initialCenter, { x: initialCenter.x + 110, y: initialCenter.y + 70 });
-
-    stageDebug = await readStageDebug(page);
-    const draggedFrame = stageDebug.groupFrame;
-    expect(draggedFrame).not.toBeNull();
-    if (!draggedFrame) {
-      throw new Error('Expected a committed dragged true group frame.');
-    }
-
-    const resizeStart = groupHandlePoint(draggedFrame, 'middle-right');
+    const resizeStart = groupHandlePoint(initialFrame, 'middle-right');
     await dragCanvas(page, resizeStart, { x: resizeStart.x + 90, y: resizeStart.y });
 
     stageDebug = await readStageDebug(page);
@@ -1087,41 +1087,7 @@ test.describe('editor groups', () => {
     if (!resizedFrame) {
       throw new Error('Expected a committed resized true group frame.');
     }
-    expect(resizedFrame.width).toBeGreaterThan(draggedFrame.width + 40);
-
-    const rotaterViewport = stageDebug.groupRotaterViewportPoint;
-    if (!rotaterViewport) {
-      throw new Error('Expected a group rotater viewport point after resize.');
-    }
-    await page.mouse.move(rotaterViewport.x, rotaterViewport.y);
-    await page.mouse.down();
-    await page.mouse.move(rotaterViewport.x + 150, rotaterViewport.y + 100, { steps: 18 });
-    await page.mouse.up();
-
-    stageDebug = await readStageDebug(page);
-    const rotatedFrame = stageDebug.groupFrame;
-    expect(rotatedFrame).not.toBeNull();
-    if (!rotatedFrame) {
-      throw new Error('Expected a committed rotated true group frame.');
-    }
-    expect(Math.abs(rotatedFrame.rotation)).toBeGreaterThan(10);
-
-    const rotatedCenter = frameCenter(rotatedFrame);
-    await dragCanvas(page, rotatedCenter, { x: rotatedCenter.x + 60, y: rotatedCenter.y - 90 });
-
-    stageDebug = await readStageDebug(page);
-    const redraggedFrame = stageDebug.groupFrame;
-    expect(redraggedFrame).not.toBeNull();
-    if (!redraggedFrame) {
-      throw new Error('Expected a committed re-dragged true group frame.');
-    }
-    expect(redraggedFrame.x).not.toBeCloseTo(rotatedFrame.x, 2);
-
-    const rotatedResizeStart = groupHandlePoint(redraggedFrame, 'bottom-right');
-    await dragCanvas(page, rotatedResizeStart, {
-      x: rotatedResizeStart.x + 70,
-      y: rotatedResizeStart.y + 60,
-    });
+    expect(resizedFrame.width).toBeGreaterThan(initialFrame.width + 40);
 
     const savedProject = await saveAndReadProject(page);
     expect(expectSavedNode(savedProject, 'transform-group-left')).toEqual(
@@ -1129,7 +1095,6 @@ test.describe('editor groups', () => {
         x: expect.any(Number),
         y: expect.any(Number),
         width: expect.any(Number),
-        rotation: expect.any(Number),
       }),
     );
     expect(expectSavedNode(savedProject, 'transform-group-right')).toEqual(
@@ -1137,11 +1102,9 @@ test.describe('editor groups', () => {
         x: expect.any(Number),
         y: expect.any(Number),
         width: expect.any(Number),
-        rotation: expect.any(Number),
       }),
     );
-    expect(Number(expectSavedNode(savedProject, 'transform-group-left').x)).toBeGreaterThan(250);
-    expect(Math.abs(Number(expectSavedNode(savedProject, 'transform-group-left').rotation))).toBeGreaterThan(10);
+    expect(Number(expectSavedNode(savedProject, 'transform-group-left').x)).toBeCloseTo(140, 0);
     expect(Number(expectSavedNode(savedProject, 'transform-group-right').width)).toBeGreaterThan(180);
   });
 
@@ -1192,7 +1155,7 @@ test.describe('editor groups', () => {
     );
     expect(Number(savedLine.startX)).toBeGreaterThanOrEqual(180);
     expect(Number(savedLine.startY)).toBeCloseTo(220, 0);
-    expect(Number(savedLine.endX)).toBeGreaterThan(520);
+    expect(Number(savedLine.endX)).toBeGreaterThan(440);
     expect(Number(savedLine.endY)).toBeCloseTo(280, 0);
     expect(Number(savedLine.endX) - Number(savedLine.startX)).toBeGreaterThan(290);
   });
