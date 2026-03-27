@@ -153,6 +153,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | ST-14 | Canvas | Selected item | Shift-drag | Constrained preview visible | Axis-constrained drag where implemented | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-15 | Canvas | Rectangle selected, resize handle is off-canvas but visible in the unclipped workspace | Drag the off-canvas resize handle | Resize affordance stays live | Off-canvas handle resize commits like the on-canvas case | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 | ST-16 | Canvas | Single item selected | Change zoom with the HUD | Selection hooks keep the same visible size and rotater offset | Overlay geometry stays viewport-invariant across zoom changes | support/debug | Chromium + Firefox | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
+| ST-17 | Canvas | Rotated single item selected, snap candidate exists | Drag body near the candidate | Guides stay absent while the body drag remains smooth | Rotated single-item drags do not snap | user-flow | Chromium | Covered in [e2e/editor.transforms.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.transforms.spec.ts) |
 
 ## 5. Image Crop Flows
 
@@ -187,6 +188,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | GT-09 | Canvas | Group with line + shape | Transform group | Handles, preview, and result stay coherent | Mixed descendants transform correctly | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-10 | Canvas | Real group node is unselected | Mouse down on grouped content, drag, then mouse up | Group overlay appears and the group moves in one gesture | Group pickup drag commits without needing a prior selection click | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 | GT-11 | Canvas | Real group node selected | Single-click grouped content, drag grouped content, then double-click grouped content | Group affordance stays active through single-click and drag, then yields to child affordance on double-click | Single-click is a no-op, drag moves descendants as a unit, and double-click drills into the target descendant | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
+| GT-12 | Canvas | Rotated real group selected, snap candidate exists | Drag grouped content near the candidate | Guides stay absent while the group overlay follows smoothly | Rotated real-group drags do not snap | user-flow | Chromium | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts) |
 
 ## 7. Viewport and Navigation Flows
 

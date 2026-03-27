@@ -297,6 +297,60 @@ describe('interaction geometry', () => {
     );
   });
 
+  it('keeps positive-rotation drags unsnapped even when sibling guides are close', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+      rotation: 15,
+    });
+    const sibling = createRectangleItem({
+      x: 480,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const result = solveDragSession(
+      item,
+      { x: 320, y: 180 },
+      { x: 604, y: 180 },
+      [sibling],
+      { x: 0, y: 0, width: 1200, height: 600 }
+    );
+
+    expect(result.item.x).toBeCloseTo(484, 0);
+    expect(result.item.y).toBeCloseTo(120, 0);
+    expect(result.guides).toEqual([]);
+  });
+
+  it('keeps negative-rotation drags unsnapped even when sibling guides are close', () => {
+    const item = createRectangleItem({
+      x: 200,
+      y: 120,
+      width: 240,
+      height: 120,
+      rotation: -15,
+    });
+    const sibling = createRectangleItem({
+      x: 480,
+      y: 120,
+      width: 240,
+      height: 120,
+    });
+    const result = solveDragSession(
+      item,
+      { x: 320, y: 180 },
+      { x: 604, y: 180 },
+      [sibling],
+      { x: 0, y: 0, width: 1200, height: 600 }
+    );
+
+    expect(result.item.x).toBeCloseTo(484, 0);
+    expect(result.item.y).toBeCloseTo(120, 0);
+    expect(result.guides).toEqual([]);
+  });
+
   it('converts between stage and local coordinates for rotated items', () => {
     const origin = { x: 120, y: 80 };
     const local = { x: 40, y: -20 };

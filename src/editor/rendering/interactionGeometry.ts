@@ -365,6 +365,21 @@ export function solveDragSession(
     };
   }
 
+  // Axis-aligned guide snapping does not map cleanly onto a rotated item's
+  // local origin, so rotated single-item drags intentionally stay unsnapped.
+  if (Math.abs(item.rotation) >= 0.001) {
+    return {
+      item: {
+        ...item,
+        x: item.x + deltaX,
+        y: item.y + deltaY,
+        scaleX: 1,
+        scaleY: 1,
+      },
+      guides: [],
+    };
+  }
+
   const renderBox = getRenderBox(item);
   const rawRect = {
     x: renderBox.x + deltaX,

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  beginCanvasDrag,
   clickCanvas,
   createImageFixture,
   createLineFixture,
@@ -11,10 +12,12 @@ import {
   dragCanvasWithModifier,
   dragCanvasHookToPoint,
   middleDragCanvas,
+  movePointerToCanvasPoint,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
   readStageDebug,
+  releasePointer,
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -460,6 +463,80 @@ test.describe('editor transforms', () => {
     expect(Number(unsnappedItem?.x)).toBeGreaterThan(Number(snappedItem?.x));
     expect(Number(snappedItem?.y)).toBe(120);
     expect(Number(unsnappedItem?.y)).toBe(120);
+  });
+
+  test('ST-17 keeps rotated single-item drags unsnapped near guide candidates', async ({ page }) => {
+    const movable = createRectangleFixture({
+      id: 'rotated-snap-movable',
+      x: 200,
+      y: 260,
+      width: 240,
+      height: 120,
+      zIndex: 0,
+    });
+    const sibling = createRectangleFixture({
+      id: 'rotated-snap-sibling',
+      x: 480,
+      y: 260,
+      width: 240,
+      height: 120,
+      fill: '#0ea5e9',
+      stroke: '#0369a1ff',
+      zIndex: 1,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([movable, sibling]),
+      'rotated-single-drag-no-snap.json',
+    );
+    await clickCanvas(page, { x: 320, y: 320 });
+    await expect(page.getByTestId('canvas-shape-handle-rotater')).toBeAttached();
+
+    const rotaterBox = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
+    if (!rotaterBox) {
+      throw new Error('Expected the rotater handle to be visible.');
+    }
+    const rotaterCenter = {
+      x: rotaterBox.x + rotaterBox.width / 2,
+      y: rotaterBox.y + rotaterBox.height / 2,
+    };
+    await page.mouse.move(rotaterCenter.x, rotaterCenter.y);
+    await page.mouse.down();
+    await page.mouse.move(rotaterCenter.x + 150, rotaterCenter.y + 100, { steps: 18 });
+    await page.mouse.up();
+
+    const rotatedDebug = await readStageDebug(page);
+    const rotatedItem = rotatedDebug.selectedItems?.[0];
+    expect(Math.abs(rotatedItem?.rotation ?? 0)).toBeGreaterThan(10);
+    if (!rotatedItem) {
+      throw new Error('Expected rotated item debug geometry before drag.');
+    }
+
+    const dragStart = rotatePoint(
+      {
+        x: rotatedItem.x + rotatedItem.width / 2,
+        y: rotatedItem.y + rotatedItem.height / 2,
+      },
+      { x: rotatedItem.x, y: rotatedItem.y },
+      rotatedItem.rotation,
+    );
+    const deltaX = 484 - rotatedItem.x;
+    await beginCanvasDrag(page, dragStart);
+    await movePointerToCanvasPoint(page, { x: dragStart.x + deltaX, y: dragStart.y });
+    await expect(page.getByTestId('guide-count')).toContainText('Guides: 0');
+    await releasePointer(page);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'rotated-snap-movable',
+    );
+
+    expect(savedItem).toEqual(expect.objectContaining({ id: 'rotated-snap-movable' }));
+    expect(Math.abs(Number(savedItem?.x) - (rotatedItem.x + deltaX))).toBeLessThan(2);
+    expect(Math.abs(Number(savedItem?.y) - rotatedItem.y)).toBeLessThan(2);
+    expect(Math.abs(Number(savedItem?.rotation))).toBeGreaterThan(10);
   });
 
   test('ST-15 supports off-canvas rectangle resize directly through the unclipped scene', async ({

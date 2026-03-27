@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  beginCanvasDrag,
   assertFocusNotInToolbarOrInputs,
   assertNoDocumentTextSelection,
   clickCanvas,
@@ -16,10 +17,12 @@ import {
   createTextFixture,
   dragCanvas,
   dragCanvasHookToPoint,
+  movePointerToCanvasPoint,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
   readStageDebug,
+  releasePointer,
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -1195,6 +1198,97 @@ test.describe('editor groups', () => {
     expect(Number(savedLine.endX)).toBeGreaterThan(520);
     expect(Number(savedLine.endY)).toBeCloseTo(280, 0);
     expect(Number(savedLine.endX) - Number(savedLine.startX)).toBeGreaterThan(290);
+  });
+
+  test('GT-12 keeps rotated real-group drags unsnapped near guide candidates', async ({ page }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'snap-group-left',
+            x: 140,
+            y: 320,
+            width: 140,
+            height: 80,
+            zIndex: 0,
+          }),
+          createRectangleFixture({
+            id: 'snap-group-right',
+            x: 340,
+            y: 380,
+            width: 120,
+            height: 72,
+            fill: '#0ea5e9',
+            stroke: '#0369a1ff',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'snap-group-node',
+          name: 'Snap Group Node',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'rotated-group-drag-no-snap.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickCanvas(page, { x: 220, y: 390 });
+
+    let stageDebug = await readStageDebug(page);
+    const initialFrame = stageDebug.groupFrame;
+    if (!initialFrame) {
+      throw new Error('Expected an initial real-group frame before rotation.');
+    }
+    const rotaterViewport = stageDebug.groupRotaterViewportPoint;
+    if (!rotaterViewport) {
+      throw new Error('Expected the real-group rotater to be visible.');
+    }
+
+    await page.mouse.move(rotaterViewport.x, rotaterViewport.y);
+    await page.mouse.down();
+    await page.mouse.move(rotaterViewport.x + 150, rotaterViewport.y + 100, { steps: 18 });
+    await page.mouse.up();
+
+    stageDebug = await readStageDebug(page);
+    const rotatedFrame = stageDebug.groupFrame;
+    const rotatedItems = stageDebug.selectedItems;
+    if (!rotatedFrame || !rotatedItems) {
+      throw new Error('Expected rotated real-group debug geometry before drag.');
+    }
+    expect(Math.abs(rotatedFrame.rotation)).toBeGreaterThan(10);
+
+    const rotatedLeft = rotatedItems.find((item) => item.id === 'snap-group-left');
+    if (!rotatedLeft) {
+      throw new Error('Expected rotated debug geometry for the left child.');
+    }
+    const dragStart = rotatePoint(
+      {
+        x: rotatedLeft.x + rotatedLeft.width / 2,
+        y: rotatedLeft.y + rotatedLeft.height / 2,
+      },
+      { x: rotatedLeft.x, y: rotatedLeft.y },
+      rotatedLeft.rotation,
+    );
+    const deltaX = 516 - (rotatedFrame.x + rotatedFrame.width);
+    await beginCanvasDrag(page, dragStart);
+    await movePointerToCanvasPoint(page, { x: dragStart.x + deltaX, y: dragStart.y });
+    await expect(page.getByTestId('guide-count')).toContainText('Guides: 0');
+    await releasePointer(page);
+
+    stageDebug = await readStageDebug(page);
+    const draggedFrame = stageDebug.groupFrame;
+    if (!draggedFrame) {
+      throw new Error('Expected a dragged real-group frame after release.');
+    }
+    expect(Math.abs(draggedFrame.x - (rotatedFrame.x + deltaX))).toBeLessThan(2);
+
+    const savedProject = await saveAndReadProject(page);
+    const savedLeft = expectSavedNode(savedProject, 'snap-group-left');
+    expect(Math.abs(Number(savedLeft.x) - (rotatedLeft.x + deltaX))).toBeLessThan(2);
+    expect(Math.abs(Number(savedLeft.y) - rotatedLeft.y)).toBeLessThan(2);
+    expect(Number(savedLeft.rotation)).toBeCloseTo(rotatedLeft.rotation, 3);
   });
 
 });

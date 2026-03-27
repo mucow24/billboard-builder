@@ -342,6 +342,39 @@ describe('interactionSession', () => {
     );
   });
 
+  it('keeps rotated group drags unsnapped even when a frame guide is close', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const frame: SelectionFrame = {
+      bounds: { x: 100, y: 100, width: 200, height: 40 },
+      rotation: 15,
+    };
+    const session = createGroupDragSession(
+      { x: 200, y: 120 },
+      {
+        selectedItems: [first, second],
+        siblingItems: [],
+        activeSelectionFrame: frame,
+      }
+    );
+
+    if (!session) {
+      throw new Error('Expected group drag session.');
+    }
+
+    const resolved = resolveInteractionSession(session, { x: 424, y: 120 }, {
+      stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+      zoom: 0.5,
+    });
+
+    expect(resolved.guides).toEqual([]);
+    expect(resolved.currentPointer).toEqual({ x: 424, y: 120 });
+    expect(resolved.previewItems).toEqual([
+      expect.objectContaining({ id: 'first', x: 324, y: 100 }),
+      expect.objectContaining({ id: 'second', x: 444, y: 100 }),
+    ]);
+  });
+
   it('snaps committed group-rotate frame rotation when shiftConstrain is true', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });

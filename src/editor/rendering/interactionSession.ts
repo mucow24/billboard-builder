@@ -648,9 +648,12 @@ export function resolveInteractionSession(
         width: current.bounds.width,
         height: current.bounds.height,
       };
-      const snapped = current.snapDisabled
-        ? { rect: rawRect, guides: [] }
-        : getSnappedRect(rawRect, current.siblingItems, stageBounds, threshold);
+      // Rotated group frames stay unsnapped because the guide system is
+      // axis-aligned while the dragged frame is not.
+      const snapped =
+        current.snapDisabled || Math.abs(current.frameRotation) >= 0.001
+          ? { rect: rawRect, guides: [] }
+          : getSnappedRect(rawRect, current.siblingItems, stageBounds, threshold);
       const resolvedPointer = {
         x: current.pointerStart.x + (snapped.rect.x - current.bounds.x),
         y: current.pointerStart.y + (snapped.rect.y - current.bounds.y),
