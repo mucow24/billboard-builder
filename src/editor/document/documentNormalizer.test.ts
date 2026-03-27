@@ -58,6 +58,46 @@ describe('document normalizer', () => {
     });
   });
 
+  it('derives a mirrored canonical image source transform from legacy crop data', () => {
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      width: 80,
+      height: 45,
+    });
+    imageItem.crop = {
+      x: 20,
+      y: 10,
+      width: 80,
+      height: 45,
+    };
+    imageItem.mirrorHorizontal = true;
+    const legacyImageItem = {
+      ...imageItem,
+      sourceTransform: undefined,
+    } as unknown as ImageCanvasItem;
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [legacyImageItem],
+      fonts: [],
+    });
+
+    expect(normalized.nodes[0]).toMatchObject({
+      kind: 'image',
+      mirrorHorizontal: true,
+      sourceTransform: {
+        x: -60,
+        y: -10,
+        width: 160,
+        height: 90,
+        rotation: 0,
+      },
+    });
+  });
+
   it('normalizes recursive node ordering, shadows, image adjustments, and font entries', () => {
     const imageItem = createImageItem({
       src: 'data:image/png;base64,AAA',
@@ -78,6 +118,7 @@ describe('document normalizer', () => {
       width: 100,
       height: 0,
     };
+    imageItem.mirrorHorizontal = true;
 
     const textItem = createTextItem({
       zIndex: 1,
@@ -131,6 +172,7 @@ describe('document normalizer', () => {
         tintColor: '#ffffff',
         tintStrength: 100,
       },
+      mirrorHorizontal: true,
       zIndex: 1,
     });
     expect(normalized.nodes[2]).toMatchObject({

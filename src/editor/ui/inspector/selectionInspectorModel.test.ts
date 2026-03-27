@@ -66,6 +66,7 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
+        'image:mirrorHorizontal:boolean',
         'image:preserveAspectRatio:boolean',
         'color:tintColor:color',
         'color:brightness:number',

@@ -346,6 +346,7 @@ export function createImageFixture(overrides: Record<string, unknown> = {}) {
       width: 160,
       height: 90,
     },
+    mirrorHorizontal: false,
     preserveAspectRatio: true,
     adjustments: {
       brightness: 100,
@@ -359,13 +360,16 @@ export function createImageFixture(overrides: Record<string, unknown> = {}) {
   const crop = baseItem.crop as { x: number; y: number; width: number; height: number };
   const scaleX = Number(baseItem.width) / Math.max(crop.width, 1);
   const scaleY = Number(baseItem.height) / Math.max(crop.height, 1);
+  const mirrorHorizontal = Boolean(baseItem.mirrorHorizontal);
 
   return {
     ...baseItem,
     sourceTransform:
       overrides.sourceTransform ??
       {
-        x: -crop.x * scaleX,
+        x: mirrorHorizontal
+          ? -(Number(baseItem.originalWidth) - crop.x - crop.width) * scaleX
+          : -crop.x * scaleX,
         y: -crop.y * scaleY,
         width: Number(baseItem.originalWidth) * scaleX,
         height: Number(baseItem.originalHeight) * scaleY,

@@ -287,21 +287,25 @@ describe('SelectionInspector', () => {
       target: { value: '98' },
     });
     fireEvent.click(screen.getByLabelText('Preserve aspect ratio'));
+    await user.click(screen.getByRole('button', { name: 'Mirror' }));
 
-    expect(onItemChange.mock.calls.at(-3)?.[0](imageItem)).toEqual({
+    expect(onItemChange.mock.calls.at(-4)?.[0](imageItem)).toEqual({
       adjustments: {
         ...imageItem.adjustments,
         tintColor: '#ff0000ff',
       },
     });
-    expect(onItemChange.mock.calls.at(-2)?.[0](imageItem)).toEqual({
+    expect(onItemChange.mock.calls.at(-3)?.[0](imageItem)).toEqual({
       adjustments: {
         ...imageItem.adjustments,
         brightness: 100,
       },
     });
-    expect(onItemChange.mock.calls.at(-1)?.[0](imageItem)).toEqual({
+    expect(onItemChange.mock.calls.at(-2)?.[0](imageItem)).toEqual({
       preserveAspectRatio: false,
+    });
+    expect(onItemChange.mock.calls.at(-1)?.[0](imageItem)).toEqual({
+      mirrorHorizontal: true,
     });
   });
 

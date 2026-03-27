@@ -121,6 +121,7 @@ export interface ImageCanvasItem extends BaseCanvasItem {
   originalHeight: number;
   crop: ImageCropRect;
   sourceTransform: ImageSourceTransform;
+  mirrorHorizontal: boolean;
   preserveAspectRatio: boolean;
   adjustments: ImageAdjustments;
 }

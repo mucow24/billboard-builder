@@ -5,6 +5,7 @@ import type Konva from 'konva';
 
 import type { ImageCanvasItem } from '../document/documentTypes';
 import { getRenderableImageAdjustments } from './imageAdjustments';
+import { getImageNodePresentation } from './imagePresentation';
 
 interface ImageItemNodeProps {
   item: ImageCanvasItem;
@@ -19,6 +20,10 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
     [item.adjustments],
   );
   const sourceTransform = item.sourceTransform;
+  const imagePresentation = useMemo(
+    () => getImageNodePresentation(sourceTransform, item.mirrorHorizontal),
+    [item.mirrorHorizontal, sourceTransform],
+  );
 
   useLayoutEffect(() => {
     const node = imageRef.current;
@@ -48,11 +53,12 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
   }, [
     adjustments,
     image,
-    sourceTransform.height,
-    sourceTransform.rotation,
-    sourceTransform.width,
-    sourceTransform.x,
-    sourceTransform.y,
+    imagePresentation.height,
+    imagePresentation.rotation,
+    imagePresentation.scaleX,
+    imagePresentation.width,
+    imagePresentation.x,
+    imagePresentation.y,
     renderBox.width,
     renderBox.height,
   ]);
@@ -72,12 +78,13 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
         shadowOffsetX={item.shadow.offsetX}
         shadowOffsetY={item.shadow.offsetY}
         shadowOpacity={item.shadow.opacity}
-        x={sourceTransform.x}
-        y={sourceTransform.y}
-        rotation={sourceTransform.rotation}
+        x={imagePresentation.x}
+        y={imagePresentation.y}
+        rotation={imagePresentation.rotation}
         image={image ?? undefined}
-        width={sourceTransform.width}
-        height={sourceTransform.height}
+        width={imagePresentation.width}
+        height={imagePresentation.height}
+        scaleX={imagePresentation.scaleX}
         listening={false}
       />
     </Group>

@@ -101,6 +101,7 @@ describe('document schema', () => {
       tintColor: '#336699',
       tintStrength: 80,
     };
+    document.nodes[0].mirrorHorizontal = true;
     document.nodes[0].crop = {
       x: 4,
       y: 2,
@@ -112,6 +113,7 @@ describe('document schema', () => {
 
     expect(parsed.nodes[0]).toMatchObject({
       kind: 'image',
+      mirrorHorizontal: true,
       crop: {
         x: 4,
         y: 2,
@@ -220,6 +222,30 @@ describe('document schema', () => {
         width: 40,
         height: 20,
       },
+    });
+  });
+
+  it('defaults missing image mirror data when loading older saved files', () => {
+    const imageItem = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+    const { mirrorHorizontal: ignoredMirrorHorizontal, ...legacyPayload } = imageItem;
+    void ignoredMirrorHorizontal;
+
+    const parsed = parseProjectDocument({
+      version: 1,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      items: [legacyPayload],
+    });
+
+    expect(parsed.nodes[0]).toMatchObject({
+      kind: 'image',
+      mirrorHorizontal: false,
     });
   });
 

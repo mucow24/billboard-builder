@@ -65,6 +65,7 @@ vi.mock('react-konva', () => ({
         shadowOffsetX,
         shadowOffsetY,
         shadowOpacity,
+        scaleX,
         width,
         height,
         x,
@@ -84,6 +85,7 @@ vi.mock('react-konva', () => ({
           'data-shadow-offset-x': shadowOffsetX,
           'data-shadow-offset-y': shadowOffsetY,
           'data-shadow-opacity': shadowOpacity,
+          'data-scale-x': scaleX,
           'data-width': width,
           'data-height': height,
           'data-x': x,
@@ -250,6 +252,36 @@ describe('ImageItemNode', () => {
     expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
       'data-rotation',
       '18',
+    );
+  });
+
+  it('mirrors the image content horizontally inside the clipped frame', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 40,
+      originalHeight: 20,
+    });
+    item.mirrorHorizontal = true;
+    item.sourceTransform = {
+      x: -8,
+      y: 3,
+      width: 56,
+      height: 28,
+      rotation: 18,
+    };
+
+    const { container } = render(
+      <ImageItemNode item={item} image={document.createElement('img')} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+    );
+
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-x',
+      '48',
+    );
+    expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
+      'data-scale-x',
+      '-1',
     );
   });
 

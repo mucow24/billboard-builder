@@ -86,6 +86,41 @@ describe('image crop geometry', () => {
     });
   });
 
+  it('rebuilds the visible mirrored crop from the persisted source transform', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      width: 80,
+      height: 45,
+    });
+    item.mirrorHorizontal = true;
+    item.crop = {
+      x: 20,
+      y: 10,
+      width: 80,
+      height: 45,
+    };
+    item.sourceTransform = {
+      x: -60,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 0,
+    };
+
+    expect(buildCroppedImagePreviewItem(item, item.sourceTransform)).toMatchObject({
+      crop: {
+        x: 20,
+        y: 10,
+        width: 80,
+        height: 45,
+      },
+      sourceTransform: item.sourceTransform,
+    });
+  });
+
   it('resizes crop bounds against the fixed full-image frame', () => {
     const item = createImageItem({
       src: 'data:image/png;base64,AAA',
@@ -301,6 +336,55 @@ describe('image crop geometry', () => {
       y: 20,
       width: 160,
       height: 90,
+    });
+  });
+
+  it('pans a mirrored source image under a fixed crop frame', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      width: 80,
+      height: 45,
+    });
+    item.x = 30;
+    item.y = 20;
+    item.mirrorHorizontal = true;
+    item.crop = {
+      x: 20,
+      y: 10,
+      width: 80,
+      height: 45,
+    };
+    item.sourceTransform = {
+      x: -60,
+      y: -10,
+      width: 160,
+      height: 90,
+      rotation: 0,
+    };
+
+    const panned = panImageUnderCrop({
+      baseItem: item,
+      pointerStart: { x: 40, y: 30 },
+      pointer: { x: 50, y: 40 },
+    });
+
+    expect(panned.crop).toMatchObject({
+      x: 30,
+      y: 0,
+      width: 80,
+      height: 45,
+    });
+    expect(panned.previewItem).toMatchObject({
+      sourceTransform: {
+        x: -50,
+        y: 0,
+        width: 160,
+        height: 90,
+        rotation: 0,
+      },
     });
   });
 });

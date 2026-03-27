@@ -60,6 +60,22 @@ export function renderItalicField({ field, onCommit }: CustomFieldRenderProps) {
   );
 }
 
+export function renderMirrorField({ field, onCommit }: CustomFieldRenderProps) {
+  return (
+    <ToggleButtonInput
+      active={typeof field.state.value === 'boolean' ? field.state.value : null}
+      disabled={field.disabled}
+      label={field.descriptor.label}
+      mixed={field.state.isMixed}
+      onChange={(nextValue) => onCommit(nextValue)}
+    >
+      <span className="inspector-toggle-button-glyph" aria-hidden="true">
+        ↔
+      </span>
+    </ToggleButtonInput>
+  );
+}
+
 export function renderAlignField({ field, onCommit }: CustomFieldRenderProps) {
   return (
     <SegmentedSelectInput

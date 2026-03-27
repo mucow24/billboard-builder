@@ -13,6 +13,7 @@ import {
   renderBoldField,
   renderFontFamilyField,
   renderItalicField,
+  renderMirrorField,
   renderVerticalAlignField,
 } from './selectionInspectorRenderers';
 
@@ -804,6 +805,21 @@ function createShapeDescriptors(
 
 function createImageDescriptors(): InspectorFieldDescriptor[] {
   return [
+    createCustomField({
+      buildChange: (_context, nextValue) => ({
+        mirrorHorizontal: Boolean(nextValue),
+      }),
+      fieldOrder: 5,
+      getValue: (item) => item.kind === 'image' && item.mirrorHorizontal,
+      label: 'Mirror',
+      propertyKey: 'mirrorHorizontal',
+      render: renderMirrorField,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
+      supportsMultiEdit: true,
+      valueType: 'boolean',
+    }),
     createBooleanField({
       buildChange: (_context, nextValue) => ({ preserveAspectRatio: nextValue }),
       fieldOrder: 10,

@@ -94,6 +94,7 @@ function deriveImageSourceTransformFromCrop(params: {
   crop: ImageCanvasItem['crop'];
   frameWidth: number;
   frameHeight: number;
+  mirrorHorizontal: boolean;
   originalWidth: number;
   originalHeight: number;
 }): ImageCanvasItem['sourceTransform'] {
@@ -101,7 +102,9 @@ function deriveImageSourceTransformFromCrop(params: {
   const scaleY = params.frameHeight / Math.max(params.crop.height, 1);
 
   return {
-    x: -params.crop.x * scaleX,
+    x: params.mirrorHorizontal
+      ? -(params.originalWidth - params.crop.x - params.crop.width) * scaleX
+      : -params.crop.x * scaleX,
     y: -params.crop.y * scaleY,
     width: params.originalWidth * scaleX,
     height: params.originalHeight * scaleY,
@@ -114,6 +117,7 @@ function normalizeImageSourceTransform(
   fallbackCrop: ImageCanvasItem['crop'],
   frameWidth: number,
   frameHeight: number,
+  mirrorHorizontal: boolean,
   originalWidth: number,
   originalHeight: number,
 ): ImageCanvasItem['sourceTransform'] {
@@ -121,6 +125,7 @@ function normalizeImageSourceTransform(
     crop: fallbackCrop,
     frameWidth,
     frameHeight,
+    mirrorHorizontal,
     originalWidth,
     originalHeight,
   });
@@ -179,6 +184,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
       const width = clampDimension(item.width);
       const height = clampDimension(item.height);
       const crop = normalizeImageCrop(item.crop, originalWidth, originalHeight);
+      const mirrorHorizontal = Boolean(item.mirrorHorizontal);
       const normalizedImageItem: ImageCanvasItem = {
         ...item,
         x: clampFinite(item.x, 0),
@@ -201,9 +207,11 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
           crop,
           width,
           height,
+          mirrorHorizontal,
           originalWidth,
           originalHeight,
         ),
+        mirrorHorizontal,
         preserveAspectRatio: Boolean(item.preserveAspectRatio),
         adjustments: normalizeImageAdjustments(item.adjustments),
       };

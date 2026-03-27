@@ -292,6 +292,11 @@ test.describe('editor properties flows', () => {
 
     await clickCanvas(page, { x: 620, y: 220 });
     await openPropertiesTab(page);
+    await page.getByRole('button', { name: 'Mirror' }).click();
+    await expect(page.getByRole('button', { name: 'Mirror' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await page.getByLabel('Preserve aspect ratio').uncheck();
     await page.getByRole('spinbutton', { name: 'Brightness value' }).fill('120');
     await page.getByRole('spinbutton', { name: 'Contrast value' }).fill('70');
@@ -318,6 +323,7 @@ test.describe('editor properties flows', () => {
       }),
       expect.objectContaining({
         id: 'properties-image',
+        mirrorHorizontal: true,
         preserveAspectRatio: false,
         adjustments: expect.objectContaining({
           brightness: 120,

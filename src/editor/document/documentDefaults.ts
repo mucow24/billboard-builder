@@ -206,6 +206,7 @@ export function createImageItem(params: {
       height: params.height ?? params.originalHeight,
       rotation: 0,
     },
+    mirrorHorizontal: false,
     preserveAspectRatio: true,
     adjustments: { ...DEFAULT_IMAGE_ADJUSTMENTS },
   };

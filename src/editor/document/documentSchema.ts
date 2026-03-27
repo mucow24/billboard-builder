@@ -85,6 +85,7 @@ const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   originalHeight: z.number().positive(),
   crop: ImageCropRectSchema.optional(),
   sourceTransform: ImageSourceTransformSchema.optional(),
+  mirrorHorizontal: z.boolean().optional(),
   preserveAspectRatio: z.boolean(),
   adjustments: ImageAdjustmentsSchema.optional(),
 });

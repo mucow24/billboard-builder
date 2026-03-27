@@ -3,10 +3,10 @@ import type {
   CanvasItem,
   GuideLine,
   ImageCanvasItem,
-  ImageCropRect,
   ImageSourceTransform,
   SnapRect,
 } from '../document/documentTypes';
+import { buildVisibleImageCropFromSourceTransform } from './imagePresentation';
 import { getResizeSnappedRect } from './snapping';
 import {
   localToStage,
@@ -19,36 +19,13 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function buildLegacyCropFromSourceTransform(
-  item: ImageCanvasItem,
-  sourceTransform: ImageSourceTransform,
-): ImageCropRect {
-  if (Math.abs(sourceTransform.rotation) > 0.001) {
-    return item.crop;
-  }
-
-  const scaleX = sourceTransform.width / Math.max(item.originalWidth, 1);
-  const scaleY = sourceTransform.height / Math.max(item.originalHeight, 1);
-  const width = clamp(item.width / Math.max(scaleX, 0.0001), 1, item.originalWidth);
-  const height = clamp(item.height / Math.max(scaleY, 0.0001), 1, item.originalHeight);
-  const x = clamp(-sourceTransform.x / Math.max(scaleX, 0.0001), 0, item.originalWidth - width);
-  const y = clamp(-sourceTransform.y / Math.max(scaleY, 0.0001), 0, item.originalHeight - height);
-
-  return {
-    x,
-    y,
-    width,
-    height,
-  };
-}
-
 export function buildImagePreviewItem(
   baseItem: ImageCanvasItem,
   sourceTransform: ImageSourceTransform,
 ): ImageCanvasItem {
   return {
     ...baseItem,
-    crop: buildLegacyCropFromSourceTransform(baseItem, sourceTransform),
+    crop: buildVisibleImageCropFromSourceTransform(baseItem, sourceTransform),
     sourceTransform,
     scaleX: 1,
     scaleY: 1,
