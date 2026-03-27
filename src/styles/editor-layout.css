@@ -21,6 +21,7 @@
   flex: 1;
   padding: 0;
   min-height: 0;
+  min-width: 900px;
 }
 
 .editor-overlays {
@@ -33,6 +34,7 @@
   --overlay-topbar-height: calc(1.8rem + 14px);
   --overlay-below-topbar: calc(var(--overlay-edge) + var(--overlay-topbar-height) + var(--overlay-gap));
   --toolbar-border-active: rgba(125, 211, 252, 0.9);
+  --panel-width: min(317px, calc(100vw - 1.15rem));
 }
 
 .overlay-topbar {
@@ -72,7 +74,7 @@
   top: calc(var(--overlay-edge) + var(--overlay-topbar-height));
   right: var(--overlay-edge);
   bottom: var(--overlay-edge);
-  width: min(340px, calc(100vw - 1.3rem));
+  width: var(--panel-width);
   pointer-events: none;
 }
 
@@ -87,7 +89,7 @@
 
 /* Compact width for right rail */
 .overlay-properties {
-  width: min(317px, calc(100vw - 1.15rem));
+  width: var(--panel-width);
 }
 
 .editor-stage-fullscreen {
@@ -120,15 +122,6 @@
     top: var(--overlay-edge);
     left: var(--overlay-edge);
     right: var(--overlay-edge);
-  }
-
-  .overlay-properties {
-    top: auto;
-    left: auto;
-    right: var(--overlay-edge);
-    bottom: var(--overlay-edge);
-    width: min(320px, calc(100vw - 4rem));
-    max-height: calc(100vh - 3.8rem);
   }
 
   .overlay-tools {

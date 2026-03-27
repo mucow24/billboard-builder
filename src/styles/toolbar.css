@@ -370,17 +370,19 @@
 .top-toolbar-inspector-tabs {
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  gap: 0;
   align-self: stretch;
+  width: var(--panel-width);
   /* Bleed past toolbar padding + border so tabs align with panel below */
   margin: -6px -7px -7px 0;
-  padding: 6px 0 0;
+  padding: 0;
 }
 
 .top-toolbar .top-toolbar-inspector-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 1 1 0;
   padding: 0 0.55rem;
   border: none;
   border-left: 1px solid var(--toolbar-border);
