@@ -6,6 +6,7 @@ import {
   instantiateFavoriteNodes,
   uniquifyFavoriteName,
 } from './favoriteLibrary';
+import { moveArrayItem } from '../editor/document/arrayUtils';
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
@@ -382,6 +383,20 @@ export function useEditorController() {
     }
   }
 
+  function reorderFavorite(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) {
+      return;
+    }
+    try {
+      persistFavorites(moveArrayItem(favorites, fromIndex, toIndex));
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        `Failed to reorder favorites: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }
+
   function recolorFavorite(favoriteId: string, color: string) {
     const nextFavorites = favorites.map((fav) =>
       fav.id === favoriteId
@@ -407,6 +422,7 @@ export function useEditorController() {
       deleteNode,
       renameFavorite,
       recolorFavorite,
+      reorderFavorite,
       deleteSelectedItems: deleteSelectedNodes,
       deleteSelectedNodes,
       dispatch,

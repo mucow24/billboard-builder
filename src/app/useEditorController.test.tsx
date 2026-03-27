@@ -681,6 +681,70 @@ describe('useEditorController', () => {
     expect(mockFavoriteLibraryService.save).not.toHaveBeenCalled();
   });
 
+  it('reorders favorites and persists the new order', async () => {
+    const favA: StoredFavorite = {
+      id: 'fav-a',
+      name: 'Alpha',
+      nodes: [],
+      fonts: [],
+      createdAt: '2026-03-01T00:00:00.000Z',
+      updatedAt: '2026-03-01T00:00:00.000Z',
+    };
+    const favB: StoredFavorite = {
+      id: 'fav-b',
+      name: 'Bravo',
+      nodes: [],
+      fonts: [],
+      createdAt: '2026-03-02T00:00:00.000Z',
+      updatedAt: '2026-03-02T00:00:00.000Z',
+    };
+    mockFavoriteLibraryService.load.mockReturnValue([favA, favB] as never);
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(result.current.state.favorites).toHaveLength(2);
+    });
+
+    act(() => {
+      result.current.actions.reorderFavorite(1, 0);
+    });
+
+    expect(result.current.state.favorites.map((f) => f.id)).toEqual(['fav-b', 'fav-a']);
+    expect(mockFavoriteLibraryService.save).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'fav-b' }),
+        expect.objectContaining({ id: 'fav-a' }),
+      ]),
+    );
+  });
+
+  it('does not persist when reordering to the same position', async () => {
+    const favA: StoredFavorite = {
+      id: 'fav-a',
+      name: 'Alpha',
+      nodes: [],
+      fonts: [],
+      createdAt: '2026-03-01T00:00:00.000Z',
+      updatedAt: '2026-03-01T00:00:00.000Z',
+    };
+    mockFavoriteLibraryService.load.mockReturnValue([favA] as never);
+
+    const { result } = renderHook(() => useEditorController());
+
+    await waitFor(() => {
+      expect(result.current.state.favorites).toHaveLength(1);
+    });
+
+    mockFavoriteLibraryService.save.mockClear();
+
+    act(() => {
+      result.current.actions.reorderFavorite(0, 0);
+    });
+
+    expect(mockFavoriteLibraryService.save).not.toHaveBeenCalled();
+  });
+
   it('surfaces favorite library persistence errors', async () => {
     const rectangle = createRectangleItem({ id: 'favorite-error-rectangle' });
     resetEditorStore({

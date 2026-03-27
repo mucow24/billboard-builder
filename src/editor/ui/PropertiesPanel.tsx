@@ -18,6 +18,7 @@ export function PropertiesPanel({
   onDeleteFavorite = () => {},
   onRenameFavorite = () => {},
   onRecolorFavorite = () => {},
+  onReorderFavorite = () => {},
   selectedGroup,
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
@@ -155,6 +156,7 @@ export function PropertiesPanel({
               onInsertFavorite={onInsertFavorite}
               onRenameFavorite={onRenameFavorite}
               onRecolorFavorite={onRecolorFavorite}
+              onReorderFavorite={onReorderFavorite}
             />
           </div>
         ) : (

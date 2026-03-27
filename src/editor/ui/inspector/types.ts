@@ -26,6 +26,7 @@ export interface PropertiesPanelProps {
   onDeleteFavorite?: (favoriteId: string) => void;
   onRenameFavorite?: (favoriteId: string, name: string) => void;
   onRecolorFavorite?: (favoriteId: string, color: string) => void;
+  onReorderFavorite?: (fromIndex: number, toIndex: number) => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
   selectedItems?: CanvasItem[];
@@ -79,4 +80,5 @@ export interface FavoritesInspectorTabProps {
   onInsertFavorite: (favoriteId: string) => void;
   onRenameFavorite: (favoriteId: string, name: string) => void;
   onRecolorFavorite: (favoriteId: string, color: string) => void;
+  onReorderFavorite: (fromIndex: number, toIndex: number) => void;
 }
