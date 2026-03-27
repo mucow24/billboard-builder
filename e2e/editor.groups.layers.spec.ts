@@ -249,21 +249,21 @@ test.describe('editor group layers and inspector flows', () => {
     expect(savedProject.background).toBe('#11223344');
   });
 
-  test('surfaces the compact Layers background trigger in the utility row for the mock parity fixture', async ({
+  test('surfaces the compact Layers background trigger in the utility controls for the mock parity fixture', async ({
     page,
   }) => {
     await openFreshEditor(page);
     await uploadProject(page, createLayersPanelMockParityFixture(), 'layers-panel-mock-parity.json');
 
     await openLayersTab(page);
-    await expect(page.locator('.layers-panel-utility-row .color-picker-trigger-compact')).toHaveCount(
+    await expect(page.locator('.layers-panel-utilities .color-picker-trigger-compact')).toHaveCount(
       1,
     );
     await page.getByRole('button', { name: 'Canvas background' }).click();
     await expect(page.getByLabel('Canvas background hex')).toBeVisible();
   });
 
-  test('shows immediate child counts for nested groups and the footer meta count', async ({ page }) => {
+  test('shows immediate child counts for nested groups', async ({ page }) => {
     const groupedDocument = createGroupedProjectDocument([
       createGroupNodeFixture(
         [
@@ -310,7 +310,6 @@ test.describe('editor group layers and inspector flows', () => {
     await expect(page.locator('.layer-row').filter({ hasText: 'Nested Group' })).toContainText(
       '1 item',
     );
-    await expect(page.locator('.layers-panel-meta-copy')).toHaveText('2 items');
   });
 
   test('deletes a grouped subtree from the layers tab', async ({ page }) => {
@@ -393,7 +392,7 @@ test.describe('editor group layers and inspector flows', () => {
     await openLayersTab(page);
     await clickLayerRow(page, 'Layers Order Group');
 
-    await page.getByRole('button', { name: 'Forward' }).click();
+    await page.getByRole('button', { name: 'Move up' }).click();
     let savedProject = await saveAndReadProject(page);
     expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
       'layers-order-first',
@@ -401,7 +400,7 @@ test.describe('editor group layers and inspector flows', () => {
       'layers-order-group',
     ]);
 
-    await page.getByRole('button', { name: 'Backward' }).click();
+    await page.getByRole('button', { name: 'Move down' }).click();
     savedProject = await saveAndReadProject(page);
     expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
       'layers-order-first',
@@ -409,7 +408,7 @@ test.describe('editor group layers and inspector flows', () => {
       'layers-order-last',
     ]);
 
-    await page.getByRole('button', { name: 'Bring front' }).click();
+    await page.getByRole('button', { name: 'Move to top' }).click();
     savedProject = await saveAndReadProject(page);
     expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
       'layers-order-first',
@@ -417,7 +416,7 @@ test.describe('editor group layers and inspector flows', () => {
       'layers-order-group',
     ]);
 
-    await page.getByRole('button', { name: 'Send back' }).click();
+    await page.getByRole('button', { name: 'Move to bottom' }).click();
     savedProject = await saveAndReadProject(page);
     expect((savedProject.nodes as Array<{ id: string }>).map((node) => node.id)).toEqual([
       'layers-order-group',

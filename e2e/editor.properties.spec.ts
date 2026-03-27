@@ -114,7 +114,7 @@ test.describe('editor properties flows', () => {
     await expect(page.getByRole('button', { name: 'Color' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Geometry' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Shadow' })).toBeVisible();
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByLabel('Stroke width')).toHaveCount(0);
     await expect(page.getByLabel('Font')).toHaveCount(0);
 

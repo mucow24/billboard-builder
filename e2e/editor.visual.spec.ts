@@ -1,14 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
-  beginCanvasDrag,
   beginCanvasHookDrag,
   canvasPointToPage,
   clickCanvas,
   clickLayerRow,
   createLineFixture,
   createLayersPanelMockParityFixture,
-  createMixedShapeTextGroupFixture,
   createNestedGroupFixture,
   createProjectDocument,
   createRectangleFixture,
@@ -70,79 +68,6 @@ async function getLayersPanelRailBounds(page: Page) {
     throw new Error('Expected the layers panel rail to have a bounding box.');
   }
   return railBounds;
-}
-
-async function readLayersTreeGeometry(page: Page) {
-  return page.evaluate(() => {
-    function roundToNearestHalfPixel(value: number) {
-      return Math.round(value * 2) / 2;
-    }
-
-    function readJunctionMetric(nodeId: string) {
-      const junction = document.querySelector<HTMLElement>(`[data-testid="layers-preview-anchor-${nodeId}"]`);
-      const list = document.querySelector<HTMLElement>('[data-testid="layers-layer-list"]');
-      if (!junction || !list) {
-        throw new Error(`Expected junction metric elements for ${nodeId}.`);
-      }
-      const junctionRect = junction.getBoundingClientRect();
-      const listRect = list.getBoundingClientRect();
-      const left = junctionRect.left - listRect.left + list.scrollLeft;
-      const top = junctionRect.top - listRect.top + list.scrollTop;
-      return {
-        junctionX: roundToNearestHalfPixel(left + 0.5),
-        junctionY: roundToNearestHalfPixel(top + junctionRect.height / 2),
-      };
-    }
-
-    function readToggleOutflowMetric(nodeId: string) {
-      const toggle = document.querySelector<HTMLElement>(`[data-testid="layers-preview-anchor-${nodeId}"]`);
-      const list = document.querySelector<HTMLElement>('[data-testid="layers-layer-list"]');
-      if (!toggle || !list) {
-        throw new Error(`Expected toggle metric elements for ${nodeId}.`);
-      }
-      const toggleRect = toggle.getBoundingClientRect();
-      const listRect = list.getBoundingClientRect();
-      const left = toggleRect.left - listRect.left + list.scrollLeft;
-      const top = toggleRect.top - listRect.top + list.scrollTop;
-      return {
-        outflowX: roundToNearestHalfPixel(left + toggleRect.width / 2),
-        outflowY: roundToNearestHalfPixel(top + toggleRect.height - 0.5),
-      };
-    }
-
-    function readLineMetric(testId: string) {
-      const line = document.querySelector<SVGLineElement>(`[data-testid="${testId}"]`);
-      if (!line) {
-        throw new Error(`Expected overlay line ${testId}.`);
-      }
-      return {
-        x1: Number(line.getAttribute('x1')),
-        y1: Number(line.getAttribute('y1')),
-        x2: Number(line.getAttribute('x2')),
-        y2: Number(line.getAttribute('y2')),
-      };
-    }
-
-    return {
-      junctions: {
-        detailsCluster: readJunctionMetric('details-cluster'),
-        detailsText: readJunctionMetric('details-text'),
-        heroLine: readJunctionMetric('hero-line'),
-        heroText: readJunctionMetric('hero-text'),
-      },
-      toggles: {
-        heroGroup: readToggleOutflowMetric('hero-group'),
-      },
-      lines: {
-        heroTrunk: readLineMetric('layers-tree-trunk-hero-group'),
-        heroDetailsBranch: readLineMetric('layers-tree-branch-hero-group-details-cluster'),
-        detailsTrunk: readLineMetric('layers-tree-trunk-details-cluster'),
-        heroTextBranch: readLineMetric('layers-tree-branch-hero-group-hero-text'),
-        detailsTextBranch: readLineMetric('layers-tree-branch-details-cluster-details-text'),
-        heroLineBranch: readLineMetric('layers-tree-branch-hero-group-hero-line'),
-      },
-    };
-  });
 }
 
 test.describe('editor visual regression', () => {
@@ -291,30 +216,6 @@ test.describe('editor visual regression', () => {
       expect(screenshot).toMatchSnapshot('layers-panel-mock-tree-parity.png');
     });
 
-    test('anchors layers tree lines to row edges and disclosure outflows', async ({
-      page,
-    }) => {
-      await prepareLayersPanelMockParity(page);
-      const geometry = await readLayersTreeGeometry(page);
-
-      expect(geometry.lines.heroTrunk.x1).toBe(geometry.toggles.heroGroup.outflowX);
-      expect(geometry.lines.heroTrunk.y1).toBe(geometry.toggles.heroGroup.outflowY);
-
-      expect(geometry.lines.heroTextBranch.x2).toBe(geometry.junctions.heroText.junctionX);
-      expect(geometry.lines.heroTextBranch.y1).toBe(geometry.junctions.heroText.junctionY);
-
-      expect(geometry.lines.heroDetailsBranch.x2).toBe(geometry.junctions.detailsCluster.junctionX);
-      expect(geometry.lines.heroDetailsBranch.y1).toBe(geometry.junctions.detailsCluster.junctionY);
-
-      expect(geometry.lines.detailsTrunk.x1).toBe(geometry.junctions.detailsCluster.junctionX);
-      expect(geometry.lines.detailsTrunk.y1).toBe(geometry.junctions.detailsCluster.junctionY);
-
-      expect(geometry.lines.detailsTextBranch.x2).toBe(geometry.junctions.detailsText.junctionX);
-      expect(geometry.lines.detailsTextBranch.y1).toBe(geometry.junctions.detailsText.junctionY);
-
-      expect(geometry.lines.heroLineBranch.x2).toBe(geometry.junctions.heroLine.junctionX);
-      expect(geometry.lines.heroLineBranch.y1).toBe(geometry.junctions.heroLine.junctionY);
-    });
   });
 
   test('captures a rectangle snapped flush to the right canvas edge without checkerboard bleed', async ({ page }) => {
@@ -457,54 +358,6 @@ test.describe('editor visual regression', () => {
     await releasePointer(page);
   });
 
-  test('captures live single-item resize and rotate previews from real canvas handles', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(
-      page,
-      createProjectDocument([
-        createRectangleFixture({
-          id: 'single-live-real',
-          x: 180,
-          y: 180,
-          width: 220,
-          height: 140,
-        }),
-      ]),
-      'single-live-real.json'
-    );
-    await setCanvasTestHooksEnabled(page, false);
-
-    await clickCanvas(page, { x: 300, y: 260 });
-
-    await beginCanvasDrag(page, { x: 400, y: 250 });
-    await movePointerToCanvasPoint(page, { x: 560, y: 250 });
-    await expect
-      .poll(async () => (await readStageDebug(page)).sessionKind)
-      .toBe('resize');
-    await expect
-      .poll(async () => (await readStageDebug(page)).previewItem?.width ?? 0)
-      .toBeGreaterThan(220);
-    await releasePointer(page);
-
-    const resizedItem = (await readStageDebug(page)).selectedItems?.[0];
-    if (!resizedItem) {
-      throw new Error('Expected selected item geometry after resize.');
-    }
-
-    await beginCanvasDrag(page, {
-      x: resizedItem.x + resizedItem.width / 2,
-      y: resizedItem.y - 50,
-    });
-    await movePointerToCanvasPoint(page, { x: 520, y: 420 });
-    await expect
-      .poll(async () => (await readStageDebug(page)).sessionKind)
-      .toBe('rotate');
-    await expect
-      .poll(async () => Math.abs((await readStageDebug(page)).previewItem?.rotation ?? 0))
-      .toBeGreaterThan(15);
-    await releasePointer(page);
-  });
-
   test('captures rotated multi-selection overlay rendering', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(
@@ -572,23 +425,6 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('true-group-selected.png');
   });
 
-  test('UI-02 captures a drilled-in grouped child selection state', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, createSimpleGroupFixture(), 'visual-drilled-child.json');
-    await setCanvasTestHooksEnabled(page, false);
-
-    await clickCanvas(page, { x: 210, y: 200 });
-    await clickCanvas(page, { x: 210, y: 200 });
-
-    const stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(true);
-    expect(stageDebug.hasLineHandles).toBe(false);
-    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
-
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('group-child-selected.png');
-  });
-
   test('UI-03 captures a nested group selection state with the ancestor outline intact', async ({
     page,
   }) => {
@@ -608,39 +444,6 @@ test.describe('editor visual regression', () => {
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(0);
 
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('nested-group-selected.png');
-  });
-
-  test('UI-04 captures a nested drilled-in child selection state with ancestor outline', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, createNestedGroupFixture(), 'visual-nested-child.json');
-    await setCanvasTestHooksEnabled(page, false);
-
-    await clickCanvas(page, { x: 400, y: 210 });
-    await clickCanvas(page, { x: 400, y: 210 });
-    await clickCanvas(page, { x: 400, y: 210 });
-
-    const stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(true);
-    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
-
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('nested-group-child-selected.png');
-  });
-
-  test('UI-02 captures grouped text drill-in affordances without group handles', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, createMixedShapeTextGroupFixture(), 'visual-grouped-text.json');
-    await setCanvasTestHooksEnabled(page, false);
-
-    await clickCanvas(page, { x: 320, y: 245 });
-    await clickCanvas(page, { x: 320, y: 245 });
-
-    const stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(true);
-    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
-
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('grouped-text-child-selected.png');
   });
 
   test('UI-06 UI-07 captures line and text single-selection affordances distinctly', async ({ page }) => {

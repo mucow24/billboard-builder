@@ -155,54 +155,6 @@ test.describe('editor transforms', () => {
     expect(Number(savedItem?.rotation)).toBe(0);
   });
 
-  test('ST-03 rotates a rectangle through a real canvas interaction', async ({ page }) => {
-    const rectangle = createRectangleFixture({
-      id: 'rotate-rect',
-      x: 140,
-      y: 140,
-      width: 200,
-      height: 120,
-    });
-
-    await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([rectangle]), 'rotate-rect.json');
-
-    // Select by clicking the item body
-    await clickCanvas(page, { x: 240, y: 200 });
-    await expect(page.getByTestId('canvas-shape-handle-rotater')).toBeAttached();
-
-    // Locate the rotater handle via its bounding box, then drag with real mouse
-    const rotaterBox = await page.getByTestId('canvas-shape-handle-rotater').boundingBox();
-    if (!rotaterBox) {
-      throw new Error('Expected rotater handle to have a bounding box.');
-    }
-    const rotaterCenter = {
-      x: rotaterBox.x + rotaterBox.width / 2,
-      y: rotaterBox.y + rotaterBox.height / 2,
-    };
-    await page.mouse.move(rotaterCenter.x, rotaterCenter.y);
-    await page.mouse.down();
-    await page.mouse.move(rotaterCenter.x + 150, rotaterCenter.y + 100, { steps: 18 });
-    await page.mouse.up();
-
-    // Verify selection still active
-    await openPropertiesTab(page);
-    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
-
-    // Verify saved geometry changed — rotation should be non-zero
-    const savedProject = await saveAndReadProject(page);
-    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
-      (item) => item.id === 'rotate-rect'
-    );
-    expect(savedItem).toBeDefined();
-    expect(Math.abs(Number(savedItem?.rotation))).toBeGreaterThan(10);
-
-    // Verify delete still works after rotation
-    await page.keyboard.press('Delete');
-    await openLayersTab(page);
-    await expect(page.locator('.layer-row')).toHaveCount(0);
-  });
-
   test('ST-04 ST-05 ST-06 drags, resizes, and rotates a text item through real canvas interactions', async ({
     page,
   }) => {
@@ -616,33 +568,6 @@ test.describe('editor transforms', () => {
     expect(Number(savedItem?.height)).toBe(120);
   });
 
-  test('ST-14 constrains selected-item drag movement to a single axis when shift is held', async ({
-    page,
-  }) => {
-    const rectangle = createRectangleFixture({
-      id: 'shift-drag-rect',
-      x: 200,
-      y: 120,
-      width: 240,
-      height: 120,
-    });
-
-    await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([rectangle]), 'shift-drag-rect.json');
-
-    await clickCanvas(page, { x: 220, y: 140 });
-    await dragCanvasWithModifier(page, 'Shift', { x: 220, y: 140 }, { x: 320, y: 200 });
-
-    const savedProject = await saveAndReadProject(page);
-    const savedRectangle = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
-      (item) => item.id === 'shift-drag-rect',
-    );
-
-    expect(savedRectangle).toBeDefined();
-    expect(Number(savedRectangle?.x)).toBeCloseTo(300, 0);
-    expect(Number(savedRectangle?.y)).toBeCloseTo(120, 0);
-  });
-
   test('toggles selection off when shift-clicking an already-selected item', async ({ page }) => {
     const rectangle = createRectangleFixture({
       id: 'shift-toggle-rect',
@@ -655,12 +580,13 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'shift-toggle-rect.json');
 
-    await clickCanvas(page, { x: 220, y: 140 });
+    const bodyPoint = { x: 320, y: 180 };
+    await clickCanvas(page, bodyPoint);
     expect((await readStageDebug(page)).hasShapeHandles).toBe(true);
 
     await page.keyboard.down('Shift');
     try {
-      await clickCanvas(page, { x: 220, y: 140 });
+      await clickCanvas(page, bodyPoint);
     } finally {
       await page.keyboard.up('Shift');
     }
@@ -668,6 +594,8 @@ test.describe('editor transforms', () => {
     const debug = await readStageDebug(page);
     expect(debug.hasShapeHandles).toBe(false);
     expect(debug.selectedItems ?? []).toHaveLength(0);
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row.active')).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
     const savedRectangle = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(

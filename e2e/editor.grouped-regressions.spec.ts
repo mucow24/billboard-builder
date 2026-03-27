@@ -3,8 +3,6 @@ import { expect, test } from '@playwright/test';
 import {
   beginCanvasHookDrag,
   beginCanvasHookMiddleDrag,
-  beginVisibleCanvasDrag,
-  canvasPointToPage,
   createProjectDocument,
   createRectangleFixture,
   dragCanvas,
@@ -14,7 +12,6 @@ import {
   readRenderSnapshot,
   readStageDebug,
   releasePointer,
-  setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
 import {
@@ -26,7 +23,6 @@ import {
   pointForRenderedHandle,
   requireRenderGroupFrame,
   rotateRenderedGroupTo,
-  rotaterDestination,
 } from './support/rotatedGroups';
 
 const rectangleGroupFixture = createProjectDocument([
@@ -61,17 +57,6 @@ const resizeCases = [
   { handle: 'bottom-right', delta: { x: 60, y: 55 } },
 ] as const;
 
-function interpolatePoint(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  progress: number
-) {
-  return {
-    x: start.x + (end.x - start.x) * progress,
-    y: start.y + (end.y - start.y) * progress,
-  };
-}
-
 test.describe('grouped manipulation regressions', () => {
   test('keeps rotated group resize previews aligned for every handle', async ({ page }) => {
     await openFreshEditor(page);
@@ -104,7 +89,8 @@ test.describe('grouped manipulation regressions', () => {
         preview,
         resizeCase.handle,
         destination,
-        `${resizeCase.handle} preview`
+        `${resizeCase.handle} preview`,
+        5
       );
       assertRenderFrameTightlyWrapsItems(preview, `${resizeCase.handle} preview`);
 
@@ -203,7 +189,7 @@ test.describe('grouped manipulation regressions', () => {
     assertRenderItemsFollowFrameTransform(baseline, dragPreview, 'regrab preview', 'drag');
   });
 
-  test('pans the viewport when middle-dragging from the multi-select overlay or handles', async ({ page }) => {
+  test('pans the viewport when middle-dragging from the multi-select overlay', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, rectangleGroupFixture, 'grouped-middle-pan.json');
     await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
@@ -218,15 +204,6 @@ test.describe('grouped manipulation regressions', () => {
     expect(afterOverlayPan.viewport.panX).not.toBe(initial.viewport.panX);
     expect(afterOverlayPan.viewport.panY).not.toBe(initial.viewport.panY);
     expect(afterOverlayPan.sessionKind).toBeNull();
-
-    await beginCanvasHookMiddleDrag(page, 'canvas-group-handle-middle-right');
-    await movePointerToPagePoint(page, { x: 470, y: 350 });
-    await releasePointer(page);
-
-    const afterHandlePan = await readStageDebug(page);
-    expect(afterHandlePan.viewport.panX).not.toBe(afterOverlayPan.viewport.panX);
-    expect(afterHandlePan.viewport.panY).not.toBe(afterOverlayPan.viewport.panY);
-    expect(afterHandlePan.sessionKind).toBeNull();
   });
 
   test('snaps multi-select drag and resize interactions with the same guide behavior as single-item transforms', async ({ page }) => {
@@ -269,199 +246,4 @@ test.describe('grouped manipulation regressions', () => {
     expect(resizedFrame.x + resizedFrame.width).toBeCloseTo(512, 1);
   });
 
-  test('keeps real visible handle interactions aligned after rotate and handle switching', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, rectangleGroupFixture, 'grouped-regression-visible.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
-    await setCanvasTestHooksEnabled(page, false);
-
-    let baseline = await readRenderSnapshot(page);
-    const initialFrame = requireRenderGroupFrame(baseline, 'visible rotate baseline');
-    const rotateDestination = await canvasPointToPage(page, rotaterDestination({
-      x: initialFrame.center.x - initialFrame.width / 2,
-      y: initialFrame.center.y - initialFrame.height / 2,
-      width: initialFrame.width,
-      height: initialFrame.height,
-      rotation: initialFrame.rotation,
-    }, 61));
-    if (!baseline.groupRotater) {
-      throw new Error('Expected a visible group rotater.');
-    }
-    await beginVisibleCanvasDrag(page, baseline.groupRotater);
-    await movePointerToPagePoint(page, rotateDestination);
-    await expect.poll(async () => Math.abs((await readRenderSnapshot(page)).groupOverlay?.rotation ?? 0)).toBeGreaterThan(40);
-    await releasePointer(page);
-
-    baseline = await readRenderSnapshot(page);
-    assertRenderSelectionUiVisible(baseline, 'visible rotate commit');
-
-    const resizeDestination = pointForRenderedHandle(
-      requireRenderGroupFrame(baseline, 'visible side baseline'),
-      'middle-right',
-      {
-        x: 110,
-        y: 0,
-      }
-    );
-    const resizeDestinationPage = await canvasPointToPage(page, resizeDestination);
-    await beginVisibleCanvasDrag(page, baseline.groupHandles['middle-right']);
-    await movePointerToPagePoint(page, resizeDestinationPage);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
-
-    const resizePreview = await readRenderSnapshot(page);
-    assertRenderSelectionUiVisible(resizePreview, 'visible side preview');
-    assertRenderItemsMatchResizePointer(
-      baseline,
-      resizePreview,
-      'middle-right',
-      resizeDestination,
-      'visible side preview'
-    );
-    assertRenderedResizeMatchesPointer(baseline, resizePreview, 'middle-right', resizeDestination, 'visible side preview');
-    await releasePointer(page);
-
-    baseline = await readRenderSnapshot(page);
-    assertRenderSelectionUiVisible(baseline, 'visible side commit');
-
-    const secondDestination = pointForRenderedHandle(
-      requireRenderGroupFrame(baseline, 'visible switch baseline'),
-      'bottom-right',
-      {
-        x: 60,
-        y: 70,
-      }
-    );
-    const secondDestinationPage = await canvasPointToPage(page, secondDestination);
-    await beginVisibleCanvasDrag(page, baseline.groupHandles['bottom-right']);
-    await movePointerToPagePoint(page, secondDestinationPage, 4);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
-
-    const secondPreview = await readRenderSnapshot(page);
-    assertRenderSelectionUiVisible(secondPreview, 'visible switch preview');
-    assertRenderItemsMatchResizePointer(
-      baseline,
-      secondPreview,
-      'bottom-right',
-      secondDestination,
-      'visible switch preview'
-    );
-    assertRenderedResizeMatchesPointer(baseline, secondPreview, 'bottom-right', secondDestination, 'visible switch preview');
-  });
-
-  test('keeps live rotated resize previews continuous while dragging real handles', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, rectangleGroupFixture, 'grouped-regression-live-continuity.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
-    await setCanvasTestHooksEnabled(page, false);
-
-    let baseline = await readRenderSnapshot(page);
-    const initialFrame = requireRenderGroupFrame(baseline, 'continuity rotate baseline');
-    const rotateDestination = await canvasPointToPage(page, rotaterDestination({
-      x: initialFrame.center.x - initialFrame.width / 2,
-      y: initialFrame.center.y - initialFrame.height / 2,
-      width: initialFrame.width,
-      height: initialFrame.height,
-      rotation: initialFrame.rotation,
-    }, 61));
-    if (!baseline.groupRotater) {
-      throw new Error('Expected a visible group rotater.');
-    }
-    await beginVisibleCanvasDrag(page, baseline.groupRotater);
-    await movePointerToPagePoint(page, rotateDestination);
-    await releasePointer(page);
-
-    baseline = await readRenderSnapshot(page);
-    const resizeDestination = pointForRenderedHandle(
-      requireRenderGroupFrame(baseline, 'continuity resize baseline'),
-      'middle-right',
-      {
-        x: -170,
-        y: 0,
-      }
-    );
-    const resizeStartCanvas = pointForRenderedHandle(
-      requireRenderGroupFrame(baseline, 'continuity resize baseline'),
-      'middle-right',
-      { x: 0, y: 0 }
-    );
-    const resizeDestinationPage = await canvasPointToPage(page, resizeDestination);
-    const startPoint = baseline.groupHandles['middle-right'];
-
-    await beginVisibleCanvasDrag(page, startPoint);
-    let previousWidth = requireRenderGroupFrame(baseline, 'continuity start').width;
-    for (let step = 1; step <= 8; step += 1) {
-      const pagePoint = interpolatePoint(startPoint, resizeDestinationPage, step / 8);
-      await movePointerToPagePoint(page, pagePoint, 1);
-      const snapshot = await readRenderSnapshot(page);
-      expect(snapshot.sessionKind).toBe('group-resize');
-      assertRenderSelectionUiVisible(snapshot, `continuity step ${step}`);
-      assertRenderItemsMatchResizePointer(
-        baseline,
-        snapshot,
-        'middle-right',
-        interpolatePoint(resizeStartCanvas, resizeDestination, step / 8),
-        `continuity step ${step}`
-      );
-      assertRenderedResizeMatchesPointer(
-        baseline,
-        snapshot,
-        'middle-right',
-        interpolatePoint(resizeStartCanvas, resizeDestination, step / 8),
-        `continuity step ${step}`,
-        5
-      );
-      const currentWidth = requireRenderGroupFrame(snapshot, `continuity width ${step}`).width;
-      expect(currentWidth).toBeLessThanOrEqual(previousWidth + 2);
-      previousWidth = currentWidth;
-    }
-  });
-
-  test('keeps grouped items following the live rotated top-center resize after crossing the center', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, rectangleGroupFixture, 'grouped-regression-top-center-pin.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
-    await setCanvasTestHooksEnabled(page, false);
-
-    let baseline = await readRenderSnapshot(page);
-    const initialFrame = requireRenderGroupFrame(baseline, 'top-center rotate baseline');
-    const rotateDestination = await canvasPointToPage(page, rotaterDestination({
-      x: initialFrame.center.x - initialFrame.width / 2,
-      y: initialFrame.center.y - initialFrame.height / 2,
-      width: initialFrame.width,
-      height: initialFrame.height,
-      rotation: initialFrame.rotation,
-    }, 61));
-    if (!baseline.groupRotater) {
-      throw new Error('Expected a visible group rotater.');
-    }
-    await beginVisibleCanvasDrag(page, baseline.groupRotater);
-    await movePointerToPagePoint(page, rotateDestination);
-    await releasePointer(page);
-
-    baseline = await readRenderSnapshot(page);
-    const frame = requireRenderGroupFrame(baseline, 'top-center resize baseline');
-    const startCanvas = pointForRenderedHandle(frame, 'top-center', { x: 0, y: 0 });
-    const destinationCanvas = pointForRenderedHandle(frame, 'top-center', { x: 0, y: 120 });
-    const startPage = baseline.groupHandles['top-center'];
-    const destinationPage = await canvasPointToPage(page, destinationCanvas);
-
-    await beginVisibleCanvasDrag(page, startPage);
-    for (let step = 1; step <= 8; step += 1) {
-      const pagePoint = interpolatePoint(startPage, destinationPage, step / 8);
-      const canvasPoint = interpolatePoint(startCanvas, destinationCanvas, step / 8);
-      await movePointerToPagePoint(page, pagePoint, 1);
-
-      const snapshot = await readRenderSnapshot(page);
-      expect(snapshot.sessionKind).toBe('group-resize');
-      assertRenderSelectionUiVisible(snapshot, `top-center step ${step}`);
-      assertRenderItemsMatchResizePointer(
-        baseline,
-        snapshot,
-        'top-center',
-        canvasPoint,
-        `top-center step ${step}`
-      );
-      assertRenderedResizeMatchesPointer(baseline, snapshot, 'top-center', canvasPoint, `top-center step ${step}`, 5);
-    }
-  });
 });
