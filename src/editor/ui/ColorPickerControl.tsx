@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import { Wheel, type ColorResult } from '@uiw/react-color';
 
+import { computePickerPosition } from './colorPickerPosition';
 import {
   commitHexColorInput,
   hexColorToHsla,
@@ -24,21 +25,6 @@ interface ColorPickerControlProps {
 
 function clampSliderValue(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
-}
-
-export function computePickerPosition(
-  triggerRect: { top: number; bottom: number; left: number; right: number },
-  panelHeight: number,
-  viewportWidth: number,
-  viewportHeight: number,
-): { top: number; right: number } {
-  if (triggerRect.bottom + panelHeight <= viewportHeight) {
-    return { top: triggerRect.bottom, right: viewportWidth - triggerRect.right };
-  }
-  return {
-    top: Math.max(0, viewportHeight - panelHeight),
-    right: viewportWidth - triggerRect.left + 4,
-  };
 }
 
 export function ColorPickerControl({

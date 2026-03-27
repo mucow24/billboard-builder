@@ -211,6 +211,8 @@ export function createRectangleFixture(overrides: Record<string, unknown> = {}) 
     opacity: 1,
     shadow: DEFAULT_SHADOW,
     fill: '#f97316',
+    secondaryFill: '#f97316',
+    gradientEnabled: false,
     stroke: '#c2410cff',
     strokeWidth: 0,
     cornerRadius: 0,
@@ -241,6 +243,8 @@ export function createTextFixture(overrides: Record<string, unknown> = {}) {
     fontStyle: 'normal',
     fontWeight: 'normal',
     fill: '#ffffff',
+    secondaryFill: '#ffffff',
+    gradientEnabled: false,
     align: 'left',
     verticalAlign: 'top',
     lineHeight: 1.1,
@@ -268,6 +272,8 @@ export function createEllipseFixture(overrides: Record<string, unknown> = {}) {
     opacity: 1,
     shadow: DEFAULT_SHADOW,
     fill: '#0ea5e9',
+    secondaryFill: '#0ea5e9',
+    gradientEnabled: false,
     stroke: '#0369a1ff',
     strokeWidth: 0,
     ...overrides,
@@ -841,14 +847,26 @@ export async function selectTool(page: Page, name: string) {
 }
 
 export async function openLayersTab(page: Page) {
+  const tabBody = page.getByTestId('layers-tab-body');
+  if (await tabBody.isVisible().catch(() => false)) {
+    return;
+  }
   await page.getByRole('tab', { name: /Layers/ }).click();
 }
 
 export async function openPropertiesTab(page: Page) {
+  const tabBody = page.getByTestId('properties-tab-body');
+  if (await tabBody.isVisible().catch(() => false)) {
+    return;
+  }
   await page.getByRole('tab', { name: 'Properties' }).click();
 }
 
 export async function openFavoritesTab(page: Page) {
+  const tabBody = page.getByTestId('favorites-tab-body');
+  if (await tabBody.isVisible().catch(() => false)) {
+    return;
+  }
   await page.getByRole('tab', { name: /Favorites/ }).click();
 }
 

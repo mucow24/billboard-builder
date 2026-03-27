@@ -25,6 +25,7 @@ import {
   getCanvasOverlayMetrics,
   getShapeOverlayHandlePoints,
 } from './overlayGeometry';
+import { buildGradientFillProps } from './gradientFill';
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
 
@@ -86,6 +87,13 @@ export const ShapeItemView = memo(function ShapeItemView({
   const outlinePoints = getSelectionOutlinePoints(item);
   const interactionEnabled = activeTool === 'select';
   const overlayMetrics = getCanvasOverlayMetrics(zoom);
+  const gradientFillProps =
+    item.kind === 'text' || item.kind === 'rectangle' || item.kind === 'ellipse'
+      ? buildGradientFillProps(item, {
+          width: renderBox.width,
+          height: renderBox.height,
+        })
+      : null;
   const handleShapeRef = useCallback(
     (node: Konva.Node | null) => {
       registerShapeRef(item.id, node);
@@ -176,6 +184,8 @@ export const ShapeItemView = memo(function ShapeItemView({
               text={item.text}
               width={Math.max(1, renderBox.width - item.padding.left - item.padding.right)}
               height={Math.max(1, renderBox.height - item.padding.top - item.padding.bottom)}
+              fillPriority={gradientFillProps ? 'linear-gradient' : 'color'}
+              {...gradientFillProps}
               perfectDrawEnabled={false}
               listening={false}
             />
@@ -195,6 +205,8 @@ export const ShapeItemView = memo(function ShapeItemView({
               cornerRadius={item.cornerRadius}
               width={renderBox.width}
               height={renderBox.height}
+              fillPriority={gradientFillProps ? 'linear-gradient' : 'color'}
+              {...gradientFillProps}
               listening={false}
             />
           ) : null}
@@ -212,6 +224,8 @@ export const ShapeItemView = memo(function ShapeItemView({
               strokeWidth={item.strokeWidth}
               radiusX={renderBox.width / 2}
               radiusY={renderBox.height / 2}
+              fillPriority={gradientFillProps ? 'linear-gradient' : 'color'}
+              {...gradientFillProps}
               listening={false}
             />
           ) : null}

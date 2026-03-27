@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { Toolbar } from './Toolbar';
+import type { InspectorTab } from './inspector/types';
 
 function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) {
   const props: ComponentProps<typeof Toolbar> = {
+    activeInspectorTab: 'properties' satisfies InspectorTab,
     canvas: { width: 2048, height: 1024, presetId: 'landscape' },
     canDelete: false,
     canGroup: false,
@@ -14,12 +16,15 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     canSaveFavorite: false,
     canUndo: false,
     canUngroup: false,
+    favoriteCount: 0,
+    itemCount: 0,
     onCanvasSizeChange: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
     onFontUpload: vi.fn(),
     onGroup: vi.fn(),
     onImageUpload: vi.fn(),
+    onInspectorTabChange: vi.fn(),
     onLoad: vi.fn(),
     onNewProject: vi.fn(),
     onRedo: vi.fn(),
@@ -27,6 +32,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onSaveFavorite: vi.fn(),
     onUndo: vi.fn(),
     onUngroup: vi.fn(),
+    panelCollapsed: false,
     ...overrides,
   };
 

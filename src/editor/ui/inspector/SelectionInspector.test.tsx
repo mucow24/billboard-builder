@@ -305,6 +305,63 @@ describe('SelectionInspector', () => {
     });
   });
 
+  it('shows gradient controls for eligible items and keeps the secondary fill disabled until enabled', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const rectangleItem = createRectangleItem({
+      fill: '#123456ff',
+      secondaryFill: '#abcdef12',
+      gradientEnabled: false,
+    });
+
+    const { rerender } = render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={rectangleItem}
+        selectedNodeCount={1}
+        selectedItems={[rectangleItem]}
+      />
+    );
+
+    expect(screen.getByLabelText('Secondary fill')).toBeDisabled();
+    expect(screen.getByLabelText('Gradient')).not.toBeChecked();
+
+    await user.click(screen.getByLabelText('Gradient'));
+
+    expect(expectLatestChange(onItemChange, rectangleItem)).toEqual({
+      gradientEnabled: true,
+    });
+
+    rerender(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={{ ...rectangleItem, gradientEnabled: true }}
+        selectedNodeCount={1}
+        selectedItems={[{ ...rectangleItem, gradientEnabled: true }]}
+      />
+    );
+
+    expect(screen.getByLabelText('Secondary fill')).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: 'Secondary fill' }));
+    fireEvent.change(screen.getByLabelText('Secondary fill hex'), {
+      target: { value: '#fedcba98' },
+    });
+    fireEvent.keyDown(screen.getByLabelText('Secondary fill hex'), {
+      key: 'Enter',
+    });
+
+    expect(expectLatestChange(onItemChange, rectangleItem)).toEqual({
+      secondaryFill: '#fedcba98',
+    });
+  });
+
   it('shows only shared fields for multi-selection and marks mixed states across control types', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
@@ -383,8 +440,8 @@ describe('SelectionInspector', () => {
   });
 
   it('shows dynamic shared fields across different item kinds', () => {
-    const rectangle = createRectangleItem({ fill: '#ff0000' });
-    const text = createTextItem({ fill: '#00ff00' });
+    const rectangle = createRectangleItem({ fill: '#ff0000', secondaryFill: '#112233', gradientEnabled: true });
+    const text = createTextItem({ fill: '#00ff00', secondaryFill: '#112233', gradientEnabled: true });
 
     render(
       <SelectionInspector
@@ -400,6 +457,8 @@ describe('SelectionInspector', () => {
     expect(screen.getByRole('button', { name: 'Color' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Geometry' })).toBeInTheDocument();
     expect(screen.getByLabelText('Fill')).toBeInTheDocument();
+    expect(screen.getByLabelText('Secondary fill')).toBeInTheDocument();
+    expect(screen.getByLabelText('Gradient')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Geometry' }));
     expect(screen.getByLabelText('X')).toBeInTheDocument();
     expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();

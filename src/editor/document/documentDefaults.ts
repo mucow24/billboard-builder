@@ -122,6 +122,8 @@ export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasIt
     fontStyle: 'normal',
     fontWeight: 'normal',
     fill: '#ffffff',
+    secondaryFill: '#ffffff',
+    gradientEnabled: false,
     align: 'left',
     verticalAlign: 'top',
     lineHeight: 1.1,
@@ -137,6 +139,8 @@ export function createRectangleItem(
   return {
     ...createBaseItem('rectangle', 'Rectangle'),
     fill: '#f97316',
+    secondaryFill: '#f97316',
+    gradientEnabled: false,
     stroke: '#c2410cff',
     strokeWidth: 0,
     cornerRadius: 0,
@@ -150,6 +154,8 @@ export function createEllipseItem(
   return {
     ...createBaseItem('ellipse', 'Ellipse'),
     fill: '#0ea5e9',
+    secondaryFill: '#0ea5e9',
+    gradientEnabled: false,
     stroke: '#0369a1ff',
     strokeWidth: 0,
     ...position,

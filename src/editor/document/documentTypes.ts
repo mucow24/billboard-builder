@@ -93,14 +93,19 @@ export interface BaseCanvasItem {
   shadow: CanvasShadow;
 }
 
-export interface TextCanvasItem extends BaseCanvasItem {
+export interface GradientFillItem {
+  fill: string;
+  secondaryFill: string;
+  gradientEnabled: boolean;
+}
+
+export interface TextCanvasItem extends BaseCanvasItem, GradientFillItem {
   kind: 'text';
   text: string;
   fontFamily: string;
   fontSize: number;
   fontStyle: 'normal' | 'italic';
   fontWeight: 'normal' | 'bold';
-  fill: string;
   align: TextAlign;
   verticalAlign: TextVerticalAlign;
   lineHeight: number;
@@ -120,17 +125,15 @@ export interface ImageCanvasItem extends BaseCanvasItem {
   adjustments: ImageAdjustments;
 }
 
-export interface RectangleCanvasItem extends BaseCanvasItem {
+export interface RectangleCanvasItem extends BaseCanvasItem, GradientFillItem {
   kind: 'rectangle';
-  fill: string;
   stroke: string;
   strokeWidth: number;
   cornerRadius: number;
 }
 
-export interface EllipseCanvasItem extends BaseCanvasItem {
+export interface EllipseCanvasItem extends BaseCanvasItem, GradientFillItem {
   kind: 'ellipse';
-  fill: string;
   stroke: string;
   strokeWidth: number;
 }

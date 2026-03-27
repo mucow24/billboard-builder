@@ -132,6 +132,8 @@ describe('document schema', () => {
     document.nodes = [
       createTextItem({
         padding: { top: 12, right: 18, bottom: 24, left: 30 },
+        gradientEnabled: true,
+        secondaryFill: '#336699ff',
       }),
     ];
 
@@ -145,13 +147,22 @@ describe('document schema', () => {
         bottom: 24,
         left: 30,
       },
+      gradientEnabled: true,
+      secondaryFill: '#336699ff',
     });
   });
 
   it('defaults missing text padding when loading older saved files', () => {
     const legacyTextItem = createTextItem();
-    const { padding: ignoredPadding, ...legacyPayload } = legacyTextItem;
+    const {
+      padding: ignoredPadding,
+      secondaryFill: ignoredSecondaryFill,
+      gradientEnabled: ignoredGradientEnabled,
+      ...legacyPayload
+    } = legacyTextItem;
     void ignoredPadding;
+    void ignoredSecondaryFill;
+    void ignoredGradientEnabled;
 
     const parsed = parseProjectDocument({
       version: 1,
@@ -169,6 +180,8 @@ describe('document schema', () => {
         bottom: 0,
         left: 0,
       },
+      gradientEnabled: false,
+      secondaryFill: legacyTextItem.fill,
     });
   });
 
@@ -207,6 +220,32 @@ describe('document schema', () => {
         width: 40,
         height: 20,
       },
+    });
+  });
+
+  it('defaults missing gradient fields for legacy rectangle payloads', () => {
+    const rectangle = createRectangleItem({ fill: '#123456ff' });
+    const {
+      secondaryFill: ignoredSecondaryFill,
+      gradientEnabled: ignoredGradientEnabled,
+      ...legacyPayload
+    } = rectangle;
+    void ignoredSecondaryFill;
+    void ignoredGradientEnabled;
+
+    const parsed = parseProjectDocument({
+      version: 1,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      items: [legacyPayload],
+    });
+
+    expect(parsed.nodes[0]).toMatchObject({
+      kind: 'rectangle',
+      fill: '#123456ff',
+      gradientEnabled: false,
+      secondaryFill: '#123456ff',
     });
   });
 });

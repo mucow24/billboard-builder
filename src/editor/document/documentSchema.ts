@@ -68,6 +68,8 @@ const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   fontStyle: z.enum(['normal', 'italic']),
   fontWeight: z.enum(['normal', 'bold']),
   fill: z.string(),
+  secondaryFill: z.string().optional(),
+  gradientEnabled: z.boolean().optional(),
   align: z.enum(['left', 'center', 'right']),
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
   lineHeight: z.number().positive(),
@@ -90,6 +92,8 @@ const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
 const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('rectangle'),
   fill: z.string(),
+  secondaryFill: z.string().optional(),
+  gradientEnabled: z.boolean().optional(),
   stroke: z.string(),
   strokeWidth: z.number().nonnegative(),
   cornerRadius: z.number().nonnegative(),
@@ -98,6 +102,8 @@ const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
 const EllipseCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   kind: z.literal('ellipse'),
   fill: z.string(),
+  secondaryFill: z.string().optional(),
+  gradientEnabled: z.boolean().optional(),
   stroke: z.string(),
   strokeWidth: z.number().nonnegative(),
 });
