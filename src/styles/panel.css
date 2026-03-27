@@ -252,16 +252,32 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-/* Left, right, bottom borders (no top — the top is drawn separately with a gap) */
+/* Left, right, bottom borders (no top — the top is drawn separately with a gap).
+   Uses background fills instead of CSS border so the rendering matches the
+   gradient-based top border drawn by ::after. */
 .panel-section-tabbed-rail::before {
   content: '';
   position: absolute;
   inset: 0;
-  border: 1px solid var(--toolbar-border-active, rgba(125, 211, 252, 0.9));
-  border-top: none;
-  border-radius: 0 0 3px 3px;
   pointer-events: none;
   z-index: 20;
+  border-radius: 0 0 3px 3px;
+  background:
+    /* left edge */
+    linear-gradient(
+      var(--toolbar-border-active, rgba(125, 211, 252, 0.9)),
+      var(--toolbar-border-active, rgba(125, 211, 252, 0.9))
+    ) left top / 1px 100% no-repeat,
+    /* right edge */
+    linear-gradient(
+      var(--toolbar-border-active, rgba(125, 211, 252, 0.9)),
+      var(--toolbar-border-active, rgba(125, 211, 252, 0.9))
+    ) right top / 1px 100% no-repeat,
+    /* bottom edge */
+    linear-gradient(
+      var(--toolbar-border-active, rgba(125, 211, 252, 0.9)),
+      var(--toolbar-border-active, rgba(125, 211, 252, 0.9))
+    ) left bottom / 100% 1px no-repeat;
 }
 
 /* Top border with a transparent gap where the connected tab sits */
