@@ -900,7 +900,7 @@ export function useCanvasInteractionSession({
         });
       }
     }
-  }, [onGuidesChange, orderedItems, resolveSession, stageBounds, updateCropSession]);
+  }, [onGuidesChange, orderedItems, resolveSession, stageBounds, updateCropSession, viewport.zoom]);
 
   const endCropInteraction = useCallback(() => {
     const current = cropSessionRef.current;
