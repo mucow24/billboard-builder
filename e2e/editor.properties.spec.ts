@@ -114,7 +114,7 @@ test.describe('editor properties flows', () => {
     await expect(page.getByRole('button', { name: 'Color' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Geometry' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Shadow' })).toBeVisible();
-    await expect(page.getByLabel('Fill')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
     await expect(page.getByLabel('Stroke width')).toHaveCount(0);
     await expect(page.getByLabel('Font')).toHaveCount(0);
 
@@ -123,7 +123,7 @@ test.describe('editor properties flows', () => {
     await page.getByRole('button', { name: 'Shadow' }).click();
     await expect(page.getByRole('spinbutton', { name: 'Blur' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Fill' }).click();
+    await page.getByRole('button', { name: 'Fill', exact: true }).click();
     await page.getByLabel('Fill hex').fill('#33669980');
     await page.getByLabel('Fill hex').press('Enter');
     await page.getByRole('spinbutton', { name: 'X', exact: true }).fill('280');
@@ -273,7 +273,7 @@ test.describe('editor properties flows', () => {
 
     await clickCanvas(page, { x: 220, y: 200 });
     await openPropertiesTab(page);
-    await page.getByRole('button', { name: 'Fill' }).click();
+    await page.getByRole('button', { name: 'Fill', exact: true }).click();
     await page.getByLabel('Fill hex').fill('#123456ff');
     await page.getByLabel('Fill hex').press('Enter');
     await page.getByRole('button', { name: 'Stroke' }).click();

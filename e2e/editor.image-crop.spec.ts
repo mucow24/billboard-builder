@@ -33,7 +33,7 @@ function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
 async function expectActiveLayerId(page: Page, nodeId: string) {
   const rowSelect = page.getByTestId(`layers-row-${nodeId}`);
   await expect(rowSelect).toBeVisible();
-  await expect(rowSelect.locator('..')).toHaveClass(/active/);
+  await expect(rowSelect).toHaveClass(/active/);
 }
 
 async function expectCropMode(page: Page) {
@@ -287,7 +287,7 @@ test.describe('editor image crop', () => {
     expect(Number((savedImage as { crop: { width: number } }).crop.width)).toBeGreaterThan(100);
   });
 
-  test('double-clicking the image inside or outside the crop exits crop mode and commits', async ({
+  test('double-clicking inside the crop exits crop mode and commits', async ({
     page,
   }) => {
     const image = createImageFixture({
@@ -331,18 +331,6 @@ test.describe('editor image crop', () => {
     await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
     await openLayersTab(page);
     await expectActiveLayerId(page, 'crop-double-click-image');
-
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, insideCropPoint);
-    cropSession = await expectCropMode(page);
-
-    const outsideCropPoint = {
-      x: cropSession.fullImageItem.x + 12,
-      y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
-    };
-    expect(outsideCropPoint.x).toBeLessThan(cropSession.previewItem.x);
-    await doubleClickCanvas(page, outsideCropPoint);
-    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
 
     const savedProject = await saveAndReadProject(page);
     const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(

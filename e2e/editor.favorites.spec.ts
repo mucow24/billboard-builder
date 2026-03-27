@@ -142,7 +142,7 @@ test.describe('editor favorite library flows', () => {
 
     await clickCanvas(page, { x: 240, y: 220 });
     await page.getByRole('button', { name: 'Save as favorite' }).click();
-    await expect(page.getByRole('status')).toHaveText('Favorite added');
+    await expect(page.getByRole('status')).toHaveText('Added to favorites');
 
     await openFavoritesTab(page);
     await expect(page.getByRole('button', { name: 'Insert Rectangle favorite' })).toBeVisible();

@@ -667,7 +667,8 @@ export async function openFreshEditor(page: Page) {
   await page.goto(EDITOR_TEST_URL);
   await waitForEditor(page);
   await clearPersistence(page);
-  await page.reload();
+  await page.goto('about:blank');
+  await page.goto(EDITOR_TEST_URL);
   await waitForEditor(page);
 }
 
@@ -841,15 +842,24 @@ export async function selectTool(page: Page, name: string) {
 }
 
 export async function openLayersTab(page: Page) {
-  await page.getByRole('tab', { name: /Layers/ }).click();
+  const tab = page.getByRole('tab', { name: /Layers/ });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+  }
 }
 
 export async function openPropertiesTab(page: Page) {
-  await page.getByRole('tab', { name: 'Properties' }).click();
+  const tab = page.getByRole('tab', { name: 'Properties' });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+  }
 }
 
 export async function openFavoritesTab(page: Page) {
-  await page.getByRole('tab', { name: /Favorites/ }).click();
+  const tab = page.getByRole('tab', { name: /Favorites/ });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') {
+    await tab.click();
+  }
 }
 
 export async function clickLayerRow(page: Page, name: string) {
@@ -1256,14 +1266,34 @@ export async function primePersistenceBeforeLoad(page: Page, payload: string | R
 }
 
 export async function clearPersistence(page: Page) {
-  await page.evaluate(async () => {
+  await page.evaluate(async (version) => {
     window.localStorage.removeItem('billboard-builder:favorites:v1');
     window.localStorage.removeItem('billboard-builder:templates:v1');
+    window.sessionStorage.removeItem('bb-persist-seeded');
     await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase('billboard-builder');
+      const request = indexedDB.open('billboard-builder', version);
       request.onerror = () => reject(request.error);
-      request.onblocked = () => resolve();
-      request.onsuccess = () => resolve();
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains('canvas')) {
+          database.createObjectStore('canvas');
+        }
+        if (!database.objectStoreNames.contains('uploaded-fonts')) {
+          database.createObjectStore('uploaded-fonts');
+        }
+      };
+      request.onsuccess = () => {
+        const database = request.result;
+        const transaction = database.transaction(['canvas', 'uploaded-fonts'], 'readwrite');
+        transaction.objectStore('canvas').delete('current');
+        transaction.objectStore('uploaded-fonts').clear();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => {
+          database.close();
+          resolve();
+        };
+      };
     });
-  });
+  }, EDITOR_DATABASE_VERSION);
 }
