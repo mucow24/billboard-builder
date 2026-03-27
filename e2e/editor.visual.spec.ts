@@ -114,6 +114,65 @@ test.describe('editor visual regression', () => {
     await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('single-selection-handles.png');
   });
 
+  test('captures a rotated rectangle with an item-local gradient fill', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createRectangleFixture({
+          id: 'gradient-visual-rect',
+          x: 260,
+          y: 220,
+          width: 280,
+          height: 180,
+          rotation: 32,
+          fill: '#ff0000ff',
+          secondaryFill: '#00ff00ff',
+          gradientEnabled: true,
+        }),
+      ]),
+      'visual-gradient-rotated-rectangle.json'
+    );
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('gradient-rotated-rectangle.png');
+  });
+
+  test('captures text padding moving glyphs through a fixed item-frame gradient', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createTextFixture({
+          id: 'gradient-text-no-padding',
+          x: 140,
+          y: 180,
+          width: 300,
+          height: 150,
+          text: 'Top anchored',
+          fill: '#ffcc00ff',
+          secondaryFill: '#0066ffff',
+          gradientEnabled: true,
+          padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        }),
+        createTextFixture({
+          id: 'gradient-text-with-padding',
+          x: 520,
+          y: 180,
+          width: 300,
+          height: 150,
+          text: 'Padded down',
+          fill: '#ffcc00ff',
+          secondaryFill: '#0066ffff',
+          gradientEnabled: true,
+          padding: { top: 32, right: 0, bottom: 0, left: 0 },
+        }),
+      ]),
+      'visual-gradient-text-padding.json'
+    );
+
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('gradient-text-padding.png');
+  });
+
   test.describe('layers panel mock parity', () => {
     test.use({
       deviceScaleFactor: 2,

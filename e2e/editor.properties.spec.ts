@@ -276,7 +276,7 @@ test.describe('editor properties flows', () => {
     await page.getByRole('button', { name: 'Fill', exact: true }).click();
     await page.getByLabel('Fill hex').fill('#123456ff');
     await page.getByLabel('Fill hex').press('Enter');
-    await page.getByRole('button', { name: 'Stroke' }).click();
+    await page.getByRole('button', { name: 'Stroke', exact: true }).click();
     await page.getByLabel('Stroke hex').fill('#abcdef80');
     await page.getByLabel('Stroke hex').press('Enter');
     await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('5');
@@ -296,7 +296,7 @@ test.describe('editor properties flows', () => {
     await page.getByRole('spinbutton', { name: 'Brightness value' }).fill('120');
     await page.getByRole('spinbutton', { name: 'Contrast value' }).fill('70');
     await page.getByRole('spinbutton', { name: 'Tint strength value' }).fill('25');
-    await page.getByRole('button', { name: 'Tint color' }).click();
+    await page.getByRole('button', { name: 'Tint color', exact: true }).click();
     await page.getByLabel('Tint color hex').fill('#ff0000ff');
     await page.getByLabel('Tint color hex').press('Enter');
 
@@ -324,6 +324,82 @@ test.describe('editor properties flows', () => {
           contrast: 70,
           tintStrength: 25,
           tintColor: '#ff0000',
+        }),
+      }),
+    ]);
+  });
+
+  test('edits rectangle and text gradient properties through the Properties panel', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'gradient-rect',
+      name: 'Gradient Rectangle',
+      x: 160,
+      y: 160,
+      width: 220,
+      height: 160,
+      fill: '#ff0000ff',
+    });
+    const text = createTextFixture({
+      id: 'gradient-text',
+      name: 'Gradient Text',
+      x: 460,
+      y: 180,
+      width: 280,
+      height: 120,
+      text: 'Gradient headline',
+      fill: '#ffffff',
+      padding: {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+      },
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle, text]), 'properties-gradients.json');
+
+    await clickCanvas(page, { x: 270, y: 240 });
+    await openPropertiesTab(page);
+    let inspector = page.getByTestId('properties-tab-body');
+    await expect(inspector.getByLabel('Secondary fill')).toBeDisabled();
+    await inspector
+      .locator('.inspector-field-shell:has-text("Gradient") input[aria-label="Gradient"]')
+      .evaluate((node: HTMLInputElement) => node.click());
+    await expect(inspector.getByLabel('Secondary fill')).toBeEnabled();
+    await inspector.getByRole('button', { name: 'Secondary fill', exact: true }).click();
+    await page.getByLabel('Secondary fill hex').fill('#00ff00ff');
+    await page.getByLabel('Secondary fill hex').press('Enter');
+
+    await clickCanvas(page, { x: 580, y: 220 });
+    await openPropertiesTab(page);
+    inspector = page.getByTestId('properties-tab-body');
+    await inspector
+      .locator('.inspector-field-shell:has-text("Gradient") input[aria-label="Gradient"]')
+      .evaluate((node: HTMLInputElement) => node.click());
+    await inspector.getByRole('button', { name: 'Secondary fill', exact: true }).click();
+    await page.getByLabel('Secondary fill hex').fill('#ff00ffff');
+    await page.getByLabel('Secondary fill hex').press('Enter');
+    await inspector.getByRole('button', { name: 'Advanced text' }).click();
+    await inspector.getByRole('spinbutton', { name: 'Padding top' }).fill('18');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({
+        id: 'gradient-rect',
+        gradientEnabled: true,
+        fill: '#ff0000ff',
+        secondaryFill: '#00ff00ff',
+      }),
+      expect.objectContaining({
+        id: 'gradient-text',
+        gradientEnabled: true,
+        fill: '#ffffff',
+        secondaryFill: '#ff00ffff',
+        padding: expect.objectContaining({
+          top: 18,
         }),
       }),
     ]);

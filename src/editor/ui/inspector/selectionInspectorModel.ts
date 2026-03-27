@@ -326,6 +326,34 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       supportsMultiEdit: true,
       valueType: 'color',
     }),
+    createColorField({
+      buildChange: (_context, nextValue) => ({ secondaryFill: nextValue }),
+      fieldOrder: 20,
+      getDisabled: ({ selectedItems }) =>
+        selectedItems.every(
+          (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
+        ),
+      getValue: (item) => (item.kind === 'text' ? item.secondaryFill : ''),
+      label: 'Secondary fill',
+      propertyKey: 'secondaryFill',
+      sectionKey: 'color',
+      sectionLabel: 'Color',
+      sectionOrder: SECTION_ORDER.color,
+      supportsMultiEdit: true,
+      valueType: 'color',
+    }),
+    createBooleanField({
+      buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
+      fieldOrder: 30,
+      getValue: (item) => item.kind === 'text' && item.gradientEnabled,
+      label: 'Gradient',
+      propertyKey: 'gradientEnabled',
+      sectionKey: 'color',
+      sectionLabel: 'Color',
+      sectionOrder: SECTION_ORDER.color,
+      supportsMultiEdit: true,
+      valueType: 'boolean',
+    }),
     createTextField({
       buildChange: (_context, nextValue) => ({ text: nextValue }),
       fieldOrder: 10,
@@ -583,18 +611,6 @@ function createShapeDescriptors(
   itemKind: 'ellipse' | 'line' | 'rectangle'
 ): InspectorFieldDescriptor[] {
   const descriptors: InspectorFieldDescriptor[] = [
-    createColorField({
-      buildChange: (_context, nextValue) => ({ stroke: nextValue }),
-      fieldOrder: itemKind === 'line' ? 10 : 20,
-      getValue: (item) => ('stroke' in item ? item.stroke : ''),
-      label: 'Stroke',
-      propertyKey: 'stroke',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
-      supportsMultiEdit: true,
-      valueType: 'color',
-    }),
     createMainNumberField(
       'strokeWidth',
       'Stroke width',
@@ -629,7 +645,49 @@ function createShapeDescriptors(
         sectionOrder: SECTION_ORDER.color,
         supportsMultiEdit: true,
         valueType: 'color',
-      })
+      }),
+      createColorField({
+        buildChange: (_context, nextValue) => ({ secondaryFill: nextValue }),
+        fieldOrder: 20,
+        getDisabled: ({ selectedItems }) =>
+          selectedItems.every(
+            (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
+          ),
+        getValue: (item) =>
+          item.kind === 'rectangle' || item.kind === 'ellipse' ? item.secondaryFill : '',
+        label: 'Secondary fill',
+        propertyKey: 'secondaryFill',
+        sectionKey: 'color',
+        sectionLabel: 'Color',
+        sectionOrder: SECTION_ORDER.color,
+        supportsMultiEdit: true,
+        valueType: 'color',
+      }),
+      createBooleanField({
+        buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
+        fieldOrder: 30,
+        getValue: (item) =>
+          (item.kind === 'rectangle' || item.kind === 'ellipse') && item.gradientEnabled,
+        label: 'Gradient',
+        propertyKey: 'gradientEnabled',
+        sectionKey: 'color',
+        sectionLabel: 'Color',
+        sectionOrder: SECTION_ORDER.color,
+        supportsMultiEdit: true,
+        valueType: 'boolean',
+      }),
+      createColorField({
+        buildChange: (_context, nextValue) => ({ stroke: nextValue }),
+        fieldOrder: 40,
+        getValue: (item) => ('stroke' in item ? item.stroke : ''),
+        label: 'Stroke',
+        propertyKey: 'stroke',
+        sectionKey: 'color',
+        sectionLabel: 'Color',
+        sectionOrder: SECTION_ORDER.color,
+        supportsMultiEdit: true,
+        valueType: 'color',
+      }),
     );
     descriptors.push(
       createMainNumberField(
@@ -640,6 +698,21 @@ function createShapeDescriptors(
         (_context, nextValue) => ({ rotation: nextValue }),
         { digits: 0, step: 1 }
       )
+    );
+  } else {
+    descriptors.unshift(
+      createColorField({
+        buildChange: (_context, nextValue) => ({ stroke: nextValue }),
+        fieldOrder: 10,
+        getValue: (item) => ('stroke' in item ? item.stroke : ''),
+        label: 'Stroke',
+        propertyKey: 'stroke',
+        sectionKey: 'color',
+        sectionLabel: 'Color',
+        sectionOrder: SECTION_ORDER.color,
+        supportsMultiEdit: true,
+        valueType: 'color',
+      }),
     );
   }
 

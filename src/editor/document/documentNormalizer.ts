@@ -138,11 +138,22 @@ function normalizeImageSourceTransform(
   };
 }
 
+function normalizeGradientFill<T extends { fill: string; secondaryFill?: string; gradientEnabled?: boolean }>(
+  item: T,
+): Pick<T, 'fill'> & { secondaryFill: string; gradientEnabled: boolean } {
+  return {
+    fill: item.fill,
+    secondaryFill: typeof item.secondaryFill === 'string' ? item.secondaryFill : item.fill,
+    gradientEnabled: Boolean(item.gradientEnabled),
+  };
+}
+
 export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
   switch (item.kind) {
     case 'text': {
       const normalizedTextItem: TextCanvasItem = {
         ...item,
+        ...normalizeGradientFill(item),
         x: clampFinite(item.x, 0),
         y: clampFinite(item.y, 0),
         width: clampDimension(item.width),
@@ -201,6 +212,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
     case 'rectangle': {
       const normalizedRectangleItem: RectangleCanvasItem = {
         ...item,
+        ...normalizeGradientFill(item),
         x: clampFinite(item.x, 0),
         y: clampFinite(item.y, 0),
         width: clampDimension(item.width),
@@ -221,6 +233,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
     case 'ellipse': {
       const normalizedEllipseItem: EllipseCanvasItem = {
         ...item,
+        ...normalizeGradientFill(item),
         x: clampFinite(item.x, 0),
         y: clampFinite(item.y, 0),
         width: clampDimension(item.width),
