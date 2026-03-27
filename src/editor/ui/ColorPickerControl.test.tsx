@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ColorPickerControl, computePickerPosition } from './ColorPickerControl';
+import { ColorPickerControl } from './ColorPickerControl';
+import { computePickerPosition } from './colorPickerPosition';
 
 vi.mock('@uiw/react-color', async () => {
   const actual =

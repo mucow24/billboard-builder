@@ -23,6 +23,8 @@ describe('selectionInspectorModel', () => {
     ).toEqual(
       expect.arrayContaining([
         'color:fill:color',
+        'color:secondaryFill:color',
+        'color:gradientEnabled:boolean',
         'color:stroke:color',
         'main:strokeWidth:number',
         'main:cornerRadius:number',
@@ -39,6 +41,9 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
+        'color:fill:color',
+        'color:secondaryFill:color',
+        'color:gradientEnabled:boolean',
         'text:text:text',
         'text:fontFamily:select',
         'text:fontWeight:boolean',
@@ -111,6 +116,8 @@ describe('selectionInspectorModel', () => {
         'main:rotation',
         'geometry:x',
         'shadow:color',
+        'color:secondaryFill',
+        'color:gradientEnabled',
       ])
     );
     expect(
@@ -128,6 +135,7 @@ describe('selectionInspectorModel', () => {
   it('marks mixed state and keeps per-item nested patch builders explicit', () => {
     const first = createRectangleItem({
       fill: '#ff0000',
+      secondaryFill: '#abcdef',
       shadow: {
         color: '#111111',
         blur: 4,
@@ -138,6 +146,7 @@ describe('selectionInspectorModel', () => {
     });
     const second = createRectangleItem({
       fill: '#00ff00',
+      secondaryFill: '#abcdef',
       shadow: {
         color: '#222222',
         blur: 7,
@@ -151,12 +160,22 @@ describe('selectionInspectorModel', () => {
     const fillField = sections
       .find((section) => section.key === 'color')
       ?.fields.find((field) => field.descriptor.propertyKey === 'fill');
+    const secondaryFillField = sections
+      .find((section) => section.key === 'color')
+      ?.fields.find((field) => field.descriptor.propertyKey === 'secondaryFill');
+    const gradientEnabledField = sections
+      .find((section) => section.key === 'color')
+      ?.fields.find((field) => field.descriptor.propertyKey === 'gradientEnabled');
     const shadowBlurField = sections
       .find((section) => section.key === 'shadow')
       ?.fields.find((field) => field.descriptor.propertyKey === 'blur');
 
     expect(fillField?.state.isMixed).toBe(true);
     expect(fillField?.state.value).toBeNull();
+    expect(secondaryFillField?.state.isMixed).toBe(false);
+    expect(secondaryFillField?.state.value).toBe(first.secondaryFill);
+    expect(gradientEnabledField?.state.isMixed).toBe(false);
+    expect(gradientEnabledField?.state.value).toBe(false);
     expect(shadowBlurField?.state.isMixed).toBe(true);
     expect(
       shadowBlurField?.descriptor.buildChange(
