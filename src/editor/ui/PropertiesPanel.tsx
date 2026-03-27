@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LayersInspectorTab } from './inspector/LayersInspectorTab';
 import { SelectionInspector } from './inspector/SelectionInspector';
 import { FavoritesInspectorTab } from './inspector/FavoritesInspectorTab';
-import type { InspectorTab, PropertiesPanelProps } from './inspector/types';
+import type { PropertiesPanelProps } from './inspector/types';
 
 export type { PropertiesPanelProps } from './inspector/types';
 export type { InspectorTab } from './inspector/types';
