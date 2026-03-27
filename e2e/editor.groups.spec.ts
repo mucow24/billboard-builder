@@ -106,17 +106,6 @@ function groupHandlePoint(
   return rotatePoint(local, center, frame.rotation);
 }
 
-function groupRotaterPoint(frame: NonNullable<Awaited<ReturnType<typeof readStageDebug>>['groupFrame']>) {
-  const center = frameCenter(frame);
-  return rotatePoint(
-    {
-      x: frame.x + frame.width / 2,
-      y: frame.y - 50,
-    },
-    center,
-    frame.rotation,
-  );
-}
 
 test.describe('editor groups', () => {
   test('GD-11 GD-12 GD-13 groups and ungroups sibling nodes through the real toolbar and keyboard flows', async ({

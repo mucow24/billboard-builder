@@ -113,29 +113,3 @@
   }
 }
 
-@media (max-width: 900px) {
-  .editor-overlays {
-    --overlay-edge: 0.35rem;
-  }
-
-  .overlay-topbar {
-    top: var(--overlay-edge);
-    left: var(--overlay-edge);
-    right: var(--overlay-edge);
-  }
-
-  .overlay-tools {
-    top: var(--overlay-below-topbar);
-    left: var(--overlay-edge);
-  }
-
-  .overlay-status {
-    left: var(--overlay-edge);
-    top: calc(var(--overlay-below-topbar) + 0.1rem);
-  }
-
-  /* canvas-hud position adjustment at small viewport — see canvas.css for the hud styles */
-  .canvas-hud {
-    left: 0.12rem;
-  }
-}
