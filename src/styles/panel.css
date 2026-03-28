@@ -210,8 +210,8 @@
   flex-direction: column;
   gap: 0;
   margin-top: 0;
-  margin-left: -8px;
-  margin-right: -8px;
+  margin-left: -5px;
+  margin-right: -5px;
   padding: 0;
 }
 
@@ -320,20 +320,23 @@
   width: 100%;
   flex-direction: column;
   overflow: auto;
-  padding: 4px 8px 8px;
+  padding: 10px 10px 8px;
 }
 
 .rail-tab-body-properties {
-  padding: 4px 0 8px;
+  padding: 10px 10px 8px;
 }
 
 .rail-tab-body-layers {
   gap: 0;
   overflow: hidden;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 
 .rail-tab-body-favorites {
-  padding-right: 0.05rem;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .panel-action-row {
