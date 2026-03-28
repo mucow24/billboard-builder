@@ -44,7 +44,7 @@ jobs:
 
       - run: npm ci
       - run: npx playwright install --with-deps ${{ matrix.project }}
-      - run: npm run e2e -- --project=${{ matrix.project }}
+      - run: npm run e2e -- --project=${{ matrix.project }} --workers=2
 
       - if: always()
         uses: actions/upload-artifact@v4
