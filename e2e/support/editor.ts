@@ -677,8 +677,7 @@ export async function openFreshEditor(page: Page) {
   await page.goto(EDITOR_TEST_URL);
   await waitForEditor(page);
   await clearPersistence(page);
-  await page.goto('about:blank');
-  await page.goto(EDITOR_TEST_URL);
+  await page.reload();
   await waitForEditor(page);
 }
 

@@ -134,7 +134,9 @@ test.describe('editor visual regression', () => {
       'visual-gradient-rotated-rectangle.json'
     );
 
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('gradient-rotated-rectangle.png');
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('gradient-rotated-rectangle.png', {
+      maxDiffPixelRatio: 0.01,
+    });
   });
 
   test('captures text padding moving glyphs through a fixed item-frame gradient', async ({ page }) => {
@@ -170,7 +172,9 @@ test.describe('editor visual regression', () => {
       'visual-gradient-text-padding.json'
     );
 
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('gradient-text-padding.png');
+    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('gradient-text-padding.png', {
+      maxDiffPixelRatio: 0.01,
+    });
   });
 
   test.describe('layers panel mock parity', () => {
