@@ -93,13 +93,10 @@ export function useCanvasViewport({
     }
   }, [fitCanvasToViewport]);
 
-  useEffect(() => {
-    panRef.current = pan;
-  }, [pan]);
-
-  useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
+  // Sync refs during render (not in useEffect) so stable callbacks
+  // read current values in the same render pass that changes zoom/pan.
+  panRef.current = pan;
+  zoomRef.current = zoom;
 
   const getViewportPointerFromClient = useCallback((clientX: number, clientY: number) => {
     const bounds = viewportRef.current?.getBoundingClientRect();
@@ -258,6 +255,30 @@ export function useCanvasViewport({
     }
   }, []);
 
+  const stableToCanvasPointer = useCallback(
+    (pointer: Point) => toCanvasPointer(pointer, zoomRef.current, panRef.current),
+    [],
+  );
+
+  const stableToViewportPoint = useCallback(
+    (point: Point) => toViewportPoint(point, zoomRef.current, panRef.current),
+    [],
+  );
+
+  const stableToViewportRect = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }) =>
+      toViewportRect(rect, zoomRef.current, panRef.current),
+    [],
+  );
+
+  const stableZoomInFromWheel = useCallback(
+    (point: Point, deltaY: number) => {
+      const direction = deltaY > 0 ? 1 / ZOOM_STEP : ZOOM_STEP;
+      zoomAround(point, zoomRef.current * direction);
+    },
+    [zoomAround],
+  );
+
   return {
     centerPoint,
     applyZoomToolClick,
@@ -271,19 +292,15 @@ export function useCanvasViewport({
     setZoomFromHud,
     getStageCursor,
     startPanDrag,
-    toCanvasPointer: (pointer: Point) => toCanvasPointer(pointer, zoom, pan),
-    toViewportPoint: (point: Point) => toViewportPoint(point, zoom, pan),
-    toViewportRect: (rect: { x: number; y: number; width: number; height: number }) =>
-      toViewportRect(rect, zoom, pan),
+    toCanvasPointer: stableToCanvasPointer,
+    toViewportPoint: stableToViewportPoint,
+    toViewportRect: stableToViewportRect,
     viewport,
     viewportRef,
     viewportSize,
     zoom,
     zoomAround,
-    zoomInFromWheel: (point: Point, deltaY: number) => {
-      const direction = deltaY > 0 ? 1 / ZOOM_STEP : ZOOM_STEP;
-      zoomAround(point, zoomRef.current * direction);
-    },
+    zoomInFromWheel: stableZoomInFromWheel,
     zoomOutFromHudStep: HUD_ZOOM_STEP,
   };
 }
