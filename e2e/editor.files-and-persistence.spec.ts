@@ -18,6 +18,7 @@ import {
   openPropertiesTab,
   readDownloadedJson,
   readDownloadedPngSize,
+  readStageDebug,
   setCanvasTestHooksEnabled,
   seedPersistence,
   startToolbarFileChooser,
@@ -326,6 +327,12 @@ test.describe('editor file and persistence flows', () => {
     await seedPersistence(page, persistedDocument);
     await page.reload();
     await waitForEditor(page);
+    await expect
+      .poll(async () => (await readStageDebug(page)).renderedItemCount, {
+        message: 'waiting for persisted item to render after reload',
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(1);
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(1);
 
