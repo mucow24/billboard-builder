@@ -105,6 +105,22 @@ export function renderAlignField({ field, onCommit }: CustomFieldRenderProps) {
   );
 }
 
+export function renderSwapFillColorsField({
+  field,
+  onCommit,
+}: CustomFieldRenderProps) {
+  return (
+    <button
+      type="button"
+      className="inspector-action-button"
+      disabled={field.disabled}
+      onClick={() => onCommit(null)}
+    >
+      Swap fill colors
+    </button>
+  );
+}
+
 export function renderVerticalAlignField({
   field,
   onCommit,
