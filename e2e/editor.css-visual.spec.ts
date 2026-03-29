@@ -50,6 +50,7 @@ test.describe('editor CSS visual regression — chrome', () => {
 
   test('chrome-shell: full editor layout', async ({ page }) => {
     await openFreshEditor(page);
+    await expect(page.locator('.selection-inspector')).toContainText('uploaded font(s) ready');
     await expect(page).toHaveScreenshot('chrome-shell.png');
   });
 
