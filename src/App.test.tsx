@@ -376,8 +376,8 @@ describe('App shell', () => {
 
 
   it('applies multi-selection opacity changes to every selected item', async () => {
-    const first = createRectangleItem({ id: 'first', opacity: 0.2 });
-    const second = createRectangleItem({ id: 'second', opacity: 0.8, x: 200 });
+    const first = createImageItem({ id: 'first', opacity: 0.2, src: 'data:image/png;base64,abc', mimeType: 'image/png', originalWidth: 20, originalHeight: 10 });
+    const second = createImageItem({ id: 'second', opacity: 0.8, x: 200, src: 'data:image/png;base64,abc', mimeType: 'image/png', originalWidth: 20, originalHeight: 10 });
 
     resetEditorStore({
       document: { ...createDefaultProjectDocument(), items: [first, second] },

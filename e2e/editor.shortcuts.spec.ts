@@ -310,7 +310,7 @@ test.describe('editor shortcuts', () => {
     await expect(page.locator('.layer-row.active').filter({ hasText: 'Rectangle' })).toContainText('Rectangle');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
-    await expect(page.getByRole('spinbutton', { name: 'Opacity' })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
 
     await page.keyboard.press('Escape');

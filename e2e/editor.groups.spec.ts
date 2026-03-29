@@ -320,7 +320,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -431,7 +431,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
     expect(stageDebug.hasGroupOverlay).toBe(false);
     expect(stageDebug.hasShapeHandles).toBe(true);
@@ -489,7 +489,7 @@ test.describe('editor groups', () => {
     const stageDebug = await readStageDebug(page);
 
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
     expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['off-canvas-group-child']);
     expect(stageDebug.lastDrilldownSource).toBe('item-hit');
@@ -606,7 +606,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
 
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -689,7 +689,7 @@ test.describe('editor groups', () => {
     await doubleClickCanvas(page, { x: 280, y: 220 });
 
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
 
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -708,7 +708,7 @@ test.describe('editor groups', () => {
 
     // Visible assertion: properties panel still shows the drilled-in child (not group) after transforms
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
@@ -990,7 +990,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
 
     expect(Number(draggedChild.x)).toBeGreaterThan(250);
@@ -1000,7 +1000,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
 
     let savedProject = await saveAndReadProject(page);
     expect(expectSavedNode(savedProject, 'undo-child')).toEqual(
@@ -1014,7 +1014,7 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
     await openPropertiesTab(page);
-    await expect(page.getByRole('button', { name: 'Fill', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
 
     savedProject = await saveAndReadProject(page);
     expect(expectSavedNode(savedProject, 'undo-child')).toEqual(
