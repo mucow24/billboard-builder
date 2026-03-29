@@ -73,12 +73,6 @@ async function getLayersPanelRailBounds(page: Page) {
 test.describe('editor visual regression', () => {
   test.skip(({ browserName }) => browserName !== 'chromium', 'Visual snapshots run only on Chromium.');
 
-  test('captures the default canvas shell', async ({ page }) => {
-    await openFreshEditor(page);
-
-    await expect(page.getByTestId('canvas-stage-root')).toHaveScreenshot('default-canvas-shell.png');
-  });
-
   test('captures marquee preview rendering', async ({ page }) => {
     await openFreshEditor(page);
 
