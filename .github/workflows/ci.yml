@@ -29,10 +29,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project:
-          - chromium
-          #- firefox
-          #- webkit
+        project: [chromium]
+        shard: [1, 2, 3, 4]
 
     steps:
       - uses: actions/checkout@v4
@@ -43,13 +41,19 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: npx playwright install --with-deps ${{ matrix.project }}
-      - run: npm run e2e -- --project=${{ matrix.project }}
 
-      - if: always()
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - run: npx playwright install --with-deps ${{ matrix.project }}
+      - run: npm run e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
+
+      - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ matrix.project }}
-          path: |
-            playwright-report
-            test-results
+          name: playwright-report-${{ matrix.project }}-${{ matrix.shard }}
+          path: playwright-report
+          retention-days: 7
