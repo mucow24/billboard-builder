@@ -445,6 +445,7 @@
 /* ── Favorites (thin-row layout) ─────────────────────────────────────────── */
 
 .favorite-library-list {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -452,16 +453,63 @@
 
 .favorite-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 12px 24px minmax(0, 1fr) auto;
   align-items: center;
   gap: 6px;
-  padding: 5px 4px 5px 6px;
+  padding: 5px 4px 5px 2px;
   border-radius: 4px;
 }
 
 .favorite-row:hover {
   background: rgba(148, 163, 184, 0.1);
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+}
+
+.favorite-row.dragging {
+  opacity: 0.4;
+}
+
+/* Drag grip handle */
+.favorite-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64789b;
+  cursor: grab;
+  touch-action: none;
+}
+
+.favorite-grip:hover {
+  color: #93a8c9;
+}
+
+.favorite-grip:active {
+  cursor: grabbing;
+}
+
+.favorite-grip-inert {
+  pointer-events: none;
+  opacity: 0.3;
+  cursor: default;
+}
+
+.favorite-grip-icon {
+  width: 6px;
+  height: 10px;
+  fill: currentColor;
+}
+
+/* Drop indicator line between rows during drag */
+.favorite-drop-indicator {
+  height: 2px;
+  background: rgba(96, 165, 250, 0.7);
+  border-radius: 1px;
+  pointer-events: none;
 }
 
 /* Swatch */

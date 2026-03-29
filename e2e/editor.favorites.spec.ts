@@ -170,6 +170,111 @@ test.describe('editor favorite library flows', () => {
     await expect(page.getByText('No favorites yet')).toBeVisible();
   });
 
+  test('TL-06 reorders favorites via drag and persists the new order', async ({ page }) => {
+    const rectA = createRectangleFixture({ id: 'rect-a', x: 100, y: 100, width: 80, height: 80 });
+    const rectB = createRectangleFixture({ id: 'rect-b', x: 300, y: 300, width: 80, height: 80 });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createGroupedProjectDocument([rectA, rectB]),
+      'reorder-test.json',
+    );
+
+    // Save first item as favorite
+    await clickCanvas(page, { x: 140, y: 140 });
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await expect(page.getByRole('status')).toHaveText('Added to favorites');
+
+    // Deselect, then save second item as favorite
+    await clickCanvas(page, { x: 500, y: 500 });
+    await clickCanvas(page, { x: 340, y: 340 });
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await expect(page.getByRole('status')).toHaveText('Added to favorites');
+
+    await openFavoritesTab(page);
+    const grips = page.getByRole('button', { name: /Reorder/ });
+    await expect(grips).toHaveCount(2);
+
+    // Read initial order
+    const insertButtons = page.getByRole('button', { name: /^Insert / });
+    const namesBefore = await insertButtons.allInnerTexts();
+    expect(namesBefore).toHaveLength(2);
+
+    // Drag second grip above the first
+    const secondGrip = grips.nth(1);
+    const firstGrip = grips.nth(0);
+
+    const secondBox = await secondGrip.boundingBox();
+    const firstBox = await firstGrip.boundingBox();
+    expect(secondBox).toBeTruthy();
+    expect(firstBox).toBeTruthy();
+
+    await page.mouse.move(secondBox!.x + secondBox!.width / 2, secondBox!.y + secondBox!.height / 2);
+    await page.mouse.down();
+    // Move above the first grip with enough distance to pass threshold
+    await page.mouse.move(firstBox!.x + firstBox!.width / 2, firstBox!.y - 2, { steps: 5 });
+    await page.mouse.up();
+
+    // Verify order reversed
+    const namesAfterDrag = await insertButtons.allInnerTexts();
+    expect(namesAfterDrag[0]).toBe(namesBefore[1]);
+    expect(namesAfterDrag[1]).toBe(namesBefore[0]);
+
+    // Verify persistence after reload
+    await page.reload();
+    await waitForEditor(page);
+    await openFavoritesTab(page);
+    const namesAfterReload = await insertButtons.allInnerTexts();
+    expect(namesAfterReload[0]).toBe(namesBefore[1]);
+    expect(namesAfterReload[1]).toBe(namesBefore[0]);
+  });
+
+  test('TL-07 reorders favorites via keyboard and persists the new order', async ({ page }) => {
+    const rectA = createRectangleFixture({ id: 'rect-c', x: 100, y: 100, width: 80, height: 80 });
+    const rectB = createRectangleFixture({ id: 'rect-d', x: 300, y: 300, width: 80, height: 80 });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createGroupedProjectDocument([rectA, rectB]),
+      'kb-reorder-test.json',
+    );
+
+    // Save first item as favorite
+    await clickCanvas(page, { x: 140, y: 140 });
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await expect(page.getByRole('status')).toHaveText('Added to favorites');
+
+    // Deselect, then save second item as favorite
+    await clickCanvas(page, { x: 500, y: 500 });
+    await clickCanvas(page, { x: 340, y: 340 });
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await expect(page.getByRole('status')).toHaveText('Added to favorites');
+
+    await openFavoritesTab(page);
+    const insertButtons = page.getByRole('button', { name: /^Insert / });
+    const namesBefore = await insertButtons.allInnerTexts();
+
+    // Focus first grip and press Alt+ArrowDown
+    const firstGrip = page.getByRole('button', { name: /Reorder/ }).nth(0);
+    await firstGrip.focus();
+    await page.keyboard.press('Alt+ArrowDown');
+
+    // Verify order swapped
+    const namesAfterKeyboard = await insertButtons.allInnerTexts();
+    expect(namesAfterKeyboard[0]).toBe(namesBefore[1]);
+    expect(namesAfterKeyboard[1]).toBe(namesBefore[0]);
+
+    // Verify persistence
+    await page.reload();
+    await waitForEditor(page);
+    await openFavoritesTab(page);
+    const namesAfterReload = await insertButtons.allInnerTexts();
+    expect(namesAfterReload[0]).toBe(namesBefore[1]);
+    expect(namesAfterReload[1]).toBe(namesBefore[0]);
+  });
+
   test('TL-05 lazily restores a favorite-only uploaded font after reload', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(

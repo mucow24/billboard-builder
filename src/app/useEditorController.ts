@@ -6,6 +6,7 @@ import {
   instantiateFavoriteNodes,
   uniquifyFavoriteName,
 } from './favoriteLibrary';
+import { moveArrayItem } from '../editor/document/arrayUtils';
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
@@ -31,6 +32,17 @@ import { createImageItem } from '../editor/document/documentDefaults';
 import { flattenLayerRows } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
 import type { CanvasItem } from '../editor/document/documentTypes';
+
+function useStableArray<T>(next: T[]): T[] {
+  const ref = useRef(next);
+  if (
+    next.length !== ref.current.length ||
+    next.some((item, i) => item !== ref.current[i])
+  ) {
+    ref.current = next;
+  }
+  return ref.current;
+}
 
 function getPointerCenteredPosition(x: number, y: number) {
   return {
@@ -94,7 +106,8 @@ export function useEditorController() {
     selectedNodeIds,
   } = session;
   const selectedNode = selectSelectedNode(document, editor) ?? null;
-  const selectedNodes = selectSelectedNodes(document, editor);
+  const selectedNodesRaw = selectSelectedNodes(document, editor);
+  const selectedNodes = useStableArray(selectedNodesRaw);
   const selectedItem = selectSelectedItem(document, editor) ?? null;
   const selectedGroup = selectSelectedGroup(document, editor) ?? null;
   const selectedItems = selectSelectedItems(document, editor);
@@ -382,6 +395,20 @@ export function useEditorController() {
     }
   }
 
+  function reorderFavorite(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) {
+      return;
+    }
+    try {
+      persistFavorites(moveArrayItem(favorites, fromIndex, toIndex));
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        `Failed to reorder favorites: ${getErrorMessage(error, 'Unknown error.')}`,
+      );
+    }
+  }
+
   function recolorFavorite(favoriteId: string, color: string) {
     const nextFavorites = favorites.map((fav) =>
       fav.id === favoriteId
@@ -407,6 +434,7 @@ export function useEditorController() {
       deleteNode,
       renameFavorite,
       recolorFavorite,
+      reorderFavorite,
       deleteSelectedItems: deleteSelectedNodes,
       deleteSelectedNodes,
       dispatch,

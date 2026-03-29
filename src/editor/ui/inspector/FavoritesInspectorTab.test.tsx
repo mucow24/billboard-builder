@@ -8,7 +8,18 @@ import {
   createTextItem,
 } from '../../document/documentDefaults';
 
+import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 import { FavoritesInspectorTab } from './FavoritesInspectorTab';
+
+function makeFavorite(overrides: Partial<StoredFavorite> & { id: string; name: string }): StoredFavorite {
+  return {
+    nodes: [createRectangleItem({ id: `${overrides.id}-rect` })],
+    fonts: [],
+    createdAt: '2026-03-19T12:00:00.000Z',
+    updatedAt: '2026-03-19T12:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('FavoritesInspectorTab', () => {
   it('renders an empty state when no favorites have been saved', () => {
@@ -18,6 +29,7 @@ describe('FavoritesInspectorTab', () => {
         onInsertFavorite={vi.fn()}
         onRenameFavorite={vi.fn()}
         onRecolorFavorite={vi.fn()}
+        onReorderFavorite={vi.fn()}
         favorites={[]}
       />,
     );
@@ -48,6 +60,7 @@ describe('FavoritesInspectorTab', () => {
         onInsertFavorite={onInsertFavorite}
         onRenameFavorite={vi.fn()}
         onRecolorFavorite={vi.fn()}
+        onReorderFavorite={vi.fn()}
         favorites={[
           {
             id: 'favorite-1',
@@ -76,5 +89,87 @@ describe('FavoritesInspectorTab', () => {
       screen.getByRole('button', { name: 'Delete favorite Hero favorite' }),
     );
     expect(onDeleteFavorite).toHaveBeenCalledWith('favorite-1');
+  });
+
+  it('renders a drag grip on each favorite row', () => {
+    render(
+      <FavoritesInspectorTab
+        onDeleteFavorite={vi.fn()}
+        onInsertFavorite={vi.fn()}
+        onRenameFavorite={vi.fn()}
+        onRecolorFavorite={vi.fn()}
+        onReorderFavorite={vi.fn()}
+        favorites={[
+          makeFavorite({ id: 'fav-1', name: 'Alpha' }),
+          makeFavorite({ id: 'fav-2', name: 'Bravo' }),
+        ]}
+      />,
+    );
+
+    const grips = screen.getAllByRole('button', { name: /Reorder/ });
+    expect(grips).toHaveLength(2);
+  });
+
+  it('makes the grip inert during edit mode', async () => {
+    const user = userEvent.setup();
+    render(
+      <FavoritesInspectorTab
+        onDeleteFavorite={vi.fn()}
+        onInsertFavorite={vi.fn()}
+        onRenameFavorite={vi.fn()}
+        onRecolorFavorite={vi.fn()}
+        onReorderFavorite={vi.fn()}
+        favorites={[makeFavorite({ id: 'fav-1', name: 'Alpha' })]}
+      />,
+    );
+
+    // Enter edit mode
+    await user.click(screen.getByRole('button', { name: 'Rename Alpha' }));
+
+    const grip = screen.getByRole('button', { name: /Reorder Alpha/ });
+    expect(grip).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('fires onReorderFavorite on keyboard Alt+ArrowDown', async () => {
+    const onReorderFavorite = vi.fn();
+    render(
+      <FavoritesInspectorTab
+        onDeleteFavorite={vi.fn()}
+        onInsertFavorite={vi.fn()}
+        onRenameFavorite={vi.fn()}
+        onRecolorFavorite={vi.fn()}
+        onReorderFavorite={onReorderFavorite}
+        favorites={[
+          makeFavorite({ id: 'fav-1', name: 'Alpha' }),
+          makeFavorite({ id: 'fav-2', name: 'Bravo' }),
+        ]}
+      />,
+    );
+
+    const grip = screen.getAllByRole('button', { name: /Reorder/ })[0];
+    grip.focus();
+    await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');
+
+    expect(onReorderFavorite).toHaveBeenCalledWith(0, 1);
+  });
+
+  it('does not fire onInsertFavorite when grip is clicked', async () => {
+    const user = userEvent.setup();
+    const onInsertFavorite = vi.fn();
+    render(
+      <FavoritesInspectorTab
+        onDeleteFavorite={vi.fn()}
+        onInsertFavorite={onInsertFavorite}
+        onRenameFavorite={vi.fn()}
+        onRecolorFavorite={vi.fn()}
+        onReorderFavorite={vi.fn()}
+        favorites={[makeFavorite({ id: 'fav-1', name: 'Alpha' })]}
+      />,
+    );
+
+    const grip = screen.getByRole('button', { name: /Reorder/ });
+    await user.click(grip);
+
+    expect(onInsertFavorite).not.toHaveBeenCalled();
   });
 });

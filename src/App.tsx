@@ -41,6 +41,7 @@ export default function App() {
       deleteSelectedItems,
       renameFavorite,
       recolorFavorite,
+      reorderFavorite,
       dispatch,
       groupSelectedNodes,
       handleExport,
@@ -284,6 +285,7 @@ export default function App() {
                 onDeleteFavorite={deleteFavorite}
                 onRenameFavorite={renameFavorite}
                 onRecolorFavorite={recolorFavorite}
+                onReorderFavorite={reorderFavorite}
                 selectedGroup={selectedGroup ?? undefined}
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
