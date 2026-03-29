@@ -14,9 +14,9 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "lint:e2e-hooks": "node scripts/check-e2e-hook-usage.mjs",
-    "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed",
-    "e2e:update-snapshots": "playwright test --update-snapshots"
+    "e2e": "node scripts/run-e2e.mjs",
+    "e2e:headed": "node scripts/run-e2e.mjs --headed",
+    "e2e:update-snapshots": "node scripts/run-e2e.mjs --update-snapshots"
   },
   "dependencies": {
     "@uiw/react-color": "^2.9.6",
