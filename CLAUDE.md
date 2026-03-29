@@ -2,7 +2,7 @@
 
 ## E2E Tests
 
-E2E snapshots target **Linux Chromium only**. Always run e2e tests via:
+Always run e2e tests via:
 
 ```
 npm run e2e
@@ -11,7 +11,16 @@ npm run e2e
 This works from both Windows and WSL — the script (`scripts/run-e2e.mjs`)
 automatically delegates to WSL when invoked on Windows.
 
-**Never run `npx playwright test` directly on Windows** — there are no win32
-snapshots and the tests will fail.
+**Never run `npx playwright test` directly on Windows.**
 
-To update snapshots: `npm run e2e:update-snapshots`
+### Screenshot / visual-regression tests
+
+Screenshot tests are **excluded** from the default `npm run e2e` run because
+the snapshots are environment-sensitive (WSL vs CI rendering differences).
+
+| Command | What it does |
+|---|---|
+| `npm run e2e` | Functional tests only (skips visual) |
+| `npm run e2e:screenshots` | Visual/screenshot tests only |
+| `npm run e2e:screenshots:update` | Regenerate screenshot baselines |
+| `npm run e2e:all` | Everything (functional + visual) |
