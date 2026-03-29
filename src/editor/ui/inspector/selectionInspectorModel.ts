@@ -332,7 +332,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       valueType: 'color',
     }),
     {
-      buildChange: ({ item }, _nextValue) => {
+      buildChange: ({ item }) => {
         const fill = 'fill' in item ? item.fill : '';
         const secondaryFill = 'secondaryFill' in item ? item.secondaryFill : '';
         return { fill: secondaryFill, secondaryFill: fill };
@@ -675,7 +675,7 @@ function createShapeDescriptors(
         valueType: 'color',
       }),
       {
-        buildChange: ({ item }, _nextValue) => {
+        buildChange: ({ item }) => {
           const fill = 'fill' in item ? item.fill : '';
           const secondaryFill = 'secondaryFill' in item ? item.secondaryFill : '';
           return { fill: secondaryFill, secondaryFill: fill };
