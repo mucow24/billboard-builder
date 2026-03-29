@@ -14,6 +14,7 @@ export interface CanvasPoint {
 }
 
 export interface StageDebugInfo {
+  renderedItemCount?: number;
   sessionKind?: string | null;
   sessionHandle?: string | null;
   cropSession?: {
@@ -904,6 +905,19 @@ export async function startToolbarFileChooser(page: Page, triggerName: string, i
   return chooser;
 }
 
+function countLeafNodes(nodes: unknown[]): number {
+  let count = 0;
+  for (const node of nodes) {
+    const n = node as { kind?: string; children?: unknown[] };
+    if (n.kind === 'group' && Array.isArray(n.children)) {
+      count += countLeafNodes(n.children);
+    } else {
+      count += 1;
+    }
+  }
+  return count;
+}
+
 export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
   const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
   await chooser.setFiles({
@@ -911,6 +925,21 @@ export async function uploadProject(page: Page, document: Record<string, unknown
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(document), 'utf8'),
   });
+
+  // Wait for the canvas to finish rendering the uploaded nodes.
+  // Without this, fast canvas interactions right after upload can race
+  // against the React render cycle on slower CI runners.
+  const leafCount = countLeafNodes(
+    (document as { nodes?: unknown[] }).nodes ?? [],
+  );
+  if (leafCount > 0) {
+    await expect
+      .poll(async () => (await readStageDebug(page)).renderedItemCount, {
+        message: `waiting for ${leafCount} rendered leaf items after upload`,
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(leafCount);
+  }
 }
 
 export async function uploadSvgImage(page: Page, name = 'fixture.svg') {

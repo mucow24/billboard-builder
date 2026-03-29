@@ -159,6 +159,7 @@ export function useCanvasDebugSnapshot({
   const debugInfo = useMemo(
     () => ({
       stageSize: viewportSize,
+      renderedItemCount: renderedItems.length,
       viewport: {
         zoom,
         panX: pan.x,
