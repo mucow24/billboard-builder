@@ -14,6 +14,7 @@ import {
   renderFontFamilyField,
   renderItalicField,
   renderMirrorField,
+  renderSwapFillColorsField,
   renderVerticalAlignField,
 } from './selectionInspectorRenderers';
 
@@ -302,9 +303,21 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       supportsMultiEdit: true,
       valueType: 'color',
     }),
+    createBooleanField({
+      buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
+      fieldOrder: 20,
+      getValue: (item) => item.kind === 'text' && item.gradientEnabled,
+      label: 'Gradient',
+      propertyKey: 'gradientEnabled',
+      sectionKey: 'fill',
+      sectionLabel: 'Fill',
+      sectionOrder: SECTION_ORDER.fill,
+      supportsMultiEdit: true,
+      valueType: 'boolean',
+    }),
     createColorField({
       buildChange: (_context, nextValue) => ({ secondaryFill: nextValue }),
-      fieldOrder: 20,
+      fieldOrder: 30,
       getDisabled: ({ selectedItems }) =>
         selectedItems.every(
           (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
@@ -318,18 +331,28 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       supportsMultiEdit: true,
       valueType: 'color',
     }),
-    createBooleanField({
-      buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
-      fieldOrder: 30,
-      getValue: (item) => item.kind === 'text' && item.gradientEnabled,
-      label: 'Gradient',
-      propertyKey: 'gradientEnabled',
+    {
+      buildChange: ({ item }: SelectionFieldChangeContext) => {
+        const fill = 'fill' in item ? item.fill : '';
+        const secondaryFill = 'secondaryFill' in item ? item.secondaryFill : '';
+        return { fill: secondaryFill, secondaryFill: fill };
+      },
+      controlKind: 'custom' as const,
+      fieldOrder: 40,
+      getDisabled: ({ selectedItems }) =>
+        selectedItems.every(
+          (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
+        ),
+      getValue: () => null,
+      label: 'Swap fill colors',
+      propertyKey: 'swapFillColors',
+      render: renderSwapFillColorsField,
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
       supportsMultiEdit: true,
-      valueType: 'boolean',
-    }),
+      valueType: 'custom',
+    },
     createTextField({
       buildChange: (_context, nextValue) => ({ text: nextValue }),
       fieldOrder: 10,
@@ -621,9 +644,22 @@ function createShapeDescriptors(
         supportsMultiEdit: true,
         valueType: 'color',
       }),
+      createBooleanField({
+        buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
+        fieldOrder: 20,
+        getValue: (item) =>
+          (item.kind === 'rectangle' || item.kind === 'ellipse') && item.gradientEnabled,
+        label: 'Gradient',
+        propertyKey: 'gradientEnabled',
+        sectionKey: 'fill',
+        sectionLabel: 'Fill',
+        sectionOrder: SECTION_ORDER.fill,
+        supportsMultiEdit: true,
+        valueType: 'boolean',
+      }),
       createColorField({
         buildChange: (_context, nextValue) => ({ secondaryFill: nextValue }),
-        fieldOrder: 20,
+        fieldOrder: 30,
         getDisabled: ({ selectedItems }) =>
           selectedItems.every(
             (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
@@ -638,19 +674,28 @@ function createShapeDescriptors(
         supportsMultiEdit: true,
         valueType: 'color',
       }),
-      createBooleanField({
-        buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
-        fieldOrder: 30,
-        getValue: (item) =>
-          (item.kind === 'rectangle' || item.kind === 'ellipse') && item.gradientEnabled,
-        label: 'Gradient',
-        propertyKey: 'gradientEnabled',
+      {
+        buildChange: ({ item }: SelectionFieldChangeContext) => {
+          const fill = 'fill' in item ? item.fill : '';
+          const secondaryFill = 'secondaryFill' in item ? item.secondaryFill : '';
+          return { fill: secondaryFill, secondaryFill: fill };
+        },
+        controlKind: 'custom' as const,
+        fieldOrder: 40,
+        getDisabled: ({ selectedItems }) =>
+          selectedItems.every(
+            (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
+          ),
+        getValue: () => null,
+        label: 'Swap fill colors',
+        propertyKey: 'swapFillColors',
+        render: renderSwapFillColorsField,
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
         supportsMultiEdit: true,
-        valueType: 'boolean',
-      }),
+        valueType: 'custom',
+      },
     );
   }
 

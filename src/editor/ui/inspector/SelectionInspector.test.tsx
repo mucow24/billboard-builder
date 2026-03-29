@@ -490,6 +490,118 @@ describe('SelectionInspector', () => {
     expect(screen.queryByText('2 items selected')).not.toBeInTheDocument();
   });
 
+  it('orders fill section fields as Fill, Gradient, Secondary fill, Swap fill colors', () => {
+    const rectangleItem = createRectangleItem({
+      fill: '#ff0000ff',
+      secondaryFill: '#0000ffff',
+      gradientEnabled: true,
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={rectangleItem}
+        selectedNodeCount={1}
+        selectedItems={[rectangleItem]}
+      />
+    );
+
+    const fillToggle = screen.getByRole('button', { name: 'Fill', expanded: true });
+    const fillSection = fillToggle.closest('section')!;
+    const labels = Array.from(fillSection.querySelectorAll('.inspector-field-shell'))
+      .map((el) => {
+        const fieldLabel = el.querySelector('.inspector-field-label');
+        const button = el.querySelector('.inspector-action-button');
+        return fieldLabel?.textContent?.replace(/:$/, '') ?? button?.textContent ?? '';
+      })
+      .filter(Boolean);
+
+    expect(labels).toEqual(['Fill', 'Gradient', 'Secondary fill', 'Swap fill colors']);
+  });
+
+  it('swaps fill and secondary fill colors when the swap button is clicked', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const rectangleItem = createRectangleItem({
+      fill: '#ff0000ff',
+      secondaryFill: '#0000ffff',
+      gradientEnabled: true,
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={rectangleItem}
+        selectedNodeCount={1}
+        selectedItems={[rectangleItem]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Swap fill colors' }));
+
+    expect(expectLatestChange(onItemChange, rectangleItem)).toEqual({
+      fill: '#0000ffff',
+      secondaryFill: '#ff0000ff',
+    });
+  });
+
+  it('disables the swap fill colors button when gradient is not enabled', () => {
+    const rectangleItem = createRectangleItem({
+      fill: '#ff0000ff',
+      secondaryFill: '#0000ffff',
+      gradientEnabled: false,
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={rectangleItem}
+        selectedNodeCount={1}
+        selectedItems={[rectangleItem]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeDisabled();
+  });
+
+  it('swaps fill colors for text items', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const textItem = createTextItem({
+      fill: '#aabbccff',
+      secondaryFill: '#ddeeffff',
+      gradientEnabled: true,
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={textItem}
+        selectedNodeCount={1}
+        selectedItems={[textItem]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Swap fill colors' }));
+
+    expect(expectLatestChange(onItemChange, textItem)).toEqual({
+      fill: '#ddeeffff',
+      secondaryFill: '#aabbccff',
+    });
+  });
+
   it('keeps multi-selection controls when multiple nodes are selected, even if the primary node is a group', () => {
     const first = createRectangleItem({ opacity: 0.5 });
     const second = createRectangleItem({ opacity: 0.7 });
