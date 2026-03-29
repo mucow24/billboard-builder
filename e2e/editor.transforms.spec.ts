@@ -308,6 +308,7 @@ test.describe('editor transforms', () => {
 
     // ST-07: Select and drag
     await clickCanvas(page, { x: 600, y: 325 });
+    await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(true);
     await openPropertiesTab(page);
     await expect(page.getByLabel('Preserve aspect ratio')).toBeVisible();
 
