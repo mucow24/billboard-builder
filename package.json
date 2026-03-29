@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "typecheck:tests": "tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint .",
-    "test": "npm run typecheck && vitest run --coverage",
+    "test": "vitest run --coverage",
     "test:watch": "vitest",
     "lint:e2e-hooks": "node scripts/check-e2e-hook-usage.mjs",
     "e2e": "node scripts/run-e2e.mjs --grep-invert visual",

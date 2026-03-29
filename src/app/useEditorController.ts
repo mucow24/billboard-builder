@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type Konva from 'konva';
 
 import {
@@ -32,6 +32,17 @@ import { createImageItem } from '../editor/document/documentDefaults';
 import { flattenLayerRows } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
 import type { CanvasItem } from '../editor/document/documentTypes';
+
+function useStableArray<T>(next: T[]): T[] {
+  const ref = useRef(next);
+  if (
+    next.length !== ref.current.length ||
+    next.some((item, i) => item !== ref.current[i])
+  ) {
+    ref.current = next;
+  }
+  return ref.current;
+}
 
 function getPointerCenteredPosition(x: number, y: number) {
   return {
@@ -95,7 +106,8 @@ export function useEditorController() {
     selectedNodeIds,
   } = session;
   const selectedNode = selectSelectedNode(document, editor) ?? null;
-  const selectedNodes = selectSelectedNodes(document, editor);
+  const selectedNodesRaw = selectSelectedNodes(document, editor);
+  const selectedNodes = useStableArray(selectedNodesRaw);
   const selectedItem = selectSelectedItem(document, editor) ?? null;
   const selectedGroup = selectSelectedGroup(document, editor) ?? null;
   const selectedItems = selectSelectedItems(document, editor);
