@@ -138,10 +138,10 @@ export interface ResolvedInspectorSection {
 }
 
 const SECTION_ORDER = {
-  color: 10,
+  image: 5,
+  fill: 10,
+  stroke: 15,
   text: 20,
-  image: 30,
-  main: 40,
   geometry: 50,
   advancedText: 60,
   shadow: 70,
@@ -234,31 +234,6 @@ function createGeometryField(
   });
 }
 
-function createMainNumberField(
-  propertyKey: string,
-  label: string,
-  fieldOrder: number,
-  getValue: (item: CanvasItem) => number,
-  buildChange: (
-    context: SelectionFieldChangeContext,
-    nextValue: number,
-  ) => Partial<CanvasItem>,
-  extra?: Partial<NumberFieldDescriptor>,
-): NumberFieldDescriptor {
-  return createNumberField({
-    buildChange,
-    fieldOrder,
-    getValue,
-    label,
-    propertyKey,
-    sectionKey: 'main',
-    sectionLabel: 'Main',
-    sectionOrder: SECTION_ORDER.main,
-    supportsMultiEdit: true,
-    valueType: 'number',
-    ...extra,
-  });
-}
 
 function createShadowNumberField(
   propertyKey: string,
@@ -321,9 +296,9 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       getValue: (item) => (item.kind === 'text' ? item.fill : ''),
       label: 'Fill',
       propertyKey: 'fill',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'fill',
+      sectionLabel: 'Fill',
+      sectionOrder: SECTION_ORDER.fill,
       supportsMultiEdit: true,
       valueType: 'color',
     }),
@@ -337,9 +312,9 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       getValue: (item) => (item.kind === 'text' ? item.secondaryFill : ''),
       label: 'Secondary fill',
       propertyKey: 'secondaryFill',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'fill',
+      sectionLabel: 'Fill',
+      sectionOrder: SECTION_ORDER.fill,
       supportsMultiEdit: true,
       valueType: 'color',
     }),
@@ -349,9 +324,9 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       getValue: (item) => item.kind === 'text' && item.gradientEnabled,
       label: 'Gradient',
       propertyKey: 'gradientEnabled',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'fill',
+      sectionLabel: 'Fill',
+      sectionOrder: SECTION_ORDER.fill,
       supportsMultiEdit: true,
       valueType: 'boolean',
     }),
@@ -458,22 +433,6 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       supportsMultiEdit: true,
       valueType: 'select',
     }),
-    createMainNumberField(
-      'opacity',
-      'Opacity',
-      10,
-      (item) => item.opacity,
-      (_context, nextValue) => ({ opacity: nextValue }),
-      { digits: 1, max: 1, min: 0, step: 0.1 }
-    ),
-    createMainNumberField(
-      'rotation',
-      'Rotation',
-      20,
-      (item) => item.rotation,
-      (_context, nextValue) => ({ rotation: nextValue }),
-      { digits: 0, step: 1 }
-    ),
     createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
       digits: 1,
       step: 0.1,
@@ -503,6 +462,14 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
         digits: 1,
         min: 1,
       }
+    ),
+    createGeometryField(
+      'rotation',
+      'Rotation',
+      50,
+      (item) => item.rotation,
+      (_context, nextValue) => ({ rotation: nextValue }),
+      { digits: 0, step: 1 }
     ),
     createNumberField({
       buildChange: (_context, nextValue) => ({ lineHeight: nextValue }),
@@ -612,25 +579,32 @@ function createShapeDescriptors(
   itemKind: 'ellipse' | 'line' | 'rectangle'
 ): InspectorFieldDescriptor[] {
   const descriptors: InspectorFieldDescriptor[] = [
-    createMainNumberField(
-      'strokeWidth',
-      'Stroke width',
-      10,
-      (item) => ('strokeWidth' in item ? item.strokeWidth : 0),
-      (_context, nextValue) => ({ strokeWidth: nextValue }),
-      {
-        digits: 1,
-        min: itemKind === 'line' ? 1 : 0,
-      }
-    ),
-    createMainNumberField(
-      'opacity',
-      'Opacity',
-      itemKind === 'line' ? 20 : 30,
-      (item) => item.opacity,
-      (_context, nextValue) => ({ opacity: nextValue }),
-      { digits: 1, max: 1, min: 0, step: 0.1 }
-    ),
+    createColorField({
+      buildChange: (_context, nextValue) => ({ stroke: nextValue }),
+      fieldOrder: 10,
+      getValue: (item) => ('stroke' in item ? item.stroke : ''),
+      label: 'Stroke',
+      propertyKey: 'stroke',
+      sectionKey: 'stroke',
+      sectionLabel: 'Stroke',
+      sectionOrder: SECTION_ORDER.stroke,
+      supportsMultiEdit: true,
+      valueType: 'color',
+    }),
+    createNumberField({
+      buildChange: (_context, nextValue) => ({ strokeWidth: nextValue }),
+      digits: 1,
+      fieldOrder: 20,
+      getValue: (item) => ('strokeWidth' in item ? item.strokeWidth : 0),
+      label: 'Stroke width',
+      min: itemKind === 'line' ? 1 : 0,
+      propertyKey: 'strokeWidth',
+      sectionKey: 'stroke',
+      sectionLabel: 'Stroke',
+      sectionOrder: SECTION_ORDER.stroke,
+      supportsMultiEdit: true,
+      valueType: 'number',
+    }),
   ];
 
   if (itemKind !== 'line') {
@@ -641,9 +615,9 @@ function createShapeDescriptors(
         getValue: (item) => ('fill' in item ? item.fill : ''),
         label: 'Fill',
         propertyKey: 'fill',
-        sectionKey: 'color',
-        sectionLabel: 'Color',
-        sectionOrder: SECTION_ORDER.color,
+        sectionKey: 'fill',
+        sectionLabel: 'Fill',
+        sectionOrder: SECTION_ORDER.fill,
         supportsMultiEdit: true,
         valueType: 'color',
       }),
@@ -658,9 +632,9 @@ function createShapeDescriptors(
           item.kind === 'rectangle' || item.kind === 'ellipse' ? item.secondaryFill : '',
         label: 'Secondary fill',
         propertyKey: 'secondaryFill',
-        sectionKey: 'color',
-        sectionLabel: 'Color',
-        sectionOrder: SECTION_ORDER.color,
+        sectionKey: 'fill',
+        sectionLabel: 'Fill',
+        sectionOrder: SECTION_ORDER.fill,
         supportsMultiEdit: true,
         valueType: 'color',
       }),
@@ -671,62 +645,12 @@ function createShapeDescriptors(
           (item.kind === 'rectangle' || item.kind === 'ellipse') && item.gradientEnabled,
         label: 'Gradient',
         propertyKey: 'gradientEnabled',
-        sectionKey: 'color',
-        sectionLabel: 'Color',
-        sectionOrder: SECTION_ORDER.color,
+        sectionKey: 'fill',
+        sectionLabel: 'Fill',
+        sectionOrder: SECTION_ORDER.fill,
         supportsMultiEdit: true,
         valueType: 'boolean',
       }),
-      createColorField({
-        buildChange: (_context, nextValue) => ({ stroke: nextValue }),
-        fieldOrder: 40,
-        getValue: (item) => ('stroke' in item ? item.stroke : ''),
-        label: 'Stroke',
-        propertyKey: 'stroke',
-        sectionKey: 'color',
-        sectionLabel: 'Color',
-        sectionOrder: SECTION_ORDER.color,
-        supportsMultiEdit: true,
-        valueType: 'color',
-      }),
-    );
-    descriptors.push(
-      createMainNumberField(
-        'rotation',
-        'Rotation',
-        itemKind === 'rectangle' ? 40 : 30,
-        (item) => item.rotation,
-        (_context, nextValue) => ({ rotation: nextValue }),
-        { digits: 0, step: 1 }
-      )
-    );
-  } else {
-    descriptors.unshift(
-      createColorField({
-        buildChange: (_context, nextValue) => ({ stroke: nextValue }),
-        fieldOrder: 10,
-        getValue: (item) => ('stroke' in item ? item.stroke : ''),
-        label: 'Stroke',
-        propertyKey: 'stroke',
-        sectionKey: 'color',
-        sectionLabel: 'Color',
-        sectionOrder: SECTION_ORDER.color,
-        supportsMultiEdit: true,
-        valueType: 'color',
-      }),
-    );
-  }
-
-  if (itemKind === 'rectangle') {
-    descriptors.push(
-      createMainNumberField(
-        'cornerRadius',
-        'Corner radius',
-        20,
-        (item) => (item.kind === 'rectangle' ? item.cornerRadius : 0),
-        (_context, nextValue) => ({ cornerRadius: nextValue }),
-        { digits: 1, min: 0 }
-      )
     );
   }
 
@@ -796,6 +720,27 @@ function createShapeDescriptors(
           digits: 1,
           min: 1,
         }
+      ),
+      createGeometryField(
+        'rotation',
+        'Rotation',
+        50,
+        (item) => item.rotation,
+        (_context, nextValue) => ({ rotation: nextValue }),
+        { digits: 0, step: 1 }
+      )
+    );
+  }
+
+  if (itemKind === 'rectangle') {
+    descriptors.push(
+      createGeometryField(
+        'cornerRadius',
+        'Corner radius',
+        60,
+        (item) => (item.kind === 'rectangle' ? item.cornerRadius : 0),
+        (_context, nextValue) => ({ cornerRadius: nextValue }),
+        { digits: 1, min: 0 }
       )
     );
   }
@@ -837,13 +782,13 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
         item.kind === 'image'
           ? buildImageAdjustmentsChange(item.adjustments, { tintColor: nextValue })
           : {},
-      fieldOrder: 10,
+      fieldOrder: 20,
       getValue: (item) => (item.kind === 'image' ? item.adjustments.tintColor : ''),
       label: 'Tint color',
       propertyKey: 'tintColor',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
       supportsMultiEdit: true,
       valueType: 'color',
     }),
@@ -853,15 +798,15 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
           ? buildImageAdjustmentsChange(item.adjustments, { brightness: nextValue })
           : {},
       digits: 0,
-      fieldOrder: 20,
+      fieldOrder: 30,
       getValue: (item) => (item.kind === 'image' ? item.adjustments.brightness : 0),
       label: 'Brightness',
       max: 200,
       min: 0,
       propertyKey: 'brightness',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
       slider: true,
       sliderDetentThreshold: 3,
       sliderDetentValue: 100,
@@ -874,15 +819,15 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
           ? buildImageAdjustmentsChange(item.adjustments, { contrast: nextValue })
           : {},
       digits: 0,
-      fieldOrder: 30,
+      fieldOrder: 40,
       getValue: (item) => (item.kind === 'image' ? item.adjustments.contrast : 0),
       label: 'Contrast',
       max: 100,
       min: 0,
       propertyKey: 'contrast',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
       slider: true,
       sliderDetentThreshold: 2,
       sliderDetentValue: 50,
@@ -895,35 +840,35 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
           ? buildImageAdjustmentsChange(item.adjustments, { tintStrength: nextValue })
           : {},
       digits: 0,
-      fieldOrder: 40,
+      fieldOrder: 50,
       getValue: (item) => (item.kind === 'image' ? item.adjustments.tintStrength : 0),
       label: 'Tint strength',
       max: 100,
       min: 0,
       propertyKey: 'tintStrength',
-      sectionKey: 'color',
-      sectionLabel: 'Color',
-      sectionOrder: SECTION_ORDER.color,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
       slider: true,
       supportsMultiEdit: true,
       valueType: 'number',
     }),
-    createMainNumberField(
-      'opacity',
-      'Opacity',
-      10,
-      (item) => item.opacity,
-      (_context, nextValue) => ({ opacity: nextValue }),
-      { digits: 1, max: 1, min: 0, step: 0.1 }
-    ),
-    createMainNumberField(
-      'rotation',
-      'Rotation',
-      20,
-      (item) => item.rotation,
-      (_context, nextValue) => ({ rotation: nextValue }),
-      { digits: 0, step: 1 }
-    ),
+    createNumberField({
+      buildChange: (_context, nextValue) => ({ opacity: nextValue }),
+      digits: 1,
+      fieldOrder: 60,
+      getValue: (item) => item.opacity,
+      label: 'Opacity',
+      max: 1,
+      min: 0,
+      propertyKey: 'opacity',
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
+      step: 0.1,
+      supportsMultiEdit: true,
+      valueType: 'number',
+    }),
     createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
       digits: 1,
       step: 0.1,
@@ -953,6 +898,14 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
         digits: 1,
         min: 1,
       }
+    ),
+    createGeometryField(
+      'rotation',
+      'Rotation',
+      50,
+      (item) => item.rotation,
+      (_context, nextValue) => ({ rotation: nextValue }),
+      { digits: 0, step: 1 }
     ),
   ];
 }

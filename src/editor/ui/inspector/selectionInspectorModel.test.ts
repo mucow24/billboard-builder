@@ -22,12 +22,12 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
-        'color:fill:color',
-        'color:secondaryFill:color',
-        'color:gradientEnabled:boolean',
-        'color:stroke:color',
-        'main:strokeWidth:number',
-        'main:cornerRadius:number',
+        'fill:fill:color',
+        'fill:secondaryFill:color',
+        'fill:gradientEnabled:boolean',
+        'stroke:stroke:color',
+        'stroke:strokeWidth:number',
+        'geometry:cornerRadius:number',
         'geometry:x:number',
         'geometry:height:number',
         'shadow:color:color',
@@ -41,14 +41,14 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
-        'color:fill:color',
-        'color:secondaryFill:color',
-        'color:gradientEnabled:boolean',
+        'fill:fill:color',
+        'fill:secondaryFill:color',
+        'fill:gradientEnabled:boolean',
         'text:text:text',
         'text:fontFamily:select',
         'text:fontWeight:boolean',
         'advancedText:paddingTop:number',
-        'main:rotation:number',
+        'geometry:rotation:number',
         'shadow:opacity:number',
       ])
     );
@@ -68,8 +68,8 @@ describe('selectionInspectorModel', () => {
       expect.arrayContaining([
         'image:mirrorHorizontal:boolean',
         'image:preserveAspectRatio:boolean',
-        'color:tintColor:color',
-        'color:brightness:number',
+        'image:tintColor:color',
+        'image:brightness:number',
         'geometry:width:number',
         'shadow:offsetY:number',
       ])
@@ -82,8 +82,8 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
-        'color:stroke:color',
-        'main:opacity:number',
+        'stroke:stroke:color',
+        'stroke:strokeWidth:number',
         'geometry:startX:number',
         'geometry:endY:number',
         'shadow:blur:number',
@@ -112,13 +112,12 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
-        'color:fill',
-        'main:opacity',
-        'main:rotation',
+        'fill:fill',
+        'geometry:rotation',
         'geometry:x',
         'shadow:color',
-        'color:secondaryFill',
-        'color:gradientEnabled',
+        'fill:secondaryFill',
+        'fill:gradientEnabled',
       ])
     );
     expect(
@@ -130,7 +129,7 @@ describe('selectionInspectorModel', () => {
       rectangleAndLineSections.flatMap((section) =>
         section.fields.map((field) => `${section.key}:${field.descriptor.propertyKey}`)
       )
-    ).toContain('main:opacity');
+    ).toContain('stroke:stroke');
   });
 
   it('marks mixed state and keeps per-item nested patch builders explicit', () => {
@@ -159,13 +158,13 @@ describe('selectionInspectorModel', () => {
     const environment = buildInspectorEnvironment([], []);
     const sections = buildSelectionInspectorSections([first, second], environment);
     const fillField = sections
-      .find((section) => section.key === 'color')
+      .find((section) => section.key === 'fill')
       ?.fields.find((field) => field.descriptor.propertyKey === 'fill');
     const secondaryFillField = sections
-      .find((section) => section.key === 'color')
+      .find((section) => section.key === 'fill')
       ?.fields.find((field) => field.descriptor.propertyKey === 'secondaryFill');
     const gradientEnabledField = sections
-      .find((section) => section.key === 'color')
+      .find((section) => section.key === 'fill')
       ?.fields.find((field) => field.descriptor.propertyKey === 'gradientEnabled');
     const shadowBlurField = sections
       .find((section) => section.key === 'shadow')

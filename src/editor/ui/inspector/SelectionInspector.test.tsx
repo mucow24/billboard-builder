@@ -421,7 +421,7 @@ describe('SelectionInspector', () => {
     });
     await user.click(screen.getByLabelText('Bold'));
     await user.click(screen.getByLabelText('Align center'));
-    await user.click(screen.getByRole('button', { name: 'Fill' }));
+    await user.click(screen.getByLabelText('Fill'));
     fireEvent.change(screen.getByLabelText('Fill hex'), {
       target: { value: '#abcdef12' },
     });
@@ -458,7 +458,7 @@ describe('SelectionInspector', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Color' })).toBeInTheDocument();
+    expect(screen.getByText('Fill', { selector: '.property-block-toggle span' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Geometry' })).toBeInTheDocument();
     expect(screen.getByLabelText('Fill')).toBeInTheDocument();
     expect(screen.getByLabelText('Secondary fill')).toBeInTheDocument();

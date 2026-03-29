@@ -129,7 +129,7 @@ test.describe('editor CSS visual regression — chrome', () => {
     );
     await clickCanvas(page, { x: 300, y: 260 });
     await openPropertiesTab(page);
-    await page.getByRole('button', { name: 'Fill', exact: true }).click();
+    await page.getByLabel('Fill', { exact: true }).click();
     await expect(page.locator('.color-picker-panel')).toBeVisible();
     await expect(page.getByTestId('layers-panel-rail')).toHaveScreenshot('chrome-color-picker.png');
   });

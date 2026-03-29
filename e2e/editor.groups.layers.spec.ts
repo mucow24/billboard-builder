@@ -232,7 +232,7 @@ test.describe('editor group layers and inspector flows', () => {
     await page.keyboard.press(`${modifier}+A`);
     await openPropertiesTab(page);
     await expect(page.locator('h2').filter({ hasText: /items selected/ })).toBeVisible();
-    await expect(page.getByRole('spinbutton', { name: 'Opacity' })).toBeVisible();
+    await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
   });
 
