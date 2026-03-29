@@ -9,6 +9,34 @@ interface SnapLineCandidate {
   position: number;
 }
 
+/**
+ * Pre-computed snap candidates for a set of sibling items + stage.
+ * Build once at gesture start via buildCandidateCache(), reuse every frame.
+ */
+export interface SnapCandidateCache {
+  lines: SnapLineCandidate[];
+  vertical: number[];
+  horizontal: number[];
+}
+
+export function buildCandidateCache(
+  siblingItems: CanvasItem[],
+  stageRect: SnapRect
+): SnapCandidateCache {
+  const lines = [
+    ...getStageCandidates(stageRect),
+    ...getItemCandidates(siblingItems),
+  ];
+  const vertical = [0, stageRect.width / 2, stageRect.width];
+  const horizontal = [0, stageRect.height / 2, stageRect.height];
+  for (const sibling of siblingItems) {
+    const rect = getItemRect(sibling);
+    vertical.push(rect.x, rect.x + rect.width / 2, rect.x + rect.width);
+    horizontal.push(rect.y, rect.y + rect.height / 2, rect.y + rect.height);
+  }
+  return { lines, vertical, horizontal };
+}
+
 function getRectGuides(rect: SnapRect) {
   return {
     vertical: [
@@ -120,12 +148,12 @@ export function getSnappedRect(
   rect: SnapRect,
   siblingItems: CanvasItem[],
   stageRect: SnapRect,
-  threshold = SNAP_THRESHOLD
+  threshold = SNAP_THRESHOLD,
+  cache?: SnapCandidateCache
 ): SnapResult {
-  const candidateLines = [
-    ...getStageCandidates(stageRect),
-    ...getItemCandidates(siblingItems),
-  ];
+  const candidateLines = cache
+    ? cache.lines
+    : [...getStageCandidates(stageRect), ...getItemCandidates(siblingItems)];
   const guides = getRectGuides(rect);
   let nextRect = { ...rect };
   const nextGuides: GuideLine[] = [];
@@ -188,12 +216,12 @@ export function getResizeSnappedRect(
   siblingItems: CanvasItem[],
   stageRect: SnapRect,
   activeAnchor: string | null | undefined,
-  threshold = SNAP_THRESHOLD
+  threshold = SNAP_THRESHOLD,
+  cache?: SnapCandidateCache
 ): SnapResult {
-  const candidateLines = [
-    ...getStageCandidates(stageRect),
-    ...getItemCandidates(siblingItems),
-  ];
+  const candidateLines = cache
+    ? cache.lines
+    : [...getStageCandidates(stageRect), ...getItemCandidates(siblingItems)];
   const guideKeys = getResizeSnapKeys(activeAnchor);
   const nextGuides: GuideLine[] = [];
   const originalEdges = {

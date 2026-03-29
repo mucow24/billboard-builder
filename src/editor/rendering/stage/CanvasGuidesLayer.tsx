@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Group, Line } from 'react-konva';
 
 import type { GuideLine, ProjectDocument } from '../../document/documentTypes';
@@ -13,7 +14,7 @@ interface CanvasGuidesLayerProps {
   zoom: number;
 }
 
-export function CanvasGuidesLayer({
+export const CanvasGuidesLayer = memo(function CanvasGuidesLayer({
   document,
   guides,
   zoom,
@@ -45,4 +46,4 @@ export function CanvasGuidesLayer({
       )}
     </Group>
   );
-}
+});

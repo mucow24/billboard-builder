@@ -18,7 +18,7 @@ import {
   itemIntersectsSelectionRect,
   type RenderBox,
 } from './transformGeometry';
-import { getResizeSnappedRect, getSnappedRect, SNAP_THRESHOLD } from './snapping';
+import { buildCandidateCache, getResizeSnappedRect, getSnappedRect, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
 import type { RenderableCanvasItem } from './renderAdapter';
 import type {
   CanvasItem,
@@ -50,6 +50,7 @@ interface InteractionSessionBase {
   pointerSource: PointerGestureSource;
   guides: GuideLine[];
   snapDisabled?: boolean;
+  snapCache?: SnapCandidateCache;
 }
 
 export interface CreateSession extends InteractionSessionBase {
@@ -565,6 +566,20 @@ export function createGroupRotateSession(
   };
 }
 
+function getOrBuildCache(
+  session: InteractionSession,
+  stageBounds: RenderBox
+): SnapCandidateCache | undefined {
+  if (session.snapCache) {
+    return session.snapCache;
+  }
+  const siblingItems = 'siblingItems' in session ? session.siblingItems : undefined;
+  if (!siblingItems) {
+    return undefined;
+  }
+  return buildCandidateCache(siblingItems, stageBounds);
+}
+
 export function resolveInteractionSession(
   current: InteractionSession,
   pointer: Point,
@@ -573,6 +588,7 @@ export function resolveInteractionSession(
   const { stageBounds, zoom = 1 } = context;
   const threshold = SNAP_THRESHOLD / zoom;
   const currentWithModifiers = current as SessionWithModifiers;
+  const cache = getOrBuildCache(current, stageBounds);
 
   switch (current.kind) {
     case 'create':
@@ -600,9 +616,10 @@ export function resolveInteractionSession(
         current.siblingItems,
         stageBounds,
         !current.snapDisabled,
-        threshold
+        threshold,
+        cache
       );
-      return { ...current, axisLock, previewItem: next.item, guides: next.guides };
+      return { ...current, snapCache: cache, axisLock, previewItem: next.item, guides: next.guides };
     }
     case 'resize': {
       const next = solveResizeSession(
@@ -613,9 +630,10 @@ export function resolveInteractionSession(
         current.siblingItems,
         stageBounds,
         !current.snapDisabled,
-        threshold
+        threshold,
+        cache
       );
-      return { ...current, previewItem: next.item, guides: next.guides };
+      return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
     }
     case 'rotate': {
       const next = solveRotateSession(
@@ -635,9 +653,10 @@ export function resolveInteractionSession(
         current.siblingItems,
         stageBounds,
         !current.snapDisabled,
-        threshold
+        threshold,
+        cache
       );
-      return { ...current, previewItem: next.item, guides: next.guides };
+      return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
     }
     case 'marquee':
       return { ...current, currentPointer: pointer };
@@ -650,13 +669,14 @@ export function resolveInteractionSession(
       };
       const snapped = current.snapDisabled
         ? { rect: rawRect, guides: [] }
-        : getSnappedRect(rawRect, current.siblingItems, stageBounds, threshold);
+        : getSnappedRect(rawRect, current.siblingItems, stageBounds, threshold, cache);
       const resolvedPointer = {
         x: current.pointerStart.x + (snapped.rect.x - current.bounds.x),
         y: current.pointerStart.y + (snapped.rect.y - current.bounds.y),
       };
       return {
         ...current,
+        snapCache: cache,
         currentPointer: resolvedPointer,
         guides: snapped.guides,
         previewItems: buildGroupDragPreviews(
@@ -690,7 +710,8 @@ export function resolveInteractionSession(
         current.siblingItems,
         stageBounds,
         current.handle,
-        threshold
+        threshold,
+        cache
       );
       const resolvedPointer = getGroupResizePointer(
         snapped.rect,
@@ -699,6 +720,7 @@ export function resolveInteractionSession(
       );
       return {
         ...current,
+        snapCache: cache,
         currentPointer: resolvedPointer,
         guides: snapped.guides,
         previewItems: buildGroupResizePreviews(
