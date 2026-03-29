@@ -78,6 +78,7 @@ test.describe('editor CSS visual regression — chrome', () => {
   test('chrome-properties-tab: properties panel empty state', async ({ page }) => {
     await openFreshEditor(page);
     await openPropertiesTab(page);
+    await expect(page.locator('.selection-inspector')).toContainText('uploaded font(s) ready');
     await expect(page.getByTestId('layers-panel-rail')).toHaveScreenshot('chrome-properties-tab-empty.png');
   });
 
