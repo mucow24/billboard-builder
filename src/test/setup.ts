@@ -40,3 +40,13 @@ class TestResizeObserver implements ResizeObserver {
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = TestResizeObserver;
 }
+
+// Make requestAnimationFrame synchronous in tests so rAF-batched state
+// updates (session, guides, crop-session) flush immediately within act().
+// Returns null so that `rafRef.current = requestAnimationFrame(cb)` leaves
+// the ref as null after the callback (which also sets it to null) runs.
+vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+  cb(performance.now());
+  return null;
+});
+vi.stubGlobal('cancelAnimationFrame', () => {});
