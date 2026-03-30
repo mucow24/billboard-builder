@@ -19,6 +19,20 @@ export interface ImageNodePresentation {
   y: number;
 }
 
+export function scaleImageSourceTransform(
+  sourceTransform: ImageSourceTransform,
+  ratioX: number,
+  ratioY: number,
+): ImageSourceTransform {
+  return {
+    ...sourceTransform,
+    x: sourceTransform.x * ratioX,
+    y: sourceTransform.y * ratioY,
+    width: sourceTransform.width * ratioX,
+    height: sourceTransform.height * ratioY,
+  };
+}
+
 export function getImageNodePresentation(
   sourceTransform: ImageSourceTransform,
   mirrorHorizontal: boolean,
