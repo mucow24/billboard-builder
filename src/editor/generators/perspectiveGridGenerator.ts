@@ -15,13 +15,13 @@ export const perspectiveGridGeneratorSpec: GeneratorSpec<PerspectiveGridGenerato
   label: 'Perspective Grid',
   fields: [
     { key: 'bandColorB', label: 'Grid Color', type: 'color' },
-    { key: 'perspectiveHorizon', label: 'Horizon', type: 'range', min: 0.1, max: 0.9, step: 0.01 },
-    { key: 'perspectiveDepth', label: 'Depth Lines', type: 'range', min: 2, max: 32, step: 1 },
-    { key: 'perspectiveNear', label: 'Near Point', type: 'range', min: -1, max: 1, step: 0.01 },
-    { key: 'perspectiveExtent', label: 'Extent', type: 'range', min: 0, max: 1, step: 0.01 },
-    { key: 'perspectiveThickness', label: 'Thickness', type: 'range', min: 0.5, max: 12, step: 0.5 },
-    { key: 'perspectiveThicknessFalloff', label: 'Falloff', type: 'range', min: 0, max: 2, step: 0.01 },
-    { key: 'perspectiveRows', label: 'Rows', type: 'range', min: 0, max: 32, step: 1 },
+    { key: 'perspectiveHorizon', label: 'Horizon', type: 'range', min: 0.1, max: 0.9, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'perspectiveDepth', label: 'Depth Lines', type: 'range', min: 2, max: 32, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'perspectiveNear', label: 'Near Point', type: 'range', min: -1, max: 1, step: 0.01, textMin: -Infinity, textMax: Infinity },
+    { key: 'perspectiveExtent', label: 'Extent', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'perspectiveThickness', label: 'Thickness', type: 'range', min: 0.5, max: 12, step: 0.5, textMin: 0, textMax: Infinity },
+    { key: 'perspectiveThicknessFalloff', label: 'Falloff', type: 'range', min: 0, max: 2, step: 0.01, textMin: 0, textMax: Infinity },
+    { key: 'perspectiveRows', label: 'Rows', type: 'range', min: 0, max: 32, step: 1, textMin: 0, textMax: Infinity },
   ],
   createDefaultParams(): PerspectiveGridGeneratorParams {
     return {

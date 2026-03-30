@@ -70,6 +70,8 @@ export interface NumberFieldDescriptor extends BaseInspectorFieldDescriptor<numb
   digits?: number;
   max?: number;
   min?: number;
+  textMin?: number;
+  textMax?: number;
   slider?: boolean;
   sliderDetentThreshold?: number;
   sliderDetentValue?: number;
@@ -1143,6 +1145,8 @@ function createGeneratorFieldDescriptor(
     valueType: 'number',
     min: field.min,
     max: field.max,
+    textMin: field.textMin,
+    textMax: field.textMax,
     step: field.step,
     slider: field.type === 'range',
     getValue: (item: CanvasItem) =>

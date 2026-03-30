@@ -36,6 +36,8 @@ export interface BareNumberInputProps {
 }
 
 interface NumberInputProps extends BareNumberInputProps {
+  textMin?: number;
+  textMax?: number;
   slider?: boolean;
   sliderDetentThreshold?: number;
   sliderDetentValue?: number;
@@ -123,6 +125,8 @@ export function NumberInput({
   max,
   mixed = false,
   min,
+  textMin,
+  textMax,
   onChange,
   slider = false,
   sliderDetentThreshold,
@@ -138,6 +142,10 @@ export function NumberInput({
 
   function commitValue(nextValue: number) {
     onChange(clampNumberInputValue(nextValue, min, max));
+  }
+
+  function commitTextValue(nextValue: number) {
+    onChange(clampNumberInputValue(nextValue, textMin ?? min, textMax ?? max));
   }
 
   if (slider) {
@@ -172,8 +180,8 @@ export function NumberInput({
             <input
               aria-label={`${label} value`}
               disabled={disabled}
-              max={max}
-              min={min}
+              max={Number.isFinite(textMax ?? max) ? (textMax ?? max) : undefined}
+              min={Number.isFinite(textMin ?? min) ? (textMin ?? min) : undefined}
               step={step}
               type="number"
               value={displayedValue}
@@ -181,7 +189,7 @@ export function NumberInput({
                 if (event.target.value === '') {
                   return;
                 }
-                commitValue(Number(event.target.value));
+                commitTextValue(Number(event.target.value));
               }}
             />
           </div>

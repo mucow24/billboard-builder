@@ -10,7 +10,7 @@ export const noiseGeneratorSpec: GeneratorSpec<NoiseGeneratorParams> = {
   type: 'noise',
   label: 'Noise',
   fields: [
-    { key: 'noise', label: 'Intensity', type: 'range', min: 0, max: 0.2, step: 0.001 },
+    { key: 'noise', label: 'Intensity', type: 'range', min: 0, max: 0.2, step: 0.001, textMin: 0, textMax: Infinity },
     { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
   ],
   createDefaultParams(): NoiseGeneratorParams {

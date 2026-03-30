@@ -24,4 +24,32 @@ test.describe('generator layers', () => {
     await expect(page.getByText('Band Count')).toBeVisible();
     await expect(page.getByText('Band Angle')).toBeVisible();
   });
+
+  test('text input accepts values beyond slider range but clamps to correctness bounds', async ({ page }) => {
+    await openFreshEditor(page);
+
+    // Scanlines is cheap to render — spacing=1 fills every row
+    await clickToolbarPopoverItem(page, 'Generators', 'Scanlines');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Scanlines');
+    await openPropertiesTab(page);
+
+    const spacingInput = page.getByLabel('Spacing value');
+    await expect(spacingInput).toBeVisible();
+
+    // Type 1 — below slider min (2) but accepted (textMin is 1)
+    await spacingInput.fill('1');
+    await spacingInput.blur();
+    await expect(spacingInput).toHaveValue('1');
+
+    // Type 0 — below textMin (1), clamped
+    await spacingInput.fill('0');
+    await spacingInput.blur();
+    await expect(spacingInput).toHaveValue('1');
+
+    // Type 100 — beyond slider max (20) but accepted (textMax is Infinity)
+    await spacingInput.fill('100');
+    await spacingInput.blur();
+    await expect(spacingInput).toHaveValue('100');
+  });
 });

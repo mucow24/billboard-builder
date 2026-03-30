@@ -16,6 +16,8 @@ export interface GeneratorFieldSpec {
   type: 'color' | 'range' | 'optionalNumber';
   min?: number;
   max?: number;
+  textMin?: number;
+  textMax?: number;
   step?: number;
 }
 
