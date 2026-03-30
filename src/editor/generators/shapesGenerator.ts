@@ -43,6 +43,16 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
     { key: 'accentColor', label: 'Accent Color', type: 'color' },
     { key: 'bandColorA', label: 'Color A', type: 'color' },
     { key: 'bandColorB', label: 'Color B', type: 'color' },
+    {
+      key: 'shapeTypes', label: 'Shape Types', type: 'toggleGroup',
+      options: [
+        { key: 'rect', icon: '▭', label: 'Rect' },
+        { key: 'diamond', icon: '◇', label: 'Diamond' },
+        { key: 'triangle', icon: '△', label: 'Tri' },
+        { key: 'circle', icon: '○', label: 'Circle' },
+        { key: 'bar', icon: '▬', label: 'Bar' },
+      ],
+    },
     { key: 'shapeCount', label: 'Count', type: 'range', min: 0, max: 64, step: 1, textMin: 0, textMax: Infinity },
     { key: 'shapeMinSize', label: 'Min Size', type: 'range', min: 4, max: 240, step: 1, textMin: 0, textMax: Infinity },
     { key: 'shapeMaxSize', label: 'Max Size', type: 'range', min: 8, max: 320, step: 1, textMin: 0, textMax: Infinity },

@@ -52,4 +52,28 @@ test.describe('generator layers', () => {
     await spacingInput.blur();
     await expect(spacingInput).toHaveValue('100');
   });
+
+  test('shapes generator shows toggle buttons for shape types', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await clickToolbarPopoverItem(page, 'Generators', 'Shapes');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Shapes');
+    await openPropertiesTab(page);
+
+    // All 5 shape toggles should be visible and pressed
+    for (const name of ['Rect', 'Diamond', 'Tri', 'Circle', 'Bar']) {
+      const btn = page.getByRole('button', { name, exact: true });
+      await expect(btn).toBeVisible();
+      await expect(btn).toHaveAttribute('aria-pressed', 'true');
+    }
+
+    // Toggle Circle off
+    await page.getByRole('button', { name: 'Circle', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Circle', exact: true })).toHaveAttribute('aria-pressed', 'false');
+
+    // Toggle Circle back on
+    await page.getByRole('button', { name: 'Circle', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Circle', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
 });

@@ -10,15 +10,22 @@ import { shapesGeneratorSpec } from './shapesGenerator';
 import { vignetteGeneratorSpec } from './vignetteGenerator';
 import { zigzagsGeneratorSpec } from './zigzagsGenerator';
 
+export interface ToggleOption {
+  key: string;
+  label: string;
+  icon?: string;
+}
+
 export interface GeneratorFieldSpec {
   key: string;
   label: string;
-  type: 'color' | 'range' | 'optionalNumber';
+  type: 'color' | 'range' | 'optionalNumber' | 'toggleGroup';
   min?: number;
   max?: number;
   textMin?: number;
   textMax?: number;
   step?: number;
+  options?: ToggleOption[];
 }
 
 export interface GeneratorSpec<TParams extends GeneratorParams = GeneratorParams> {

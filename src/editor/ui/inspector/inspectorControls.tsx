@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import type { FontOption } from '../FontFamilyPicker';
 import { FontFamilyPicker } from '../FontFamilyPicker';
+import type { ToggleOption } from '../../generators';
 
 import { formatDisplayedNumber } from './inspectorModel';
 
@@ -531,5 +532,47 @@ export function SegmentedIconButton({
     >
       {children}
     </button>
+  );
+}
+
+interface ToggleGroupInputProps {
+  disabled?: boolean;
+  label: string;
+  onChange: (value: Record<string, boolean>) => void;
+  options: ToggleOption[];
+  value: Record<string, boolean>;
+}
+
+export function ToggleGroupInput({
+  disabled = false,
+  label,
+  onChange,
+  options,
+  value,
+}: ToggleGroupInputProps) {
+  return (
+    <FieldShell label={label} layout="stacked">
+      <div className="toggle-group-grid" role="group" aria-label={label}>
+        {options.map((option) => {
+          const active = Boolean(value[option.key]);
+          return (
+            <button
+              key={option.key}
+              type="button"
+              className={active ? 'toggle-group-btn active' : 'toggle-group-btn'}
+              aria-label={option.label}
+              aria-pressed={active}
+              disabled={disabled}
+              onClick={() => onChange({ ...value, [option.key]: !active })}
+            >
+              {option.icon ? (
+                <span className="toggle-group-icon" aria-hidden="true">{option.icon}</span>
+              ) : null}
+              <span className="toggle-group-label">{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </FieldShell>
   );
 }

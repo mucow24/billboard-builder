@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { createElement, type ReactNode } from 'react';
 
 import type {
   CanvasItem,
@@ -22,6 +22,7 @@ import {
   renderVerticalAlignField,
 } from './selectionInspectorRenderers';
 
+import { ToggleGroupInput } from './inspectorControls';
 import {
   buildFontOptions,
   buildImageAdjustmentsChange,
@@ -1108,6 +1109,40 @@ function createGeneratorFieldDescriptor(
   fieldOrder: number,
   specLabel: string,
 ): InspectorFieldDescriptor {
+  if (field.type === 'toggleGroup') {
+    const descriptor: CustomFieldDescriptor = {
+      controlKind: 'custom',
+      propertyKey: `gen_${field.key}`,
+      label: field.label,
+      fieldOrder,
+      sectionKey: 'generator',
+      sectionLabel: specLabel,
+      sectionOrder: SECTION_ORDER.generator,
+      supportsMultiEdit: false,
+      valueType: 'custom',
+      getValue: (item: CanvasItem) =>
+        item.kind === 'generator'
+          ? (item.generatorParams as unknown as Record<string, unknown>)[field.key]
+          : {},
+      buildChange: ({ item }, nextValue) => {
+        if (item.kind !== 'generator') return {};
+        return {
+          generatorParams: { ...item.generatorParams, [field.key]: nextValue },
+        } as Partial<CanvasItem>;
+      },
+      render: ({ field: resolvedField, onCommit }) => {
+        const value = resolvedField.state.value as Record<string, boolean> ?? {};
+        return createElement(ToggleGroupInput, {
+          label: resolvedField.descriptor.label,
+          options: field.options ?? [],
+          value,
+          onChange: (nextValue: Record<string, boolean>) => onCommit(nextValue),
+        });
+      },
+    };
+    return descriptor;
+  }
+
   if (field.type === 'color') {
     const descriptor: ColorFieldDescriptor = {
       controlKind: 'color',
