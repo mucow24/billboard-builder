@@ -263,6 +263,68 @@ describe('selectionInspectorModel', () => {
 
     // Reset original — rectangle (no-op)
     expect(bc({ kind: 'resetOriginal' })).toEqual({});
+
+    // Image dimension actions scale sourceTransform
+    const bcImg = (action: DimensionAction) =>
+      dimImage?.descriptor.buildChange({ item: image }, action as never);
+
+    // absWidth unlocked — scales sourceTransform.width proportionally, normalizes scaleX to 1
+    expect(bcImg({ kind: 'absWidth', value: 200, locked: false })).toEqual({
+      width: 200,
+      scaleX: 1,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 300, rotation: 0 },
+    });
+
+    // absWidth locked — uniform scale on both axes
+    expect(bcImg({ kind: 'absWidth', value: 200, locked: true })).toEqual({
+      width: 200,
+      height: 150,
+      scaleX: 1,
+      scaleY: 1,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 150, rotation: 0 },
+    });
+
+    // absHeight unlocked
+    expect(bcImg({ kind: 'absHeight', value: 150, locked: false })).toEqual({
+      height: 150,
+      scaleY: 1,
+      sourceTransform: { x: 0, y: 0, width: 400, height: 150, rotation: 0 },
+    });
+
+    // absHeight locked — uniform scale
+    expect(bcImg({ kind: 'absHeight', value: 150, locked: true })).toEqual({
+      width: 200,
+      height: 150,
+      scaleX: 1,
+      scaleY: 1,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 150, rotation: 0 },
+    });
+
+    // pctWidth unlocked — scales sourceTransform proportionally
+    expect(bcImg({ kind: 'pctWidth', value: 50, locked: false })).toEqual({
+      scaleX: 0.5,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 300, rotation: 0 },
+    });
+
+    // pctWidth locked — both axes
+    expect(bcImg({ kind: 'pctWidth', value: 50, locked: true })).toEqual({
+      scaleX: 0.5,
+      scaleY: 0.5,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 150, rotation: 0 },
+    });
+
+    // pctHeight unlocked
+    expect(bcImg({ kind: 'pctHeight', value: 50, locked: false })).toEqual({
+      scaleY: 0.5,
+      sourceTransform: { x: 0, y: 0, width: 400, height: 150, rotation: 0 },
+    });
+
+    // pctHeight locked
+    expect(bcImg({ kind: 'pctHeight', value: 50, locked: true })).toEqual({
+      scaleX: 0.5,
+      scaleY: 0.5,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 150, rotation: 0 },
+    });
   });
 
   it('filters unsupported mismatched descriptors and resolves select options', () => {

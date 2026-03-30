@@ -12,6 +12,7 @@ import type {
   LineCanvasItem,
   SnapRect,
 } from '../document/documentTypes';
+import { scaleImageSourceTransform } from './imagePresentation';
 import { getRenderBox } from './transformGeometry';
 import { getItemRect, getSnappedRect, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
 import { measureWordWrappedTextHeight } from './textMeasurement';
@@ -292,18 +293,12 @@ function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
     return resizedItem;
   }
 
-  const scaleX = localRect.width / Math.max(renderBox.width, 1);
-  const scaleY = localRect.height / Math.max(renderBox.height, 1);
+  const ratioX = localRect.width / Math.max(renderBox.width, 1);
+  const ratioY = localRect.height / Math.max(renderBox.height, 1);
 
   return {
     ...resizedItem,
-    sourceTransform: {
-      ...item.sourceTransform,
-      x: item.sourceTransform.x * scaleX,
-      y: item.sourceTransform.y * scaleY,
-      width: item.sourceTransform.width * scaleX,
-      height: item.sourceTransform.height * scaleY,
-    },
+    sourceTransform: scaleImageSourceTransform(item.sourceTransform, ratioX, ratioY),
   };
 }
 
