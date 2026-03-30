@@ -55,6 +55,7 @@ const BaseCanvasItemSchemaV1 = z.object({
   scaleY: z.number(),
   zIndex: z.number().int().nonnegative(),
   locked: z.boolean(),
+  lockAspectRatio: z.boolean().optional(),
   hidden: z.boolean(),
   opacity: z.number().min(0).max(1),
   shadow: CanvasShadowSchema.optional(),

@@ -83,6 +83,7 @@ function createBaseItem<TKind extends CanvasLeafKind>(
     scaleY: 1,
     zIndex: 0,
     locked: false,
+    lockAspectRatio: false,
     hidden: false,
     opacity: 1,
     shadow: { ...DEFAULT_ITEM_SHADOW },

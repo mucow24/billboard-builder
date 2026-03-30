@@ -23,7 +23,7 @@ function applyDetent(value: number, detentValue?: number, detentThreshold = 0): 
   return Math.abs(value - detentValue) <= detentThreshold ? detentValue : value;
 }
 
-interface NumberInputProps {
+export interface BareNumberInputProps {
   disabled?: boolean;
   digits?: number;
   label: string;
@@ -31,11 +31,14 @@ interface NumberInputProps {
   mixed?: boolean;
   min?: number;
   onChange: (value: number) => void;
+  step?: number;
+  value: number | null;
+}
+
+interface NumberInputProps extends BareNumberInputProps {
   slider?: boolean;
   sliderDetentThreshold?: number;
   sliderDetentValue?: number;
-  step?: number;
-  value: number | null;
 }
 
 export function FieldShell({
@@ -76,6 +79,43 @@ export function FieldShell({
   );
 }
 
+export function BareNumberInput({
+  disabled = false,
+  digits = 1,
+  label,
+  max,
+  min,
+  onChange,
+  step = 1,
+  value,
+}: BareNumberInputProps) {
+  const displayedValue =
+    value === null ? '' : formatDisplayedNumber(value, digits);
+
+  function commitValue(nextValue: number) {
+    onChange(clampNumberInputValue(nextValue, min, max));
+  }
+
+  return (
+    <input
+      className="inspector-field-control"
+      aria-label={label}
+      disabled={disabled}
+      max={max}
+      min={min}
+      step={step}
+      type="number"
+      value={displayedValue}
+      onChange={(event) => {
+        if (event.target.value === '') {
+          return;
+        }
+        commitValue(Number(event.target.value));
+      }}
+    />
+  );
+}
+
 export function NumberInput({
   disabled = false,
   digits = 1,
@@ -94,7 +134,6 @@ export function NumberInput({
     value === null ? '' : formatDisplayedNumber(value, digits);
   const sliderValue =
     value === null ? min ?? sliderDetentValue ?? 0 : Number(displayedValue);
-  const inputId = useId();
   const sliderId = useId();
 
   function commitValue(nextValue: number) {
@@ -131,7 +170,6 @@ export function NumberInput({
               }}
             />
             <input
-              id={inputId}
               aria-label={`${label} value`}
               disabled={disabled}
               max={max}
@@ -154,22 +192,15 @@ export function NumberInput({
 
   return (
     <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
-      <input
-        className="inspector-field-control"
-        id={inputId}
-        aria-label={label}
+      <BareNumberInput
         disabled={disabled}
+        digits={digits}
+        label={label}
         max={max}
         min={min}
+        onChange={onChange}
         step={step}
-        type="number"
-        value={displayedValue}
-        onChange={(event) => {
-          if (event.target.value === '') {
-            return;
-          }
-          commitValue(Number(event.target.value));
-        }}
+        value={value}
       />
     </FieldShell>
   );

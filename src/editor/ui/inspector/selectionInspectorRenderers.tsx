@@ -5,7 +5,9 @@ import {
   SegmentedSelectInput,
   ToggleButtonInput,
 } from './inspectorControls';
-import type { CustomFieldRenderProps, SelectOption } from './selectionInspectorModel';
+import { DimensionsWidget } from './DimensionsWidget';
+import type { CustomFieldRenderProps, ResolvedInspectorFieldState, SelectOption } from './selectionInspectorModel';
+import type { DimensionAction } from './selectionInspectorModel';
 
 function toFontOptions(options: readonly SelectOption[]): FontOption[] {
   return options.map((option) => ({
@@ -149,6 +151,42 @@ export function renderVerticalAlignField({
       ]}
       value={typeof field.state.value === 'string' ? field.state.value : null}
       onChange={(nextValue) => onCommit(nextValue)}
+    />
+  );
+}
+
+function asNum(v: unknown): number {
+  return typeof v === 'number' ? v : 0;
+}
+
+function toOriginalSize(
+  ss: Record<string, ResolvedInspectorFieldState<unknown>>
+): { width: number; height: number } | null {
+  const ow = ss.originalWidth?.value ?? ss.originalWidth?.firstValue;
+  const oh = ss.originalHeight?.value ?? ss.originalHeight?.firstValue;
+  if (typeof ow === 'number' && typeof oh === 'number') {
+    return { width: ow, height: oh };
+  }
+  return null;
+}
+
+export function renderDimensionsField({ field, onCommit }: CustomFieldRenderProps) {
+  const ss = field.selectorStates;
+  return (
+    <DimensionsWidget
+      disabled={field.disabled}
+      width={asNum(field.state.value ?? field.state.firstValue)}
+      widthMixed={field.state.isMixed}
+      height={asNum(ss.height?.value ?? ss.height?.firstValue)}
+      heightMixed={ss.height?.isMixed ?? false}
+      scaleX={asNum(ss.scaleX?.value ?? ss.scaleX?.firstValue) || 1}
+      scaleXMixed={ss.scaleX?.isMixed ?? false}
+      scaleY={asNum(ss.scaleY?.value ?? ss.scaleY?.firstValue) || 1}
+      scaleYMixed={ss.scaleY?.isMixed ?? false}
+      locked={Boolean(ss.lockAspectRatio?.value ?? ss.lockAspectRatio?.firstValue)}
+      lockedMixed={ss.lockAspectRatio?.isMixed ?? false}
+      originalSize={toOriginalSize(ss)}
+      onCommit={(action: DimensionAction) => onCommit(action)}
     />
   );
 }

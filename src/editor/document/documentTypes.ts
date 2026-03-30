@@ -88,6 +88,7 @@ export interface BaseCanvasItem {
   // Derived runtime ordering for leaf helpers that still assume flat items.
   zIndex: number;
   locked: boolean;
+  lockAspectRatio: boolean;
   hidden: boolean;
   opacity: number;
   shadow: CanvasShadow;
