@@ -1,4 +1,6 @@
-import type { CanvasItem, CanvasTool } from '../../document/documentTypes';
+import type { CanvasItem, CanvasTool, GeneratorCanvasItem, LineCanvasItem } from '../../document/documentTypes';
+
+type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 import type { Point, ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
@@ -15,13 +17,13 @@ interface SingleSelectionOverlayProps {
     source?: PointerGestureSource,
   ) => void;
   beginResize: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: ShapeItem,
     handle: ResizeHandle,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
   beginRotate: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: ShapeItem,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
@@ -53,6 +55,10 @@ export function SingleSelectionOverlay({
   toCanvasPointer,
   zoom,
 }: SingleSelectionOverlayProps) {
+  if (selectedRenderedItem.kind === 'generator') {
+    return null;
+  }
+
   return selectedRenderedItem.kind === 'line' ? (
     <LineItemView
       key={`${selectedRenderedItem.id}-selection`}
@@ -75,7 +81,7 @@ export function SingleSelectionOverlay({
       isSelected={selectedRenderedItem.id === selectedItemId}
       item={selectedRenderedItem}
       selectableNodeId={selectedRenderedItem.selectableNodeId}
-      onItemDoubleClick={handleItemDoubleClick as (item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>) => void}
+      onItemDoubleClick={handleItemDoubleClick as (item: ShapeItem) => void}
       onBeginResize={beginResize}
       onBeginRotate={beginRotate}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}

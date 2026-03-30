@@ -32,6 +32,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onSaveFavorite: vi.fn(),
     onUndo: vi.fn(),
     onUngroup: vi.fn(),
+    onAddGenerator: vi.fn(),
     panelCollapsed: false,
     ...overrides,
   };

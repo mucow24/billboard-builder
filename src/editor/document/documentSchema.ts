@@ -42,9 +42,29 @@ const TextPaddingSchema = z.object({
   left: z.number(),
 });
 
+const BandsGeneratorParamsSchema = z.object({
+  generatorType: z.literal('bands'),
+  bandColorA: z.string(),
+  bandColorB: z.string(),
+  shadowColor: z.string(),
+  stripeCount: z.number().int().min(2).max(64),
+  stripeAngle: z.number().min(-90).max(90),
+  stripeThickness: z.number().min(8).max(220),
+  stripeSpacingJitter: z.number().min(0).max(1),
+  stripeOffset: z.number().min(-1).max(1),
+  stripeSkew: z.number().min(0).max(1),
+  stripeContrast: z.number().min(0).max(1),
+  stripeGlow: z.number().min(0).max(0.6),
+  seedOverride: z.number().nullable(),
+});
+
+const GeneratorParamsSchema = z.discriminatedUnion('generatorType', [
+  BandsGeneratorParamsSchema,
+]);
+
 const BaseCanvasItemSchemaV1 = z.object({
   id: z.string().min(1),
-  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line']),
+  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line', 'generator']),
   name: z.string().min(1),
   x: z.number(),
   y: z.number(),
@@ -120,11 +140,18 @@ const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   endY: z.number().optional(),
 });
 
+const GeneratorCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+  kind: z.literal('generator'),
+  seed: z.number(),
+  generatorParams: GeneratorParamsSchema,
+});
+
 const TextCanvasItemSchemaV2 = TextCanvasItemSchemaV1.omit({ zIndex: true });
 const ImageCanvasItemSchemaV2 = ImageCanvasItemSchemaV1.omit({ zIndex: true });
 const RectangleCanvasItemSchemaV2 = RectangleCanvasItemSchemaV1.omit({ zIndex: true });
 const EllipseCanvasItemSchemaV2 = EllipseCanvasItemSchemaV1.omit({ zIndex: true });
 const LineCanvasItemSchemaV2 = LineCanvasItemSchemaV1.omit({ zIndex: true });
+const GeneratorCanvasItemSchemaV2 = GeneratorCanvasItemSchemaV1.omit({ zIndex: true });
 
 const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
   TextCanvasItemSchemaV1,
@@ -132,6 +159,7 @@ const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
   RectangleCanvasItemSchemaV1,
   EllipseCanvasItemSchemaV1,
   LineCanvasItemSchemaV1,
+  GeneratorCanvasItemSchemaV1,
 ]);
 
 const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
@@ -140,6 +168,7 @@ const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
   RectangleCanvasItemSchemaV2,
   EllipseCanvasItemSchemaV2,
   LineCanvasItemSchemaV2,
+  GeneratorCanvasItemSchemaV2,
 ]);
 
 const CanvasNodeSchemaV2: z.ZodTypeAny = z.lazy(() =>

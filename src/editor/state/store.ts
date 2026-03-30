@@ -47,7 +47,7 @@ export interface EditorStoreState {
   dispatch: (command: EditorCommand) => void;
   applyTransaction: (actions: Parameters<typeof createTransactionAction>[0]) => void;
   setActiveTool: (tool: CanvasTool) => void;
-  createItemAt: (kind: Exclude<CanvasLeafKind, 'image'>, x: number, y: number) => void;
+  createItemAt: (kind: Exclude<CanvasLeafKind, 'image' | 'generator'>, x: number, y: number) => void;
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   updateSelectedGroup: (opacity: number) => void;

@@ -1,4 +1,6 @@
-import type { CanvasItem } from '../../document/documentTypes';
+import type { CanvasItem, GeneratorCanvasItem, LineCanvasItem } from '../../document/documentTypes';
+
+type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 import { type Point, type ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
@@ -30,13 +32,13 @@ interface CanvasTestHooksProps {
     source?: PointerGestureSource,
   ) => void;
   beginResize: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: ShapeItem,
     handle: ResizeHandle,
     pointer: { x: number; y: number },
     source?: PointerGestureSource,
   ) => void;
   beginRotate: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: ShapeItem,
     pointer: { x: number; y: number },
     source?: PointerGestureSource,
   ) => void;
@@ -325,6 +327,7 @@ export function CanvasTestHooks({
                   if (!pointer) {
                     return;
                   }
+                  if (selectedRenderedItem.kind === 'generator') return;
                   if (handle === 'rotater') {
                     beginRotate(selectedRenderedItem, toCanvasPointer(pointer), OVERLAY_POINTER_SOURCE);
                     return;

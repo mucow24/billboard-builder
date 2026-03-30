@@ -86,6 +86,8 @@ describe('CanvasItemLayer', () => {
       onItemDoubleClick: vi.fn(),
       onItemPointerDown: vi.fn(),
       registerShapeRef: vi.fn(),
+      canvasWidth: 1024,
+      canvasHeight: 1024,
       toCanvasPointer: (pointer: { x: number; y: number }) => pointer,
     };
 
@@ -124,6 +126,8 @@ describe('CanvasItemLayer', () => {
       onItemDoubleClick: vi.fn(),
       onItemPointerDown: vi.fn(),
       registerShapeRef: vi.fn(),
+      canvasWidth: 1024,
+      canvasHeight: 1024,
       toCanvasPointer: (pointer: { x: number; y: number }) => pointer,
     };
 

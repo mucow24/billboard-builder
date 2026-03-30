@@ -2,7 +2,7 @@ import { memo, useCallback } from 'react';
 import { Circle, Ellipse, Group, Line, Rect, Text } from 'react-konva';
 import type Konva from 'konva';
 
-import type { CanvasTool, LineCanvasItem, CanvasItem } from '../../document/documentTypes';
+import type { CanvasTool, GeneratorCanvasItem, LineCanvasItem, CanvasItem } from '../../document/documentTypes';
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import {
   getSelectionOutlinePoints,
@@ -27,7 +27,7 @@ import {
 } from './overlayGeometry';
 import { buildGradientFillProps } from './gradientFill';
 
-type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
+type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 
 interface ShapeItemViewProps {
   activeTool: CanvasTool;

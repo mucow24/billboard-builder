@@ -23,11 +23,12 @@ import type { RenderableCanvasItem } from './renderAdapter';
 import type {
   CanvasItem,
   CanvasTool,
+  GeneratorCanvasItem,
   GuideLine,
   LineCanvasItem,
 } from '../document/documentTypes';
 
-export type ShapeItem = Exclude<CanvasItem, LineCanvasItem>;
+export type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 export type PointerGestureSource = 'stage' | 'overlay';
 
 export interface SelectionFrame {

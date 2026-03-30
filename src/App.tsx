@@ -9,6 +9,7 @@ import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { InspectorTab } from './editor/ui/PropertiesPanel';
+import { createGeneratorItem } from './editor/document/documentDefaults';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
@@ -254,6 +255,12 @@ export default function App() {
               }}
               onUndo={undo}
               onUngroup={ungroupSelectedNode}
+              onAddGenerator={(generatorType) => {
+                dispatch({
+                  type: 'add_item',
+                  item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
+                });
+              }}
               activeInspectorTab={inspectorTab}
               panelCollapsed={panelCollapsed}
               onInspectorTabChange={handleInspectorTabChange}

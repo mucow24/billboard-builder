@@ -5,7 +5,9 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import type {
   CanvasItem,
   CanvasTool,
+  GeneratorCanvasItem,
   GuideLine,
+  LineCanvasItem,
   ProjectDocument,
 } from '../../document/documentTypes';
 import type { Point, ResizeHandle } from '../interactionGeometry';
@@ -37,13 +39,13 @@ interface CanvasSceneProps {
     source?: PointerGestureSource,
   ) => void;
   beginResize: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
     handle: ResizeHandle,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
   beginRotate: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
@@ -174,6 +176,8 @@ export function CanvasScene({
           <Group name="export-content">
             <CanvasItemLayer
               activeTool={activeTool}
+              canvasWidth={document.canvas.width}
+              canvasHeight={document.canvas.height}
               items={sceneItems}
               onBeginLineHandle={beginLineHandle}
               onBeginResize={beginResize}

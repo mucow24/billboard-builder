@@ -456,7 +456,7 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
 }
 
 export function createItemForKind(
-  kind: Exclude<CanvasLeafKind, 'image'>,
+  kind: Exclude<CanvasLeafKind, 'image' | 'generator'>,
   x: number,
   y: number
 ): CanvasItem {

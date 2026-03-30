@@ -12,7 +12,8 @@ export type CanvasLeafKind =
   | 'image'
   | 'rectangle'
   | 'ellipse'
-  | 'line';
+  | 'line'
+  | 'generator';
 
 export type CanvasNodeKind = CanvasLeafKind | 'group';
 
@@ -150,12 +151,37 @@ export interface LineCanvasItem extends BaseCanvasItem {
   endY: number;
 }
 
+export interface BandsGeneratorParams {
+  generatorType: 'bands';
+  bandColorA: string;
+  bandColorB: string;
+  shadowColor: string;
+  stripeCount: number;
+  stripeAngle: number;
+  stripeThickness: number;
+  stripeSpacingJitter: number;
+  stripeOffset: number;
+  stripeSkew: number;
+  stripeContrast: number;
+  stripeGlow: number;
+  seedOverride: number | null;
+}
+
+export type GeneratorParams = BandsGeneratorParams;
+
+export interface GeneratorCanvasItem extends BaseCanvasItem {
+  kind: 'generator';
+  seed: number;
+  generatorParams: GeneratorParams;
+}
+
 export type CanvasItem =
   | TextCanvasItem
   | ImageCanvasItem
   | RectangleCanvasItem
   | EllipseCanvasItem
-  | LineCanvasItem;
+  | LineCanvasItem
+  | GeneratorCanvasItem;
 
 export interface GroupNode {
   id: string;

@@ -27,6 +27,8 @@ function getSingleNodeFavoriteLabel(node: CanvasNode): string {
       return `Text:${normalizeFavoriteTextContent(node.text)}`;
     case 'image':
       return 'Image';
+    case 'generator':
+      return node.name || 'Generator';
   }
 }
 

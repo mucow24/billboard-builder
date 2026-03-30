@@ -11,6 +11,7 @@ import type {
   CanvasNode,
   CanvasShadow,
   EllipseCanvasItem,
+  GeneratorCanvasItem,
   GroupNode,
   ImageCanvasItem,
   LineCanvasItem,
@@ -289,6 +290,26 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         strokeWidth: clampLineStrokeWidth(item.strokeWidth),
       };
       return normalizedLineItem;
+    }
+    case 'generator': {
+      const normalizedGeneratorItem: GeneratorCanvasItem = {
+        ...item,
+        x: clampFinite(item.x, 0),
+        y: clampFinite(item.y, 0),
+        width: clampDimension(item.width),
+        height: clampDimension(item.height),
+        rotation: clampFinite(item.rotation, 0),
+        scaleX: clampFinite(item.scaleX, 1),
+        scaleY: clampFinite(item.scaleY, 1),
+        zIndex: Math.max(0, Math.trunc(clampFinite(item.zIndex, 0, 0))),
+        locked: Boolean(item.locked),
+        lockAspectRatio: Boolean(item.lockAspectRatio),
+        hidden: Boolean(item.hidden),
+        opacity: clampOpacity(item.opacity),
+        shadow: normalizeShadow(item.shadow),
+        seed: clampFinite(item.seed, Math.floor(Math.random() * 0xffffffff)),
+      };
+      return normalizedGeneratorItem;
     }
   }
 }
