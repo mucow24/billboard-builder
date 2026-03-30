@@ -11,6 +11,7 @@ import {
   buildInspectorEnvironment,
   buildSelectionInspectorSections,
   getSelectionDescriptorCoverage,
+  type DimensionAction,
 } from './selectionInspectorModel';
 
 describe('selectionInspectorModel', () => {
@@ -29,7 +30,7 @@ describe('selectionInspectorModel', () => {
         'stroke:strokeWidth:number',
         'geometry:cornerRadius:number',
         'geometry:x:number',
-        'geometry:height:number',
+        'geometry:dimensions:number',
         'shadow:color:color',
       ])
     );
@@ -70,7 +71,7 @@ describe('selectionInspectorModel', () => {
         'image:preserveAspectRatio:boolean',
         'image:tintColor:color',
         'image:brightness:number',
-        'geometry:width:number',
+        'geometry:dimensions:number',
         'shadow:offsetY:number',
       ])
     );
@@ -188,6 +189,80 @@ describe('selectionInspectorModel', () => {
         blur: 12,
       },
     });
+  });
+
+  it('dimensions buildChange computes correct patches for all DimensionAction kinds', () => {
+    const environment = buildInspectorEnvironment([], []);
+    const rect400x200 = createRectangleItem({ x: 0, y: 0, width: 400, height: 200 });
+    const sections = buildSelectionInspectorSections([rect400x200], environment);
+    const dimensionsField = sections
+      .find((s) => s.key === 'geometry')
+      ?.fields.find((f) => f.descriptor.propertyKey === 'dimensions');
+
+    if (!dimensionsField) throw new Error('dimensions field not found');
+    const bc = (action: DimensionAction) =>
+      dimensionsField.descriptor.buildChange({ item: rect400x200 }, action as never);
+
+    // Unlocked absolute
+    expect(bc({ kind: 'absWidth', value: 300, locked: false })).toEqual({ width: 300 });
+    expect(bc({ kind: 'absHeight', value: 100, locked: false })).toEqual({ height: 100 });
+
+    // Locked absolute (400×200 → ratio 2)
+    expect(bc({ kind: 'absWidth', value: 200, locked: true })).toEqual({ width: 200, height: 100 });
+    expect(bc({ kind: 'absHeight', value: 100, locked: true })).toEqual({ width: 200, height: 100 });
+
+    // Unlocked percentage
+    expect(bc({ kind: 'pctWidth', value: 50, locked: false })).toEqual({ scaleX: 0.5 });
+    expect(bc({ kind: 'pctHeight', value: 50, locked: false })).toEqual({ scaleY: 0.5 });
+
+    // Locked percentage
+    expect(bc({ kind: 'pctWidth', value: 50, locked: true })).toEqual({ scaleX: 0.5, scaleY: 0.5 });
+    expect(bc({ kind: 'pctHeight', value: 50, locked: true })).toEqual({ scaleX: 0.5, scaleY: 0.5 });
+
+    // Lock toggle
+    const unlockedRect = createRectangleItem({ lockAspectRatio: false });
+    const sectionsUnlocked = buildSelectionInspectorSections([unlockedRect], environment);
+    const dimUnlocked = sectionsUnlocked
+      .find((s) => s.key === 'geometry')
+      ?.fields.find((f) => f.descriptor.propertyKey === 'dimensions');
+    expect(
+      dimUnlocked?.descriptor.buildChange({ item: unlockedRect }, { kind: 'setLock', value: true } as never)
+    ).toEqual({ lockAspectRatio: true });
+
+    const lockedRect = createRectangleItem({ lockAspectRatio: true });
+    const sectionsLocked = buildSelectionInspectorSections([lockedRect], environment);
+    const dimLocked = sectionsLocked
+      .find((s) => s.key === 'geometry')
+      ?.fields.find((f) => f.descriptor.propertyKey === 'dimensions');
+    expect(
+      dimLocked?.descriptor.buildChange({ item: lockedRect }, { kind: 'setLock', value: false } as never)
+    ).toEqual({ lockAspectRatio: false });
+
+    // Reset original — image
+    const image = createImageItem({
+      src: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+      width: 400,
+      height: 300,
+      originalWidth: 800,
+      originalHeight: 600,
+    });
+    const imageSections = buildSelectionInspectorSections([image], environment);
+    const dimImage = imageSections
+      .find((s) => s.key === 'geometry')
+      ?.fields.find((f) => f.descriptor.propertyKey === 'dimensions');
+    expect(
+      dimImage?.descriptor.buildChange({ item: image }, { kind: 'resetOriginal' } as never)
+    ).toEqual({
+      width: 800,
+      height: 600,
+      scaleX: 1,
+      scaleY: 1,
+      sourceTransform: { x: 0, y: 0, width: 800, height: 600, rotation: 0 },
+    });
+
+    // Reset original — rectangle (no-op)
+    expect(bc({ kind: 'resetOriginal' })).toEqual({});
   });
 
   it('filters unsupported mismatched descriptors and resolves select options', () => {
