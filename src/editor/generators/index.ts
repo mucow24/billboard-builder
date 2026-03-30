@@ -1,6 +1,14 @@
 import type { GeneratorParams } from '../document/documentTypes';
 
 import { bandsGeneratorSpec } from './bandsGenerator';
+import { burstGeneratorSpec } from './burstGenerator';
+import { flatGridGeneratorSpec } from './flatGridGenerator';
+import { noiseGeneratorSpec } from './noiseGenerator';
+import { perspectiveGridGeneratorSpec } from './perspectiveGridGenerator';
+import { scanlinesGeneratorSpec } from './scanlinesGenerator';
+import { shapesGeneratorSpec } from './shapesGenerator';
+import { vignetteGeneratorSpec } from './vignetteGenerator';
+import { zigzagsGeneratorSpec } from './zigzagsGenerator';
 
 export interface GeneratorFieldSpec {
   key: string;
@@ -21,6 +29,14 @@ export interface GeneratorSpec<TParams extends GeneratorParams = GeneratorParams
 
 const generators: Record<string, GeneratorSpec> = {
   bands: bandsGeneratorSpec,
+  burst: burstGeneratorSpec,
+  zigzags: zigzagsGeneratorSpec,
+  flatGrid: flatGridGeneratorSpec,
+  perspectiveGrid: perspectiveGridGeneratorSpec,
+  scanlines: scanlinesGeneratorSpec,
+  noise: noiseGeneratorSpec,
+  vignette: vignetteGeneratorSpec,
+  shapes: shapesGeneratorSpec,
 };
 
 export function getGenerator(type: string): GeneratorSpec | undefined {
