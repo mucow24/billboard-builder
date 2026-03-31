@@ -22,7 +22,7 @@ export function LayersInspectorTab({
   collapsedGroupIds,
   rows,
   onBackgroundChange,
-  onDeleteSelection,
+  onDeleteNode,
   onOpenProperties,
   onReorder,
   onSelectNode,
@@ -41,11 +41,6 @@ export function LayersInspectorTab({
     () => computeRowConnectors(visibleRows),
     [visibleRows],
   );
-  const deleteSelectionLabel =
-    selectedNodeIds.length > 0
-      ? `Delete selected (${selectedNodeIds.length})`
-      : 'Delete selected';
-
   function renderReorderIcon(kind: 'front' | 'forward' | 'backward' | 'back') {
     switch (kind) {
       case 'front':
@@ -137,19 +132,6 @@ export function LayersInspectorTab({
               variant="compact"
             />
           </div>
-          <button
-            type="button"
-            aria-label={deleteSelectionLabel}
-            title="Delete"
-            className="delete-button layers-panel-delete-selection"
-            disabled={selectedNodeIds.length === 0}
-            onClick={onDeleteSelection}
-          >
-            <svg viewBox="0 0 12 12" aria-hidden="true">
-              <path d="M3 3l6 6" />
-              <path d="M9 3 3 9" />
-            </svg>
-          </button>
         </div>
         <div className="footer-rule" />
       </div>
@@ -349,6 +331,21 @@ export function LayersInspectorTab({
                           <circle cx="6" cy="6" r="1.5" fill="none" />
                         </svg>
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      className="layer-row-action-btn"
+                      aria-label="Delete layer"
+                      title="Delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteNode(row.node.id);
+                      }}
+                    >
+                      <svg viewBox="0 0 12 12" aria-hidden="true">
+                        <path d="M3 3l6 6" />
+                        <path d="M9 3 3 9" />
+                      </svg>
                     </button>
                   </span>
                 </div>

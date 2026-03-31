@@ -25,7 +25,7 @@ export function PropertiesPanel({
   selectedNodeIds,
   onBackgroundChange,
   onGroupOpacityChange,
-  onDeleteSelection,
+  onDeleteNode,
   onOpenProperties = () => {},
   onItemChange,
   onInsertFavorite = () => {},
@@ -133,7 +133,7 @@ export function PropertiesPanel({
               collapsedGroupIds={collapsedGroupIds}
               rows={layerRows}
               onBackgroundChange={onBackgroundChange}
-              onDeleteSelection={onDeleteSelection}
+              onDeleteNode={onDeleteNode}
               onOpenProperties={onOpenProperties}
               onReorder={onReorder}
               onSelectNode={onSelectNode}

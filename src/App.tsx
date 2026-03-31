@@ -39,6 +39,7 @@ export default function App() {
   const {
     actions: {
       deleteFavorite,
+      deleteNode,
       deleteSelectedItems,
       renameFavorite,
       recolorFavorite,
@@ -304,7 +305,7 @@ export default function App() {
                     dispatch({ type: 'select_nodes', nodeIds: selectedGroup.children.map((c) => c.id) });
                   }
                 }}
-                onDeleteSelection={deleteSelectedItems}
+                onDeleteNode={deleteNode}
                 onOpenProperties={() => handleInspectorTabChange('properties')}
                 onItemChange={(changes) => {
                   const resolveChanges = (item: CanvasItem) =>

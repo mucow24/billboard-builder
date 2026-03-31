@@ -336,8 +336,9 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, groupedDocument, 'delete-group.json');
 
     await openLayersTab(page);
-    await clickLayerRow(page, 'Delete Group');
-    await page.getByRole('button', { name: 'Delete selected (1)' }).click();
+    const groupRow = page.locator('.layer-row').filter({ hasText: 'Delete Group' });
+    await groupRow.hover();
+    await groupRow.getByRole('button', { name: 'Delete layer' }).click();
     await expect(page.locator('.layer-row')).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
@@ -378,8 +379,9 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, groupedDocument, 'collapse-singleton-group.json');
 
     await openLayersTab(page);
-    await page.getByTestId('layers-row-collapse-first-rect').click();
-    await page.getByRole('button', { name: 'Delete selected (1)' }).click();
+    const targetRow = page.getByTestId('layers-row-collapse-first-rect');
+    await targetRow.hover();
+    await targetRow.getByRole('button', { name: 'Delete layer' }).click();
 
     await expect(page.getByTestId('layers-row-collapse-first-rect')).toHaveCount(0);
     await expect(page.getByTestId('layers-row-collapse-group')).toHaveCount(0);
@@ -393,6 +395,44 @@ test.describe('editor group layers and inspector flows', () => {
         kind: 'rectangle',
       }),
     ]);
+  });
+
+  test('deletes a single layer via its inline delete button', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createRectangleFixture({
+        id: 'keep-rect',
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 100,
+        zIndex: 0,
+      }),
+      createTextFixture({
+        id: 'delete-text',
+        x: 300,
+        y: 100,
+        width: 200,
+        height: 50,
+        zIndex: 1,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'inline-delete.json');
+    await openLayersTab(page);
+
+    await expect(page.locator('.layer-row')).toHaveCount(2);
+
+    const targetRow = page.locator('.layer-row').filter({ hasText: 'Text' });
+    await targetRow.hover();
+    await targetRow.getByRole('button', { name: 'Delete layer' }).click();
+
+    await expect(page.locator('.layer-row')).toHaveCount(1);
+    await expect(page.locator('.layer-row')).toContainText('Rectangle');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toHaveLength(1);
+    expect(savedProject.nodes[0].id).toBe('keep-rect');
   });
 
   test('reorders groups from the layers footer controls as whole top-level nodes', async ({

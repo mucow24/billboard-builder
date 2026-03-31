@@ -13,10 +13,10 @@ import { flattenLayerRows } from '../../document/sceneGraph';
 import { LayersInspectorTab } from './LayersInspectorTab';
 
 describe('LayersInspectorTab', () => {
-  it('renders layers in z-index order and deletes the current selection from the utility row', async () => {
+  it('renders layers in z-index order and deletes a layer via its inline delete button', async () => {
     const user = userEvent.setup();
     const onSelectNode = vi.fn();
-    const onDeleteSelection = vi.fn();
+    const onDeleteNode = vi.fn();
     const backItem = createRectangleItem({ zIndex: 0 });
     const frontItem = createTextItem({ zIndex: 1 });
 
@@ -26,7 +26,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([backItem, frontItem])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={onDeleteSelection}
+        onDeleteNode={onDeleteNode}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -46,10 +46,12 @@ describe('LayersInspectorTab', () => {
     await user.click(layerRows[0]);
     expect(onSelectNode).toHaveBeenCalledWith(frontItem.id);
 
-    expect(screen.queryByRole('button', { name: 'Delete Rectangle' })).not.toBeInTheDocument();
+    const deleteButtons = screen.getAllByRole('button', { name: 'Delete layer' });
+    expect(deleteButtons).toHaveLength(2);
 
-    await user.click(screen.getByRole('button', { name: 'Delete selected (1)' }));
-    expect(onDeleteSelection).toHaveBeenCalledTimes(1);
+    await user.click(deleteButtons[0]);
+    expect(onDeleteNode).toHaveBeenCalledWith(frontItem.id);
+    expect(onSelectNode).toHaveBeenCalledTimes(1);
   });
 
   it('opens properties on double-click and wires layer reorder controls', async () => {
@@ -65,7 +67,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([item])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={onOpenProperties}
         onReorder={onReorder}
         onSelectNode={onSelectNode}
@@ -97,7 +99,7 @@ describe('LayersInspectorTab', () => {
         canReorder={false}
         rows={flattenLayerRows([item])}
         onBackgroundChange={onBackgroundChange}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={vi.fn()}
@@ -111,7 +113,6 @@ describe('LayersInspectorTab', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Move to top' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Delete selected' })).toBeDisabled();
 
     await user.click(screen.getByRole('button', { name: 'Canvas background' }));
     await user.clear(screen.getByLabelText('Canvas background hex'));
@@ -137,7 +138,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([item])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={vi.fn()}
@@ -171,7 +172,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([group])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -198,7 +199,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([group])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -220,7 +221,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([group])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -249,7 +250,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([item])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
@@ -279,7 +280,7 @@ describe('LayersInspectorTab', () => {
         canReorder
         rows={flattenLayerRows([item])}
         onBackgroundChange={vi.fn()}
-        onDeleteSelection={vi.fn()}
+        onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
         onSelectNode={onSelectNode}
