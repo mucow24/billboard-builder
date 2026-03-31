@@ -76,4 +76,65 @@ test.describe('generator layers', () => {
     await page.getByRole('button', { name: 'Circle', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Circle', exact: true })).toHaveAttribute('aria-pressed', 'true');
   });
+
+  test('generator layer row shows G icon with primary and secondary colors', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await clickToolbarPopoverItem(page, 'Generators', 'Diagonal Bands');
+    await openLayersTab(page);
+
+    const icon = page.locator('.layer-row-generator-icon').first();
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveText('G');
+
+    // Primary color (bandColorA #8d1fff) → rgb(141, 31, 255)
+    const textColor = await icon.evaluate((el) => getComputedStyle(el).color);
+    expect(textColor).toBe('rgb(141, 31, 255)');
+
+    // Secondary color (bandColorB #30f2ff) as background on parent swatch
+    const swatch = page.locator('.layer-row-type-generator').first();
+    const bgColor = await swatch.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bgColor).toBe('rgb(48, 242, 255)');
+  });
+
+  test('colorless generator shows muted fallback G icon', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await clickToolbarPopoverItem(page, 'Generators', 'Scanlines');
+    await openLayersTab(page);
+
+    const icon = page.locator('.layer-row-generator-icon').first();
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveText('G');
+
+    // Should NOT be the bands primary color — should be a muted fallback
+    const textColor = await icon.evaluate((el) => getComputedStyle(el).color);
+    expect(textColor).not.toBe('rgb(141, 31, 255)');
+  });
+
+  test('generator layer icon updates when color parameter changes', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await clickToolbarPopoverItem(page, 'Generators', 'Diagonal Bands');
+    await openLayersTab(page);
+
+    const icon = page.locator('.layer-row-generator-icon').first();
+    const initialColor = await icon.evaluate((el) => getComputedStyle(el).color);
+    expect(initialColor).toBe('rgb(141, 31, 255)');
+
+    // Select and change Band Color A
+    await clickLayerRow(page, 'Diagonal Bands');
+    await openPropertiesTab(page);
+
+    // Open the Band Color A picker and change the hex value
+    await page.getByRole('button', { name: 'Band Color A', exact: true }).click();
+    const hexInput = page.getByLabel('Band Color A hex');
+    await hexInput.fill('#ff0000');
+    await hexInput.press('Enter');
+
+    // Check layer icon updated
+    await openLayersTab(page);
+    const updatedColor = await icon.evaluate((el) => getComputedStyle(el).color);
+    expect(updatedColor).toBe('rgb(255, 0, 0)');
+  });
 });

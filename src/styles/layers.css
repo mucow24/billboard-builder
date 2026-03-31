@@ -240,6 +240,14 @@
   transform-origin: center;
 }
 
+.layer-row-generator-icon {
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+  display: block;
+}
+
 /* ── Row copy (label + secondary) ────────────────────────────────────────── */
 
 .layer-row-copy {
