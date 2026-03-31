@@ -1,3 +1,5 @@
+import { Rect } from 'react-konva';
+
 import type { CanvasItem, CanvasTool, GeneratorCanvasItem, LineCanvasItem } from '../../document/documentTypes';
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
@@ -6,6 +8,8 @@ import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 import { LineItemView } from './LineItemView';
+import { getCanvasOverlayMetrics } from './overlayGeometry';
+import { SELECTION_STROKE } from './renderConstants';
 import { ShapeItemView } from './ShapeItemView';
 
 interface SingleSelectionOverlayProps {
@@ -56,7 +60,19 @@ export function SingleSelectionOverlay({
   zoom,
 }: SingleSelectionOverlayProps) {
   if (selectedRenderedItem.kind === 'generator') {
-    return null;
+    const overlayMetrics = getCanvasOverlayMetrics(zoom);
+    return (
+      <Rect
+        x={0}
+        y={0}
+        width={selectedRenderedItem.width}
+        height={selectedRenderedItem.height}
+        stroke={SELECTION_STROKE}
+        strokeWidth={overlayMetrics.selectionStrokeWidth}
+        dash={overlayMetrics.selectionDash}
+        listening={false}
+      />
+    );
   }
 
   return selectedRenderedItem.kind === 'line' ? (
