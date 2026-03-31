@@ -6,6 +6,7 @@ import { Image as KonvaImage } from 'react-konva';
 import type { ImageCanvasItem } from '../document/documentTypes';
 import { getRenderableImageAdjustments } from './imageAdjustments';
 import { getImageNodePresentation } from './imagePresentation';
+import { nativeBlur } from './useBlurEffect';
 
 interface ImageItemNodeProps {
   item: ImageCanvasItem;
@@ -34,7 +35,7 @@ export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemN
 
     const filters = [...adjustments.filters];
     if (blurRadius > 0) {
-      filters.push(Konva.Filters.Blur);
+      filters.push(nativeBlur);
     }
 
     node.filters(filters);
