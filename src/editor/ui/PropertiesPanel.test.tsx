@@ -17,7 +17,7 @@ const baseProps = {
   missingFontFamilies: [] as string[],
   onBackgroundChange: vi.fn(),
   onGroupOpacityChange: vi.fn(),
-  onDeleteSelection: vi.fn(),
+  onDeleteNode: vi.fn(),
   onItemChange: vi.fn(),
   onSelectNode: vi.fn(),
   onReorder: vi.fn(),

@@ -318,10 +318,11 @@
   height: 19px;
   padding: 0;
   border: 0;
+  border-radius: 3px;
   background: transparent;
   cursor: pointer;
   opacity: 0.25;
-  transition: opacity 0.12s;
+  transition: opacity 0.12s, background 0.12s;
 }
 
 .layer-row-action-btn svg {
@@ -345,15 +346,17 @@
 }
 
 .layer-row:hover .layer-row-action-btn.active {
-  opacity: 0.9;
+  opacity: 1;
 }
 
-.layer-row-action-btn:hover {
-  opacity: 0.85;
-}
-
+.layer-row-action-btn:hover,
 .layer-row-action-btn.active:hover {
   opacity: 1;
+  background: rgba(129, 140, 248, 0.55);
+}
+
+.layer-row-action-btn:hover svg {
+  stroke: #e0eaff;
 }
 
 /* ── Layers footer toolbar ───────────────────────────────────────────────── */

@@ -35,7 +35,7 @@ export interface PropertiesPanelProps {
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;
   onInsertFavorite?: (favoriteId: string) => void;
-  onDeleteSelection: () => void;
+  onDeleteNode: (nodeId: string) => void;
   onOpenProperties?: () => void;
   onSelectNode: (nodeId: string) => void;
   onSelectGroupChildren?: () => void;
@@ -51,7 +51,7 @@ export interface LayersInspectorTabProps {
   collapsedGroupIds: ReadonlySet<string>;
   rows: LayerRow[];
   onBackgroundChange: (background: string) => void;
-  onDeleteSelection: () => void;
+  onDeleteNode: (nodeId: string) => void;
   onOpenProperties: () => void;
   onReorder: (mode: ReorderMode) => void;
   onSelectNode: (nodeId: string) => void;
