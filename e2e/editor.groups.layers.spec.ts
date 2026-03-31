@@ -379,8 +379,9 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, groupedDocument, 'collapse-singleton-group.json');
 
     await openLayersTab(page);
-    await page.getByTestId('layers-row-collapse-first-rect').click();
-    await page.getByRole('button', { name: 'Delete selected (1)' }).click();
+    const targetRow = page.getByTestId('layers-row-collapse-first-rect');
+    await targetRow.hover();
+    await targetRow.getByRole('button', { name: 'Delete layer' }).click();
 
     await expect(page.getByTestId('layers-row-collapse-first-rect')).toHaveCount(0);
     await expect(page.getByTestId('layers-row-collapse-group')).toHaveCount(0);
