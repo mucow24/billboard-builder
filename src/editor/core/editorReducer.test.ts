@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createDefaultProjectDocument,
+  createGroupNode,
   createLineItem,
   createRectangleItem,
   createTextItem,
@@ -185,5 +186,28 @@ describe('editor reducer', () => {
     expect(nextItem.height).toBe(70);
     expect(nextItem.x).toBe(10);
     expect(nextItem.y).toBe(20);
+  });
+
+  it('collapses singleton groups after deleting a grouped child through the reducer command path', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createTextItem({ id: 'second' });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+    const document = {
+      ...createDefaultProjectDocument(),
+      nodes: [group],
+      items: [first, second],
+    };
+
+    const nextDocument = applyEditorCommand(document, {
+      type: 'delete_nodes',
+      nodeIds: [first.id],
+    });
+
+    expect(nextDocument.nodes).toHaveLength(1);
+    expect(nextDocument.nodes[0]).toMatchObject({
+      id: second.id,
+      kind: 'text',
+    });
   });
 });

@@ -17,6 +17,7 @@ import {
   getParentNodeId,
   groupNodes,
   normalizeLeafZIndices,
+  removeNodesByIds,
   ungroupNode,
 } from './sceneGraph';
 
@@ -195,5 +196,64 @@ describe('scene graph helpers', () => {
     expect(getParentNodeId([outerGroup], innerGroup.id)).toBe(outerGroup.id);
     expect(getNextDrilldownNodeId([outerGroup], outerGroup.id, leaf.id)).toBe(innerGroup.id);
     expect(getNextDrilldownNodeId([outerGroup], innerGroup.id, leaf.id)).toBe(leaf.id);
+  });
+
+  it('ungroups a surviving child in place when delete leaves a group with one child', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createTextItem({ id: 'second' });
+    const sibling = createRectangleItem({ id: 'sibling' });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+
+    const nextNodes = removeNodesByIds([group, sibling], new Set([first.id]));
+
+    expect(nextNodes.map((node) => node.id)).toEqual([second.id, sibling.id]);
+    expect(nextNodes[0]?.kind).toBe('text');
+  });
+
+  it('removes a group entirely when delete removes all of its children', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createTextItem({ id: 'second' });
+    const sibling = createRectangleItem({ id: 'sibling' });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+
+    const nextNodes = removeNodesByIds([group, sibling], new Set([first.id, second.id]));
+
+    expect(nextNodes.map((node) => node.id)).toEqual([sibling.id]);
+  });
+
+  it('cascades group collapse upward after nested child deletion', () => {
+    const leaf = createRectangleItem({ id: 'leaf' });
+    const cousin = createTextItem({ id: 'cousin' });
+    const nestedGroup = createGroupNode([leaf], 'Nested Group');
+    nestedGroup.id = 'nested-group';
+    const outerGroup = createGroupNode([nestedGroup, cousin], 'Outer Group');
+    outerGroup.id = 'outer-group';
+
+    const nextNodes = removeNodesByIds([outerGroup], new Set([cousin.id]));
+
+    expect(nextNodes.map((node) => node.id)).toEqual([leaf.id]);
+    expect(nextNodes[0]?.kind).toBe('rectangle');
+  });
+
+  it('leaves valid groups intact when delete touches an unrelated sibling', () => {
+    const first = createRectangleItem({ id: 'first' });
+    const second = createTextItem({ id: 'second' });
+    const unrelated = createRectangleItem({ id: 'unrelated' });
+    const group = createGroupNode([first, second], 'Poster Group');
+    group.id = 'group-1';
+
+    const nextNodes = removeNodesByIds([group, unrelated], new Set([unrelated.id]));
+
+    expect(nextNodes).toHaveLength(1);
+    expect(nextNodes[0]).toMatchObject({
+      id: group.id,
+      kind: 'group',
+    });
+    if (nextNodes[0]?.kind !== 'group') {
+      throw new Error('Expected surviving group.');
+    }
+    expect(nextNodes[0].children.map((node) => node.id)).toEqual([first.id, second.id]);
   });
 });
