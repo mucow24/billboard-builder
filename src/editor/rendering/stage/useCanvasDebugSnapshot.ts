@@ -287,6 +287,7 @@ export function useCanvasDebugSnapshot({
       lastTestHookEvent,
       marqueeViewportRect,
       nodeClientRect,
+      renderedItems.length,
       pan.x,
       pan.y,
       lastDrilldownSource,

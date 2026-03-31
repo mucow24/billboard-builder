@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import type { FontOption } from '../FontFamilyPicker';
 import { FontFamilyPicker } from '../FontFamilyPicker';
+import type { ToggleOption } from '../../generators';
 
 import { formatDisplayedNumber } from './inspectorModel';
 
@@ -36,6 +37,8 @@ export interface BareNumberInputProps {
 }
 
 interface NumberInputProps extends BareNumberInputProps {
+  textMin?: number;
+  textMax?: number;
   slider?: boolean;
   sliderDetentThreshold?: number;
   sliderDetentValue?: number;
@@ -123,6 +126,8 @@ export function NumberInput({
   max,
   mixed = false,
   min,
+  textMin,
+  textMax,
   onChange,
   slider = false,
   sliderDetentThreshold,
@@ -138,6 +143,10 @@ export function NumberInput({
 
   function commitValue(nextValue: number) {
     onChange(clampNumberInputValue(nextValue, min, max));
+  }
+
+  function commitTextValue(nextValue: number) {
+    onChange(clampNumberInputValue(nextValue, textMin ?? min, textMax ?? max));
   }
 
   if (slider) {
@@ -172,8 +181,8 @@ export function NumberInput({
             <input
               aria-label={`${label} value`}
               disabled={disabled}
-              max={max}
-              min={min}
+              max={Number.isFinite(textMax ?? max) ? (textMax ?? max) : undefined}
+              min={Number.isFinite(textMin ?? min) ? (textMin ?? min) : undefined}
               step={step}
               type="number"
               value={displayedValue}
@@ -181,7 +190,7 @@ export function NumberInput({
                 if (event.target.value === '') {
                   return;
                 }
-                commitValue(Number(event.target.value));
+                commitTextValue(Number(event.target.value));
               }}
             />
           </div>
@@ -523,5 +532,47 @@ export function SegmentedIconButton({
     >
       {children}
     </button>
+  );
+}
+
+interface ToggleGroupInputProps {
+  disabled?: boolean;
+  label: string;
+  onChange: (value: Record<string, boolean>) => void;
+  options: ToggleOption[];
+  value: Record<string, boolean>;
+}
+
+export function ToggleGroupInput({
+  disabled = false,
+  label,
+  onChange,
+  options,
+  value,
+}: ToggleGroupInputProps) {
+  return (
+    <FieldShell label={label} layout="stacked">
+      <div className="toggle-group-grid" role="group" aria-label={label}>
+        {options.map((option) => {
+          const active = Boolean(value[option.key]);
+          return (
+            <button
+              key={option.key}
+              type="button"
+              className={active ? 'toggle-group-btn active' : 'toggle-group-btn'}
+              aria-label={option.label}
+              aria-pressed={active}
+              disabled={disabled}
+              onClick={() => onChange({ ...value, [option.key]: !active })}
+            >
+              {option.icon ? (
+                <span className="toggle-group-icon" aria-hidden="true">{option.icon}</span>
+              ) : null}
+              <span className="toggle-group-label">{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </FieldShell>
   );
 }

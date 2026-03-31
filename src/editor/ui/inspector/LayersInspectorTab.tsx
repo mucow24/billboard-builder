@@ -281,6 +281,8 @@ export function LayersInspectorTab({
                           alt=""
                           draggable={false}
                         />
+                      ) : row.node.kind === 'generator' ? (
+                        <span className="layer-row-generator-icon">G</span>
                       ) : null}
                     </span>
                   )}

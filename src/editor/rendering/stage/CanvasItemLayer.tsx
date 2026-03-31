@@ -1,14 +1,19 @@
 import type Konva from 'konva';
 
-import type { CanvasItem, CanvasTool, LineCanvasItem } from '../../document/documentTypes';
+import type { CanvasItem, CanvasTool, GeneratorCanvasItem, LineCanvasItem } from '../../document/documentTypes';
 import type { Point, ResizeHandle } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
+import { GeneratorItemView } from '../GeneratorItemView';
 import { LineItemView } from './LineItemView';
 import { ShapeItemView } from './ShapeItemView';
 
+type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
+
 interface CanvasItemLayerProps {
   activeTool: CanvasTool;
+  canvasWidth: number;
+  canvasHeight: number;
   interactive?: boolean;
   items: RenderableCanvasItem[];
   onBeginLineHandle?: (
@@ -17,12 +22,12 @@ interface CanvasItemLayerProps {
     pointer: Point,
   ) => void;
   onBeginResize?: (
-    item: Exclude<CanvasItem, LineCanvasItem>,
+    item: ShapeItem,
     handle: ResizeHandle,
     pointer: Point,
   ) => void;
   onBeginRotate?: (
-    item: Exclude<CanvasItem, LineCanvasItem>,
+    item: ShapeItem,
     pointer: Point,
   ) => void;
   onItemDoubleClick?: (item: CanvasItem) => void;
@@ -49,6 +54,8 @@ const NOOP_START_PAN_DRAG = () => {};
 
 export function CanvasItemLayer({
   activeTool,
+  canvasWidth,
+  canvasHeight,
   interactive = true,
   items,
   onBeginLineHandle = NOOP_BEGIN_LINE_HANDLE,
@@ -66,7 +73,19 @@ export function CanvasItemLayer({
   return (
     <>
       {items.map((item) =>
-        item.kind === 'line' ? (
+        item.kind === 'generator' ? (
+          <GeneratorItemView
+            key={item.id}
+            activeTool={effectiveTool}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            item={item}
+            selectableNodeId={item.selectableNodeId}
+            onItemPointerDown={onItemPointerDown}
+            startPanDrag={startPanDrag}
+            toCanvasPointer={toCanvasPointer}
+          />
+        ) : item.kind === 'line' ? (
           <LineItemView
             key={item.id}
             activeTool={effectiveTool}
@@ -92,13 +111,13 @@ export function CanvasItemLayer({
             key={item.id}
             activeTool={effectiveTool}
             isSelected={interactive && item.id === selectedItemId}
-            item={item}
+            item={item as RenderableCanvasItem & ShapeItem}
             selectableNodeId={item.selectableNodeId}
-            onItemDoubleClick={onItemDoubleClick as (item: Exclude<CanvasItem, LineCanvasItem>) => void}
+            onItemDoubleClick={onItemDoubleClick as (item: ShapeItem) => void}
             onBeginResize={onBeginResize}
             onBeginRotate={onBeginRotate}
             onItemPointerDown={onItemPointerDown as (
-              item: Exclude<CanvasItem, LineCanvasItem>,
+              item: ShapeItem,
               selectionNodeId: string,
               pointer: Point,
               shiftKey: boolean,

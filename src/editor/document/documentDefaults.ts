@@ -1,3 +1,4 @@
+import { getGenerator } from '../generators';
 import { DEFAULT_IMAGE_ADJUSTMENTS } from './imageAdjustments';
 import { DEFAULT_TEXT_PADDING } from './textPadding';
 
@@ -9,6 +10,7 @@ import type {
   CanvasSize,
   CanvasShadow,
   EllipseCanvasItem,
+  GeneratorCanvasItem,
   ImageCropRect,
   ImageCanvasItem,
   LineCanvasItem,
@@ -210,6 +212,24 @@ export function createImageItem(params: {
     mirrorHorizontal: false,
     preserveAspectRatio: true,
     adjustments: { ...DEFAULT_IMAGE_ADJUSTMENTS },
+  };
+}
+
+export function createGeneratorItem(
+  generatorType: string,
+  canvasWidth: number,
+  canvasHeight: number,
+): GeneratorCanvasItem {
+  const spec = getGenerator(generatorType);
+  if (!spec) throw new Error(`Unknown generator type: ${generatorType}`);
+  return {
+    ...createBaseItem('generator', spec.label),
+    x: 0,
+    y: 0,
+    width: canvasWidth,
+    height: canvasHeight,
+    seed: Math.floor(Math.random() * 0xffffffff),
+    generatorParams: spec.createDefaultParams(),
   };
 }
 

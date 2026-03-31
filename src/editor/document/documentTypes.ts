@@ -12,7 +12,8 @@ export type CanvasLeafKind =
   | 'image'
   | 'rectangle'
   | 'ellipse'
-  | 'line';
+  | 'line'
+  | 'generator';
 
 export type CanvasNodeKind = CanvasLeafKind | 'group';
 
@@ -150,12 +151,127 @@ export interface LineCanvasItem extends BaseCanvasItem {
   endY: number;
 }
 
+export interface BandsGeneratorParams {
+  generatorType: 'bands';
+  bandColorA: string;
+  bandColorB: string;
+  shadowColor: string;
+  stripeCount: number;
+  stripeAngle: number;
+  stripeThickness: number;
+  stripeSpacingJitter: number;
+  stripeOffset: number;
+  stripeSkew: number;
+  stripeContrast: number;
+  stripeGlow: number;
+  seedOverride: number | null;
+}
+
+export interface BurstGeneratorParams {
+  generatorType: 'burst';
+  accentColor: string;
+  bandColorB: string;
+  burstRays: number;
+  burstScale: number;
+  burstOpacity: number;
+  burstOffsetX: number;
+  burstOffsetY: number;
+  burstRotation: number;
+}
+
+export interface ZigzagsGeneratorParams {
+  generatorType: 'zigzags';
+  accentColor: string;
+  bandColorA: string;
+  zigzagCount: number;
+  zigzagAmplitude: number;
+  zigzagThickness: number;
+  zigzagOpacity: number;
+  seedOverride: number | null;
+}
+
+export interface FlatGridGeneratorParams {
+  generatorType: 'flatGrid';
+  accentColor: string;
+  gridSpacingX: number;
+  gridSpacingY: number;
+  gridThickness: number;
+  gridOffsetX: number;
+  gridOffsetY: number;
+  gridRotation: number;
+}
+
+export interface PerspectiveGridGeneratorParams {
+  generatorType: 'perspectiveGrid';
+  bandColorB: string;
+  perspectiveHorizon: number;
+  perspectiveDepth: number;
+  perspectiveNear: number;
+  perspectiveExtent: number;
+  perspectiveThickness: number;
+  perspectiveThicknessFalloff: number;
+  perspectiveRows: number;
+}
+
+export interface ScanlinesGeneratorParams {
+  generatorType: 'scanlines';
+  scanlineSpacing: number;
+  scanlineOpacity: number;
+}
+
+export interface NoiseGeneratorParams {
+  generatorType: 'noise';
+  noise: number;
+  seedOverride: number | null;
+}
+
+export interface VignetteGeneratorParams {
+  generatorType: 'vignette';
+  vignette: number;
+}
+
+export type ShapeTypeKey = 'rect' | 'diamond' | 'triangle' | 'circle' | 'bar';
+
+export interface ShapesGeneratorParams {
+  generatorType: 'shapes';
+  accentColor: string;
+  bandColorA: string;
+  bandColorB: string;
+  shapeTypes: Record<ShapeTypeKey, boolean>;
+  shapeCount: number;
+  shapeMinSize: number;
+  shapeMaxSize: number;
+  shapeRotation: number;
+  shapeOpacity: number;
+  shapeOutline: number;
+  shapeMix: number;
+  seedOverride: number | null;
+}
+
+export type GeneratorParams =
+  | BandsGeneratorParams
+  | BurstGeneratorParams
+  | ZigzagsGeneratorParams
+  | FlatGridGeneratorParams
+  | PerspectiveGridGeneratorParams
+  | ScanlinesGeneratorParams
+  | NoiseGeneratorParams
+  | VignetteGeneratorParams
+  | ShapesGeneratorParams;
+
+export interface GeneratorCanvasItem extends BaseCanvasItem {
+  kind: 'generator';
+  seed: number;
+  generatorParams: GeneratorParams;
+}
+
 export type CanvasItem =
   | TextCanvasItem
   | ImageCanvasItem
   | RectangleCanvasItem
   | EllipseCanvasItem
-  | LineCanvasItem;
+  | LineCanvasItem
+  | GeneratorCanvasItem;
 
 export interface GroupNode {
   id: string;

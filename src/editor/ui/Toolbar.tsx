@@ -2,9 +2,10 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } 
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
+import { getAllGenerators } from '../generators';
 import type { InspectorTab } from './inspector/types';
 
-type ToolbarMenuName = 'canvas' | 'size' | 'upload';
+type ToolbarMenuName = 'canvas' | 'size' | 'upload' | 'generators';
 
 function joinClassNames(...classNames: Array<string | false | null | undefined>) {
   return classNames.filter(Boolean).join(' ');
@@ -34,6 +35,7 @@ interface ToolbarProps {
   onSaveFavorite: () => void;
   onUndo: () => void;
   onUngroup: () => void;
+  onAddGenerator: (generatorType: string) => void;
   activeInspectorTab: InspectorTab;
   panelCollapsed: boolean;
   onInspectorTabChange: (tab: InspectorTab) => void;
@@ -134,6 +136,7 @@ export function Toolbar({
   onSaveFavorite,
   onUndo,
   onUngroup,
+  onAddGenerator,
   activeInspectorTab,
   panelCollapsed,
   onInspectorTabChange,
@@ -144,12 +147,14 @@ export function Toolbar({
   const canvasTriggerRef = useRef<HTMLButtonElement | null>(null);
   const sizeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const uploadTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const generatorsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [openMenu, setOpenMenu] = useState<ToolbarMenuName | null>(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
   const [isExportFocused, setIsExportFocused] = useState(false);
   const canvasMenuId = useId();
   const sizeMenuId = useId();
   const uploadMenuId = useId();
+  const generatorsMenuId = useId();
 
   useEffect(() => {
     onExportIntentChange?.(isExportHovered || isExportFocused);
@@ -183,6 +188,7 @@ export function Toolbar({
         canvas: canvasTriggerRef.current,
         size: sizeTriggerRef.current,
         upload: uploadTriggerRef.current,
+        generators: generatorsTriggerRef.current,
       };
       window.requestAnimationFrame(() => {
         triggerByMenu[menu]?.focus();
@@ -399,6 +405,32 @@ export function Toolbar({
                 <path d="M11.5 15.5 15 4.5" />
                 <path d="M6.4 11.2h6.9" />
               </ToolbarMenuAction>
+            </div>
+          ) : null}
+        </div>
+
+        <div className={openMenu === 'generators' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
+          <button
+            ref={generatorsTriggerRef}
+            type="button"
+            className="top-toolbar-button top-toolbar-control top-toolbar-menu-trigger"
+            aria-controls={generatorsMenuId}
+            aria-expanded={openMenu === 'generators'}
+            aria-haspopup="true"
+            onClick={() => toggleMenu('generators')}
+          >
+            <span>Generators</span>
+            <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
+          </button>
+          {openMenu === 'generators' ? (
+            <div id={generatorsMenuId} className="top-toolbar-popover-panel" role="group" aria-label="Generator types">
+              {getAllGenerators().map((spec) => (
+                <ToolbarMenuAction
+                  key={spec.type}
+                  label={spec.label}
+                  onSelect={createMenuActionHandler(() => onAddGenerator(spec.type))}
+                />
+              ))}
             </div>
           ) : null}
         </div>

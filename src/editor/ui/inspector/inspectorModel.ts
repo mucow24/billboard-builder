@@ -1,4 +1,5 @@
 import { DEFAULT_FONT_FAMILY, WEB_SAFE_FONTS } from '../../document/documentDefaults';
+import { getGenerator } from '../../generators';
 import type {
   CanvasItem,
   DocumentFontReference,
@@ -183,6 +184,18 @@ export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
       borderColor: previewStroke,
       borderWidth: hasVisibleStroke ? '2px' : '',
       color: previewStroke,
+    };
+  }
+  if (item.kind === 'generator') {
+    const spec = getGenerator(item.generatorParams.generatorType);
+    const colorFields = spec?.fields.filter((f) => f.type === 'color') ?? [];
+    const params = item.generatorParams as unknown as Record<string, unknown>;
+    const primary = colorFields[0] ? (params[colorFields[0].key] as string) : null;
+    const secondary = colorFields[1] ? (params[colorFields[1].key] as string) : null;
+    return {
+      background: secondary ?? 'rgba(12, 19, 32, 0.92)',
+      borderColor: primary ?? 'rgba(147, 168, 201, 0.26)',
+      color: primary ?? 'rgba(147, 168, 201, 0.7)',
     };
   }
   return {};

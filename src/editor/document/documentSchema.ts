@@ -42,9 +42,124 @@ const TextPaddingSchema = z.object({
   left: z.number(),
 });
 
+const BandsGeneratorParamsSchema = z.object({
+  generatorType: z.literal('bands'),
+  bandColorA: z.string(),
+  bandColorB: z.string(),
+  shadowColor: z.string(),
+  stripeCount: z.number().int().min(1),
+  stripeAngle: z.number(),
+  stripeThickness: z.number().min(1),
+  stripeSpacingJitter: z.number().min(0),
+  stripeOffset: z.number(),
+  stripeSkew: z.number().min(0),
+  stripeContrast: z.number().min(0).max(1),
+  stripeGlow: z.number().min(0).max(1),
+  seedOverride: z.number().nullable(),
+});
+
+const BurstGeneratorParamsSchema = z.object({
+  generatorType: z.literal('burst'),
+  accentColor: z.string(),
+  bandColorB: z.string(),
+  burstRays: z.number().int().min(1),
+  burstScale: z.number().min(0),
+  burstOpacity: z.number().min(0).max(1),
+  burstOffsetX: z.number(),
+  burstOffsetY: z.number(),
+  burstRotation: z.number(),
+});
+
+const ZigzagsGeneratorParamsSchema = z.object({
+  generatorType: z.literal('zigzags'),
+  accentColor: z.string(),
+  bandColorA: z.string(),
+  zigzagCount: z.number().int().min(0),
+  zigzagAmplitude: z.number().min(0),
+  zigzagThickness: z.number().min(0),
+  zigzagOpacity: z.number().min(0).max(1),
+  seedOverride: z.number().nullable(),
+});
+
+const FlatGridGeneratorParamsSchema = z.object({
+  generatorType: z.literal('flatGrid'),
+  accentColor: z.string(),
+  gridSpacingX: z.number().min(1),
+  gridSpacingY: z.number().min(1),
+  gridThickness: z.number().min(0),
+  gridOffsetX: z.number(),
+  gridOffsetY: z.number(),
+  gridRotation: z.number(),
+});
+
+const PerspectiveGridGeneratorParamsSchema = z.object({
+  generatorType: z.literal('perspectiveGrid'),
+  bandColorB: z.string(),
+  perspectiveHorizon: z.number(),
+  perspectiveDepth: z.number().int().min(1),
+  perspectiveNear: z.number(),
+  perspectiveExtent: z.number(),
+  perspectiveThickness: z.number().min(0),
+  perspectiveThicknessFalloff: z.number().min(0),
+  perspectiveRows: z.number().int().min(0),
+});
+
+const ScanlinesGeneratorParamsSchema = z.object({
+  generatorType: z.literal('scanlines'),
+  scanlineSpacing: z.number().int().min(1),
+  scanlineOpacity: z.number().min(0).max(1),
+});
+
+const NoiseGeneratorParamsSchema = z.object({
+  generatorType: z.literal('noise'),
+  noise: z.number().min(0).max(1),
+  seedOverride: z.number().nullable(),
+});
+
+const VignetteGeneratorParamsSchema = z.object({
+  generatorType: z.literal('vignette'),
+  vignette: z.number().min(0).max(1),
+});
+
+const ShapeTypesSchema = z.object({
+  rect: z.boolean(),
+  diamond: z.boolean(),
+  triangle: z.boolean(),
+  circle: z.boolean(),
+  bar: z.boolean(),
+});
+
+const ShapesGeneratorParamsSchema = z.object({
+  generatorType: z.literal('shapes'),
+  accentColor: z.string(),
+  bandColorA: z.string(),
+  bandColorB: z.string(),
+  shapeTypes: ShapeTypesSchema,
+  shapeCount: z.number().int().min(0),
+  shapeMinSize: z.number().min(0),
+  shapeMaxSize: z.number().min(0),
+  shapeRotation: z.number().min(0),
+  shapeOpacity: z.number().min(0).max(1),
+  shapeOutline: z.number().min(0),
+  shapeMix: z.number().min(0).max(1),
+  seedOverride: z.number().nullable(),
+});
+
+const GeneratorParamsSchema = z.discriminatedUnion('generatorType', [
+  BandsGeneratorParamsSchema,
+  BurstGeneratorParamsSchema,
+  ZigzagsGeneratorParamsSchema,
+  FlatGridGeneratorParamsSchema,
+  PerspectiveGridGeneratorParamsSchema,
+  ScanlinesGeneratorParamsSchema,
+  NoiseGeneratorParamsSchema,
+  VignetteGeneratorParamsSchema,
+  ShapesGeneratorParamsSchema,
+]);
+
 const BaseCanvasItemSchemaV1 = z.object({
   id: z.string().min(1),
-  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line']),
+  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line', 'generator']),
   name: z.string().min(1),
   x: z.number(),
   y: z.number(),
@@ -120,11 +235,18 @@ const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   endY: z.number().optional(),
 });
 
+const GeneratorCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+  kind: z.literal('generator'),
+  seed: z.number(),
+  generatorParams: GeneratorParamsSchema,
+});
+
 const TextCanvasItemSchemaV2 = TextCanvasItemSchemaV1.omit({ zIndex: true });
 const ImageCanvasItemSchemaV2 = ImageCanvasItemSchemaV1.omit({ zIndex: true });
 const RectangleCanvasItemSchemaV2 = RectangleCanvasItemSchemaV1.omit({ zIndex: true });
 const EllipseCanvasItemSchemaV2 = EllipseCanvasItemSchemaV1.omit({ zIndex: true });
 const LineCanvasItemSchemaV2 = LineCanvasItemSchemaV1.omit({ zIndex: true });
+const GeneratorCanvasItemSchemaV2 = GeneratorCanvasItemSchemaV1.omit({ zIndex: true });
 
 const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
   TextCanvasItemSchemaV1,
@@ -132,6 +254,7 @@ const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
   RectangleCanvasItemSchemaV1,
   EllipseCanvasItemSchemaV1,
   LineCanvasItemSchemaV1,
+  GeneratorCanvasItemSchemaV1,
 ]);
 
 const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
@@ -140,6 +263,7 @@ const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
   RectangleCanvasItemSchemaV2,
   EllipseCanvasItemSchemaV2,
   LineCanvasItemSchemaV2,
+  GeneratorCanvasItemSchemaV2,
 ]);
 
 const CanvasNodeSchemaV2: z.ZodTypeAny = z.lazy(() =>

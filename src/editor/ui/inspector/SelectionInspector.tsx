@@ -64,6 +64,8 @@ function FieldRenderer({
           max={field.descriptor.max}
           mixed={field.state.isMixed}
           min={field.descriptor.min}
+          textMin={field.descriptor.textMin}
+          textMax={field.descriptor.textMax}
           slider={field.descriptor.slider}
           sliderDetentThreshold={field.descriptor.sliderDetentThreshold}
           sliderDetentValue={field.descriptor.sliderDetentValue}

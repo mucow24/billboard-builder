@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createGeneratorItem,
   createImageItem,
   createLineItem,
   createRectangleItem,
@@ -12,6 +13,7 @@ import {
   buildSelectionInspectorSections,
   getSelectionDescriptorCoverage,
   type DimensionAction,
+  type NumberFieldDescriptor,
 } from './selectionInspectorModel';
 
 describe('selectionInspectorModel', () => {
@@ -349,5 +351,70 @@ describe('selectionInspectorModel', () => {
     expect(fontField?.options.map((option) => option.label)).toEqual(
       expect.arrayContaining(['Alpha Sans', 'Arial', 'Verdana'])
     );
+  });
+
+  it('produces generator section descriptors with correct textMin/textMax bounds', () => {
+    const generator = createGeneratorItem('bands', 1024, 1024);
+
+    const coverage = getSelectionDescriptorCoverage(generator).map(
+      ({ propertyKey, sectionKey, valueType }) =>
+        `${sectionKey}:${propertyKey}:${valueType}`,
+    );
+    expect(coverage).toEqual(
+      expect.arrayContaining([
+        'generator:gen_bandColorA:color',
+        'generator:gen_stripeCount:number',
+        'generator:gen_stripeAngle:number',
+        'generator:gen_stripeGlow:number',
+      ]),
+    );
+
+    const environment = buildInspectorEnvironment([], []);
+    const sections = buildSelectionInspectorSections([generator], environment);
+    const generatorSection = sections.find((s) => s.key === 'generator');
+    expect(generatorSection).toBeDefined();
+
+    function findField(propertyKey: string) {
+      return generatorSection?.fields.find(
+        (f) => f.descriptor.propertyKey === propertyKey,
+      )?.descriptor as NumberFieldDescriptor | undefined;
+    }
+
+    // stripeCount: slider 2-64, text allows 1 to +Inf
+    const countField = findField('gen_stripeCount');
+    expect(countField?.min).toBe(2);
+    expect(countField?.max).toBe(64);
+    expect(countField?.textMin).toBe(1);
+    expect(countField?.textMax).toBe(Infinity);
+
+    // stripeGlow: slider 0-0.6, text allows 0-1
+    const glowField = findField('gen_stripeGlow');
+    expect(glowField?.min).toBe(0);
+    expect(glowField?.max).toBe(0.6);
+    expect(glowField?.textMin).toBe(0);
+    expect(glowField?.textMax).toBe(1);
+
+    // stripeAngle: slider -90 to 90, text allows -Inf to +Inf
+    const angleField = findField('gen_stripeAngle');
+    expect(angleField?.min).toBe(-90);
+    expect(angleField?.max).toBe(90);
+    expect(angleField?.textMin).toBe(-Infinity);
+    expect(angleField?.textMax).toBe(Infinity);
+  });
+
+  it('generator buildChange produces correct generatorParams patch', () => {
+    const generator = createGeneratorItem('bands', 1024, 1024);
+    const environment = buildInspectorEnvironment([], []);
+    const sections = buildSelectionInspectorSections([generator], environment);
+    const generatorSection = sections.find((s) => s.key === 'generator');
+    const countField = generatorSection?.fields.find(
+      (f) => f.descriptor.propertyKey === 'gen_stripeCount',
+    );
+
+    expect(countField).toBeDefined();
+    const patch = countField!.descriptor.buildChange({ item: generator }, 100 as never);
+    expect(patch).toEqual({
+      generatorParams: { ...generator.generatorParams, stripeCount: 100 },
+    });
   });
 });

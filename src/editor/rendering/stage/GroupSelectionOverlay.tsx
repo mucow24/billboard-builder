@@ -1,6 +1,8 @@
 import { Circle, Group, Line, Rect } from 'react-konva';
 
-import type { CanvasItem, CanvasTool } from '../../document/documentTypes';
+import type { CanvasItem, CanvasTool, GeneratorCanvasItem, LineCanvasItem } from '../../document/documentTypes';
+
+type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 import type { RenderableCanvasItem } from '../renderAdapter';
 import {
   RESIZE_HANDLE_NAMES,
@@ -29,13 +31,13 @@ interface GroupSelectionOverlayProps {
     source?: PointerGestureSource,
   ) => void;
   beginResize: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: ShapeItem,
     handle: ResizeHandle,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
   beginRotate: (
-    item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+    item: ShapeItem,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
@@ -77,6 +79,7 @@ export function GroupSelectionOverlay({
   return (
     <>
       {renderedSelectedItems.map((selectedRenderedItem) =>
+        selectedRenderedItem.kind === 'generator' ? null :
         selectedRenderedItem.kind === 'line' ? (
           <LineItemView
             key={`${selectedRenderedItem.id}-selection-outline`}
@@ -99,7 +102,7 @@ export function GroupSelectionOverlay({
             isSelected
             item={selectedRenderedItem}
             selectableNodeId={selectedRenderedItem.selectableNodeId}
-            onItemDoubleClick={handleItemDoubleClick as (item: Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>) => void}
+            onItemDoubleClick={handleItemDoubleClick as (item: ShapeItem) => void}
             onBeginResize={beginResize}
             onBeginRotate={beginRotate}
             onItemPointerDown={handleItemPointerDown}
