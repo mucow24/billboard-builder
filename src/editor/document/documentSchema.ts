@@ -175,6 +175,7 @@ const BaseCanvasItemSchemaV1 = z.object({
   hidden: z.boolean(),
   opacity: z.number().min(0).max(1),
   shadow: CanvasShadowSchema.optional(),
+  blurRadius: z.number().nonnegative().optional(),
 });
 
 const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({

@@ -335,6 +335,36 @@ test.describe('editor properties flows', () => {
     ]);
   });
 
+  test('PI-12 edits blur radius through the Properties panel and persists the value', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'blur-rect',
+      name: 'Blur Rectangle',
+      x: 180,
+      y: 180,
+      width: 200,
+      height: 140,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle]), 'properties-blur.json');
+    await clickCanvas(page, { x: 280, y: 250 });
+    await openPropertiesTab(page);
+
+    await page.getByRole('button', { name: 'Blur' }).click();
+    await page.getByRole('spinbutton', { name: 'Blur radius' }).fill('10');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({
+        id: 'blur-rect',
+        blurRadius: 10,
+      }),
+    ]);
+  });
+
   test('edits rectangle and text gradient properties through the Properties panel', async ({
     page,
   }) => {

@@ -223,6 +223,27 @@ describe('document normalizer', () => {
     ]);
   });
 
+  it('defaults missing blurRadius to zero and preserves valid values', () => {
+    const rectangle = createRectangleItem();
+    const withBlur = { ...rectangle, blurRadius: 10 };
+    const withoutBlur = { ...rectangle } as Record<string, unknown>;
+    delete withoutBlur.blurRadius;
+
+    const normalizedWithBlur = normalizeProjectDocument({
+      version: 2,
+      nodes: [withBlur],
+      fonts: [],
+    });
+    expect(normalizedWithBlur.nodes[0]).toMatchObject({ blurRadius: 10 });
+
+    const normalizedWithout = normalizeProjectDocument({
+      version: 2,
+      nodes: [withoutBlur as never],
+      fonts: [],
+    });
+    expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
+  });
+
   it('uses the same canonical normalization for loaded and live documents', () => {
     const liveDocument = {
       version: 2 as const,

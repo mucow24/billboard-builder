@@ -224,6 +224,7 @@ export function SelectionInspector({
             key={section.key}
             defaultExpanded={
               section.key !== 'advancedText' &&
+              section.key !== 'blur' &&
               section.key !== 'geometry' &&
               section.key !== 'shadow'
             }

@@ -1,10 +1,11 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { Circle, Line } from 'react-konva';
 import type Konva from 'konva';
 
 import type { CanvasTool, LineCanvasItem } from '../../document/documentTypes';
 import { getLineHandleRects, type Point } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
+import { useBlurEffect } from '../useBlurEffect';
 
 import {
   HANDLE_FILL,
@@ -62,12 +63,15 @@ export const LineItemView = memo(function LineItemView({
   const lineHandleRects = getLineHandleRects(item);
   const interactionEnabled = activeTool === 'select';
   const overlayMetrics = getCanvasOverlayMetrics(zoom);
+  const lineNodeRef = useRef<Konva.Line | null>(null);
   const handleShapeRef = useCallback(
-    (node: Konva.Node | null) => {
+    (node: Konva.Line | null) => {
+      lineNodeRef.current = node;
       registerShapeRef(item.id, node);
     },
     [item.id, registerShapeRef],
   );
+  useBlurEffect(lineNodeRef, item.blurRadius);
 
   return (
     <>

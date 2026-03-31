@@ -249,6 +249,27 @@ describe('document schema', () => {
     });
   });
 
+  it('round-trips blurRadius through serialization and defaults missing blurRadius for legacy files', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createRectangleItem({ blurRadius: 15 })];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+    expect(parsed.nodes[0]).toMatchObject({ blurRadius: 15 });
+
+    // Legacy file without blurRadius should normalize to 0
+    const legacy = createRectangleItem({ id: 'legacy-no-blur' });
+    const { blurRadius: _, ...legacyPayload } = legacy;
+    void _;
+    const parsedLegacy = parseProjectDocument({
+      version: 1,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      items: [legacyPayload],
+    });
+    expect(parsedLegacy.nodes[0]).toMatchObject({ blurRadius: 0 });
+  });
+
   it('defaults missing gradient fields for legacy rectangle payloads', () => {
     const rectangle = createRectangleItem({ fill: '#123456ff' });
     const {

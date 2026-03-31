@@ -93,6 +93,7 @@ export interface BaseCanvasItem {
   hidden: boolean;
   opacity: number;
   shadow: CanvasShadow;
+  blurRadius: number;
 }
 
 export interface GradientFillItem {

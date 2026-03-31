@@ -155,6 +155,7 @@ const SECTION_ORDER = {
   text: 20,
   geometry: 50,
   advancedText: 60,
+  blur: 65,
   shadow: 70,
 } as const;
 
@@ -1045,6 +1046,25 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
   ];
 }
 
+const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
+  createNumberField({
+    buildChange: (_context, nextValue) => ({ blurRadius: nextValue }),
+    digits: 0,
+    fieldOrder: 10,
+    getValue: (item) => item.blurRadius,
+    label: 'Blur radius',
+    max: 100,
+    min: 0,
+    propertyKey: 'blurRadius',
+    sectionKey: 'blur',
+    sectionLabel: 'Blur',
+    sectionOrder: SECTION_ORDER.blur,
+    step: 1,
+    supportsMultiEdit: true,
+    valueType: 'number',
+  }),
+];
+
 const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
   createColorField({
     buildChange: ({ item }, nextValue) => ({
@@ -1213,17 +1233,17 @@ function createGeneratorDescriptors(item: GeneratorCanvasItem): InspectorFieldDe
 function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
   switch (item.kind) {
     case 'text':
-      return [...createTextDescriptors(), ...COMMON_SHADOW_DESCRIPTORS];
+      return [...createTextDescriptors(), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'image':
-      return [...createImageDescriptors(), ...COMMON_SHADOW_DESCRIPTORS];
+      return [...createImageDescriptors(), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'rectangle':
-      return [...createShapeDescriptors('rectangle'), ...COMMON_SHADOW_DESCRIPTORS];
+      return [...createShapeDescriptors('rectangle'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'ellipse':
-      return [...createShapeDescriptors('ellipse'), ...COMMON_SHADOW_DESCRIPTORS];
+      return [...createShapeDescriptors('ellipse'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'line':
-      return [...createShapeDescriptors('line'), ...COMMON_SHADOW_DESCRIPTORS];
+      return [...createShapeDescriptors('line'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'generator':
-      return createGeneratorDescriptors(item);
+      return [...createGeneratorDescriptors(item), ...COMMON_BLUR_DESCRIPTORS];
     default:
       return [];
   }
