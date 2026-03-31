@@ -1,4 +1,11 @@
-export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+interface ColorChannels {
+  a: number;
+  b: number;
+  g: number;
+  r: number;
+}
+
+function parseColorChannels(hex: string): ColorChannels {
   const clean = String(hex || '')
     .replace('#', '')
     .trim();
@@ -9,21 +16,55 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
           .map((c) => c + c)
           .join('')
       : clean;
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return { r: 255, g: 255, b: 255 };
-  const int = Number.parseInt(normalized, 16);
-  return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 };
+  if (/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    const int = Number.parseInt(normalized, 16);
+    return {
+      a: 1,
+      r: (int >> 16) & 255,
+      g: (int >> 8) & 255,
+      b: int & 255,
+    };
+  }
+  if (/^[0-9a-fA-F]{8}$/.test(normalized)) {
+    const rgb = Number.parseInt(normalized.slice(0, 6), 16);
+    const alpha = Number.parseInt(normalized.slice(6, 8), 16) / 255;
+    return {
+      a: alpha,
+      r: (rgb >> 16) & 255,
+      g: (rgb >> 8) & 255,
+      b: rgb & 255,
+    };
+  }
+
+  return { a: 1, r: 255, g: 255, b: 255 };
+}
+
+function clampUnit(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function formatAlpha(alpha: number): string {
+  return Number(alpha.toFixed(3)).toString();
+}
+
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const { r, g, b } = parseColorChannels(hex);
+  return { r, g, b };
 }
 
 export function rgba(hex: string, alpha = 1): string {
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const { a, r, g, b } = parseColorChannels(hex);
+  const effectiveAlpha = clampUnit(a * alpha);
+  return `rgba(${r}, ${g}, ${b}, ${formatAlpha(effectiveAlpha)})`;
 }
 
 export function mixColor(hexA: string, hexB: string, t: number): string {
-  const a = hexToRgb(hexA);
-  const b = hexToRgb(hexB);
-  const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
-  return `rgb(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)})`;
+  const a = parseColorChannels(hexA);
+  const b = parseColorChannels(hexB);
+  const clampedT = clampUnit(t);
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * clampedT);
+  const mixAlpha = (x: number, y: number) => x + (y - x) * clampedT;
+  return `rgba(${mix(a.r, b.r)}, ${mix(a.g, b.g)}, ${mix(a.b, b.b)}, ${formatAlpha(mixAlpha(a.a, b.a))})`;
 }
 
 export function mulberry32(seed: number): () => number {
