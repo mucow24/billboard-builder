@@ -344,15 +344,24 @@ export function Toolbar({
               role="group"
               aria-label="Canvas size"
             >
-              {CANVAS_PRESETS.map((preset) => (
-                <ToolbarMenuAction
-                  key={preset.id}
-                  label={preset.label}
-                  selected={selectedPresetId === preset.id}
-                  pressed={selectedPresetId === preset.id}
-                  onSelect={() => handlePresetSelect(preset.id)}
-                />
-              ))}
+              {CANVAS_PRESETS.map((preset) => {
+                const maxDim = Math.max(preset.width, preset.height);
+                const w = (preset.width / maxDim) * 12;
+                const h = (preset.height / maxDim) * 12;
+                const x = 10 - w / 2;
+                const y = 10 - h / 2;
+                return (
+                  <ToolbarMenuAction
+                    key={preset.id}
+                    label={preset.label}
+                    selected={selectedPresetId === preset.id}
+                    pressed={selectedPresetId === preset.id}
+                    onSelect={() => handlePresetSelect(preset.id)}
+                  >
+                    <rect x={x} y={y} width={w} height={h} rx="1" />
+                  </ToolbarMenuAction>
+                );
+              })}
               <div className="top-toolbar-menu-divider" aria-hidden="true" />
               <div className="top-toolbar-size-menu-row">
                 <span className="top-toolbar-size-menu-label">Custom:</span>
