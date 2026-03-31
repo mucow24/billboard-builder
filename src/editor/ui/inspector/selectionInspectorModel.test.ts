@@ -417,4 +417,37 @@ describe('selectionInspectorModel', () => {
       generatorParams: { ...generator.generatorParams, stripeCount: 100 },
     });
   });
+
+  it('produces scanlines descriptors with color, height, and gap-size spacing bounds', () => {
+    const generator = createGeneratorItem('scanlines', 1024, 1024);
+    const environment = buildInspectorEnvironment([], []);
+    const sections = buildSelectionInspectorSections([generator], environment);
+    const generatorSection = sections.find((section) => section.key === 'generator');
+
+    expect(generatorSection?.fields.map((field) => field.descriptor.propertyKey)).toEqual(
+      expect.arrayContaining([
+        'gen_scanlineColor',
+        'gen_scanlineHeight',
+        'gen_scanlineSpacing',
+      ]),
+    );
+
+    const heightField = generatorSection?.fields.find(
+      (field) => field.descriptor.propertyKey === 'gen_scanlineHeight',
+    )?.descriptor as NumberFieldDescriptor | undefined;
+    expect(heightField?.label).toBe('Height');
+    expect(heightField?.min).toBe(1);
+    expect(heightField?.max).toBe(20);
+    expect(heightField?.textMin).toBe(1);
+    expect(heightField?.textMax).toBe(Infinity);
+
+    const spacingField = generatorSection?.fields.find(
+      (field) => field.descriptor.propertyKey === 'gen_scanlineSpacing',
+    )?.descriptor as NumberFieldDescriptor | undefined;
+    expect(spacingField?.label).toBe('Spacing');
+    expect(spacingField?.min).toBe(1);
+    expect(spacingField?.max).toBe(20);
+    expect(spacingField?.textMin).toBe(0);
+    expect(spacingField?.textMax).toBe(Infinity);
+  });
 });

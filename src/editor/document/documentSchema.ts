@@ -106,8 +106,9 @@ const PerspectiveGridGeneratorParamsSchema = z.object({
 
 const ScanlinesGeneratorParamsSchema = z.object({
   generatorType: z.literal('scanlines'),
-  scanlineSpacing: z.number().int().min(1),
-  scanlineOpacity: z.number().min(0).max(1),
+  scanlineColor: z.string(),
+  scanlineHeight: z.number().int().min(1),
+  scanlineSpacing: z.number().int().min(0),
 });
 
 const NoiseGeneratorParamsSchema = z.object({
