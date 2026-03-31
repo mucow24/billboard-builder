@@ -173,6 +173,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         fontSize: clampFinite(item.fontSize, 1, 1),
         lineHeight: clampFinite(item.lineHeight, 1, 0.1),
         letterSpacing: clampFinite(item.letterSpacing ?? 0, 0),
@@ -202,6 +203,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         originalWidth,
         originalHeight,
         crop,
@@ -237,6 +239,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         strokeWidth: clampFinite(item.strokeWidth, 0, 0),
         cornerRadius: clampFinite(item.cornerRadius, 0, 0),
       };
@@ -259,6 +262,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         strokeWidth: clampFinite(item.strokeWidth, 0, 0),
       };
       return normalizedEllipseItem;
@@ -283,6 +287,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         startX,
         startY,
         endX,
@@ -307,6 +312,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         seed: clampFinite(item.seed, Math.floor(Math.random() * 0xffffffff)),
       };
       return normalizedGeneratorItem;

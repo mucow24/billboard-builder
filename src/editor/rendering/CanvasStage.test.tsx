@@ -112,6 +112,7 @@ vi.mock('react-konva', () => {
           Object.assign(node, {
             alpha: noop,
             blue: noop,
+            blurRadius: noop,
             brightness: noop,
             cache: noop,
             clearCache: noop,

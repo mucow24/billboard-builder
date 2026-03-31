@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
+import Konva from 'konva';
 import { Group } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
-import type Konva from 'konva';
 
 import type { ImageCanvasItem } from '../document/documentTypes';
 import { getRenderableImageAdjustments } from './imageAdjustments';
@@ -11,9 +11,10 @@ interface ImageItemNodeProps {
   item: ImageCanvasItem;
   image: HTMLImageElement | null;
   renderBox: { x: number; y: number; width: number; height: number };
+  blurRadius: number;
 }
 
-export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
+export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemNodeProps) {
   const imageRef = useRef<Konva.Image | null>(null);
   const adjustments = useMemo(
     () => getRenderableImageAdjustments(item.adjustments),
@@ -31,16 +32,24 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
       return;
     }
 
-    node.filters(adjustments.filters);
+    const filters = [...adjustments.filters];
+    if (blurRadius > 0) {
+      filters.push(Konva.Filters.Blur);
+    }
+
+    node.filters(filters);
     node.brightness(adjustments.brightness);
     node.contrast(adjustments.contrast);
     node.red(adjustments.tintRed);
     node.green(adjustments.tintGreen);
     node.blue(adjustments.tintBlue);
     node.alpha(adjustments.tintAlpha);
+    node.blurRadius(blurRadius);
 
-    if (image && adjustments.isActive) {
-      node.cache();
+    const needsCache = adjustments.isActive || blurRadius > 0;
+    if (image && needsCache) {
+      const offset = blurRadius > 0 ? Math.ceil(blurRadius * 2) : 0;
+      node.cache({ offset });
     } else {
       node.clearCache();
     }
@@ -52,6 +61,7 @@ export function ImageItemNode({ item, image, renderBox }: ImageItemNodeProps) {
     };
   }, [
     adjustments,
+    blurRadius,
     image,
     imagePresentation.height,
     imagePresentation.rotation,

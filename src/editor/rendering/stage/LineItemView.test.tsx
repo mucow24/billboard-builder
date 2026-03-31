@@ -52,6 +52,10 @@ const { makeKonvaNode } = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('../useBlurEffect', () => ({
+  useBlurEffect: () => {},
+}));
+
 vi.mock('react-konva', () => ({
   Circle: makeKonvaNode('Circle'),
   Line: makeKonvaNode('Line'),

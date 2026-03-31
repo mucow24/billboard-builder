@@ -8,6 +8,7 @@ vi.mock('konva', () => ({
       Brighten: Symbol('Brighten'),
       Contrast: Symbol('Contrast'),
       RGBA: Symbol('RGBA'),
+      Blur: Symbol('Blur'),
     },
   },
 }));
@@ -28,6 +29,7 @@ const {
     green: vi.fn(),
     blue: vi.fn(),
     alpha: vi.fn(),
+    blurRadius: vi.fn(),
     cache: vi.fn(),
     clearCache: vi.fn(),
     getLayer: vi.fn(() => ({ batchDraw: mockBatchDraw })),
@@ -130,7 +132,7 @@ describe('ImageItemNode', () => {
     const image = document.createElement('img');
 
     const { container } = render(
-      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} blurRadius={0} />,
     );
 
     const clipGroup = container.querySelector('[data-konva-node="Group"]');
@@ -178,7 +180,7 @@ describe('ImageItemNode', () => {
     const image = document.createElement('img');
 
     const { rerender } = render(
-      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} blurRadius={0} />,
     );
 
     expect(mockKonvaImageNode.cache).toHaveBeenCalledTimes(1);
@@ -192,7 +194,7 @@ describe('ImageItemNode', () => {
     mockBatchDraw.mockClear();
 
     rerender(
-      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 120, height: 60 }} />,
+      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 120, height: 60 }} blurRadius={0} />,
     );
 
     expect(mockKonvaImageNode.cache).toHaveBeenCalledTimes(1);
@@ -207,7 +209,7 @@ describe('ImageItemNode', () => {
       originalHeight: 20,
     });
 
-    render(<ImageItemNode item={item} image={null} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />);
+    render(<ImageItemNode item={item} image={null} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} blurRadius={0} />);
 
     expect(mockKonvaImageNode.filters).toHaveBeenCalledWith([]);
     expect(mockKonvaImageNode.clearCache).toHaveBeenCalled();
@@ -230,7 +232,7 @@ describe('ImageItemNode', () => {
     };
 
     const { container } = render(
-      <ImageItemNode item={item} image={document.createElement('img')} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+      <ImageItemNode item={item} image={document.createElement('img')} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} blurRadius={0} />,
     );
 
     expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
@@ -272,7 +274,7 @@ describe('ImageItemNode', () => {
     };
 
     const { container } = render(
-      <ImageItemNode item={item} image={document.createElement('img')} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+      <ImageItemNode item={item} image={document.createElement('img')} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} blurRadius={0} />,
     );
 
     expect(container.querySelector('[data-konva-node="Image"]')).toHaveAttribute(
@@ -295,7 +297,7 @@ describe('ImageItemNode', () => {
     const image = document.createElement('img');
 
     const { rerender } = render(
-      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} />,
+      <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 40, height: 20 }} blurRadius={0} />,
     );
 
     Object.values(mockKonvaImageNode).forEach((value) => {
@@ -319,6 +321,7 @@ describe('ImageItemNode', () => {
         }}
         image={image}
         renderBox={{ x: 0, y: 0, width: 40, height: 20 }}
+        blurRadius={0}
       />,
     );
 

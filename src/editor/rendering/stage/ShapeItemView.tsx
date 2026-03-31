@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { Circle, Ellipse, Group, Line, Rect, Text } from 'react-konva';
 import type Konva from 'konva';
 
@@ -12,6 +12,7 @@ import {
 } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import { ImageItemNode } from '../ImageItemNode';
+import { useBlurEffect } from '../useBlurEffect';
 import { useImageElement } from '../useImageElement';
 import { getRenderBox } from '../transformGeometry';
 
@@ -94,12 +95,15 @@ export const ShapeItemView = memo(function ShapeItemView({
           height: renderBox.height,
         })
       : null;
+  const contentGroupRef = useRef<Konva.Group | null>(null);
   const handleShapeRef = useCallback(
-    (node: Konva.Node | null) => {
+    (node: Konva.Group | null) => {
+      contentGroupRef.current = node;
       registerShapeRef(item.id, node);
     },
     [item.id, registerShapeRef],
   );
+  useBlurEffect(contentGroupRef, item.kind === 'image' ? 0 : item.blurRadius);
 
   return (
     <>
@@ -230,7 +234,7 @@ export const ShapeItemView = memo(function ShapeItemView({
             />
           ) : null}
           {item.kind === 'image' ? (
-            <ImageItemNode item={item} image={imageElement} renderBox={renderBox} />
+            <ImageItemNode item={item} image={imageElement} renderBox={renderBox} blurRadius={item.blurRadius} />
           ) : null}
         </Group>
       ) : null}

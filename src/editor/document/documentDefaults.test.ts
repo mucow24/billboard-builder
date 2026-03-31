@@ -58,6 +58,21 @@ describe('document defaults', () => {
     expect(lineItem.endX).toBeGreaterThan(lineItem.startX);
   });
 
+  it('defaults blurRadius to zero for all item types', () => {
+    expect(createTextItem().blurRadius).toBe(0);
+    expect(createRectangleItem().blurRadius).toBe(0);
+    expect(createEllipseItem().blurRadius).toBe(0);
+    expect(createLineItem().blurRadius).toBe(0);
+    expect(
+      createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 40,
+        originalHeight: 20,
+      }).blurRadius
+    ).toBe(0);
+  });
+
   it('derives image size from the source aspect ratio', () => {
     const imageItem = createImageItem({
       src: 'data:image/png;base64,AAA',

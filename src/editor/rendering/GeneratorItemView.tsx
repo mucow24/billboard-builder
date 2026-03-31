@@ -1,8 +1,10 @@
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { Group, Image as KonvaImage } from 'react-konva';
+import type Konva from 'konva';
 
 import type { CanvasItem, CanvasTool, GeneratorCanvasItem } from '../document/documentTypes';
 import type { Point } from './interactionGeometry';
+import { useBlurEffect } from './useBlurEffect';
 
 import { useGeneratorCanvas } from '../generators/useGeneratorCanvas';
 
@@ -35,9 +37,12 @@ export const GeneratorItemView = memo(function GeneratorItemView({
 }: GeneratorItemViewProps) {
   const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight);
   const interactionEnabled = activeTool === 'select';
+  const groupRef = useRef<Konva.Group | null>(null);
+  useBlurEffect(groupRef, item.blurRadius);
 
   return (
     <Group
+      ref={groupRef}
       id={`render-item-${item.id}`}
       name={`render-item render-item-generator`}
       x={0}

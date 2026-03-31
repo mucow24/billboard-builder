@@ -33,6 +33,7 @@ describe('selectionInspectorModel', () => {
         'geometry:cornerRadius:number',
         'geometry:x:number',
         'geometry:dimensions:number',
+        'blur:blurRadius:number',
         'shadow:color:color',
       ])
     );
@@ -52,6 +53,7 @@ describe('selectionInspectorModel', () => {
         'text:fontWeight:boolean',
         'advancedText:paddingTop:number',
         'geometry:rotation:number',
+        'blur:blurRadius:number',
         'shadow:opacity:number',
       ])
     );
@@ -74,6 +76,7 @@ describe('selectionInspectorModel', () => {
         'image:tintColor:color',
         'image:brightness:number',
         'geometry:dimensions:number',
+        'blur:blurRadius:number',
         'shadow:offsetY:number',
       ])
     );
@@ -89,6 +92,7 @@ describe('selectionInspectorModel', () => {
         'stroke:strokeWidth:number',
         'geometry:startX:number',
         'geometry:endY:number',
+        'blur:blurRadius:number',
         'shadow:blur:number',
       ])
     );

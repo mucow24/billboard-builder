@@ -46,6 +46,7 @@ vi.mock('konva', () => ({
       Brighten: Symbol('Brighten'),
       Contrast: Symbol('Contrast'),
       RGBA: Symbol('RGBA'),
+      Blur: Symbol('Blur'),
     },
   },
 }));
@@ -64,16 +65,28 @@ vi.mock('react-konva', () => {
       });
       const domProps = Object.fromEntries(domEntries);
 
+      const noop = () => {};
       const setRef = (node: HTMLDivElement | null) => {
         nodeRef = node;
         if (node) {
           Object.assign(node, {
+            alpha: noop,
+            blue: noop,
+            blurRadius: noop,
+            brightness: noop,
+            cache: noop,
+            clearCache: noop,
+            contrast: noop,
+            filters: noop,
+            getLayer: () => ({ batchDraw: noop }),
             getStage: () => ({
               getPointerPosition: () => ({ x: 640, y: 360 }),
             }),
             getClientRect: () => ({ x: 0, y: 0, width: 100, height: 100 }),
+            green: noop,
             hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
             name: () => String(props.name ?? ''),
+            red: noop,
             x: () => Number(props.x ?? 0),
             y: () => Number(props.y ?? 0),
             rotation: () => Number(props.rotation ?? 0),

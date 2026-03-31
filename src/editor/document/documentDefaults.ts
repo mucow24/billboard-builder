@@ -89,6 +89,7 @@ function createBaseItem<TKind extends CanvasLeafKind>(
     hidden: false,
     opacity: 1,
     shadow: { ...DEFAULT_ITEM_SHADOW },
+    blurRadius: 0,
   };
 }
 
