@@ -7,7 +7,7 @@ export const scanlinesGeneratorSpec: GeneratorSpec<ScanlinesGeneratorParams> = {
   label: 'Scanlines',
   fields: [
     { key: 'scanlineSpacing', label: 'Spacing', type: 'range', min: 2, max: 20, step: 1, textMin: 1, textMax: Infinity },
-    { key: 'scanlineOpacity', label: 'Opacity', type: 'range', min: 0, max: 0.35, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'scanlineOpacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
   ],
   createDefaultParams(): ScanlinesGeneratorParams {
     return {

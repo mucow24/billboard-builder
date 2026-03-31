@@ -387,10 +387,10 @@ describe('selectionInspectorModel', () => {
     expect(countField?.textMin).toBe(1);
     expect(countField?.textMax).toBe(Infinity);
 
-    // stripeGlow: slider 0-0.6, text allows 0-1
+    // stripeGlow: slider 0-1, text allows 0-1
     const glowField = findField('gen_stripeGlow');
     expect(glowField?.min).toBe(0);
-    expect(glowField?.max).toBe(0.6);
+    expect(glowField?.max).toBe(1);
     expect(glowField?.textMin).toBe(0);
     expect(glowField?.textMax).toBe(1);
 

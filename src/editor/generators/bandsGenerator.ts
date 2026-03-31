@@ -70,7 +70,7 @@ export const bandsGeneratorSpec: GeneratorSpec<BandsGeneratorParams> = {
     { key: 'stripeOffset', label: 'Band Offset', type: 'range', min: -1, max: 1, step: 0.001, textMin: -Infinity, textMax: Infinity },
     { key: 'stripeSkew', label: 'Skew Intensity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: Infinity },
     { key: 'stripeContrast', label: 'Color Contrast', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'stripeGlow', label: 'Glow', type: 'range', min: 0, max: 0.6, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'stripeGlow', label: 'Glow', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
     { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
   ],
   createDefaultParams(): BandsGeneratorParams {
