@@ -6,6 +6,7 @@ import {
   cloneCanvasItem,
   createDefaultProjectDocument,
   createEllipseItem,
+  createGeneratorItem,
   createGroupNode,
   createImageItem,
   createLineItem,
@@ -139,5 +140,16 @@ describe('document defaults', () => {
       [1024, 2048],
       [1024, 1024],
     ]);
+  });
+
+  it('creates scanlines generators with the expected default params', () => {
+    const scanlines = createGeneratorItem('scanlines', 1024, 1024);
+
+    expect(scanlines.generatorParams).toEqual({
+      generatorType: 'scanlines',
+      scanlineColor: '#00000017',
+      scanlineHeight: 1,
+      scanlineSpacing: 4,
+    });
   });
 });

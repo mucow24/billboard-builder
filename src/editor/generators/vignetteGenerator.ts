@@ -6,7 +6,7 @@ export const vignetteGeneratorSpec: GeneratorSpec<VignetteGeneratorParams> = {
   type: 'vignette',
   label: 'Vignette',
   fields: [
-    { key: 'vignette', label: 'Intensity', type: 'range', min: 0, max: 0.5, step: 0.01, textMin: 0, textMax: Infinity },
+    { key: 'vignette', label: 'Intensity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
   ],
   createDefaultParams(): VignetteGeneratorParams {
     return {

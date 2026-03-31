@@ -215,8 +215,9 @@ export interface PerspectiveGridGeneratorParams {
 
 export interface ScanlinesGeneratorParams {
   generatorType: 'scanlines';
+  scanlineColor: string;
+  scanlineHeight: number;
   scanlineSpacing: number;
-  scanlineOpacity: number;
 }
 
 export interface NoiseGeneratorParams {

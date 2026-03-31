@@ -1,28 +1,33 @@
 import type { ScanlinesGeneratorParams } from '../document/documentTypes';
 
+import { rgba } from './colorUtils';
 import type { GeneratorSpec } from './index';
 
 export const scanlinesGeneratorSpec: GeneratorSpec<ScanlinesGeneratorParams> = {
   type: 'scanlines',
   label: 'Scanlines',
   fields: [
-    { key: 'scanlineSpacing', label: 'Spacing', type: 'range', min: 2, max: 20, step: 1, textMin: 1, textMax: Infinity },
-    { key: 'scanlineOpacity', label: 'Opacity', type: 'range', min: 0, max: 0.35, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'scanlineColor', label: 'Scanline Color', type: 'color' },
+    { key: 'scanlineHeight', label: 'Height', type: 'range', min: 1, max: 20, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'scanlineSpacing', label: 'Spacing', type: 'range', min: 1, max: 20, step: 1, textMin: 0, textMax: Infinity },
   ],
   createDefaultParams(): ScanlinesGeneratorParams {
     return {
       generatorType: 'scanlines',
-      scanlineSpacing: 5,
-      scanlineOpacity: 0.09,
+      scanlineColor: '#00000017',
+      scanlineHeight: 1,
+      scanlineSpacing: 4,
     };
   },
   draw(ctx, w, h, params) {
-    if (params.scanlineOpacity <= 0) return;
+    const lineHeight = Math.max(1, params.scanlineHeight);
+    const gap = Math.max(0, params.scanlineSpacing);
+    const step = lineHeight + gap;
+
     ctx.save();
-    ctx.globalAlpha = params.scanlineOpacity;
-    ctx.fillStyle = '#000';
-    for (let y = 0; y < h; y += params.scanlineSpacing) {
-      ctx.fillRect(0, y, w, 1);
+    ctx.fillStyle = rgba(params.scanlineColor, 1);
+    for (let y = 0; y < h; y += step) {
+      ctx.fillRect(0, y, w, lineHeight);
     }
     ctx.restore();
   },

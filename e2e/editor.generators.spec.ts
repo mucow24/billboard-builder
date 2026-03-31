@@ -28,24 +28,27 @@ test.describe('generator layers', () => {
   test('text input accepts values beyond slider range but clamps to correctness bounds', async ({ page }) => {
     await openFreshEditor(page);
 
-    // Scanlines is cheap to render — spacing=1 fills every row
+    // Scanlines is cheap to render — height=1 and spacing=0 fills every row
     await clickToolbarPopoverItem(page, 'Generators', 'Scanlines');
     await openLayersTab(page);
     await clickLayerRow(page, 'Scanlines');
     await openPropertiesTab(page);
 
+    await expect(page.getByText('Scanline Color')).toBeVisible();
+    await expect(page.getByText('Height:')).toBeVisible();
+
     const spacingInput = page.getByLabel('Spacing value');
     await expect(spacingInput).toBeVisible();
 
-    // Type 1 — below slider min (2) but accepted (textMin is 1)
-    await spacingInput.fill('1');
-    await spacingInput.blur();
-    await expect(spacingInput).toHaveValue('1');
-
-    // Type 0 — below textMin (1), clamped
+    // Type 0 — below slider min (1) but accepted (textMin is 0)
     await spacingInput.fill('0');
     await spacingInput.blur();
-    await expect(spacingInput).toHaveValue('1');
+    await expect(spacingInput).toHaveValue('0');
+
+    // Type -1 — below textMin (0), clamped
+    await spacingInput.fill('-1');
+    await spacingInput.blur();
+    await expect(spacingInput).toHaveValue('0');
 
     // Type 100 — beyond slider max (20) but accepted (textMax is Infinity)
     await spacingInput.fill('100');
@@ -100,7 +103,7 @@ test.describe('generator layers', () => {
   test('colorless generator shows muted fallback G icon', async ({ page }) => {
     await openFreshEditor(page);
 
-    await clickToolbarPopoverItem(page, 'Generators', 'Scanlines');
+    await clickToolbarPopoverItem(page, 'Generators', 'Noise');
     await openLayersTab(page);
 
     const icon = page.locator('.layer-row-generator-icon').first();
