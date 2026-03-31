@@ -8,7 +8,7 @@ const SHAPE_KEYS: ShapeTypeKey[] = ['rect', 'diamond', 'triangle', 'circle', 'ba
 function drawRectShape(ctx: CanvasRenderingContext2D, w: number, h: number, fill: boolean): void {
   ctx.beginPath();
   ctx.rect(-w / 2, -h / 2, w, h);
-  fill ? ctx.fill() : ctx.stroke();
+  if (fill) { ctx.fill(); } else { ctx.stroke(); }
 }
 
 function drawDiamondShape(ctx: CanvasRenderingContext2D, size: number, fill: boolean): void {
@@ -18,7 +18,7 @@ function drawDiamondShape(ctx: CanvasRenderingContext2D, size: number, fill: boo
   ctx.lineTo(0, size / 2);
   ctx.lineTo(-size / 2, 0);
   ctx.closePath();
-  fill ? ctx.fill() : ctx.stroke();
+  if (fill) { ctx.fill(); } else { ctx.stroke(); }
 }
 
 function drawTriangleShape(ctx: CanvasRenderingContext2D, size: number, fill: boolean): void {
@@ -27,13 +27,13 @@ function drawTriangleShape(ctx: CanvasRenderingContext2D, size: number, fill: bo
   ctx.lineTo(size / 2, size / 2);
   ctx.lineTo(-size / 2, size / 2);
   ctx.closePath();
-  fill ? ctx.fill() : ctx.stroke();
+  if (fill) { ctx.fill(); } else { ctx.stroke(); }
 }
 
 function drawCircleShape(ctx: CanvasRenderingContext2D, radius: number, fill: boolean): void {
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  fill ? ctx.fill() : ctx.stroke();
+  if (fill) { ctx.fill(); } else { ctx.stroke(); }
 }
 
 export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
