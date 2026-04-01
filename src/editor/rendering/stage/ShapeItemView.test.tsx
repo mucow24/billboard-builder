@@ -38,6 +38,10 @@ vi.mock('react-konva', () => ({
   Text: makeKonvaNode('Text'),
 }));
 
+vi.mock('../useBlurEffect', () => ({
+  useBlurEffect: () => {},
+}));
+
 vi.mock('../useImageElement', () => ({
   useImageElement: () => null,
 }));

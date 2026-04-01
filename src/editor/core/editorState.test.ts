@@ -15,7 +15,6 @@ describe('editor state', () => {
       missingFontFamilies: [],
       exportScale: 1,
       selectedNodeIds: [],
-      selectedItemIds: [],
     });
     expect(createDefaultHistoryState()).toEqual({
       past: [],
@@ -35,7 +34,6 @@ describe('editor state', () => {
         missingFontFamilies: [],
         exportScale: 1,
         selectedNodeIds: [],
-        selectedItemIds: [],
       },
       history: {
         past: [],

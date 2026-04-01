@@ -166,32 +166,6 @@ export function rotateGroupPointerDelta(
   return deltaDegrees;
 }
 
-export function buildRenderedItems(
-  orderedItems: CanvasItem[],
-  session: InteractionSession | null
-): CanvasItem[] {
-  const previewItem = session && 'previewItem' in session ? session.previewItem : null;
-  const previewItems = session && 'previewItems' in session ? session.previewItems : null;
-  const previewMap = new Map(previewItems?.map((item) => [item.id, item] as const) ?? []);
-  const baseItems = orderedItems.map((item) => {
-    if (previewMap.has(item.id)) {
-      return previewMap.get(item.id)!;
-    }
-    if (
-      previewItem &&
-      session &&
-      'itemId' in session &&
-      item.id === session.itemId
-    ) {
-      return previewItem;
-    }
-    return item;
-  });
-  return session?.kind === 'create' && session.previewItem
-    ? [...baseItems, session.previewItem]
-    : baseItems;
-}
-
 function buildPreviewRenderable(
   previewItem: CanvasItem,
   baseRenderable: RenderableCanvasItem | null

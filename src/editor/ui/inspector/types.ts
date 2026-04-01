@@ -3,14 +3,13 @@ import type {
   DocumentFontReference,
   GroupNode,
   ReorderMode,
+  SelectionItemChange,
   UploadedFont,
 } from '../../document/documentTypes';
 import type { LayerRow } from '../../document/sceneGraph';
 import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 
-export type SelectionItemChange =
-  | Partial<CanvasItem>
-  | ((item: CanvasItem) => Partial<CanvasItem>);
+export type { SelectionItemChange };
 
 export type InspectorTab = 'properties' | 'layers' | 'favorites';
 
@@ -19,7 +18,6 @@ export interface PropertiesPanelProps {
   availableFonts: UploadedFont[];
   background: string;
   fonts: DocumentFontReference[];
-  items: CanvasItem[];
   layerRows: LayerRow[];
   missingFontFamilies: string[];
   favorites?: StoredFavorite[];
@@ -35,7 +33,7 @@ export interface PropertiesPanelProps {
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;
   onInsertFavorite?: (favoriteId: string) => void;
-  onDeleteSelection: () => void;
+  onDeleteNode: (nodeId: string) => void;
   onOpenProperties?: () => void;
   onSelectNode: (nodeId: string) => void;
   onSelectGroupChildren?: () => void;
@@ -51,7 +49,7 @@ export interface LayersInspectorTabProps {
   collapsedGroupIds: ReadonlySet<string>;
   rows: LayerRow[];
   onBackgroundChange: (background: string) => void;
-  onDeleteSelection: () => void;
+  onDeleteNode: (nodeId: string) => void;
   onOpenProperties: () => void;
   onReorder: (mode: ReorderMode) => void;
   onSelectNode: (nodeId: string) => void;

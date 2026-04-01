@@ -1,3 +1,4 @@
+import { clampFinite } from './clampFinite';
 import type { TextPadding } from './documentTypes';
 
 export const DEFAULT_TEXT_PADDING: TextPadding = {
@@ -6,13 +7,6 @@ export const DEFAULT_TEXT_PADDING: TextPadding = {
   bottom: 0,
   left: 0,
 } as const;
-
-function clampFinite(value: number, fallback: number): number {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-  return value;
-}
 
 export function normalizeTextPadding(
   padding: Partial<TextPadding> | undefined,

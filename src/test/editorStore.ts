@@ -2,7 +2,7 @@ import {
   createDefaultEditorState,
   type EditorState,
 } from '../editor/core/editorState';
-import { normalizeExistingProjectDocument } from '../editor/document/documentNormalizer';
+import { normalizeProjectDocument } from '../editor/document/documentNormalizer';
 import { useEditorStore } from '../editor/state/store';
 
 type EditorStateOverrides = Partial<Omit<EditorState, 'session' | 'history'>> & {
@@ -13,10 +13,9 @@ type EditorStateOverrides = Partial<Omit<EditorState, 'session' | 'history'>> & 
 export function createEditorState(overrides: EditorStateOverrides = {}): EditorState {
   const initialState = createDefaultEditorState();
   const document = overrides.document
-    ? normalizeExistingProjectDocument(overrides.document)
+    ? normalizeProjectDocument(overrides.document)
     : initialState.document;
   const selectedNodeIds = overrides.session?.selectedNodeIds
-    ?? overrides.session?.selectedItemIds
     ?? initialState.session.selectedNodeIds;
 
   return {
@@ -27,7 +26,6 @@ export function createEditorState(overrides: EditorStateOverrides = {}): EditorS
       ...initialState.session,
       ...overrides.session,
       selectedNodeIds,
-      selectedItemIds: overrides.session?.selectedItemIds ?? selectedNodeIds,
     },
     history: {
       ...initialState.history,

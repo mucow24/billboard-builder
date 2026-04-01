@@ -6,6 +6,8 @@ import {
   selectCanUndo,
   selectPrimarySelectedNodeId,
   selectSelectedGroup,
+  selectSelectedItem,
+  selectSelectedItems,
 } from '../core/selectors';
 import {
   createItemForKind,
@@ -37,6 +39,7 @@ import type {
   ProjectDocument,
   ReorderMode,
   UploadedFont,
+  SelectionItemChange,
 } from '../document/documentTypes';
 import type { EditorState as CoreEditorState } from '../core/editorState';
 
@@ -50,27 +53,19 @@ export interface EditorStoreState {
   createItemAt: (kind: Exclude<CanvasLeafKind, 'image' | 'generator'>, x: number, y: number) => void;
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
+  updateSelectionItems: (changes: SelectionItemChange) => void;
   updateSelectedGroup: (opacity: number) => void;
-  selectSingleItem: (nodeId?: string) => void;
   selectSingleNode: (nodeId?: string) => void;
   selectParentNode: () => boolean;
-  toggleSelectedItem: (nodeId: string) => void;
   toggleSelectedNode: (nodeId: string) => void;
-  toggleSelectedItems: (nodeIds: string[]) => void;
   toggleSelectedNodes: (nodeIds: string[]) => void;
-  selectAllItems: () => void;
   selectAllNodes: () => void;
-  deleteItem: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;
-  deleteSelectedItems: () => void;
   deleteSelectedNodes: () => void;
-  reorderSelectedItem: (mode: ReorderMode) => void;
   reorderSelectedNode: (mode: ReorderMode) => void;
-  duplicateSelectedItems: () => void;
   groupSelectedNodes: () => void;
   ungroupSelectedNode: () => void;
   duplicateSelectedNodes: () => void;
-  nudgeSelectedItems: (deltaX: number, deltaY: number) => void;
   nudgeSelectedNodes: (deltaX: number, deltaY: number) => void;
   undo: () => void;
   redo: () => void;
@@ -101,7 +96,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     setActiveTool: (tool) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_active_tool', tool })),
     createItemAt: (kind, x, y) => {
       const item = createItemForKind(kind, x, y);
-      get().dispatch({ type: 'add_item', item });
+      get().dispatch({ type: 'add_node', item });
       get().setActiveTool('select');
     },
     updateSelectedItem: (changes) => {
@@ -113,7 +108,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       if (!selectedNode || selectedNode.kind === 'group') {
         return;
       }
-      get().dispatch({ type: 'update_item', itemId: selectedId, changes });
+      get().dispatch({ type: 'update_node', itemId: selectedId, changes });
     },
     updateSelectedItems: (changesById) => {
       if (changesById.length === 0) {
@@ -122,9 +117,33 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().applyTransaction(
         changesById.map(({ itemId, changes }) => ({
           family: 'document' as const,
-          command: { type: 'update_item' as const, itemId, changes },
+          command: { type: 'update_node' as const, itemId, changes },
         }))
       );
+    },
+    updateSelectionItems: (changes) => {
+      const editor = get().editor;
+      const selectedItems = selectSelectedItems(editor.document, editor);
+      const selectedItem = selectSelectedItem(editor.document, editor);
+      const resolveChanges = (item: CanvasItem) =>
+        typeof changes === 'function' ? changes(item) : changes;
+
+      if (selectedItems.length > 1) {
+        get().updateSelectedItems(
+          selectedItems.map((item) => ({
+            itemId: item.id,
+            changes: resolveChanges(item),
+          }))
+        );
+        return;
+      }
+
+      const targetItem = selectedItems[0] ?? selectedItem ?? null;
+      if (!targetItem) {
+        return;
+      }
+
+      get().updateSelectedItem(resolveChanges(targetItem));
     },
     updateSelectedGroup: (opacity) => {
       const selectedGroup = selectSelectedGroup(get().editor.document, get().editor);
@@ -135,9 +154,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     },
     selectSingleNode: (nodeId) =>
       get().dispatch(nodeId ? { type: 'select_nodes', nodeIds: [nodeId] } : { type: 'clear_selection' }),
-    selectSingleItem: (nodeId) => {
-      get().selectSingleNode(nodeId);
-    },
     selectParentNode: () => {
       const selectedId = selectPrimarySelectedNodeId(get().editor);
       if (!selectedId) {
@@ -160,9 +176,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         nodeIds: toggleSelectionNode(get().editor.session.selectedNodeIds, nodeId),
       });
     },
-    toggleSelectedItem: (nodeId) => {
-      get().toggleSelectedNode(nodeId);
-    },
     toggleSelectedNodes: (nodeIds) => {
       const nextSelection = normalizeSelectionForNodes(
         toggleSelectionNodes(get().editor.session.selectedNodeIds, nodeIds),
@@ -170,23 +183,14 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       );
       get().dispatch({ type: 'select_nodes', nodeIds: nextSelection });
     },
-    toggleSelectedItems: (nodeIds) => {
-      get().toggleSelectedNodes(nodeIds);
-    },
     selectAllNodes: () => {
       get().dispatch({
         type: 'select_nodes',
         nodeIds: selectAllNodeIds(get().editor.document.nodes),
       });
     },
-    selectAllItems: () => {
-      get().selectAllNodes();
-    },
     deleteNode: (nodeId) => {
       get().dispatch({ type: 'delete_nodes', nodeIds: [nodeId] });
-    },
-    deleteItem: (nodeId) => {
-      get().deleteNode(nodeId);
     },
     deleteSelectedNodes: () => {
       const selectedIds = get().editor.session.selectedNodeIds;
@@ -194,9 +198,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return;
       }
       get().dispatch({ type: 'delete_nodes', nodeIds: selectedIds });
-    },
-    deleteSelectedItems: () => {
-      get().deleteSelectedNodes();
     },
     reorderSelectedNode: (mode) => {
       const selectedIds = normalizeSelectionForNodes(
@@ -211,9 +212,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return;
       }
       get().dispatch({ type: 'reorder_nodes', nodeIds: selectedIds, mode });
-    },
-    reorderSelectedItem: (mode) => {
-      get().reorderSelectedNode(mode);
     },
     groupSelectedNodes: () => {
       const selectedIds = normalizeSelectionForNodes(
@@ -255,9 +253,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       });
       get().dispatch({ type: 'select_nodes', nodeIds: clones.map((node) => node.id) });
     },
-    duplicateSelectedItems: () => {
-      get().duplicateSelectedNodes();
-    },
     nudgeSelectedNodes: (deltaX, deltaY) => {
       const selectedIds = normalizeSelectionForNodes(
         get().editor.session.selectedNodeIds,
@@ -286,17 +281,14 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         }));
       get().updateSelectedItems(updates);
     },
-    nudgeSelectedItems: (deltaX, deltaY) => {
-      get().nudgeSelectedNodes(deltaX, deltaY);
-    },
     undo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'undo' })),
     redo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'redo' })),
-    canUndo: () => selectCanUndo(get().editor),
-    canRedo: () => selectCanRedo(get().editor),
+    canUndo: () => selectCanUndo(get().editor.history),
+    canRedo: () => selectCanRedo(get().editor.history),
     registerAvailableFont: (font) => set((state) => applyStoreAction(state, { family: 'session', type: 'register_available_font', font })),
     setMissingFontFamilies: (families) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_missing_font_families', families })),
     loadDocument: (document) => get().dispatch({ type: 'load_document', document }),
-    addImageItem: (item) => get().dispatch({ type: 'add_item', item }),
+    addImageItem: (item) => get().dispatch({ type: 'add_node', item }),
     setCanvasSize: (canvas) => get().dispatch({ type: 'set_canvas_size', canvas }),
     setExportScale: (scale) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_export_scale', scale })),
     resetDocument: () => set((state) => applyStoreAction(state, createResetDocumentTransaction())),

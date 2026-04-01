@@ -1,3 +1,4 @@
+import { clampFinite } from './clampFinite';
 import type { ImageAdjustments } from './documentTypes';
 import { parseHexColor } from '../color/hexColor';
 
@@ -7,13 +8,6 @@ export const DEFAULT_IMAGE_ADJUSTMENTS: ImageAdjustments = {
   tintColor: '#ffffff',
   tintStrength: 0,
 } as const;
-
-function clampFinite(value: number, fallback: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-  return Math.min(max, Math.max(min, value));
-}
 
 export function normalizeImageAdjustments(
   adjustments: Partial<ImageAdjustments> | undefined,

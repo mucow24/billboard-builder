@@ -11,89 +11,11 @@ import {
 import {
   buildInspectorEnvironment,
   buildSelectionInspectorSections,
-  getSelectionDescriptorCoverage,
   type DimensionAction,
   type NumberFieldDescriptor,
 } from './selectionInspectorModel';
 
 describe('selectionInspectorModel', () => {
-  it('covers the expected descriptor identities for each supported item kind', () => {
-    expect(
-      getSelectionDescriptorCoverage(createRectangleItem()).map(
-        ({ propertyKey, sectionKey, valueType }) =>
-          `${sectionKey}:${propertyKey}:${valueType}`
-      )
-    ).toEqual(
-      expect.arrayContaining([
-        'fill:fill:color',
-        'fill:secondaryFill:color',
-        'fill:gradientEnabled:boolean',
-        'stroke:stroke:color',
-        'stroke:strokeWidth:number',
-        'geometry:cornerRadius:number',
-        'geometry:x:number',
-        'geometry:dimensions:number',
-        'shadow:color:color',
-      ])
-    );
-
-    expect(
-      getSelectionDescriptorCoverage(createTextItem()).map(
-        ({ propertyKey, sectionKey, valueType }) =>
-          `${sectionKey}:${propertyKey}:${valueType}`
-      )
-    ).toEqual(
-      expect.arrayContaining([
-        'fill:fill:color',
-        'fill:secondaryFill:color',
-        'fill:gradientEnabled:boolean',
-        'text:text:text',
-        'text:fontFamily:select',
-        'text:fontWeight:boolean',
-        'advancedText:paddingTop:number',
-        'geometry:rotation:number',
-        'shadow:opacity:number',
-      ])
-    );
-
-    expect(
-      getSelectionDescriptorCoverage(
-        createImageItem({
-          src: 'data:image/png;base64,abc',
-          mimeType: 'image/png',
-          originalWidth: 20,
-          originalHeight: 10,
-        })
-      ).map(({ propertyKey, sectionKey, valueType }) =>
-        `${sectionKey}:${propertyKey}:${valueType}`
-      )
-    ).toEqual(
-      expect.arrayContaining([
-        'image:mirrorHorizontal:boolean',
-        'image:preserveAspectRatio:boolean',
-        'image:tintColor:color',
-        'image:brightness:number',
-        'geometry:dimensions:number',
-        'shadow:offsetY:number',
-      ])
-    );
-
-    expect(
-      getSelectionDescriptorCoverage(createLineItem()).map(
-        ({ propertyKey, sectionKey, valueType }) =>
-          `${sectionKey}:${propertyKey}:${valueType}`
-      )
-    ).toEqual(
-      expect.arrayContaining([
-        'stroke:stroke:color',
-        'stroke:strokeWidth:number',
-        'geometry:startX:number',
-        'geometry:endY:number',
-        'shadow:blur:number',
-      ])
-    );
-  });
-
   it('intersects fields by exact section, property, and type across selections', () => {
     const rectangle = createRectangleItem({ fill: '#ff0000' });
     const text = createTextItem({ fill: '#00ff00' });
@@ -356,19 +278,6 @@ describe('selectionInspectorModel', () => {
   it('produces generator section descriptors with correct textMin/textMax bounds', () => {
     const generator = createGeneratorItem('bands', 1024, 1024);
 
-    const coverage = getSelectionDescriptorCoverage(generator).map(
-      ({ propertyKey, sectionKey, valueType }) =>
-        `${sectionKey}:${propertyKey}:${valueType}`,
-    );
-    expect(coverage).toEqual(
-      expect.arrayContaining([
-        'generator:gen_bandColorA:color',
-        'generator:gen_stripeCount:number',
-        'generator:gen_stripeAngle:number',
-        'generator:gen_stripeGlow:number',
-      ]),
-    );
-
     const environment = buildInspectorEnvironment([], []);
     const sections = buildSelectionInspectorSections([generator], environment);
     const generatorSection = sections.find((s) => s.key === 'generator');
@@ -387,10 +296,10 @@ describe('selectionInspectorModel', () => {
     expect(countField?.textMin).toBe(1);
     expect(countField?.textMax).toBe(Infinity);
 
-    // stripeGlow: slider 0-0.6, text allows 0-1
+    // stripeGlow: slider 0-1, text allows 0-1
     const glowField = findField('gen_stripeGlow');
     expect(glowField?.min).toBe(0);
-    expect(glowField?.max).toBe(0.6);
+    expect(glowField?.max).toBe(1);
     expect(glowField?.textMin).toBe(0);
     expect(glowField?.textMax).toBe(1);
 
@@ -416,5 +325,38 @@ describe('selectionInspectorModel', () => {
     expect(patch).toEqual({
       generatorParams: { ...generator.generatorParams, stripeCount: 100 },
     });
+  });
+
+  it('produces scanlines descriptors with color, height, and gap-size spacing bounds', () => {
+    const generator = createGeneratorItem('scanlines', 1024, 1024);
+    const environment = buildInspectorEnvironment([], []);
+    const sections = buildSelectionInspectorSections([generator], environment);
+    const generatorSection = sections.find((section) => section.key === 'generator');
+
+    expect(generatorSection?.fields.map((field) => field.descriptor.propertyKey)).toEqual(
+      expect.arrayContaining([
+        'gen_scanlineColor',
+        'gen_scanlineHeight',
+        'gen_scanlineSpacing',
+      ]),
+    );
+
+    const heightField = generatorSection?.fields.find(
+      (field) => field.descriptor.propertyKey === 'gen_scanlineHeight',
+    )?.descriptor as NumberFieldDescriptor | undefined;
+    expect(heightField?.label).toBe('Height');
+    expect(heightField?.min).toBe(1);
+    expect(heightField?.max).toBe(20);
+    expect(heightField?.textMin).toBe(1);
+    expect(heightField?.textMax).toBe(Infinity);
+
+    const spacingField = generatorSection?.fields.find(
+      (field) => field.descriptor.propertyKey === 'gen_scanlineSpacing',
+    )?.descriptor as NumberFieldDescriptor | undefined;
+    expect(spacingField?.label).toBe('Spacing');
+    expect(spacingField?.min).toBe(1);
+    expect(spacingField?.max).toBe(20);
+    expect(spacingField?.textMin).toBe(0);
+    expect(spacingField?.textMax).toBe(Infinity);
   });
 });

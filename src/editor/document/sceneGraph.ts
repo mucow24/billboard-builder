@@ -275,16 +275,34 @@ export function insertNodesAt(
 }
 
 export function removeNodesByIds(nodes: CanvasNode[], nodeIds: Set<string>): CanvasNode[] {
-  return nodes
-    .filter((node) => !nodeIds.has(node.id))
-    .map((node) =>
-      isGroupNode(node)
-        ? {
-            ...node,
-            children: removeNodesByIds(node.children, nodeIds),
-          }
-        : node
-    );
+  const nextNodes: CanvasNode[] = [];
+
+  for (const node of nodes) {
+    if (nodeIds.has(node.id)) {
+      continue;
+    }
+
+    if (!isGroupNode(node)) {
+      nextNodes.push(node);
+      continue;
+    }
+
+    const nextChildren = removeNodesByIds(node.children, nodeIds);
+    if (nextChildren.length === 0) {
+      continue;
+    }
+    if (nextChildren.length === 1) {
+      nextNodes.push(nextChildren[0]);
+      continue;
+    }
+
+    nextNodes.push({
+      ...node,
+      children: nextChildren,
+    });
+  }
+
+  return nextNodes;
 }
 
 export function getSelectionParentInfo(nodes: CanvasNode[], nodeIds: string[]) {

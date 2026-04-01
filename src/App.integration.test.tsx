@@ -46,6 +46,7 @@ vi.mock('konva', () => ({
       Brighten: Symbol('Brighten'),
       Contrast: Symbol('Contrast'),
       RGBA: Symbol('RGBA'),
+      Blur: Symbol('Blur'),
     },
   },
 }));
@@ -64,16 +65,28 @@ vi.mock('react-konva', () => {
       });
       const domProps = Object.fromEntries(domEntries);
 
+      const noop = () => {};
       const setRef = (node: HTMLDivElement | null) => {
         nodeRef = node;
         if (node) {
           Object.assign(node, {
+            alpha: noop,
+            blue: noop,
+            blurRadius: noop,
+            brightness: noop,
+            cache: noop,
+            clearCache: noop,
+            contrast: noop,
+            filters: noop,
+            getLayer: () => ({ batchDraw: noop }),
             getStage: () => ({
               getPointerPosition: () => ({ x: 640, y: 360 }),
             }),
             getClientRect: () => ({ x: 0, y: 0, width: 100, height: 100 }),
+            green: noop,
             hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
             name: () => String(props.name ?? ''),
+            red: noop,
             x: () => Number(props.x ?? 0),
             y: () => Number(props.y ?? 0),
             rotation: () => Number(props.rotation ?? 0),
@@ -178,6 +191,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from './editor/document/documentDefaults';
+import { collectLeafItems } from './editor/document/sceneGraph';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
 
@@ -225,9 +239,9 @@ describe('App integration', () => {
     act(() => {
       useEditorStore.getState().loadDocument({
         ...createDefaultProjectDocument(),
-        items: [selectedRectangle],
+        nodes: [selectedRectangle],
       });
-      useEditorStore.getState().selectSingleItem(selectedRectangle.id);
+      useEditorStore.getState().selectSingleNode(selectedRectangle.id);
     });
 
     fireEvent.change(screen.getByLabelText('Corner radius'), {
@@ -235,7 +249,7 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      const item = useEditorStore.getState().editor.document.items[0];
+      const item = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0];
       expect(item.kind).toBe('rectangle');
       expect(item.kind === 'rectangle' ? item.cornerRadius : 0).toBe(24);
     });
@@ -256,35 +270,35 @@ describe('App integration', () => {
     act(() => {
       useEditorStore.getState().loadDocument({
         ...createDefaultProjectDocument(),
-        items: [selectedRectangle],
+        nodes: [selectedRectangle],
       });
-      useEditorStore.getState().selectSingleItem(selectedRectangle.id);
+      useEditorStore.getState().selectSingleNode(selectedRectangle.id);
     });
 
     fireEvent.keyDown(document, { key: 'ArrowRight' });
     fireEvent.keyDown(document, { key: 'ArrowDown', shiftKey: true });
 
     await waitFor(() => {
-      const item = useEditorStore.getState().editor.document.items[0];
+      const item = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0];
       expect(item.x).toBe(101);
       expect(item.y).toBe(125);
     });
 
     fireEvent.keyDown(document, { key: 'Delete' });
     await waitFor(() => {
-      expect(useEditorStore.getState().editor.document.items).toHaveLength(0);
+      expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
     });
 
     fireEvent.keyDown(document, { key: 'z', ctrlKey: true });
     await waitFor(() => {
-      expect(useEditorStore.getState().editor.document.items).toHaveLength(1);
+      expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
     });
   });
 
   it('wires save, export, open, and import flows through their real controller boundaries', async () => {
     const openedDocument = {
       ...createDefaultProjectDocument(),
-      items: [createTextItem({ id: 'opened-text', text: 'Opened from file' })],
+      nodes: [createTextItem({ id: 'opened-text', text: 'Opened from file' })],
     };
     mockReadProjectFile.mockResolvedValue(openedDocument);
     mockImportImageFile.mockResolvedValue({
@@ -320,8 +334,8 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().editor.document.items).toHaveLength(1);
-      expect(useEditorStore.getState().editor.document.items[0]?.id).toBe('opened-text');
+      expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
+      expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0]?.id).toBe('opened-text');
     });
 
     clickToolbarPopoverItem('Upload', 'Image...');
@@ -332,7 +346,7 @@ describe('App integration', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().editor.document.items.some((item) => item.kind === 'image')).toBe(true);
+      expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems).some((item) => item.kind === 'image')).toBe(true);
     });
 
     clickToolbarPopoverItem('Upload', 'Font...');
@@ -359,7 +373,7 @@ describe('App integration', () => {
     mockReadProjectFile.mockRejectedValueOnce(new Error('Broken project'));
     mockReadProjectFile.mockResolvedValueOnce({
       ...createDefaultProjectDocument(),
-      items: [createRectangleItem({ id: 'opened-rectangle' })],
+      nodes: [createRectangleItem({ id: 'opened-rectangle' })],
     });
     mockRegisterFontFile.mockRejectedValueOnce(new Error('Broken font'));
     mockRegisterFontFile.mockResolvedValueOnce({
@@ -443,7 +457,7 @@ describe('App integration', () => {
 
     act(() => {
       useEditorStore.getState().dispatch({
-        type: 'add_item',
+        type: 'add_node',
         item: createRectangleItem({ id: 'persisted-after-debounce' }),
       });
     });

@@ -1,7 +1,5 @@
 import type { UploadedFont } from '../document/documentTypes';
 import {
-  createBundledFont,
-  createUploadedFont,
   parseFontSourceName,
   type ParsedFontMetadata,
   type PersistedUploadedFont,
@@ -13,41 +11,24 @@ const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,wof
   eager: true,
 }) as Record<string, string>;
 
-type FontRegistrationMetadata = ParsedFontMetadata;
-
-function toRuntimeFont(
-  metadata: FontRegistrationMetadata,
-  kind: UploadedFont['kind'],
-): UploadedFont {
-  const parsedMetadata: ParsedFontMetadata = {
+async function registerFontSource(
+  metadata: ParsedFontMetadata,
+  source: ArrayBuffer | string,
+  kind: UploadedFont['kind']
+): Promise<UploadedFont> {
+  const fontFace = new FontFace(metadata.family, typeof source === 'string' ? `url(${source})` : source, {
+    weight: metadata.weight,
+    style: metadata.style,
+  });
+  await fontFace.load();
+  document.fonts.add(fontFace);
+  return {
     family: metadata.family,
     sourceName: metadata.sourceName,
     weight: metadata.weight,
     style: metadata.style,
+    kind,
   };
-  return kind === 'bundled'
-    ? createBundledFont(parsedMetadata)
-    : createUploadedFont(parsedMetadata);
-}
-
-async function registerFontSource(
-  metadata: FontRegistrationMetadata,
-  source: ArrayBuffer | string,
-  kind: UploadedFont['kind']
-): Promise<UploadedFont> {
-  const fontFace =
-    typeof source === 'string'
-      ? new FontFace(metadata.family, `url(${source})`, {
-          weight: metadata.weight,
-          style: metadata.style,
-        })
-      : new FontFace(metadata.family, source, {
-          weight: metadata.weight,
-          style: metadata.style,
-        });
-  await fontFace.load();
-  document.fonts.add(fontFace);
-  return toRuntimeFont(metadata, kind);
 }
 
 export async function registerFontFile(file: File): Promise<UploadedFont> {
