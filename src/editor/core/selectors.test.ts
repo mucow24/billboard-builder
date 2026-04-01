@@ -54,13 +54,13 @@ describe('selectors', () => {
 
   it('computes undo/redo availability from history', () => {
     const state = createDefaultEditorState();
-    expect(selectCanUndo(state)).toBe(false);
-    expect(selectCanRedo(state)).toBe(false);
+    expect(selectCanUndo(state.history)).toBe(false);
+    expect(selectCanRedo(state.history)).toBe(false);
 
     state.history.past.push(createDefaultProjectDocument());
     state.history.future.push(createDefaultProjectDocument());
-    expect(selectCanUndo(state)).toBe(true);
-    expect(selectCanRedo(state)).toBe(true);
+    expect(selectCanUndo(state.history)).toBe(true);
+    expect(selectCanRedo(state.history)).toBe(true);
   });
 
   it('selects available fonts and missing font families from session', () => {
@@ -74,7 +74,7 @@ describe('selectors', () => {
     });
     state.session.missingFontFamilies = ['Missing One', 'Missing Two'];
 
-    expect(selectAvailableFonts(state)).toEqual(state.session.availableFonts);
-    expect(selectMissingFontFamilies(state)).toEqual(['Missing One', 'Missing Two']);
+    expect(selectAvailableFonts(state.session)).toEqual(state.session.availableFonts);
+    expect(selectMissingFontFamilies(state.session)).toEqual(['Missing One', 'Missing Two']);
   });
 });

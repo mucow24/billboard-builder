@@ -122,9 +122,9 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       );
     },
     updateSelectionItems: (changes) => {
-      const { document, session } = get().editor;
-      const selectedItems = selectSelectedItems(document, { session });
-      const selectedItem = selectSelectedItem(document, { session });
+      const editor = get().editor;
+      const selectedItems = selectSelectedItems(editor.document, editor);
+      const selectedItem = selectSelectedItem(editor.document, editor);
       const resolveChanges = (item: CanvasItem) =>
         typeof changes === 'function' ? changes(item) : changes;
 
@@ -283,8 +283,8 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     },
     undo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'undo' })),
     redo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'redo' })),
-    canUndo: () => selectCanUndo(get().editor),
-    canRedo: () => selectCanRedo(get().editor),
+    canUndo: () => selectCanUndo(get().editor.history),
+    canRedo: () => selectCanRedo(get().editor.history),
     registerAvailableFont: (font) => set((state) => applyStoreAction(state, { family: 'session', type: 'register_available_font', font })),
     setMissingFontFamilies: (families) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_missing_font_families', families })),
     loadDocument: (document) => get().dispatch({ type: 'load_document', document }),
