@@ -71,7 +71,7 @@ export const LineItemView = memo(function LineItemView({
     },
     [item.id, registerShapeRef],
   );
-  useBlurEffect(lineNodeRef, item.blurRadius);
+  useBlurEffect(lineNodeRef, item.blurRadius, item);
 
   return (
     <>
