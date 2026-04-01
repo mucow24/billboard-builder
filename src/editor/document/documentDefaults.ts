@@ -103,17 +103,6 @@ export function createDefaultProjectDocument(): ProjectDocument {
   };
 }
 
-export function normalizeZIndices<T extends CanvasItem>(items: T[]): T[] {
-  return items.map((item, index) => ({
-    ...item,
-    zIndex: index,
-  }));
-}
-
-export function sortByZIndex<T extends CanvasItem>(items: T[]): T[] {
-  return items.slice().sort((left, right) => left.zIndex - right.zIndex);
-}
-
 export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasItem {
   return {
     ...createBaseItem('text', 'Text'),

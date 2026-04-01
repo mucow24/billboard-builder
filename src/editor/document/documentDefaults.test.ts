@@ -12,8 +12,6 @@ import {
   createLineItem,
   createRectangleItem,
   createTextItem,
-  normalizeZIndices,
-  sortByZIndex,
 } from './documentDefaults';
 
 describe('document defaults', () => {
@@ -97,16 +95,6 @@ describe('document defaults', () => {
       tintColor: '#ffffff',
       tintStrength: 0,
     });
-  });
-
-  it('sorts and normalizes derived z-indices deterministically', () => {
-    const first = createRectangleItem({ zIndex: 9 });
-    const second = createRectangleItem({ zIndex: 3 });
-
-    const normalized = normalizeZIndices(sortByZIndex([first, second]));
-
-    expect(normalized.map((item) => item.id)).toEqual([second.id, first.id]);
-    expect(normalized.map((item) => item.zIndex)).toEqual([0, 1]);
   });
 
   it('clones regular and line items with a new id and visible offset', () => {

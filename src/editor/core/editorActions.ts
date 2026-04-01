@@ -46,10 +46,6 @@ export function toEditorAction(command: EditorCommand): DocumentAction | Selecti
     : { family: 'document', command };
 }
 
-export function isHistoryCommand(command: EditorCommand): boolean {
-  return !isSelectionCommand(command) && command.type !== 'register_font' && command.type !== 'load_document';
-}
-
 export function createTransactionAction(
   actions: Array<DocumentAction | SelectionAction | SessionAction>,
   historyMode: TransactionHistoryMode = 'single'

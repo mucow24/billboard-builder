@@ -1,13 +1,5 @@
 import type { CanvasNode } from '../document/documentTypes';
 
-export function replaceSelection(nodeIds: string[]): string[] {
-  return Array.from(new Set(nodeIds));
-}
-
-export function clearSelection(): string[] {
-  return [];
-}
-
 export function toggleSelectionNode(selectedNodeIds: string[], nodeId: string): string[] {
   return selectedNodeIds.includes(nodeId)
     ? selectedNodeIds.filter((id) => id !== nodeId)

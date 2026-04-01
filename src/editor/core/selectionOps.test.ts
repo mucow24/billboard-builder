@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  clearSelection,
   normalizeSelectionForNodes,
-  replaceSelection,
   selectAllNodes,
   toggleSelectionNode,
   toggleSelectionNodes,
@@ -15,11 +13,6 @@ import {
 } from '../document/documentDefaults';
 
 describe('selectionOps', () => {
-  it('deduplicates replacement selections and clears them explicitly', () => {
-    expect(replaceSelection(['a', 'b', 'a'])).toEqual(['a', 'b']);
-    expect(clearSelection()).toEqual([]);
-  });
-
   it('toggles a single node in and out of the selection', () => {
     expect(toggleSelectionNode(['a'], 'b')).toEqual(['a', 'b']);
     expect(toggleSelectionNode(['a', 'b'], 'a')).toEqual(['b']);

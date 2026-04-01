@@ -15,8 +15,6 @@ export type CanvasLeafKind =
   | 'line'
   | 'generator';
 
-export type CanvasNodeKind = CanvasLeafKind | 'group';
-
 export type TextAlign = 'left' | 'center' | 'right';
 
 export type TextVerticalAlign = 'top' | 'middle' | 'bottom';

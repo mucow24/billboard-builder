@@ -29,10 +29,6 @@ function clampOpacity(value: number, fallback = 1): number {
   return clampFinite(value, fallback, 0, 1);
 }
 
-function clampLineStrokeWidth(value: number): number {
-  return clampFinite(value, 1, 1);
-}
-
 function normalizeShadow(shadow: Partial<CanvasShadow> | undefined): CanvasShadow {
   const nextShadow = {
     ...DEFAULT_ITEM_SHADOW,
@@ -276,7 +272,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         startY,
         endX,
         endY,
-        strokeWidth: clampLineStrokeWidth(item.strokeWidth),
+        strokeWidth: clampDimension(item.strokeWidth),
       };
       return normalizedLineItem;
     }
