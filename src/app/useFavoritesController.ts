@@ -11,9 +11,7 @@ import { defaultFavoriteLibraryService, type StoredFavorite } from '../editor/pe
 import type { EditorStoreState } from '../editor/state/store';
 import type { ProjectDocument, UploadedFont } from '../editor/document/documentTypes';
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { getErrorMessage } from './errorUtils';
 
 interface UseFavoritesControllerParams {
   applyTransaction: EditorStoreState['applyTransaction'];

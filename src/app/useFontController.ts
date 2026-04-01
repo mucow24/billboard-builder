@@ -1,10 +1,7 @@
 import { registerFontFile, toFontReference } from '../editor/fonts';
 import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
 import type { CanvasItem, DocumentFontReference, UploadedFont } from '../editor/document/documentTypes';
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { getErrorMessage } from './errorUtils';
 
 async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
   if (typeof blob.arrayBuffer === 'function') {

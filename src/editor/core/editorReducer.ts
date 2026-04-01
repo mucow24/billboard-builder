@@ -31,6 +31,7 @@ import {
   type EditorState,
   type SessionState,
 } from './editorState';
+import { normalizeSelectionForNodes } from './selectionOps';
 import {
   createTransactionAction,
   toEditorAction,
@@ -46,15 +47,10 @@ function normalizeSelectionForDocument(
   selectedNodeIds: string[],
   document: ProjectDocument
 ): string[] {
-  const nodeIds = new Set(getNodeIds(document.nodes));
-  const seenSelectionIds = new Set<string>();
-  return selectedNodeIds.filter((id) => {
-    if (!nodeIds.has(id) || seenSelectionIds.has(id)) {
-      return false;
-    }
-    seenSelectionIds.add(id);
-    return true;
-  });
+  // Use getNodeIds to flatten the tree (includes group IDs), then delegate
+  // to the shared dedup-and-filter logic in selectionOps.
+  const allNodes = getNodeIds(document.nodes).map((id) => ({ id }));
+  return normalizeSelectionForNodes(selectedNodeIds, allNodes);
 }
 
 interface DocumentCommandResult {

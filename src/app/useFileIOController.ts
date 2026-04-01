@@ -13,9 +13,7 @@ function getPointerCenteredPosition(x: number, y: number) {
   };
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
-}
+import { getErrorMessage } from './errorUtils';
 
 interface UseFileIOControllerParams {
   document: ProjectDocument;
