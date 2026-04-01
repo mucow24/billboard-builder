@@ -1,6 +1,5 @@
 import {
   collectLeafItems,
-  flattenVisibleLeafNodes,
   getNodeById,
   isCanvasItemNode,
   isGroupNode,
@@ -62,13 +61,6 @@ export function selectSelectedItems(
   return selectSelectedNodes(document, selection).flatMap((node) =>
     isCanvasItemNode(node) ? [node] : collectLeafItems(node)
   );
-}
-
-export function selectRenderableLeafItems(document: ProjectDocument): CanvasItem[] {
-  return flattenVisibleLeafNodes(document.nodes).map((entry) => ({
-    ...entry.item,
-    opacity: entry.effectiveOpacity,
-  }));
 }
 
 export function selectCanUndo(history: HistoryState | Pick<EditorState, 'history'>): boolean {

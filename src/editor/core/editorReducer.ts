@@ -5,7 +5,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
-import { normalizeExistingProjectDocument, normalizeProjectDocument } from '../document/documentNormalizer';
+import { normalizeProjectDocument } from '../document/documentNormalizer';
 import {
   getNodeIds,
   groupNodes,
@@ -80,7 +80,7 @@ function applyDocumentCommandWithEffects(
   document: ProjectDocument,
   command: DocumentCommand
 ): DocumentCommandResult {
-  const currentDocument = normalizeExistingProjectDocument(document);
+  const currentDocument = normalizeProjectDocument(document);
   let result: DocumentCommandResult;
 
   switch (command.type) {
@@ -207,7 +207,7 @@ function applyDocumentCommandWithEffects(
 
   return {
     ...result,
-    nextDocument: normalizeExistingProjectDocument(result.nextDocument),
+    nextDocument: normalizeProjectDocument(result.nextDocument),
   };
 }
 

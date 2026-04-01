@@ -8,7 +8,6 @@ import {
   createTextItem,
 } from './documentDefaults';
 import {
-  normalizeExistingProjectDocument,
   normalizeProjectDocument,
 } from './documentNormalizer';
 import type { ImageCanvasItem } from './documentTypes';
@@ -244,32 +243,4 @@ describe('document normalizer', () => {
     expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
   });
 
-  it('uses the same canonical normalization for loaded and live documents', () => {
-    const liveDocument = {
-      version: 2 as const,
-      canvas: {
-        width: Number.NaN,
-        height: 0,
-        presetId: 123 as unknown as string,
-      },
-      background: '#abcdef',
-      nodes: [
-        createGroupNode([
-          createRectangleItem({
-            id: 'rectangle',
-            zIndex: 9,
-            width: 0,
-            opacity: 3,
-          }),
-        ]),
-      ],
-      fonts: [
-        { family: 'Poster Sans', sourceName: 'PosterSans.ttf', kind: 'uploaded' as const },
-      ],
-    };
-
-    expect(normalizeExistingProjectDocument(liveDocument)).toEqual(
-      normalizeProjectDocument(liveDocument)
-    );
-  });
 });

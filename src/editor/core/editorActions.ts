@@ -50,14 +50,6 @@ export function isHistoryCommand(command: EditorCommand): boolean {
   return !isSelectionCommand(command) && command.type !== 'register_font' && command.type !== 'load_document';
 }
 
-export function isFontRegistration(command: EditorCommand): command is Extract<EditorCommand, { type: 'register_font' }> {
-  return command.type === 'register_font';
-}
-
-export function isLoadDocumentCommand(command: EditorCommand): command is Extract<EditorCommand, { type: 'load_document' }> {
-  return command.type === 'load_document';
-}
-
 export function createTransactionAction(
   actions: Array<DocumentAction | SelectionAction | SessionAction>,
   historyMode: TransactionHistoryMode = 'single'

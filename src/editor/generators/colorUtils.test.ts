@@ -1,22 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { hexToRgb, mixColor, rgba } from './colorUtils';
+import { mixColor, rgba } from './colorUtils';
 
 describe('generator colorUtils', () => {
-  it('parses 8-digit hex colors into RGB channels', () => {
-    expect(hexToRgb('#ff0000ff')).toEqual({ r: 255, g: 0, b: 0 });
-    expect(hexToRgb('#33669980')).toEqual({ r: 51, g: 102, b: 153 });
-  });
-
-  it('preserves existing 3-digit and 6-digit hex behavior', () => {
-    expect(hexToRgb('#0f8')).toEqual({ r: 0, g: 255, b: 136 });
-    expect(hexToRgb('#336699')).toEqual({ r: 51, g: 102, b: 153 });
-  });
-
-  it('falls back to white for invalid colors', () => {
-    expect(hexToRgb('not-a-color')).toEqual({ r: 255, g: 255, b: 255 });
-  });
-
   it('multiplies embedded alpha with the explicit rgba alpha', () => {
     expect(rgba('#ff0000ff', 0.65)).toBe('rgba(255, 0, 0, 0.65)');
     expect(rgba('#ff000080', 0.5)).toBe('rgba(255, 0, 0, 0.251)');

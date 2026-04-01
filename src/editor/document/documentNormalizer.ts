@@ -1,3 +1,4 @@
+import { clampFinite } from './clampFinite';
 import {
   createDefaultProjectDocument,
   createFullImageCropRect,
@@ -19,22 +20,6 @@ import type {
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
-
-function clampFinite(
-  value: number,
-  fallback: number,
-  min?: number,
-  max?: number
-): number {
-  let nextValue = Number.isFinite(value) ? value : fallback;
-  if (min !== undefined) {
-    nextValue = Math.max(min, nextValue);
-  }
-  if (max !== undefined) {
-    nextValue = Math.min(max, nextValue);
-  }
-  return nextValue;
-}
 
 function clampDimension(value: number): number {
   return clampFinite(value, 1, 1);
@@ -385,8 +370,4 @@ export function normalizeProjectDocument(
     nodes: normalizedNodes,
     fonts: normalizedFonts,
   };
-}
-
-export function normalizeExistingProjectDocument(document: ProjectDocument): ProjectDocument {
-  return normalizeProjectDocument(document);
 }
