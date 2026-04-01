@@ -65,12 +65,12 @@ import type {
 interface UseCanvasInteractionSessionParams {
   activeTool: CanvasTool;
   document: ProjectDocument;
-  selectedItemIds: string[];
+  selectedNodeIds: string[];
   viewport?: { zoom: number; panX: number; panY: number };
   onGuidesChange: (guides: GuideLine[]) => void;
-  onSelectItem: (itemId?: string) => void;
-  onToggleSelectItem?: (itemId: string) => void;
-  onToggleSelectItems?: (itemIds: string[]) => void;
+  onSelectNode: (itemId?: string) => void;
+  onToggleSelectNode?: (itemId: string) => void;
+  onToggleSelectNodes?: (itemIds: string[]) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
   onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
@@ -179,12 +179,12 @@ function getGroupDescendantAtPoint(
 export function useCanvasInteractionSession({
   activeTool,
   document,
-  selectedItemIds,
+  selectedNodeIds,
   viewport = { zoom: 1, panX: 0, panY: 0 },
   onGuidesChange,
-  onSelectItem,
-  onToggleSelectItem,
-  onToggleSelectItems,
+  onSelectNode,
+  onToggleSelectNode,
+  onToggleSelectNodes,
   onUpdateItem,
   onUpdateItems,
   onAddItem,
@@ -217,10 +217,10 @@ export function useCanvasInteractionSession({
     };
   }, []);
 
-  const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+  const selectedIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
   const renderables = useMemo(
-    () => buildRenderableCanvasItems(document, selectedItemIds),
-    [document, selectedItemIds]
+    () => buildRenderableCanvasItems(document, selectedNodeIds),
+    [document, selectedNodeIds]
   );
   const orderedItems = useMemo(
     () => renderables.map(({ selectableNodeId, ...item }) => {
@@ -235,10 +235,10 @@ export function useCanvasInteractionSession({
   );
   const selectedNodes = useMemo(
     () =>
-      selectedItemIds
+      selectedNodeIds
         .map((nodeId) => getNodeById(document.nodes, nodeId))
         .filter((node): node is CanvasNode => Boolean(node)),
-    [document.nodes, selectedItemIds]
+    [document.nodes, selectedNodeIds]
   );
   const selectedItems = useMemo(
     () =>
@@ -505,9 +505,9 @@ export function useCanvasInteractionSession({
     source: PointerGestureSource = 'stage',
   ) => {
     const selectedGroupNodeId =
-      selectedItemIds.length === 1 &&
+      selectedNodeIds.length === 1 &&
       (() => {
-        const selectedNode = getNodeById(document.nodes, selectedItemIds[0]);
+        const selectedNode = getNodeById(document.nodes, selectedNodeIds[0]);
         return selectedNode && isGroupNode(selectedNode) ? selectedNode.id : null;
       })();
     const clickedRenderable = renderableByLeafId.get(item.id);
@@ -559,7 +559,7 @@ export function useCanvasInteractionSession({
     orderedItems,
     renderableByLeafId,
     selectedIdSet,
-    selectedItemIds,
+    selectedNodeIds,
     selectedItems,
     selectedLeafIdSet,
   ]);
@@ -760,17 +760,17 @@ export function useCanvasInteractionSession({
         onSetActiveTool(commit.nextTool);
         return;
       case 'marquee':
-        if (commit.toggleMode && onToggleSelectItems) {
-          onToggleSelectItems(Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId))));
+        if (commit.toggleMode && onToggleSelectNodes) {
+          onToggleSelectNodes(Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId))));
         } else if (commit.hitIds.length > 0) {
           const selectableIds = Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId)));
-          onSelectItem(selectableIds[0]);
-          if (selectableIds.length > 1 && onToggleSelectItems) {
-            onSelectItem(undefined);
-            onToggleSelectItems(selectableIds);
+          onSelectNode(selectableIds[0]);
+          if (selectableIds.length > 1 && onToggleSelectNodes) {
+            onSelectNode(undefined);
+            onToggleSelectNodes(selectableIds);
           }
         } else {
-          onSelectItem(undefined);
+          onSelectNode(undefined);
         }
         return;
       case 'group':
@@ -785,7 +785,7 @@ export function useCanvasInteractionSession({
         onUpdateItem(commit.itemId, commit.changes);
         return;
     }
-  }, [onAddItem, updateGuides, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
+  }, [onAddItem, updateGuides, onSetActiveTool, onSelectNode, onToggleSelectNodes, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
@@ -999,7 +999,7 @@ export function useCanvasInteractionSession({
       clearPendingItemGesture();
       if (!pointer) {
         if (pending.kind === 'shift-toggle') {
-          onToggleSelectItem?.(pending.selectionNodeId);
+          onToggleSelectNode?.(pending.selectionNodeId);
         }
         updateSession(null);
         updateGuides([]);
@@ -1012,7 +1012,7 @@ export function useCanvasInteractionSession({
       );
       if (distance < PICKUP_DRAG_THRESHOLD) {
         if (pending.kind === 'shift-toggle') {
-          onToggleSelectItem?.(pending.selectionNodeId);
+          onToggleSelectNode?.(pending.selectionNodeId);
         }
         updateSession(null);
         updateGuides([]);
@@ -1035,7 +1035,7 @@ export function useCanvasInteractionSession({
       createPendingItemSession,
       finishSession,
       updateGuides,
-      onToggleSelectItem,
+      onToggleSelectNode,
       updateSession,
     ],
   );
@@ -1207,7 +1207,7 @@ export function useCanvasInteractionSession({
     if (selectedSession) {
       clearPendingItemGesture();
       setLastDrilldownSource(null);
-      if (shiftPressed && onToggleSelectItem && selectedIdSet.has(selectionNodeId)) {
+      if (shiftPressed && onToggleSelectNode && selectedIdSet.has(selectionNodeId)) {
         // Defer the toggle until mouseup so shift-drag can still constrain movement.
         setPendingItemGesture({
           kind: 'shift-toggle',
@@ -1222,10 +1222,10 @@ export function useCanvasInteractionSession({
       updateSession(selectedSession);
       return;
     }
-    if (shiftPressed && onToggleSelectItem && !selectedIdSet.has(selectionNodeId)) {
+    if (shiftPressed && onToggleSelectNode && !selectedIdSet.has(selectionNodeId)) {
       clearPendingItemGesture();
       setLastDrilldownSource(null);
-      onToggleSelectItem(selectionNodeId);
+      onToggleSelectNode(selectionNodeId);
       return;
     }
     setPendingItemGesture({
@@ -1240,15 +1240,15 @@ export function useCanvasInteractionSession({
       updateSession(pickupSession);
     }
     setLastDrilldownSource(null);
-    onSelectItem(selectionNodeId);
+    onSelectNode(selectionNodeId);
   }, [
     clearPendingItemGesture,
     commitCropSession,
     createSelectableNodeDragSession,
     createSelectedDragSession,
     resolveModifierKeys,
-    onSelectItem,
-    onToggleSelectItem,
+    onSelectNode,
+    onToggleSelectNode,
     selectedIdSet,
     setPendingItemGesture,
     updateSession,
@@ -1259,7 +1259,7 @@ export function useCanvasInteractionSession({
       return;
     }
     const latestHandledItemEvent = lastHandledItemPointerEventRef.current;
-    const currentSelectedNodeId = selectedItemIds.length === 1 ? selectedItemIds[0] : null;
+    const currentSelectedNodeId = selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
     const currentSelectionDrillTarget = currentSelectedNodeId
       ? getNextDrilldownNodeId(document.nodes, currentSelectedNodeId, item.id)
       : null;
@@ -1280,7 +1280,7 @@ export function useCanvasInteractionSession({
     const nextNodeId = getNextDrilldownNodeId(document.nodes, effectiveSelectedNodeId, item.id);
     if (nextNodeId && nextNodeId !== effectiveSelectedNodeId) {
       setLastDrilldownSource('item-hit');
-      onSelectItem(nextNodeId);
+      onSelectNode(nextNodeId);
       return;
     }
     if (
@@ -1292,7 +1292,7 @@ export function useCanvasInteractionSession({
       setLastDrilldownSource(null);
       startImageCropSession(item);
     }
-  }, [document.nodes, onSelectItem, selectedItemIds, startImageCropSession]);
+  }, [document.nodes, onSelectNode, selectedNodeIds, startImageCropSession]);
 
   const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
     const target = event.target;
@@ -1314,7 +1314,7 @@ export function useCanvasInteractionSession({
         event.evt?.button !== 1
       ) {
         commitCropSession();
-        onSelectItem(undefined);
+        onSelectNode(undefined);
       }
       return;
     }
@@ -1343,9 +1343,9 @@ export function useCanvasInteractionSession({
       isCanvasSurface &&
       activeTool === 'select' &&
       event.evt?.button !== 1 &&
-      selectedItemIds.length === 1
+      selectedNodeIds.length === 1
     ) {
-      const selectedNodeId = selectedItemIds[0];
+      const selectedNodeId = selectedNodeIds[0];
       const selectedNode = getNodeById(document.nodes, selectedNodeId);
       if (selectedNode && isGroupNode(selectedNode)) {
         const drilledItem = getGroupDescendantAtPoint(renderedItems, selectedNodeId, pointer);
@@ -1375,7 +1375,7 @@ export function useCanvasInteractionSession({
           if (isStageSurfaceDoubleClick) {
             lastStageDescendantClickRef.current = null;
             setLastDrilldownSource('stage-surface');
-            onSelectItem(nextNodeId);
+            onSelectNode(nextNodeId);
           } else {
             lastStageDescendantClickRef.current = {
               groupId: selectedNodeId,
@@ -1404,14 +1404,14 @@ export function useCanvasInteractionSession({
     if (activeTool === 'select') {
       setLastDrilldownSource(null);
       updateGuides([]);
-      onSelectItem(undefined);
+      onSelectNode(undefined);
       setPendingMarquee({ pointerStart: pointer, toggleMode: modifiers.shiftKey });
       updateSession(null);
       return;
     }
     setLastDrilldownSource(null);
     updateGuides([]);
-    onSelectItem(undefined);
+    onSelectNode(undefined);
   }, [
     activeTool,
     beginCreate,
@@ -1420,10 +1420,10 @@ export function useCanvasInteractionSession({
     document.nodes,
     getCanvasPointerFromStageEvent,
     updateGuides,
-    onSelectItem,
+    onSelectNode,
     resolveModifierKeys,
     renderedItems,
-    selectedItemIds,
+    selectedNodeIds,
     setPendingMarquee,
     updateSession,
   ]);

@@ -8,6 +8,7 @@ import {
   createTextItem,
 } from '../document/documentDefaults';
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
+import { collectLeafItems } from '../document/sceneGraph';
 import { createDefaultEditorState } from './editorState';
 import { applyEditorCommand, createResetDocumentTransaction, reduceEditorState } from './editorReducer';
 import { createTransactionAction, toEditorAction } from './editorActions';
@@ -21,8 +22,8 @@ describe('editor reducer', () => {
       ...toEditorAction({ type: 'add_item', item }),
     });
 
-    expect(nextState.document.items).toHaveLength(1);
-    expect(nextState.session.selectedItemIds).toEqual([item.id]);
+    expect(nextState.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
+    expect(nextState.session.selectedNodeIds).toEqual([item.id]);
     expect(nextState.history.past).toEqual([state.document]);
   });
 
@@ -33,10 +34,10 @@ describe('editor reducer', () => {
     });
 
     const selected = reduceEditorState(seeded, {
-      ...toEditorAction({ type: 'select_items', itemIds: [item.id] }),
+      ...toEditorAction({ type: 'select_nodes', nodeIds: [item.id] }),
     });
 
-    expect(selected.session.selectedItemIds).toEqual([item.id]);
+    expect(selected.session.selectedNodeIds).toEqual([item.id]);
     expect(selected.history).toEqual(seeded.history);
   });
 
@@ -44,7 +45,7 @@ describe('editor reducer', () => {
     const firstItem = createRectangleItem();
     const secondDoc = {
       ...createDefaultProjectDocument(),
-      items: [createTextItem({ id: 'loaded-item' })],
+      nodes: [createTextItem({ id: 'loaded-item' })],
     };
     const seeded = reduceEditorState(createDefaultEditorState(), {
       ...toEditorAction({ type: 'add_item', item: firstItem }),
@@ -55,8 +56,8 @@ describe('editor reducer', () => {
       ...toEditorAction({ type: 'load_document', document: secondDoc }),
     });
 
-    expect(opened.document.items.map((item) => item.id)).toEqual(['loaded-item']);
-    expect(opened.session.selectedItemIds).toEqual([]);
+    expect(opened.document.nodes.flatMap(collectLeafItems).map((item) => item.id)).toEqual(['loaded-item']);
+    expect(opened.session.selectedNodeIds).toEqual([]);
     expect(opened.history.future).toEqual([]);
     expect(opened.history.past).toEqual([]);
   });
@@ -75,11 +76,11 @@ describe('editor reducer', () => {
       ])
     );
 
-    expect(nextState.document.items).toHaveLength(2);
+    expect(nextState.document.nodes.flatMap(collectLeafItems)).toHaveLength(2);
     expect(nextState.history.past).toHaveLength(1);
 
     const undone = reduceEditorState(nextState, { family: 'history', type: 'undo' });
-    expect(undone.document.items).toHaveLength(0);
+    expect(undone.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
   });
 
   it('does not create history for session-only transactions', () => {
@@ -105,11 +106,11 @@ describe('editor reducer', () => {
     });
 
     const cleared = reduceEditorState(seeded, createResetDocumentTransaction());
-    expect(cleared.document.items).toHaveLength(0);
+    expect(cleared.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
     expect(cleared.history.past).toHaveLength(2);
 
     const undone = reduceEditorState(cleared, { family: 'history', type: 'undo' });
-    expect(undone.document.items).toHaveLength(1);
+    expect(undone.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
     expect(undone.session.activeTool).toBe('select');
   });
 
@@ -122,8 +123,8 @@ describe('editor reducer', () => {
     const undone = reduceEditorState(seeded, { family: 'history', type: 'undo' });
     const redone = reduceEditorState(undone, { family: 'history', type: 'redo' });
 
-    expect(undone.document.items).toHaveLength(0);
-    expect(redone.document.items).toHaveLength(1);
+    expect(undone.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
+    expect(redone.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
   });
 
   it('normalizes document updates through the reducer path', () => {
@@ -139,7 +140,7 @@ describe('editor reducer', () => {
     });
     const baseDocument = {
       ...createDefaultProjectDocument(),
-      items: [rectangleItem],
+      nodes: [rectangleItem],
     };
 
     const nextDocument = applyEditorCommand(baseDocument, {
@@ -156,7 +157,7 @@ describe('editor reducer', () => {
         },
       },
     });
-    const nextItem = nextDocument.items[0];
+    const nextItem = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
     expect(nextItem.width).toBe(1);
     expect(nextItem.height).toBe(1);
@@ -172,7 +173,7 @@ describe('editor reducer', () => {
     const item = createLineItem({ startX: 10, startY: 20, endX: 110, endY: 60 });
     const document = {
       ...createDefaultProjectDocument(),
-      items: [item],
+      nodes: [item],
     };
 
     const nextDocument = applyEditorCommand(document, {
@@ -180,7 +181,7 @@ describe('editor reducer', () => {
       itemId: item.id,
       changes: { endX: 160, endY: 90 },
     });
-    const nextItem = nextDocument.items[0];
+    const nextItem = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
     expect(nextItem.width).toBe(150);
     expect(nextItem.height).toBe(70);
@@ -196,7 +197,6 @@ describe('editor reducer', () => {
     const document = {
       ...createDefaultProjectDocument(),
       nodes: [group],
-      items: [first, second],
     };
 
     const nextDocument = applyEditorCommand(document, {

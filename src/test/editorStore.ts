@@ -16,7 +16,6 @@ export function createEditorState(overrides: EditorStateOverrides = {}): EditorS
     ? normalizeExistingProjectDocument(overrides.document)
     : initialState.document;
   const selectedNodeIds = overrides.session?.selectedNodeIds
-    ?? overrides.session?.selectedItemIds
     ?? initialState.session.selectedNodeIds;
 
   return {
@@ -27,7 +26,6 @@ export function createEditorState(overrides: EditorStateOverrides = {}): EditorS
       ...initialState.session,
       ...overrides.session,
       selectedNodeIds,
-      selectedItemIds: overrides.session?.selectedItemIds ?? selectedNodeIds,
     },
     history: {
       ...initialState.history,

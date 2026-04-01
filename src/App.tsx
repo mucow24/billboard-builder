@@ -40,7 +40,7 @@ export default function App() {
     actions: {
       deleteFavorite,
       deleteNode,
-      deleteSelectedItems,
+      deleteSelectedNodes,
       renameFavorite,
       recolorFavorite,
       reorderFavorite,
@@ -53,14 +53,14 @@ export default function App() {
       handleOpenProject,
       handleSave,
       redo,
-      reorderSelectedItem,
+      reorderSelectedNode,
       saveSelectionAsFavorite,
-      selectSingleItem,
+      selectSingleNode,
       setActiveTool,
       setCanvasSize,
       insertFavorite,
-      toggleSelectedItem,
-      toggleSelectedItems,
+      toggleSelectedNode,
+      toggleSelectedNodes,
       undo,
       ungroupSelectedNode,
       updateSelectedGroup,
@@ -78,7 +78,6 @@ export default function App() {
       missingFontFamilies,
       selectedGroup,
       selectedItem,
-      selectedItemIds,
       selectedItems,
       selectedNode,
       selectedNodeIds,
@@ -203,12 +202,12 @@ export default function App() {
           showCanvasTestHooks={runtimeFlags.enableCanvasTestHooks}
           showExportBoundsCue={showExportBoundsCue}
           document={document}
-          selectedItemIds={selectedItemIds}
+          selectedNodeIds={selectedNodeIds}
           guides={guides}
           onGuidesChange={setGuides}
-          onSelectItem={selectSingleItem}
-          onToggleSelectItem={toggleSelectedItem}
-          onToggleSelectItems={toggleSelectedItems}
+          onSelectNode={selectSingleNode}
+          onToggleSelectNode={toggleSelectedNode}
+          onToggleSelectNodes={toggleSelectedNodes}
           onUpdateItem={(itemId, changes) => {
             dispatch({ type: 'update_item', itemId, changes });
           }}
@@ -235,7 +234,7 @@ export default function App() {
               favoriteStatusFading={favoriteStatusFading}
               favoriteStatusMessage={favoriteStatusMessage}
               onCanvasSizeChange={setCanvasSize}
-              onDelete={deleteSelectedItems}
+              onDelete={deleteSelectedNodes}
               onExport={() => handleExport(stageRef.current)}
               onExportIntentChange={handleExportIntentChange}
               onFontUpload={() => fontInputRef.current?.click()}
@@ -265,7 +264,7 @@ export default function App() {
               activeInspectorTab={inspectorTab}
               panelCollapsed={panelCollapsed}
               onInspectorTabChange={handleInspectorTabChange}
-              itemCount={document.items.length}
+              itemCount={layerRows.length}
               favoriteCount={favorites.length}
             />
           </div>
@@ -287,7 +286,6 @@ export default function App() {
                 availableFonts={availableFonts}
                 background={document.background}
                 fonts={document.fonts}
-                items={document.items}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
                 onDeleteFavorite={deleteFavorite}
@@ -329,8 +327,8 @@ export default function App() {
                   updateSelectedItem(resolveChanges(targetItem));
                 }}
                 onInsertFavorite={insertFavorite}
-                onSelectNode={selectSingleItem}
-                onToggleNode={toggleSelectedItem}
+                onSelectNode={selectSingleNode}
+                onToggleNode={toggleSelectedNode}
                 onToggleNodeLocked={(nodeId) => {
                   const node = getNodeById(document.nodes, nodeId);
                   if (!node) return;
@@ -349,7 +347,7 @@ export default function App() {
                     dispatch({ type: 'update_item', itemId: nodeId, changes: { hidden: !node.hidden } });
                   }
                 }}
-                onReorder={reorderSelectedItem}
+                onReorder={reorderSelectedNode}
                 favorites={favorites}
               />
             </div>

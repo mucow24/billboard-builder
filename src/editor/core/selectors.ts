@@ -22,8 +22,6 @@ export function selectPrimarySelectedNodeId(selection: SelectionSource): string 
   return getSelectedNodeIds(selection)[0];
 }
 
-export const selectPrimarySelectedItemId = selectPrimarySelectedNodeId;
-
 export function selectSelectedNodes(
   document: ProjectDocument,
   selection: SelectionSource
@@ -61,13 +59,9 @@ export function selectSelectedItems(
   document: ProjectDocument,
   selection: SelectionSource
 ): CanvasItem[] {
-  const selectedLeafIds = new Set(
-    selectSelectedNodes(document, selection).flatMap((node) =>
-      isCanvasItemNode(node) ? [node.id] : collectLeafItems(node).map((item) => item.id)
-    )
+  return selectSelectedNodes(document, selection).flatMap((node) =>
+    isCanvasItemNode(node) ? [node] : collectLeafItems(node)
   );
-
-  return document.items.filter((item) => selectedLeafIds.has(item.id));
 }
 
 export function selectRenderableLeafItems(document: ProjectDocument): CanvasItem[] {

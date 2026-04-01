@@ -13,21 +13,15 @@ import type { EditorStoreState } from '../editor/state/store';
 
 interface UseEditorShortcutsArgs {
   applyTransaction: EditorStoreState['applyTransaction'];
-  deleteSelectedItems?: EditorStoreState['deleteSelectedItems'];
   deleteSelectedNodes: EditorStoreState['deleteSelectedNodes'];
-  duplicateSelectedItems?: EditorStoreState['duplicateSelectedItems'];
   duplicateSelectedNodes: EditorStoreState['duplicateSelectedNodes'];
   groupSelectedNodes: EditorStoreState['groupSelectedNodes'];
-  nudgeSelectedItems?: EditorStoreState['nudgeSelectedItems'];
   nudgeSelectedNodes: EditorStoreState['nudgeSelectedNodes'];
   onPasteImageFile: (file: File) => void | Promise<void>;
   redo: EditorStoreState['redo'];
-  reorderSelectedItem?: EditorStoreState['reorderSelectedItem'];
   reorderSelectedNode: EditorStoreState['reorderSelectedNode'];
   selectParentNode: EditorStoreState['selectParentNode'];
-  selectedItems?: CanvasNode[];
   selectedNodes: CanvasNode[];
-  selectAllItems?: EditorStoreState['selectAllItems'];
   selectAllNodes: EditorStoreState['selectAllNodes'];
   setActiveTool: EditorStoreState['setActiveTool'];
   undo: EditorStoreState['undo'];
@@ -36,21 +30,15 @@ interface UseEditorShortcutsArgs {
 
 export function useEditorShortcuts({
   applyTransaction,
-  deleteSelectedItems,
   deleteSelectedNodes,
-  duplicateSelectedItems,
   duplicateSelectedNodes,
   groupSelectedNodes,
-  nudgeSelectedItems,
   nudgeSelectedNodes,
   onPasteImageFile,
   redo,
-  reorderSelectedItem,
   reorderSelectedNode,
   selectParentNode,
-  selectedItems,
   selectedNodes,
-  selectAllItems,
   selectAllNodes,
   setActiveTool,
   undo,
@@ -59,13 +47,6 @@ export function useEditorShortcuts({
   const pasteStateRef = useRef<{ payload: string; count: number } | null>(null);
 
   useEffect(() => {
-    const resolvedDeleteSelectedNodes = deleteSelectedNodes ?? deleteSelectedItems!;
-    const resolvedDuplicateSelectedNodes = duplicateSelectedNodes ?? duplicateSelectedItems!;
-    const resolvedNudgeSelectedNodes = nudgeSelectedNodes ?? nudgeSelectedItems!;
-    const resolvedReorderSelectedNode = reorderSelectedNode ?? reorderSelectedItem!;
-    const resolvedSelectedNodes = selectedNodes ?? selectedItems ?? [];
-    const resolvedSelectAllNodes = selectAllNodes ?? selectAllItems!;
-
     function clearSelection() {
       applyTransaction([{ family: 'selection', command: { type: 'clear_selection' } }]);
     }
@@ -91,12 +72,12 @@ export function useEditorShortcuts({
       }
       if (hasModifier && !isEditable && pressedKey === 'a') {
         event.preventDefault();
-        resolvedSelectAllNodes();
+        selectAllNodes();
         return;
       }
       if (hasModifier && !isEditable && pressedKey === 'd') {
         event.preventDefault();
-        resolvedDuplicateSelectedNodes();
+        duplicateSelectedNodes();
         return;
       }
       if (hasModifier && !isEditable && pressedKey === 'g') {
@@ -110,20 +91,20 @@ export function useEditorShortcuts({
       }
       if (hasModifier && !isEditable && event.key === 'ArrowUp') {
         event.preventDefault();
-        resolvedReorderSelectedNode(event.shiftKey ? 'front' : 'forward');
+        reorderSelectedNode(event.shiftKey ? 'front' : 'forward');
         return;
       }
       if (hasModifier && !isEditable && event.key === 'ArrowDown') {
         event.preventDefault();
-        resolvedReorderSelectedNode(event.shiftKey ? 'back' : 'backward');
+        reorderSelectedNode(event.shiftKey ? 'back' : 'backward');
         return;
       }
-      if (!hasModifier && !isEditable && resolvedSelectedNodes.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      if (!hasModifier && !isEditable && selectedNodes.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         event.preventDefault();
         const distance = event.shiftKey ? 5 : 1;
         const deltaX = event.key === 'ArrowLeft' ? -distance : event.key === 'ArrowRight' ? distance : 0;
         const deltaY = event.key === 'ArrowUp' ? -distance : event.key === 'ArrowDown' ? distance : 0;
-        resolvedNudgeSelectedNodes(deltaX, deltaY);
+        nudgeSelectedNodes(deltaX, deltaY);
         return;
       }
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -131,7 +112,7 @@ export function useEditorShortcuts({
           return;
         }
         event.preventDefault();
-        resolvedDeleteSelectedNodes();
+        deleteSelectedNodes();
         return;
       }
       const hotkeyMap = new Map<string, CanvasTool>([
@@ -165,10 +146,10 @@ export function useEditorShortcuts({
     }
 
     function handleCopy(event: ClipboardEvent) {
-      if (isEditableTarget(event.target) || resolvedSelectedNodes.length === 0) {
+      if (isEditableTarget(event.target) || selectedNodes.length === 0) {
         return;
       }
-      if (!writeSelectionToClipboardData(event.clipboardData, resolvedSelectedNodes)) {
+      if (!writeSelectionToClipboardData(event.clipboardData, selectedNodes)) {
         return;
       }
       pasteStateRef.current = null;
@@ -176,15 +157,15 @@ export function useEditorShortcuts({
     }
 
     function handleCut(event: ClipboardEvent) {
-      if (isEditableTarget(event.target) || resolvedSelectedNodes.length === 0) {
+      if (isEditableTarget(event.target) || selectedNodes.length === 0) {
         return;
       }
-      if (!writeSelectionToClipboardData(event.clipboardData, resolvedSelectedNodes)) {
+      if (!writeSelectionToClipboardData(event.clipboardData, selectedNodes)) {
         return;
       }
       pasteStateRef.current = null;
       event.preventDefault();
-      resolvedDeleteSelectedNodes();
+      deleteSelectedNodes();
     }
 
     function handlePaste(event: ClipboardEvent) {
@@ -232,21 +213,15 @@ export function useEditorShortcuts({
     };
   }, [
     applyTransaction,
-    deleteSelectedItems,
     deleteSelectedNodes,
-    duplicateSelectedItems,
     duplicateSelectedNodes,
     groupSelectedNodes,
-    nudgeSelectedItems,
     nudgeSelectedNodes,
     onPasteImageFile,
     redo,
-    reorderSelectedItem,
     reorderSelectedNode,
     selectParentNode,
-    selectedItems,
     selectedNodes,
-    selectAllItems,
     selectAllNodes,
     setActiveTool,
     undo,

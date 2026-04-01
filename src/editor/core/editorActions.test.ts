@@ -6,7 +6,7 @@ import { createTransactionAction, isHistoryCommand, isSelectionCommand, toEditor
 
 describe('editor action families', () => {
   it('classifies selection commands separately from document commands', () => {
-    const selectCommand: EditorCommand = { type: 'select_items', itemIds: ['item-1'] };
+    const selectCommand: EditorCommand = { type: 'select_nodes', nodeIds: ['item-1'] };
     const addCommand: EditorCommand = { type: 'add_item', item: createRectangleItem() };
 
     expect(isSelectionCommand(selectCommand)).toBe(true);
@@ -17,11 +17,10 @@ describe('editor action families', () => {
 
   it('only records history for document-affecting commands that should be undoable', () => {
     expect(isHistoryCommand({ type: 'add_item', item: createRectangleItem() })).toBe(true);
-    expect(isHistoryCommand({ type: 'load_document', document: { version: 1, canvas: { width: 1, height: 1, presetId: 'custom' }, background: '#fff', items: [], fonts: [] } })).toBe(false);
+    expect(isHistoryCommand({ type: 'load_document', document: { version: 2, canvas: { width: 1, height: 1, presetId: 'custom' }, background: '#fff', nodes: [], fonts: [] } })).toBe(false);
     expect(isHistoryCommand({ type: 'register_font', font: { family: 'Test', sourceName: 'Test.ttf', kind: 'uploaded' } })).toBe(false);
     expect(isHistoryCommand({ type: 'clear_selection' })).toBe(false);
   });
-});
 
   it('can create grouped transaction actions with a single history mode', () => {
     const addCommand: EditorCommand = { type: 'add_item', item: createRectangleItem() };
@@ -32,3 +31,4 @@ describe('editor action families', () => {
       historyMode: 'single',
     });
   });
+});

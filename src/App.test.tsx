@@ -12,6 +12,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from './editor/document/documentDefaults';
+import { collectLeafItems } from './editor/document/sceneGraph';
 import type { PersistedUploadedFont } from './editor/fonts';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
@@ -92,11 +93,11 @@ vi.mock('./editor/rendering/CanvasStage', () => ({
     document,
   }: {
     activeTool: string;
-    document: { items: Array<{ id: string }> };
+    document: { nodes: Array<{ id: string; kind: string; children?: unknown[] }> };
   }) => (
     <div>
       <div data-testid="mock-stage">
-        Tool: {activeTool} / Items: {document.items.length}
+        Tool: {activeTool} / Items: {document.nodes.flatMap(collectLeafItems).length}
       </div>
     </div>
   ),
@@ -186,7 +187,7 @@ describe('App shell', () => {
 
   it('restores the persisted document on boot', async () => {
     const persistedDocument = createDefaultProjectDocument();
-    persistedDocument.items = [createRectangleItem()];
+    persistedDocument.nodes = [createRectangleItem()];
     mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
 
     render(<App />);
@@ -204,9 +205,9 @@ describe('App shell', () => {
     act(() => {
       useEditorStore.getState().loadDocument({
         ...createDefaultProjectDocument(),
-        items: [rectangle],
+        nodes: [rectangle],
       });
-      useEditorStore.getState().selectSingleItem(rectangle.id);
+      useEditorStore.getState().selectSingleNode(rectangle.id);
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
@@ -248,9 +249,9 @@ describe('App shell', () => {
     act(() => {
       useEditorStore.getState().loadDocument({
         ...createDefaultProjectDocument(),
-        items: [rectangle],
+        nodes: [rectangle],
       });
-      useEditorStore.getState().selectSingleItem(rectangle.id);
+      useEditorStore.getState().selectSingleNode(rectangle.id);
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save as favorite' }));
@@ -269,7 +270,7 @@ describe('App shell', () => {
         kind: 'uploaded',
       },
     ];
-    persistedDocument.items = [
+    persistedDocument.nodes = [
       createTextItem({
         id: 'persisted-text',
         fontFamily: 'Poster Sans',
@@ -332,7 +333,7 @@ describe('App shell', () => {
     });
 
     const latestSavedDocument = mockCanvasPersistenceService.save.mock.calls.at(-1)?.[0];
-    expect(latestSavedDocument.items).toHaveLength(1);
+    expect(latestSavedDocument.nodes.flatMap(collectLeafItems)).toHaveLength(1);
   });
 
 
@@ -362,7 +363,7 @@ describe('App shell', () => {
 
     await waitFor(() => {
       const latestSavedDocument = mockCanvasPersistenceService.save.mock.calls.at(-1)?.[0];
-      expect(latestSavedDocument.items[0]).toMatchObject({
+      expect(latestSavedDocument.nodes.flatMap(collectLeafItems)[0]).toMatchObject({
         kind: 'image',
         adjustments: {
           brightness: 140,
@@ -395,9 +396,9 @@ describe('App shell', () => {
     second.opacity = 0.8;
 
     resetEditorStore({
-      document: { ...createDefaultProjectDocument(), items: [first, second] },
+      document: { ...createDefaultProjectDocument(), nodes: [first, second] },
       session: {
-        selectedItemIds: [first.id, second.id],
+        selectedNodeIds: [first.id, second.id],
       },
     });
 
@@ -409,7 +410,7 @@ describe('App shell', () => {
     expect(opacityInput).toBeDefined();
     fireEvent.change(opacityInput as HTMLInputElement, { target: { value: '0.5' } });
 
-    const updatedItems = useEditorStore.getState().editor.document.items;
+    const updatedItems = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(updatedItems.find((item) => item.id === first.id)?.opacity).toBe(0.5);
     expect(updatedItems.find((item) => item.id === second.id)?.opacity).toBe(0.5);
   });
@@ -438,9 +439,9 @@ describe('App shell', () => {
     });
 
     resetEditorStore({
-      document: { ...createDefaultProjectDocument(), items: [first, second] },
+      document: { ...createDefaultProjectDocument(), nodes: [first, second] },
       session: {
-        selectedItemIds: [first.id, second.id],
+        selectedNodeIds: [first.id, second.id],
       },
     });
 
@@ -454,7 +455,7 @@ describe('App shell', () => {
       target: { value: '12' },
     });
 
-    const updatedItems = useEditorStore.getState().editor.document.items;
+    const updatedItems = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(updatedItems.find((item) => item.id === first.id)?.shadow).toEqual({
       ...first.shadow,
       blur: 12,
@@ -489,10 +490,10 @@ describe('App shell', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [rectangleItem],
+        nodes: [rectangleItem],
       },
       session: {
-        selectedItemIds: [rectangleItem.id],
+        selectedNodeIds: [rectangleItem.id],
       },
     });
     render(<App />);
@@ -506,25 +507,25 @@ describe('App shell', () => {
       clipboardData,
     });
 
-    let items = useEditorStore.getState().editor.document.items;
+    let items = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(items).toHaveLength(2);
     expect(items[1].x).toBe(rectangleItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[1].y).toBe(rectangleItem.y + DUPLICATE_ITEM_OFFSET);
 
     await user.keyboard('{Control>}d{/Control}');
-    items = useEditorStore.getState().editor.document.items;
+    items = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(items).toHaveLength(3);
 
     const cutItem = items[2];
     fireEvent.cut(document.body, {
       clipboardData,
     });
-    expect(useEditorStore.getState().editor.document.items).toHaveLength(2);
+    expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)).toHaveLength(2);
 
     fireEvent.paste(document.body, {
       clipboardData,
     });
-    items = useEditorStore.getState().editor.document.items;
+    items = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(items).toHaveLength(3);
     expect(items[2].x).toBe(cutItem.x + DUPLICATE_ITEM_OFFSET);
     expect(items[2].y).toBe(cutItem.y + DUPLICATE_ITEM_OFFSET);
@@ -552,7 +553,7 @@ describe('App shell', () => {
       expect(mockImportImageFile).toHaveBeenCalledWith(imageFile);
     });
 
-    const items = useEditorStore.getState().editor.document.items;
+    const items = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(items).toHaveLength(1);
     expect(items[0]).toEqual(
       expect.objectContaining({
@@ -590,10 +591,10 @@ describe('App shell', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [copiedItem],
+        nodes: [copiedItem],
       },
       session: {
-        selectedItemIds: [copiedItem.id],
+        selectedNodeIds: [copiedItem.id],
       },
     });
 
@@ -606,7 +607,7 @@ describe('App shell', () => {
     });
 
     await waitFor(() => {
-      expect(useEditorStore.getState().editor.document.items).toHaveLength(2);
+      expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)).toHaveLength(2);
     });
 
     fireEvent.copy(document.body, {
@@ -622,7 +623,7 @@ describe('App shell', () => {
       }),
     });
 
-    const items = useEditorStore.getState().editor.document.items;
+    const items = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(items).toHaveLength(3);
     expect(items[0]).toEqual(
       expect.objectContaining({
@@ -655,19 +656,19 @@ describe('App shell', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [rectangleItem],
+        nodes: [rectangleItem],
       },
       session: {
-        selectedItemIds: [rectangleItem.id],
+        selectedNodeIds: [rectangleItem.id],
       },
     });
     render(<App />);
 
     await user.keyboard('{ArrowRight}');
-    expect(useEditorStore.getState().editor.document.items[0].x).toBe(41);
+    expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0].x).toBe(41);
 
     await user.keyboard('{Shift>}{ArrowDown}{/Shift}');
-    expect(useEditorStore.getState().editor.document.items[0].y).toBe(65);
+    expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0].y).toBe(65);
   });
 
   it('updates canvas size controls from the size menu', async () => {
@@ -723,7 +724,7 @@ describe('App shell', () => {
     });
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(useEditorStore.getState().editor.document.items).toHaveLength(0);
+    expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
     expect(useEditorStore.getState().editor.session.availableFonts).toEqual([]);
   });
 });

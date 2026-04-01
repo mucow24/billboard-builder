@@ -8,6 +8,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../editor/document/documentDefaults';
+import { collectLeafItems } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
 import { resetEditorStore } from '../test/editorStore';
 
@@ -141,10 +142,10 @@ describe('useEditorController', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [rectangleItem],
+        nodes: [rectangleItem],
       },
       session: {
-        selectedItemIds: [rectangleItem.id],
+        selectedNodeIds: [rectangleItem.id],
       },
       history: {
         past: [createDefaultProjectDocument()],
@@ -182,11 +183,11 @@ describe('useEditorController', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.state.document.items).toHaveLength(1);
+      expect(result.current.state.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
     });
 
     expect(mockImportImageFile).toHaveBeenCalledWith(file);
-    expect(result.current.state.document.items[0]).toMatchObject({
+    expect(result.current.state.document.nodes.flatMap(collectLeafItems)[0]).toMatchObject({
       kind: 'image',
       name: 'poster.png',
       originalWidth: 640,
@@ -257,7 +258,7 @@ describe('useEditorController', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [textItem],
+        nodes: [textItem],
       },
       session: {
         selectedNodeIds: [textItem.id],
@@ -341,7 +342,7 @@ describe('useEditorController', () => {
             kind: 'bundled',
           },
         ],
-        items: [
+        nodes: [
           createTextItem({
             id: 'body-text',
             fontFamily: 'Arial',
@@ -370,7 +371,7 @@ describe('useEditorController', () => {
           kind: 'uploaded' as const,
         },
       ],
-      items: [
+      nodes: [
         createTextItem({
           id: 'persisted-text',
           fontFamily: 'Poster Sans',
@@ -431,7 +432,7 @@ describe('useEditorController', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [rectangle],
+        nodes: [rectangle],
       },
       session: {
         selectedNodeIds: [rectangle.id],
@@ -464,7 +465,7 @@ describe('useEditorController', () => {
       await result.current.actions.insertFavorite(savedFavoriteId);
     });
 
-    const insertedRectangles = result.current.state.document.items.filter(
+    const insertedRectangles = result.current.state.document.nodes.flatMap(collectLeafItems).filter(
       (item) => item.kind === 'rectangle',
     );
     expect(insertedRectangles).toHaveLength(3);
@@ -482,7 +483,7 @@ describe('useEditorController', () => {
             kind: 'uploaded',
           },
         ],
-        items: [
+        nodes: [
           createRectangleItem({ id: 'placeholder' }),
           createRectangleItem({ id: 'placeholder-2', x: 300 }),
         ],
@@ -505,7 +506,7 @@ describe('useEditorController', () => {
             kind: 'uploaded',
           },
         ],
-        items: [
+        nodes: [
           createTextItem({
             id: 'favorite-text',
             fontFamily: 'Poster Sans',
@@ -532,7 +533,7 @@ describe('useEditorController', () => {
       kind: 'uploaded',
     });
     expect(
-      result.current.state.document.items.some(
+      result.current.state.document.nodes.flatMap(collectLeafItems).some(
         (item) => item.kind === 'text' && item.fontFamily === 'Poster Sans',
       ),
     ).toBe(true);
@@ -605,7 +606,7 @@ describe('useEditorController', () => {
       kind: 'uploaded',
     });
     expect(
-      result.current.state.document.items.some(
+      result.current.state.document.nodes.flatMap(collectLeafItems).some(
         (item) => item.kind === 'text' && item.fontFamily === 'Poster Sans',
       ),
     ).toBe(true);
@@ -622,7 +623,7 @@ describe('useEditorController', () => {
             kind: 'uploaded',
           },
         ],
-        items: [
+        nodes: [
           createTextItem({
             id: 'canvas-font-text',
             fontFamily: 'Canvas Font',
@@ -750,7 +751,7 @@ describe('useEditorController', () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
-        items: [rectangle],
+        nodes: [rectangle],
       },
       session: {
         selectedNodeIds: [rectangle.id],

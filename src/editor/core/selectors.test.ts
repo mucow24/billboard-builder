@@ -3,12 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultProjectDocument, createRectangleItem, createTextItem } from '../document/documentDefaults';
 import type { ProjectDocument } from '../document/documentTypes';
 import { createDefaultEditorState } from './editorState';
+import { collectLeafItems } from '../document/sceneGraph';
 import {
   selectAvailableFonts,
   selectCanRedo,
   selectCanUndo,
   selectMissingFontFamilies,
-  selectPrimarySelectedItemId,
+  selectPrimarySelectedNodeId,
   selectSelectedItem,
   selectSelectedItems,
 } from './selectors';
@@ -19,35 +20,34 @@ function buildDocument(): ProjectDocument {
   return {
     ...createDefaultProjectDocument(),
     nodes: [first, second],
-    items: [first, second],
   };
 }
 
 describe('selectors', () => {
-  it('returns the primary selected item id', () => {
+  it('returns the primary selected node id', () => {
     const state = createDefaultEditorState(buildDocument());
-    state.session.selectedNodeIds = [state.document.items[1].id, state.document.items[0].id];
-    state.session.selectedItemIds = [state.document.items[1].id, state.document.items[0].id];
-    expect(selectPrimarySelectedItemId(state)).toBe(state.session.selectedItemIds[0]);
+    const items = state.document.nodes.flatMap(collectLeafItems);
+    state.session.selectedNodeIds = [items[1].id, items[0].id];
+    expect(selectPrimarySelectedNodeId(state)).toBe(state.session.selectedNodeIds[0]);
   });
 
   it('returns the selected item', () => {
     const state = createDefaultEditorState(buildDocument());
-    state.session.selectedNodeIds = [state.document.items[1].id, state.document.items[0].id];
-    state.session.selectedItemIds = [state.document.items[1].id, state.document.items[0].id];
-    expect(selectSelectedItem(state.document, state)?.id).toBe(state.session.selectedItemIds[0]);
+    const items = state.document.nodes.flatMap(collectLeafItems);
+    state.session.selectedNodeIds = [items[1].id, items[0].id];
+    expect(selectSelectedItem(state.document, state)?.id).toBe(state.session.selectedNodeIds[0]);
   });
 
   it('returns all selected items in document order', () => {
     const state = createDefaultEditorState(buildDocument());
-    state.session.selectedNodeIds = [state.document.items[1].id, state.document.items[0].id];
-    state.session.selectedItemIds = [state.document.items[1].id, state.document.items[0].id];
-    expect(selectSelectedItems(state.document, state).map((item) => item.id)).toEqual(state.document.items.map((item) => item.id));
+    const items = state.document.nodes.flatMap(collectLeafItems);
+    state.session.selectedNodeIds = [items[1].id, items[0].id];
+    expect(selectSelectedItems(state.document, state).map((item) => item.id)).toEqual([items[1].id, items[0].id]);
   });
 
   it('returns undefined when there is no selected item', () => {
     const state = createDefaultEditorState(buildDocument());
-    expect(selectPrimarySelectedItemId(state)).toBeUndefined();
+    expect(selectPrimarySelectedNodeId(state)).toBeUndefined();
     expect(selectSelectedItem(state.document, state)).toBeUndefined();
     expect(selectSelectedItems(state.document, state)).toEqual([]);
   });

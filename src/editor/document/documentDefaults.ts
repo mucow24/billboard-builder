@@ -99,7 +99,6 @@ export function createDefaultProjectDocument(): ProjectDocument {
     canvas: DEFAULT_CANVAS,
     background: '#ffffff00',
     nodes: [],
-    items: [],
     fonts: [],
   };
 }

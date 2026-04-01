@@ -26,12 +26,12 @@ export interface CanvasStageProps {
   showCanvasTestHooks?: boolean;
   showExportBoundsCue?: boolean;
   document: ProjectDocument;
-  selectedItemIds: string[];
+  selectedNodeIds: string[];
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
-  onSelectItem: (itemId?: string) => void;
-  onToggleSelectItem?: (itemId: string) => void;
-  onToggleSelectItems?: (itemIds: string[]) => void;
+  onSelectNode: (nodeId?: string) => void;
+  onToggleSelectNode?: (nodeId: string) => void;
+  onToggleSelectNodes?: (nodeIds: string[]) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
   onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
@@ -45,12 +45,12 @@ export function CanvasStage({
   showCanvasTestHooks = false,
   showExportBoundsCue = false,
   document,
-  selectedItemIds,
+  selectedNodeIds,
   guides,
   onGuidesChange,
-  onSelectItem,
-  onToggleSelectItem,
-  onToggleSelectItems,
+  onSelectNode,
+  onToggleSelectNode,
+  onToggleSelectNodes,
   onUpdateItem,
   onUpdateItems,
   onAddItem,
@@ -99,11 +99,11 @@ export function CanvasStage({
   } = useCanvasInteractionSession({
     activeTool,
     document,
-    selectedItemIds,
+    selectedNodeIds,
     onGuidesChange,
-    onSelectItem,
-    onToggleSelectItem,
-    onToggleSelectItems,
+    onSelectNode,
+    onToggleSelectNode,
+    onToggleSelectNodes,
     onUpdateItem,
     onUpdateItems,
     onAddItem,
@@ -255,7 +255,7 @@ export function CanvasStage({
           renderedItems={renderedItems}
           renderedSelectedItems={renderedSelectedItems}
           selectedDocumentItem={selectedDocumentItem}
-          selectedItemIds={selectedItemIds}
+          selectedNodeIds={selectedNodeIds}
           selectedItemViewportRect={selectedItemViewportRect}
           selectedLineHandleRects={selectedLineHandleRects}
           selectedNode={selectedNode}
@@ -400,7 +400,7 @@ function CanvasStageDebug({
   renderedItems,
   renderedSelectedItems,
   selectedDocumentItem,
-  selectedItemIds,
+  selectedNodeIds,
   selectedItemViewportRect,
   selectedLineHandleRects,
   selectedNode,
@@ -432,7 +432,7 @@ function CanvasStageDebug({
     renderedSelectedItems,
     selectedDocumentItem,
     lastDrilldownSource,
-    selectedItemIds,
+    selectedNodeIds,
     selectedItemViewportRect,
     selectedLineHandleRects,
     selectedNode,

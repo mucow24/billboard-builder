@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { fileDtoToDocument, documentToFileDto } from './documentCodec';
 import { normalizeProjectDocument } from './documentNormalizer';
-import type { CanvasItem, CanvasNode, ProjectDocument } from './documentTypes';
+import type { CanvasNode, ProjectDocument } from './documentTypes';
 import type { ProjectFile } from './documentFileDto';
 
 const CanvasShadowSchema = z.object({
@@ -158,7 +158,7 @@ const GeneratorParamsSchema = z.discriminatedUnion('generatorType', [
   ShapesGeneratorParamsSchema,
 ]);
 
-const BaseCanvasItemSchemaV1 = z.object({
+const BaseCanvasItemSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line', 'generator']),
   name: z.string().min(1),
@@ -169,7 +169,6 @@ const BaseCanvasItemSchemaV1 = z.object({
   rotation: z.number(),
   scaleX: z.number(),
   scaleY: z.number(),
-  zIndex: z.number().int().nonnegative(),
   locked: z.boolean(),
   lockAspectRatio: z.boolean().optional(),
   hidden: z.boolean(),
@@ -178,7 +177,7 @@ const BaseCanvasItemSchemaV1 = z.object({
   blurRadius: z.number().nonnegative().optional(),
 });
 
-const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('text'),
   text: z.string(),
   fontFamily: z.string(),
@@ -195,7 +194,7 @@ const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   padding: TextPaddingSchema.optional(),
 });
 
-const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('image'),
   src: z.string(),
   mimeType: z.string(),
@@ -208,7 +207,7 @@ const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   adjustments: ImageAdjustmentsSchema.optional(),
 });
 
-const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const RectangleCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('rectangle'),
   fill: z.string(),
   secondaryFill: z.string().optional(),
@@ -218,7 +217,7 @@ const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   cornerRadius: z.number().nonnegative(),
 });
 
-const EllipseCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const EllipseCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('ellipse'),
   fill: z.string(),
   secondaryFill: z.string().optional(),
@@ -227,7 +226,7 @@ const EllipseCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   strokeWidth: z.number().nonnegative(),
 });
 
-const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('line'),
   stroke: z.string(),
   strokeWidth: z.number().positive(),
@@ -237,69 +236,35 @@ const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   endY: z.number().optional(),
 });
 
-const GeneratorCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const GeneratorCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('generator'),
   seed: z.number(),
   generatorParams: GeneratorParamsSchema,
 });
 
-const TextCanvasItemSchemaV2 = TextCanvasItemSchemaV1.omit({ zIndex: true });
-const ImageCanvasItemSchemaV2 = ImageCanvasItemSchemaV1.omit({ zIndex: true });
-const RectangleCanvasItemSchemaV2 = RectangleCanvasItemSchemaV1.omit({ zIndex: true });
-const EllipseCanvasItemSchemaV2 = EllipseCanvasItemSchemaV1.omit({ zIndex: true });
-const LineCanvasItemSchemaV2 = LineCanvasItemSchemaV1.omit({ zIndex: true });
-const GeneratorCanvasItemSchemaV2 = GeneratorCanvasItemSchemaV1.omit({ zIndex: true });
-
-const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
-  TextCanvasItemSchemaV1,
-  ImageCanvasItemSchemaV1,
-  RectangleCanvasItemSchemaV1,
-  EllipseCanvasItemSchemaV1,
-  LineCanvasItemSchemaV1,
-  GeneratorCanvasItemSchemaV1,
+const CanvasItemSchema = z.discriminatedUnion('kind', [
+  TextCanvasItemSchema,
+  ImageCanvasItemSchema,
+  RectangleCanvasItemSchema,
+  EllipseCanvasItemSchema,
+  LineCanvasItemSchema,
+  GeneratorCanvasItemSchema,
 ]);
 
-const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
-  TextCanvasItemSchemaV2,
-  ImageCanvasItemSchemaV2,
-  RectangleCanvasItemSchemaV2,
-  EllipseCanvasItemSchemaV2,
-  LineCanvasItemSchemaV2,
-  GeneratorCanvasItemSchemaV2,
-]);
-
-const CanvasNodeSchemaV2: z.ZodTypeAny = z.lazy(() =>
+const CanvasNodeSchema: z.ZodTypeAny = z.lazy(() =>
   z.discriminatedUnion('kind', [
     z.object({
       id: z.string().min(1),
       kind: z.literal('group'),
       name: z.string().min(1),
       opacity: z.number().min(0).max(1),
-      children: z.array(CanvasNodeSchemaV2),
+      children: z.array(CanvasNodeSchema),
     }),
-    CanvasItemSchemaV2,
+    CanvasItemSchema,
   ])
 );
 
-const ProjectFileSchemaV1 = z.object({
-  version: z.literal(1),
-  canvas: z.object({
-    width: z.number().positive(),
-    height: z.number().positive(),
-    presetId: z.string().optional(),
-  }),
-  background: z.string(),
-  items: z.array(CanvasItemSchemaV1),
-  fonts: z.array(
-    z.object({
-      family: z.string(),
-      sourceName: z.string(),
-      kind: z.enum(['system', 'bundled', 'uploaded']),
-    })
-  ),
-});
-
-const ProjectFileSchemaV2 = z.object({
+const ProjectFileSchema = z.object({
   version: z.literal(2),
   canvas: z.object({
     width: z.number().positive(),
@@ -307,8 +272,7 @@ const ProjectFileSchemaV2 = z.object({
     presetId: z.string().optional(),
   }),
   background: z.string(),
-  nodes: z.array(CanvasNodeSchemaV2),
-  items: z.array(CanvasItemSchemaV1).optional(),
+  nodes: z.array(CanvasNodeSchema),
   fonts: z.array(
     z.object({
       family: z.string(),
@@ -318,19 +282,13 @@ const ProjectFileSchemaV2 = z.object({
   ),
 });
 
-const ProjectFileSchema = z.union([ProjectFileSchemaV1, ProjectFileSchemaV2]);
-
 export function parseProjectDocument(input: unknown): ProjectDocument {
   const parsedFile = ProjectFileSchema.parse(input) as ProjectFile;
   return fileDtoToDocument(parsedFile);
 }
 
-export function parseCanvasItems(input: unknown): CanvasItem[] {
-  return z.array(CanvasItemSchemaV1).parse(input) as CanvasItem[];
-}
-
 export function parseCanvasNodes(input: unknown): CanvasNode[] {
-  const parsedNodes = z.array(CanvasNodeSchemaV2).parse(input) as CanvasNode[];
+  const parsedNodes = z.array(CanvasNodeSchema).parse(input) as CanvasNode[];
   return normalizeProjectDocument({ version: 2, nodes: parsedNodes }).nodes;
 }
 

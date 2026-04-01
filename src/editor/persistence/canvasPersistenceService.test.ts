@@ -64,11 +64,11 @@ describe('CanvasPersistenceService', () => {
 
     await service.save({
       ...createDefaultProjectDocument(),
-      items: [image],
+      nodes: [image],
     });
 
     await expect(service.load()).resolves.toMatchObject({
-      items: [
+      nodes: [
         {
           kind: 'image',
           crop: {

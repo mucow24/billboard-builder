@@ -266,7 +266,6 @@ describe('document normalizer', () => {
       fonts: [
         { family: 'Poster Sans', sourceName: 'PosterSans.ttf', kind: 'uploaded' as const },
       ],
-      items: [],
     };
 
     expect(normalizeExistingProjectDocument(liveDocument)).toEqual(

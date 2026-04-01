@@ -249,7 +249,7 @@ describe('CanvasStage viewport controls', () => {
         debugMode={false}
         showCanvasTestHooks={false}
         document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -273,7 +273,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -332,7 +332,7 @@ describe('CanvasStage viewport controls', () => {
         activeTool="select"
         showExportBoundsCue
         document={document}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -377,7 +377,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40, rotation: 0 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50, rotation: 0 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -400,7 +400,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
+        selectedNodeIds={['first', 'second']}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -464,13 +464,13 @@ describe('CanvasStage viewport controls', () => {
       selectedItemId: previewItem.id,
     });
     const document = createDefaultProjectDocument();
-    document.items = [previewItem];
+    document.nodes = [previewItem];
 
     const { container } = render(
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[previewItem.id]}
+        selectedNodeIds={[previewItem.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -516,7 +516,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -548,7 +548,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -561,7 +561,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[first.id, second.id]}
+        selectedNodeIds={[first.id, second.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -598,7 +598,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -612,7 +612,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[first.id, second.id]}
+        selectedNodeIds={[first.id, second.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -644,7 +644,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -658,7 +658,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[first.id, second.id]}
+        selectedNodeIds={[first.id, second.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -685,7 +685,7 @@ describe('CanvasStage viewport controls', () => {
   it('starts a pan drag instead of item drag when middle-clicking the selected item overlay hook', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [rectangle],
@@ -701,7 +701,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
+        selectedNodeIds={[rectangle.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -727,7 +727,7 @@ describe('CanvasStage viewport controls', () => {
   it('forwards shift-modified selected-item overlay drags to the interaction session', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [rectangle],
@@ -743,7 +743,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
+        selectedNodeIds={[rectangle.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -777,7 +777,7 @@ describe('CanvasStage viewport controls', () => {
   it('starts a pan drag instead of item resize when middle-clicking a selected item handle hook', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [rectangle],
@@ -790,7 +790,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
+        selectedNodeIds={[rectangle.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -821,7 +821,7 @@ describe('CanvasStage viewport controls', () => {
     const draggedSecond = createRectangleItem({ id: 'second', x: 180, y: 100, width: 60, height: 50 });
     const resizedFirst = createRectangleItem({ id: 'first', x: 30, y: 20, width: 110, height: 80 });
     const resizedSecond = createRectangleItem({ id: 'second', x: 170, y: 70, width: 90, height: 90 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [draggedFirst, draggedSecond],
@@ -845,7 +845,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
+        selectedNodeIds={['first', 'second']}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -906,7 +906,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
+        selectedNodeIds={['first', 'second']}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -963,7 +963,7 @@ describe('CanvasStage viewport controls', () => {
       createRectangleItem({ id: 'first', x: 40, y: 35, width: 120, height: 70, rotation: 30 }),
       createRectangleItem({ id: 'second', x: 190, y: 95, width: 90, height: 85, rotation: 30 }),
     ];
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     const cases = [
       {
@@ -1003,7 +1003,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
+        selectedNodeIds={['first', 'second']}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1028,7 +1028,7 @@ describe('CanvasStage viewport controls', () => {
         <CanvasStage
           activeTool="select"
           document={document}
-          selectedItemIds={['first', 'second']}
+          selectedNodeIds={['first', 'second']}
           guides={[]}
           onGuidesChange={vi.fn()}
           onSelectItem={vi.fn()}
@@ -1067,7 +1067,7 @@ describe('CanvasStage viewport controls', () => {
       endX: 360,
       endY: 220,
     });
-    document.items = [line];
+    document.nodes = [line];
     const startHandle = getLineHandleRects(line).start;
 
     Object.assign(mockInteractionSession, {
@@ -1082,7 +1082,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[line.id]}
+        selectedNodeIds={[line.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1118,7 +1118,7 @@ describe('CanvasStage viewport controls', () => {
       width: 160,
       height: 100,
     });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
     const handlePoints = getShapeHandlePoints(rectangle);
 
     Object.assign(mockInteractionSession, {
@@ -1133,7 +1133,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
+        selectedNodeIds={[rectangle.id]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1193,7 +1193,7 @@ describe('CanvasStage viewport controls', () => {
       width: 160,
       height: 100,
     });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
     document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
@@ -1204,7 +1204,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1245,7 +1245,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1295,7 +1295,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={document}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[
           { orientation: 'vertical', position: 120 },
           { orientation: 'horizontal', position: 90 },
@@ -1338,7 +1338,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="text"
         document={document}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1368,7 +1368,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="select"
         document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}
@@ -1412,7 +1412,7 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="zoom"
         document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
+        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
         onSelectItem={vi.fn()}

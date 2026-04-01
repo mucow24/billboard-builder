@@ -19,7 +19,6 @@ export interface PropertiesPanelProps {
   availableFonts: UploadedFont[];
   background: string;
   fonts: DocumentFontReference[];
-  items: CanvasItem[];
   layerRows: LayerRow[];
   missingFontFamilies: string[];
   favorites?: StoredFavorite[];

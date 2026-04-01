@@ -51,26 +51,17 @@ export interface EditorStoreState {
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   updateSelectedGroup: (opacity: number) => void;
-  selectSingleItem: (nodeId?: string) => void;
   selectSingleNode: (nodeId?: string) => void;
   selectParentNode: () => boolean;
-  toggleSelectedItem: (nodeId: string) => void;
   toggleSelectedNode: (nodeId: string) => void;
-  toggleSelectedItems: (nodeIds: string[]) => void;
   toggleSelectedNodes: (nodeIds: string[]) => void;
-  selectAllItems: () => void;
   selectAllNodes: () => void;
-  deleteItem: (nodeId: string) => void;
   deleteNode: (nodeId: string) => void;
-  deleteSelectedItems: () => void;
   deleteSelectedNodes: () => void;
-  reorderSelectedItem: (mode: ReorderMode) => void;
   reorderSelectedNode: (mode: ReorderMode) => void;
-  duplicateSelectedItems: () => void;
   groupSelectedNodes: () => void;
   ungroupSelectedNode: () => void;
   duplicateSelectedNodes: () => void;
-  nudgeSelectedItems: (deltaX: number, deltaY: number) => void;
   nudgeSelectedNodes: (deltaX: number, deltaY: number) => void;
   undo: () => void;
   redo: () => void;
@@ -135,9 +126,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     },
     selectSingleNode: (nodeId) =>
       get().dispatch(nodeId ? { type: 'select_nodes', nodeIds: [nodeId] } : { type: 'clear_selection' }),
-    selectSingleItem: (nodeId) => {
-      get().selectSingleNode(nodeId);
-    },
     selectParentNode: () => {
       const selectedId = selectPrimarySelectedNodeId(get().editor);
       if (!selectedId) {
@@ -160,9 +148,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         nodeIds: toggleSelectionNode(get().editor.session.selectedNodeIds, nodeId),
       });
     },
-    toggleSelectedItem: (nodeId) => {
-      get().toggleSelectedNode(nodeId);
-    },
     toggleSelectedNodes: (nodeIds) => {
       const nextSelection = normalizeSelectionForNodes(
         toggleSelectionNodes(get().editor.session.selectedNodeIds, nodeIds),
@@ -170,23 +155,14 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       );
       get().dispatch({ type: 'select_nodes', nodeIds: nextSelection });
     },
-    toggleSelectedItems: (nodeIds) => {
-      get().toggleSelectedNodes(nodeIds);
-    },
     selectAllNodes: () => {
       get().dispatch({
         type: 'select_nodes',
         nodeIds: selectAllNodeIds(get().editor.document.nodes),
       });
     },
-    selectAllItems: () => {
-      get().selectAllNodes();
-    },
     deleteNode: (nodeId) => {
       get().dispatch({ type: 'delete_nodes', nodeIds: [nodeId] });
-    },
-    deleteItem: (nodeId) => {
-      get().deleteNode(nodeId);
     },
     deleteSelectedNodes: () => {
       const selectedIds = get().editor.session.selectedNodeIds;
@@ -194,9 +170,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return;
       }
       get().dispatch({ type: 'delete_nodes', nodeIds: selectedIds });
-    },
-    deleteSelectedItems: () => {
-      get().deleteSelectedNodes();
     },
     reorderSelectedNode: (mode) => {
       const selectedIds = normalizeSelectionForNodes(
@@ -211,9 +184,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return;
       }
       get().dispatch({ type: 'reorder_nodes', nodeIds: selectedIds, mode });
-    },
-    reorderSelectedItem: (mode) => {
-      get().reorderSelectedNode(mode);
     },
     groupSelectedNodes: () => {
       const selectedIds = normalizeSelectionForNodes(
@@ -255,9 +225,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       });
       get().dispatch({ type: 'select_nodes', nodeIds: clones.map((node) => node.id) });
     },
-    duplicateSelectedItems: () => {
-      get().duplicateSelectedNodes();
-    },
     nudgeSelectedNodes: (deltaX, deltaY) => {
       const selectedIds = normalizeSelectionForNodes(
         get().editor.session.selectedNodeIds,
@@ -285,9 +252,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
               },
         }));
       get().updateSelectedItems(updates);
-    },
-    nudgeSelectedItems: (deltaX, deltaY) => {
-      get().nudgeSelectedNodes(deltaX, deltaY);
     },
     undo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'undo' })),
     redo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'redo' })),

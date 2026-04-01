@@ -16,7 +16,6 @@ import type {
   ImageCanvasItem,
   LineCanvasItem,
   ProjectDocument,
-  LegacyProjectDocumentV1,
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
@@ -354,18 +353,14 @@ function normalizeDocumentFonts(
   return fonts.filter((font) => referencedFamilies.has(font.family));
 }
 
-type ProjectInput = Partial<ProjectDocument> | Partial<LegacyProjectDocumentV1> | undefined;
+type ProjectInput = Partial<ProjectDocument> | undefined;
 
 export function normalizeProjectDocument(
   input: ProjectInput
 ): ProjectDocument {
   const baseDocument = createDefaultProjectDocument();
   const projectInput = input ?? {};
-  const projectNodes = 'nodes' in projectInput
-    ? ((projectInput as Partial<ProjectDocument>).nodes ?? [])
-    : undefined;
-  const legacyItems = (projectInput as Partial<ProjectDocument> & Partial<LegacyProjectDocumentV1>).items ?? [];
-  const rawNodes = projectNodes && projectNodes.length > 0 ? projectNodes : legacyItems;
+  const rawNodes = projectInput.nodes ?? [];
   const normalizedNodes = normalizeCanvasNodes(rawNodes);
   const normalizedFonts = normalizeDocumentFonts(
     normalizedNodes,
@@ -388,7 +383,6 @@ export function normalizeProjectDocument(
     },
     background: input?.background ?? baseDocument.background,
     nodes: normalizedNodes,
-    items: normalizedNodes.flatMap(collectLeafItems),
     fonts: normalizedFonts,
   };
 }
