@@ -91,7 +91,7 @@ export function useFavoritesController({
       return;
     }
 
-    await restoreUploadedFontsForReferences({
+    const restoredFamilies = await restoreUploadedFontsForReferences({
       references: favorite.fonts,
       availableFonts,
       registerAvailableFont,
@@ -101,15 +101,18 @@ export function useFavoritesController({
     favoriteInsertCountsRef.current[favoriteId] = nextInsertCount;
     const insertedNodes = instantiateFavoriteNodes(favorite.nodes, nextInsertCount);
 
+    const availableFamilies = new Set(availableFonts.map((f) => f.family));
     applyTransaction([
       {
         family: 'document' as const,
         command: { type: 'insert_nodes' as const, nodes: insertedNodes },
       },
-      ...favorite.fonts.map((font) => ({
-        family: 'document' as const,
-        command: { type: 'register_font' as const, font },
-      })),
+      ...favorite.fonts
+        .filter((font) => availableFamilies.has(font.family) || restoredFamilies.has(font.family))
+        .map((font) => ({
+          family: 'document' as const,
+          command: { type: 'register_font' as const, font },
+        })),
       {
         family: 'selection' as const,
         command: {

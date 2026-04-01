@@ -113,6 +113,7 @@ vi.mock('react-konva', () => {
     Layer: make('Layer'),
     Group: make('Group'),
     Rect: make('Rect'),
+    Shape: make('Shape'),
     Line: make('Line'),
     Text: make('Text'),
     Circle: make('Circle'),

@@ -523,6 +523,24 @@ describe('useEditorController', () => {
 
     const savedFavoriteId = result.current.state.favorites[0]!.id;
 
+    mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([
+      {
+        family: 'Poster Sans',
+        sourceName: 'PosterSans-Regular.ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'uploaded',
+        bytes: new Uint8Array([1, 2, 3]).buffer,
+      },
+    ]);
+    mockRegisterUploadedFontBytes.mockResolvedValue({
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+    });
+
     await act(async () => {
       await result.current.actions.insertFavorite(savedFavoriteId);
     });

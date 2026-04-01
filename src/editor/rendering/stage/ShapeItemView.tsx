@@ -84,10 +84,7 @@ export const ShapeItemView = memo(function ShapeItemView({
 }: ShapeItemViewProps) {
   const imageElement = useImageElement(item.kind === 'image' ? item.src : '');
   const renderBox = getRenderBox(item);
-  const handlePoints = getShapeOverlayHandlePoints(item, zoom);
-  const outlinePoints = getSelectionOutlinePoints(item);
   const interactionEnabled = activeTool === 'select';
-  const overlayMetrics = getCanvasOverlayMetrics(zoom);
   const gradientFillProps =
     item.kind === 'text' || item.kind === 'rectangle' || item.kind === 'ellipse'
       ? buildGradientFillProps(item, {
@@ -220,93 +217,98 @@ export const ShapeItemView = memo(function ShapeItemView({
           ) : null}
         </Group>
       ) : null}
-      {renderSelection && isSelected && interactionEnabled ? (
-        <>
-          <Group
-            x={renderBox.x}
-            y={renderBox.y}
-            rotation={item.rotation}
-            onMouseDown={createItemPointerDownHandler({
-              isInteractive: () => !item.locked,
-              startPanDrag,
-              toCanvasPointer,
-              onAction: (pointer, shiftKey, nativeEvent) =>
-                onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
-            })}
-            onDblClick={() => {
-              if (!interactionEnabled || item.locked) {
-                return;
-              }
-              onItemDoubleClick?.(item);
-            }}
-          >
-            <Rect
-              x={0}
-              y={0}
-              width={renderBox.width}
-              height={renderBox.height}
-              fill={SHADOW_MIN_ALPHA_STROKE}
-              strokeEnabled={false}
-            />
-          </Group>
-          <Line
-            points={[...outlinePoints, outlinePoints[0], outlinePoints[1]]}
-            stroke={SELECTION_STROKE}
-            strokeWidth={overlayMetrics.selectionStrokeWidth}
-            dash={overlayMetrics.selectionDash}
-            listening={false}
-          />
-          {renderHandles ? (
-            <>
-              <Line
-                points={[
-                  handlePoints['top-center'].x,
-                  handlePoints['top-center'].y,
-                  handlePoints.rotater.x,
-                  handlePoints.rotater.y,
-                ]}
-                stroke={SELECTION_STROKE}
-                strokeWidth={overlayMetrics.selectionStrokeWidth}
-                listening={false}
-              />
-              {RESIZE_HANDLE_NAMES.map((handle) => {
-                const point = handlePoints[handle];
-                return (
-                  <Circle
-                    key={`${item.id}-${handle}`}
-                    x={point.x}
-                    y={point.y}
-                    radius={overlayMetrics.handleRadius}
-                    fill={HANDLE_FILL}
-                    stroke={HANDLE_STROKE}
-                    strokeWidth={overlayMetrics.handleStrokeWidth}
-                    onMouseDown={createItemPointerDownHandler({
-                      isInteractive: () => !item.locked,
-                      startPanDrag,
-                      toCanvasPointer,
-                      onAction: (pointer) => onBeginResize(item, handle, pointer, 'overlay'),
-                    })}
-                  />
-                );
+      {renderSelection && isSelected && interactionEnabled ? (() => {
+        const handlePoints = getShapeOverlayHandlePoints(item, zoom);
+        const outlinePoints = getSelectionOutlinePoints(item);
+        const overlayMetrics = getCanvasOverlayMetrics(zoom);
+        return (
+          <>
+            <Group
+              x={renderBox.x}
+              y={renderBox.y}
+              rotation={item.rotation}
+              onMouseDown={createItemPointerDownHandler({
+                isInteractive: () => !item.locked,
+                startPanDrag,
+                toCanvasPointer,
+                onAction: (pointer, shiftKey, nativeEvent) =>
+                  onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
               })}
-              <Circle
-                x={handlePoints.rotater.x}
-                y={handlePoints.rotater.y}
-                radius={overlayMetrics.handleRadius}
-                fill={HANDLE_FILL}
-                stroke={HANDLE_STROKE}
-                strokeWidth={overlayMetrics.handleStrokeWidth}
-                onMouseDown={createItemPointerDownHandler({
-                  isInteractive: () => !item.locked,
-                  startPanDrag,
-                  toCanvasPointer,
-                  onAction: (pointer) => onBeginRotate(item, pointer, 'overlay'),
-                })}
+              onDblClick={() => {
+                if (!interactionEnabled || item.locked) {
+                  return;
+                }
+                onItemDoubleClick?.(item);
+              }}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={renderBox.width}
+                height={renderBox.height}
+                fill={SHADOW_MIN_ALPHA_STROKE}
+                strokeEnabled={false}
               />
-            </>
-          ) : null}
-        </>
-      ) : null}
+            </Group>
+            <Line
+              points={[...outlinePoints, outlinePoints[0], outlinePoints[1]]}
+              stroke={SELECTION_STROKE}
+              strokeWidth={overlayMetrics.selectionStrokeWidth}
+              dash={overlayMetrics.selectionDash}
+              listening={false}
+            />
+            {renderHandles ? (
+              <>
+                <Line
+                  points={[
+                    handlePoints['top-center'].x,
+                    handlePoints['top-center'].y,
+                    handlePoints.rotater.x,
+                    handlePoints.rotater.y,
+                  ]}
+                  stroke={SELECTION_STROKE}
+                  strokeWidth={overlayMetrics.selectionStrokeWidth}
+                  listening={false}
+                />
+                {RESIZE_HANDLE_NAMES.map((handle) => {
+                  const point = handlePoints[handle];
+                  return (
+                    <Circle
+                      key={`${item.id}-${handle}`}
+                      x={point.x}
+                      y={point.y}
+                      radius={overlayMetrics.handleRadius}
+                      fill={HANDLE_FILL}
+                      stroke={HANDLE_STROKE}
+                      strokeWidth={overlayMetrics.handleStrokeWidth}
+                      onMouseDown={createItemPointerDownHandler({
+                        isInteractive: () => !item.locked,
+                        startPanDrag,
+                        toCanvasPointer,
+                        onAction: (pointer) => onBeginResize(item, handle, pointer, 'overlay'),
+                      })}
+                    />
+                  );
+                })}
+                <Circle
+                  x={handlePoints.rotater.x}
+                  y={handlePoints.rotater.y}
+                  radius={overlayMetrics.handleRadius}
+                  fill={HANDLE_FILL}
+                  stroke={HANDLE_STROKE}
+                  strokeWidth={overlayMetrics.handleStrokeWidth}
+                  onMouseDown={createItemPointerDownHandler({
+                    isInteractive: () => !item.locked,
+                    startPanDrag,
+                    toCanvasPointer,
+                    onAction: (pointer) => onBeginRotate(item, pointer, 'overlay'),
+                  })}
+                />
+              </>
+            ) : null}
+          </>
+        );
+      })() : null}
     </>
   );
 });
