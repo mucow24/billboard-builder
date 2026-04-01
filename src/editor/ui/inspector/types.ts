@@ -8,9 +8,7 @@ import type {
 import type { LayerRow } from '../../document/sceneGraph';
 import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 
-export type SelectionItemChange =
-  | Partial<CanvasItem>
-  | ((item: CanvasItem) => Partial<CanvasItem>);
+export type { SelectionItemChange } from '../../document/documentTypes';
 
 export type InspectorTab = 'properties' | 'layers' | 'favorites';
 

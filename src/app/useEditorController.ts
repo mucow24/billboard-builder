@@ -60,8 +60,7 @@ export function useEditorController() {
     undo,
     ungroupSelectedNode,
     updateSelectedGroup,
-    updateSelectedItem,
-    updateSelectedItems,
+    updateSelectionItems,
   } = useEditorStore();
 
   const { document, history, session } = editor;
@@ -106,15 +105,13 @@ export function useEditorController() {
 
   const {
     handleFontUpload,
-    handleSelectedItemUpdate,
-    handleSelectedItemsUpdate,
+    handleSelectionItemChange,
   } = useFontController({
     availableFonts,
     dispatch,
     registerAvailableFont,
     setErrorMessage,
-    updateSelectedItem,
-    updateSelectedItems,
+    updateSelectionItems,
   });
 
   const {
@@ -198,8 +195,7 @@ export function useEditorController() {
       undo,
       ungroupSelectedNode,
       updateSelectedGroup,
-      updateSelectedItem: handleSelectedItemUpdate,
-      updateSelectedItems: handleSelectedItemsUpdate,
+      updateSelectionItems: handleSelectionItemChange,
     },
     state: {
       activeTool,

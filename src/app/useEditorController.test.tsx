@@ -296,7 +296,7 @@ describe('useEditorController', () => {
     expect(result.current.state.document.fonts).toEqual([]);
 
     act(() => {
-      result.current.actions.updateSelectedItem({ fontFamily: 'Poster Sans' });
+      result.current.actions.updateSelectionItems({ fontFamily: 'Poster Sans' });
     });
 
     await waitFor(() => {

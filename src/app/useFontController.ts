@@ -1,6 +1,6 @@
 import { registerFontFile, toFontReference } from '../editor/fonts';
 import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
-import type { CanvasItem, DocumentFontReference, UploadedFont } from '../editor/document/documentTypes';
+import type { DocumentFontReference, SelectionItemChange, UploadedFont } from '../editor/document/documentTypes';
 import { getErrorMessage } from './errorUtils';
 
 async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
@@ -15,8 +15,7 @@ interface UseFontControllerParams {
   dispatch: (action: { type: 'register_font'; font: DocumentFontReference }) => void;
   registerAvailableFont: (font: UploadedFont) => void;
   setErrorMessage: (message: string | null) => void;
-  updateSelectedItem: (changes: Partial<CanvasItem>) => void;
-  updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
+  updateSelectionItems: (changes: SelectionItemChange) => void;
 }
 
 export function useFontController({
@@ -24,8 +23,7 @@ export function useFontController({
   dispatch,
   registerAvailableFont,
   setErrorMessage,
-  updateSelectedItem,
-  updateSelectedItems,
+  updateSelectionItems,
 }: UseFontControllerParams) {
   function registerDocumentFontForFamily(fontFamily: string | undefined) {
     if (typeof fontFamily !== 'string') {
@@ -68,32 +66,15 @@ export function useFontController({
     }
   }
 
-  function handleSelectedItemUpdate(changes: Partial<CanvasItem>) {
-    updateSelectedItem(changes);
-    registerDocumentFontForFamily('fontFamily' in changes ? changes.fontFamily : undefined);
-  }
-
-  function handleSelectedItemsUpdate(
-    changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>,
-  ) {
-    const fontFamilies = new Set(
-      changesById.flatMap(({ changes }) =>
-        'fontFamily' in changes && typeof changes.fontFamily === 'string'
-          ? [changes.fontFamily]
-          : [],
-      ),
-    );
-
-    updateSelectedItems(changesById);
-
-    for (const fontFamily of fontFamilies) {
-      registerDocumentFontForFamily(fontFamily);
+  function handleSelectionItemChange(changes: SelectionItemChange) {
+    updateSelectionItems(changes);
+    if (typeof changes !== 'function' && 'fontFamily' in changes) {
+      registerDocumentFontForFamily(changes.fontFamily);
     }
   }
 
   return {
     handleFontUpload,
-    handleSelectedItemUpdate,
-    handleSelectedItemsUpdate,
+    handleSelectionItemChange,
   };
 }

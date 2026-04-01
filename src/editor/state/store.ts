@@ -6,6 +6,8 @@ import {
   selectCanUndo,
   selectPrimarySelectedNodeId,
   selectSelectedGroup,
+  selectSelectedItem,
+  selectSelectedItems,
 } from '../core/selectors';
 import {
   createItemForKind,
@@ -37,6 +39,7 @@ import type {
   ProjectDocument,
   ReorderMode,
   UploadedFont,
+  SelectionItemChange,
 } from '../document/documentTypes';
 import type { EditorState as CoreEditorState } from '../core/editorState';
 
@@ -50,6 +53,7 @@ export interface EditorStoreState {
   createItemAt: (kind: Exclude<CanvasLeafKind, 'image' | 'generator'>, x: number, y: number) => void;
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
+  updateSelectionItems: (changes: SelectionItemChange) => void;
   updateSelectedGroup: (opacity: number) => void;
   selectSingleNode: (nodeId?: string) => void;
   selectParentNode: () => boolean;
@@ -116,6 +120,30 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
           command: { type: 'update_item' as const, itemId, changes },
         }))
       );
+    },
+    updateSelectionItems: (changes) => {
+      const { document, session } = get().editor;
+      const selectedItems = selectSelectedItems(document, { session });
+      const selectedItem = selectSelectedItem(document, { session });
+      const resolveChanges = (item: CanvasItem) =>
+        typeof changes === 'function' ? changes(item) : changes;
+
+      if (selectedItems.length > 1) {
+        get().updateSelectedItems(
+          selectedItems.map((item) => ({
+            itemId: item.id,
+            changes: resolveChanges(item),
+          }))
+        );
+        return;
+      }
+
+      const targetItem = selectedItems[0] ?? selectedItem ?? null;
+      if (!targetItem) {
+        return;
+      }
+
+      get().updateSelectedItem(resolveChanges(targetItem));
     },
     updateSelectedGroup: (opacity) => {
       const selectedGroup = selectSelectedGroup(get().editor.document, get().editor);

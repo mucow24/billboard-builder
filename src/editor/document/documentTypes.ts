@@ -285,6 +285,10 @@ export interface GroupNode {
 
 export type CanvasNode = GroupNode | CanvasItem;
 
+export type SelectionItemChange =
+  | Partial<CanvasItem>
+  | ((item: CanvasItem) => Partial<CanvasItem>);
+
 export interface ProjectDocument {
   version: 2;
   canvas: CanvasSize;

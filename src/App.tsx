@@ -11,7 +11,7 @@ import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { InspectorTab } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
-import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
+import type { GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
 export default function App() {
@@ -58,8 +58,7 @@ export default function App() {
       undo,
       ungroupSelectedNode,
       updateSelectedGroup,
-      updateSelectedItem,
-      updateSelectedItems,
+      updateSelectionItems,
     },
     state: {
       activeTool,
@@ -256,27 +255,7 @@ export default function App() {
                 }}
                 onDeleteNode={deleteNode}
                 onOpenProperties={() => handleInspectorTabChange('properties')}
-                onItemChange={(changes) => {
-                  const resolveChanges = (item: CanvasItem) =>
-                    typeof changes === 'function' ? changes(item) : changes;
-
-                  if (selectedItems.length > 1) {
-                    updateSelectedItems(
-                      selectedItems.map((item) => ({
-                        itemId: item.id,
-                        changes: resolveChanges(item),
-                      }))
-                    );
-                    return;
-                  }
-
-                  const targetItem = selectedItems[0] ?? selectedItem ?? null;
-                  if (!targetItem) {
-                    return;
-                  }
-
-                  updateSelectedItem(resolveChanges(targetItem));
-                }}
+                onItemChange={updateSelectionItems}
                 onInsertFavorite={insertFavorite}
                 onSelectNode={selectSingleNode}
                 onToggleNode={toggleSelectedNode}
