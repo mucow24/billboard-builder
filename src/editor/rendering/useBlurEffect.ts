@@ -39,11 +39,22 @@ export function nativeBlur(this: Konva.Node, imageData: ImageData): void {
  * Applies a Gaussian blur filter to a Konva node when blurRadius > 0.
  * Caches the node with offset padding so the blur isn't clipped at edges.
  * Clears the cache when blurRadius returns to 0.
+ *
+ * The `contentSource` parameter is the item object whose visual properties
+ * determine when re-caching is needed. Position fields (`x`, `y`, `rotation`)
+ * are excluded from the cache key because they live on the parent Group
+ * transform and don't affect cached content. This prevents expensive
+ * re-caching during drag when only position changes.
  */
 export function useBlurEffect(
   nodeRef: RefObject<Konva.Node | null>,
   blurRadius: number,
+  contentSource: object,
 ): void {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { x: _x, y: _y, rotation: _rot, ...visual } = contentSource as Record<string, unknown>;
+  const contentKey = blurRadius > 0 ? JSON.stringify(visual) : '';
+
   useLayoutEffect(() => {
     const node = nodeRef.current;
     if (!node || typeof node.filters !== 'function') {
@@ -64,5 +75,6 @@ export function useBlurEffect(
     return () => {
       node.clearCache();
     };
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- nodeRef is a stable ref object
+  }, [blurRadius, contentKey]);
 }

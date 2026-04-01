@@ -103,7 +103,7 @@ export const ShapeItemView = memo(function ShapeItemView({
     },
     [item.id, registerShapeRef],
   );
-  useBlurEffect(contentGroupRef, item.kind === 'image' ? 0 : item.blurRadius);
+  useBlurEffect(contentGroupRef, item.kind === 'image' ? 0 : item.blurRadius, item);
 
   return (
     <>
