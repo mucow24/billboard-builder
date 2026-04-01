@@ -30,13 +30,12 @@ import {
   type ShapeItem,
 } from './interactionSession';
 import { useCropSession } from './useCropSession';
-import { buildRenderableCanvasItems } from './renderAdapter';
+import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInteractionDerivedState';
 import { getGroupDescendantAtPoint } from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
   getNextDrilldownNodeId,
-  getNodeEntry,
   getNodeById,
   isCanvasItemNode,
   isGroupNode,
@@ -45,7 +44,6 @@ import type {
   CanvasItem,
   ImageCanvasItem,
   CanvasTool,
-  CanvasNode,
   GuideLine,
   LineCanvasItem,
   ProjectDocument,
@@ -154,40 +152,17 @@ export function useCanvasInteractionSession({
     };
   }, []);
 
-  const selectedIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
-  const renderables = useMemo(
-    () => buildRenderableCanvasItems(document, selectedNodeIds),
-    [document, selectedNodeIds]
-  );
-  const orderedItems = useMemo(
-    () => renderables.map(({ selectableNodeId, ...item }) => {
-      void selectableNodeId;
-      return item;
-    }),
-    [renderables]
-  );
-  const renderableByLeafId = useMemo(
-    () => new Map(renderables.map((item) => [item.id, item])),
-    [renderables]
-  );
-  const selectedNodes = useMemo(
-    () =>
-      selectedNodeIds
-        .map((nodeId) => getNodeById(document.nodes, nodeId))
-        .filter((node): node is CanvasNode => Boolean(node)),
-    [document.nodes, selectedNodeIds]
-  );
-  const selectedItems = useMemo(
-    () =>
-      selectedNodes
-        .flatMap(collectLeafItems)
-        .slice()
-        .sort((left, right) => left.zIndex - right.zIndex),
-    [selectedNodes]
-  );
-  const selectedLeafIdSet = useMemo(() => new Set(selectedItems.map((item) => item.id)), [selectedItems]);
-  const groupBounds = useMemo(() => getSelectionRenderBounds(selectedItems), [selectedItems]);
-  const stageBounds = useMemo(() => ({ x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }), [document.canvas.height, document.canvas.width]);
+  const {
+    selectedIdSet,
+    renderables,
+    orderedItems,
+    renderableByLeafId,
+    selectedNodes,
+    selectedItems,
+    selectedLeafIdSet,
+    groupBounds,
+    stageBounds,
+  } = useInteractionDerivedState(document, selectedNodeIds);
 
   const updateGuides = useCallback((nextGuides: GuideLine[]) => {
     guidesRef.current = nextGuides;
@@ -270,32 +245,7 @@ export function useCanvasInteractionSession({
   );
   const selectedItemId = selectedDocumentItem?.id;
   const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId) ?? null;
-  const subgroupOutlineFrames = useMemo(() => {
-    const outlineGroupIds = new Set<string>();
-
-    if (selectedNodes.length === 1 && isCanvasItemNode(selectedNodes[0])) {
-      const parentGroupId =
-        getNodeEntry(document.nodes, selectedNodes[0].id)?.parent?.id ?? null;
-      if (parentGroupId) {
-        outlineGroupIds.add(parentGroupId);
-      }
-    } else if (selectedNodes.length > 1) {
-      selectedNodes.filter(isGroupNode).forEach((node) => {
-        outlineGroupIds.add(node.id);
-      });
-    }
-
-    return Array.from(outlineGroupIds)
-      .map((groupId) => {
-        const outlineItems = renderedItems.filter((item) => item.groupPath.includes(groupId));
-        const bounds = getSelectionRenderBounds(outlineItems);
-        return bounds ? { nodeId: groupId, bounds } : null;
-      })
-      .filter(
-        (frame): frame is { nodeId: string; bounds: { x: number; y: number; width: number; height: number } } =>
-          Boolean(frame),
-      );
-  }, [document.nodes, renderedItems, selectedNodes]);
+  const subgroupOutlineFrames = useSubgroupOutlineFrames(document, selectedNodes, renderedItems);
 
   const { resolveModifierKeys } = useModifierKeys({ capture: true });
 
@@ -360,7 +310,6 @@ export function useCanvasInteractionSession({
       clientY <= containerBounds.bottom
     );
   }, [stageRef]);
-
 
   useEffect(() => {
     if ((activeTool === 'select' || activeTool === 'pan' || activeTool === 'zoom') && session?.kind === 'create') {
