@@ -53,11 +53,11 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
         { key: 'bar', icon: '▬', label: 'Bar' },
       ],
     },
-    { key: 'shapeCount', label: 'Count', type: 'range', min: 0, max: 64, step: 1, textMin: 0, textMax: Infinity },
+    { key: 'count', label: 'Count', type: 'range', min: 0, max: 64, step: 1, textMin: 0, textMax: Infinity },
     { key: 'shapeMinSize', label: 'Min Size', type: 'range', min: 4, max: 240, step: 1, textMin: 0, textMax: Infinity },
     { key: 'shapeMaxSize', label: 'Max Size', type: 'range', min: 8, max: 320, step: 1, textMin: 0, textMax: Infinity },
-    { key: 'shapeRotation', label: 'Rotation', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'shapeOpacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'rotation', label: 'Rotation', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
     { key: 'shapeOutline', label: 'Outline Width', type: 'range', min: 0, max: 24, step: 1, textMin: 0, textMax: Infinity },
     { key: 'shapeMix', label: 'Fill Mix', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
     { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
@@ -69,29 +69,29 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
       bandColorA: '#8d1fff',
       bandColorB: '#30f2ff',
       shapeTypes: { rect: true, diamond: true, triangle: true, circle: true, bar: true },
-      shapeCount: 12,
+      count: 12,
       shapeMinSize: 40,
       shapeMaxSize: 180,
-      shapeRotation: 0.5,
-      shapeOpacity: 0.85,
+      rotation: 0.5,
+      opacity: 0.85,
       shapeOutline: 6,
       shapeMix: 0.7,
       seedOverride: null,
     };
   },
   draw(ctx, w, h, params, seed) {
-    if (params.shapeCount <= 0 || params.shapeOpacity <= 0) return;
+    if (params.count <= 0 || params.opacity <= 0) return;
     const rng = mulberry32(params.seedOverride ?? seed);
     const types = SHAPE_KEYS.filter((key) => params.shapeTypes[key]);
     if (!types.length) return;
 
     ctx.save();
-    ctx.globalAlpha = params.shapeOpacity;
-    for (let i = 0; i < params.shapeCount; i++) {
+    ctx.globalAlpha = params.opacity;
+    for (let i = 0; i < params.count; i++) {
       const x = rng() * w;
       const y = rng() * h;
       const size = params.shapeMinSize + rng() * Math.max(0, params.shapeMaxSize - params.shapeMinSize);
-      const rotation = (rng() - 0.5) * Math.PI * params.shapeRotation * 2;
+      const rotationAngle = (rng() - 0.5) * Math.PI * params.rotation * 2;
       const fill = rng() < params.shapeMix;
       const type = types[Math.floor(rng() * types.length)];
       const color =
@@ -103,7 +103,7 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
 
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(rotation);
+      ctx.rotate(rotationAngle);
       ctx.lineWidth = params.shapeOutline;
       ctx.strokeStyle = color;
       ctx.fillStyle = color;

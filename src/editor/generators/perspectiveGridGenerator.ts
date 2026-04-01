@@ -19,7 +19,7 @@ export const perspectiveGridGeneratorSpec: GeneratorSpec<PerspectiveGridGenerato
     { key: 'perspectiveDepth', label: 'Depth Lines', type: 'range', min: 2, max: 32, step: 1, textMin: 1, textMax: Infinity },
     { key: 'perspectiveNear', label: 'Near Point', type: 'range', min: -1, max: 1, step: 0.01, textMin: -Infinity, textMax: Infinity },
     { key: 'perspectiveExtent', label: 'Extent', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'perspectiveThickness', label: 'Thickness', type: 'range', min: 0.5, max: 12, step: 0.5, textMin: 0, textMax: Infinity },
+    { key: 'thickness', label: 'Thickness', type: 'range', min: 0.5, max: 12, step: 0.5, textMin: 0, textMax: Infinity },
     { key: 'perspectiveThicknessFalloff', label: 'Falloff', type: 'range', min: 0, max: 2, step: 0.01, textMin: 0, textMax: Infinity },
     { key: 'perspectiveRows', label: 'Rows', type: 'range', min: 0, max: 32, step: 1, textMin: 0, textMax: Infinity },
   ],
@@ -31,7 +31,7 @@ export const perspectiveGridGeneratorSpec: GeneratorSpec<PerspectiveGridGenerato
       perspectiveDepth: 14,
       perspectiveNear: 0,
       perspectiveExtent: 0.5,
-      perspectiveThickness: 2,
+      thickness: 2,
       perspectiveThicknessFalloff: 0.5,
       perspectiveRows: 16,
     };
@@ -45,7 +45,7 @@ export const perspectiveGridGeneratorSpec: GeneratorSpec<PerspectiveGridGenerato
     const extent = Math.max(0, Math.min(1, Number(params.perspectiveExtent) || 0));
     const totalY = closestY - horizonY;
     const farY = closestY - totalY * extent;
-    const baseThickness = Math.max(0.1, Number(params.perspectiveThickness) || 2);
+    const baseThickness = Math.max(0.1, Number(params.thickness) || 2);
     const thicknessFalloff = Math.max(0, Number(params.perspectiveThicknessFalloff) || 0);
 
     function thicknessAtDepth(depth: number): number {

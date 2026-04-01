@@ -59,7 +59,7 @@ interface BaseInspectorFieldDescriptor<TValue> {
   sectionKey: string;
   sectionLabel: string;
   sectionOrder: number;
-  supportsMultiEdit: boolean;
+
   valueType: InspectorValueType;
   getDisabled?: (context: InspectorDescriptorContext) => boolean;
   getOptions?: (context: InspectorDescriptorContext) => SelectOption[];
@@ -239,7 +239,7 @@ function createGeometryField(
     sectionKey: 'geometry',
     sectionLabel: 'Geometry',
     sectionOrder: SECTION_ORDER.geometry,
-    supportsMultiEdit: true,
+
     valueType: 'number',
     ...extra,
   });
@@ -384,7 +384,7 @@ function createDimensionsField(): CustomFieldDescriptor {
       originalWidth: (item) => (item.kind === 'image' ? item.originalWidth : null),
       originalHeight: (item) => (item.kind === 'image' ? item.originalHeight : null),
     },
-    supportsMultiEdit: true,
+
     valueType: 'number',
   });
 }
@@ -411,7 +411,7 @@ function createShadowNumberField(
     sectionKey: 'shadow',
     sectionLabel: 'Shadow',
     sectionOrder: SECTION_ORDER.shadow,
-    supportsMultiEdit: true,
+
     valueType: 'number',
     ...extra,
   });
@@ -437,7 +437,7 @@ function createFontFamilyField(): CustomFieldDescriptor {
     sectionKey: 'text',
     sectionLabel: 'Text',
     sectionOrder: SECTION_ORDER.text,
-    supportsMultiEdit: true,
+
     valueType: 'select',
   });
 }
@@ -453,7 +453,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+  
       valueType: 'color',
     }),
     createBooleanField({
@@ -465,7 +465,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+  
       valueType: 'boolean',
     }),
     createColorField({
@@ -481,7 +481,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+  
       valueType: 'color',
     }),
     {
@@ -503,7 +503,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+  
       valueType: 'custom',
     },
     createTextField({
@@ -516,7 +516,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+  
       valueType: 'text',
     }),
     createFontFamilyField(),
@@ -532,7 +532,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
       step: 1,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createCustomField({
@@ -553,7 +553,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+  
       valueType: 'boolean',
     }),
     createCustomField({
@@ -574,7 +574,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+  
       valueType: 'boolean',
     }),
     createCustomField({
@@ -590,7 +590,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+  
       valueType: 'select',
     }),
     createCustomField({
@@ -606,7 +606,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+  
       valueType: 'select',
     }),
     createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
@@ -638,7 +638,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
       step: 0.1,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -652,7 +652,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
       step: 0.5,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -670,7 +670,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -688,7 +688,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -706,7 +706,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -724,7 +724,7 @@ function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
   ];
@@ -743,7 +743,7 @@ function createShapeDescriptors(
       sectionKey: 'stroke',
       sectionLabel: 'Stroke',
       sectionOrder: SECTION_ORDER.stroke,
-      supportsMultiEdit: true,
+  
       valueType: 'color',
     }),
     createNumberField({
@@ -757,7 +757,7 @@ function createShapeDescriptors(
       sectionKey: 'stroke',
       sectionLabel: 'Stroke',
       sectionOrder: SECTION_ORDER.stroke,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
   ];
@@ -773,7 +773,7 @@ function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+    
         valueType: 'color',
       }),
       createBooleanField({
@@ -786,7 +786,7 @@ function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+    
         valueType: 'boolean',
       }),
       createColorField({
@@ -803,7 +803,7 @@ function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+    
         valueType: 'color',
       }),
       {
@@ -825,7 +825,7 @@ function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+    
         valueType: 'custom',
       },
     );
@@ -918,7 +918,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
-      supportsMultiEdit: true,
+  
       valueType: 'boolean',
     }),
     createBooleanField({
@@ -930,7 +930,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
-      supportsMultiEdit: true,
+  
       valueType: 'boolean',
     }),
     createColorField({
@@ -945,7 +945,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
-      supportsMultiEdit: true,
+  
       valueType: 'color',
     }),
     createNumberField({
@@ -966,7 +966,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
       sliderDetentThreshold: 3,
       sliderDetentValue: 100,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -987,7 +987,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
       sliderDetentThreshold: 2,
       sliderDetentValue: 50,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -1006,7 +1006,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
       slider: true,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createNumberField({
@@ -1022,7 +1022,7 @@ function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
       step: 0.1,
-      supportsMultiEdit: true,
+  
       valueType: 'number',
     }),
     createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
@@ -1060,7 +1060,7 @@ const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     sectionKey: 'shadow',
     sectionLabel: 'Shadow',
     sectionOrder: SECTION_ORDER.shadow,
-    supportsMultiEdit: true,
+
     valueType: 'color',
   }),
   createShadowNumberField('blur', 'Blur', 20, (item) => item.shadow.blur, (nextValue) => ({
@@ -1118,7 +1118,7 @@ function createGeneratorFieldDescriptor(
       sectionKey: 'generator',
       sectionLabel: specLabel,
       sectionOrder: SECTION_ORDER.generator,
-      supportsMultiEdit: false,
+
       valueType: 'custom',
       getValue: (item: CanvasItem) =>
         item.kind === 'generator'
@@ -1152,7 +1152,7 @@ function createGeneratorFieldDescriptor(
       sectionKey: 'generator',
       sectionLabel: specLabel,
       sectionOrder: SECTION_ORDER.generator,
-      supportsMultiEdit: false,
+
       valueType: 'color',
       getValue: (item: CanvasItem) =>
         item.kind === 'generator'
@@ -1176,7 +1176,6 @@ function createGeneratorFieldDescriptor(
     sectionKey: 'generator',
     sectionLabel: specLabel,
     sectionOrder: SECTION_ORDER.generator,
-    supportsMultiEdit: false,
     valueType: 'number',
     min: field.min,
     max: field.max,
@@ -1256,11 +1255,8 @@ export function buildSelectionInspectorSections(
     new Map(descriptors.map((descriptor) => [getDescriptorKey(descriptor), descriptor]))
   );
   const firstDescriptorList = descriptorLists[0] ?? [];
-  const isMultiSelection = selectedItems.length > 1;
+
   const sharedDescriptors = firstDescriptorList.filter((descriptor) => {
-    if (isMultiSelection && !descriptor.supportsMultiEdit) {
-      return false;
-    }
     const descriptorKey = getDescriptorKey(descriptor);
     return descriptorMaps.every((map) => map.has(descriptorKey));
   });
