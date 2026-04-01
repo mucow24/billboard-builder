@@ -35,7 +35,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="properties"
-        items={[item]}
         layerRows={flattenLayerRows([item])}
         missingFontFamilies={['Ghost Sans']}
       />,
@@ -52,7 +51,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[item]}
         layerRows={flattenLayerRows([item])}
       />,
     );
@@ -66,7 +64,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[]}
         layerRows={[]}
       />,
     );
@@ -83,7 +80,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[item]}
         layerRows={flattenLayerRows([item])}
         selectedItem={item}
         selectedNodeIds={[item.id]}
@@ -109,7 +105,6 @@ describe('PropertiesPanel', () => {
             kind: 'uploaded',
           },
         ]}
-        items={[]}
         layerRows={[]}
       />,
     );
@@ -127,7 +122,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[child]}
         layerRows={flattenLayerRows([group])}
       />,
     );
@@ -141,7 +135,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="properties"
-        items={[child]}
         layerRows={flattenLayerRows([group])}
       />,
     );
@@ -149,7 +142,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[child]}
         layerRows={flattenLayerRows([group])}
       />,
     );
@@ -160,7 +152,6 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[child]}
         layerRows={flattenLayerRows([group])}
         selectedItem={child}
         selectedNodeIds={[child.id]}
@@ -176,7 +167,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="properties"
-        items={[item]}
+
         layerRows={flattenLayerRows([item])}
         selectedItem={item}
         selectedNodeIds={[item.id]}
@@ -195,7 +186,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[item]}
+
         layerRows={flattenLayerRows([item])}
         selectedItem={item}
         selectedNodeIds={[item.id]}
@@ -214,7 +205,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[item]}
+
         layerRows={flattenLayerRows([item])}
         selectedItem={item}
         selectedNodeIds={[item.id]}
@@ -226,7 +217,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="properties"
-        items={[item]}
+
         layerRows={flattenLayerRows([item])}
         selectedItem={item}
         selectedNodeIds={[item.id]}
@@ -239,7 +230,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="layers"
-        items={[item]}
+
         layerRows={flattenLayerRows([item])}
         selectedItem={item}
         selectedNodeIds={[item.id]}
@@ -265,7 +256,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[rect]}
+
         layerRows={flattenLayerRows([rect])}
         favorites={[favorite]}
       />,
@@ -295,7 +286,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[rect]}
+
         layerRows={flattenLayerRows([rect])}
         favorites={[favorite]}
         onRenameFavorite={onRenameFavorite}
@@ -331,7 +322,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[rect]}
+
         layerRows={flattenLayerRows([rect])}
         favorites={[favorite]}
         onRenameFavorite={onRenameFavorite}
@@ -363,7 +354,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[rect]}
+
         layerRows={flattenLayerRows([rect])}
         favorites={[favorite]}
         onRenameFavorite={onRenameFavorite}
@@ -401,7 +392,7 @@ describe('PropertiesPanel', () => {
       <PropertiesPanel
         {...baseProps}
         activeTab="favorites"
-        items={[rect]}
+
         layerRows={flattenLayerRows([rect])}
         favorites={[favorite]}
         onDeleteFavorite={onDeleteFavorite}

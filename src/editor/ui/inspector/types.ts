@@ -3,12 +3,13 @@ import type {
   DocumentFontReference,
   GroupNode,
   ReorderMode,
+  SelectionItemChange,
   UploadedFont,
 } from '../../document/documentTypes';
 import type { LayerRow } from '../../document/sceneGraph';
 import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 
-export type { SelectionItemChange } from '../../document/documentTypes';
+export type { SelectionItemChange };
 
 export type InspectorTab = 'properties' | 'layers' | 'favorites';
 

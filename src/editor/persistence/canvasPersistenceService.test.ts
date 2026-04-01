@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createDefaultProjectDocument, createImageItem, createRectangleItem } from '../document/documentDefaults';
+import { createDefaultProjectDocument, createImageItem } from '../document/documentDefaults';
 import { normalizeProjectDocument } from '../document/documentNormalizer';
 import { CanvasPersistenceService } from './canvasPersistenceService';
 import type { RawCanvasStore } from './indexedDbCanvasStore';
@@ -25,7 +25,7 @@ describe('CanvasPersistenceService', () => {
     });
     const service = new CanvasPersistenceService(store);
     const projectDocument = createDefaultProjectDocument();
-    projectDocument.items = [createRectangleItem()];
+
     const expectedDocument = normalizeProjectDocument(projectDocument);
 
     await service.save(projectDocument);

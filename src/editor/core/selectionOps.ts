@@ -1,5 +1,3 @@
-import type { CanvasNode } from '../document/documentTypes';
-
 export function toggleSelectionNode(selectedNodeIds: string[], nodeId: string): string[] {
   return selectedNodeIds.includes(nodeId)
     ? selectedNodeIds.filter((id) => id !== nodeId)
@@ -13,7 +11,7 @@ export function toggleSelectionNodes(selectedNodeIds: string[], nodeIds: string[
   return [...retained, ...appended];
 }
 
-export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: CanvasNode[]): string[] {
+export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: ReadonlyArray<{ id: string }>): string[] {
   const selectableIds = new Set(nodes.map((node) => node.id));
   const seen = new Set<string>();
   return selectedNodeIds.filter((id) => {
@@ -25,6 +23,6 @@ export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: Can
   });
 }
 
-export function selectAllNodes(nodes: CanvasNode[]): string[] {
+export function selectAllNodes(nodes: ReadonlyArray<{ id: string }>): string[] {
   return nodes.map((node) => node.id);
 }

@@ -16,7 +16,6 @@ import {
   createRectangleItem,
 } from '../document/documentDefaults';
 import { buildRenderableCanvasItems } from './renderAdapter';
-import { collectLeafItems } from '../document/sceneGraph';
 import type { ProjectDocument } from '../document/documentTypes';
 
 function createDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
@@ -29,7 +28,6 @@ function createDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
     },
     background: '#ffffff00',
     nodes,
-    items: nodes.flatMap(collectLeafItems),
     fonts: [],
   };
 }
