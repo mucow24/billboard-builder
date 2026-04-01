@@ -4,7 +4,6 @@ import { DEFAULT_TEXT_PADDING } from './textPadding';
 
 import type {
   BaseCanvasItem,
-  CanvasItem,
   CanvasLeafKind,
   CanvasPreset,
   CanvasSize,
@@ -18,7 +17,7 @@ import type {
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
-import { cloneCanvasNode, createGroupNode } from './sceneGraph';
+import { createGroupNode } from './sceneGraph';
 
 export const DEFAULT_FONT_FAMILY = 'Arial';
 
@@ -224,6 +223,3 @@ export function createGeneratorItem(
 
 export { createGroupNode };
 
-export function cloneCanvasItem(item: CanvasItem, offset = DUPLICATE_ITEM_OFFSET): CanvasItem {
-  return cloneCanvasNode(item, offset) as CanvasItem;
-}

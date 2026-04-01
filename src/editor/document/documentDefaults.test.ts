@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   CANVAS_PRESETS,
   DUPLICATE_ITEM_OFFSET,
-  cloneCanvasItem,
   createDefaultProjectDocument,
   createEllipseItem,
   createGeneratorItem,
@@ -13,6 +12,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from './documentDefaults';
+import { cloneCanvasNode } from './sceneGraph';
 
 describe('document defaults', () => {
   it('creates an empty default project document', () => {
@@ -99,7 +99,7 @@ describe('document defaults', () => {
 
   it('clones regular and line items with a new id and visible offset', () => {
     const rectangleItem = createRectangleItem({ x: 40, y: 60 });
-    const clonedRectangle = cloneCanvasItem(rectangleItem);
+    const clonedRectangle = cloneCanvasNode(rectangleItem) as typeof rectangleItem;
     const lineItem = createLineItem({
       x: 10,
       y: 20,
@@ -108,7 +108,7 @@ describe('document defaults', () => {
       endX: 110,
       endY: 120,
     });
-    const clonedLine = cloneCanvasItem(lineItem);
+    const clonedLine = cloneCanvasNode(lineItem) as typeof lineItem;
 
     expect(clonedRectangle.id).not.toBe(rectangleItem.id);
     expect(clonedRectangle.x).toBe(rectangleItem.x + DUPLICATE_ITEM_OFFSET);
@@ -117,10 +117,6 @@ describe('document defaults', () => {
     expect(clonedLine.id).not.toBe(lineItem.id);
     expect(clonedLine.x).toBe(lineItem.x + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.y).toBe(lineItem.y + DUPLICATE_ITEM_OFFSET);
-    expect(clonedLine.kind).toBe('line');
-    if (clonedLine.kind !== 'line') {
-      throw new Error('Expected a line item clone.');
-    }
     expect(clonedLine.startX).toBe(lineItem.startX + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.startY).toBe(lineItem.startY + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.endX).toBe(lineItem.endX + DUPLICATE_ITEM_OFFSET);
