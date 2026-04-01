@@ -151,6 +151,7 @@ vi.mock('react-konva', () => {
     Layer: make('Layer'),
     Group: make('Group'),
     Rect: make('Rect'),
+    Shape: make('Shape'),
     Line: make('Line'),
     Text: make('Text'),
     Circle: make('Circle'),
@@ -292,7 +293,7 @@ describe('CanvasStage viewport controls', () => {
 
 
 
-  it('renders an exact canvas edge treatment and clips the checkerboard to canvas bounds', () => {
+  it('renders an exact canvas edge treatment and draws the checkerboard as a single Shape', () => {
     const { container } = render(
       <CanvasStage />,
     );
@@ -307,14 +308,12 @@ describe('CanvasStage viewport controls', () => {
     expect(glowRect).toHaveAttribute('data-prop-stroke', 'rgba(128, 176, 255, 0.18)');
     expect(glowRect).toHaveAttribute('data-prop-shadowcolor', 'rgba(110, 160, 255, 0.14)');
 
-    const checkerboardGroup = container.querySelector(
-      '[data-konva-node="Group"][data-prop-name="checkerboard export-exclude"]',
+    const checkerboardShape = container.querySelector(
+      '[data-konva-node="Shape"][data-prop-name="checkerboard export-exclude"]',
     );
-    expect(checkerboardGroup).not.toBeNull();
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipx', '0');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipy', '0');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipwidth', '2048');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipheight', '2048');
+    expect(checkerboardShape).not.toBeNull();
+    expect(checkerboardShape).toHaveAttribute('data-prop-width', '2048');
+    expect(checkerboardShape).toHaveAttribute('data-prop-height', '2048');
 
     const canvasRect = container.querySelector(
       '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
