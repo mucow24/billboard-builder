@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
@@ -15,21 +15,9 @@ import {
   selectSelectedItem,
   selectSelectedItems,
   selectSelectedNode,
-  selectSelectedNodes,
 } from '../editor/core/selectors';
 import { flattenLayerRows } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
-
-function useStableArray<T>(next: T[]): T[] {
-  const ref = useRef(next);
-  if (
-    next.length !== ref.current.length ||
-    next.some((item, i) => item !== ref.current[i])
-  ) {
-    ref.current = next;
-  }
-  return ref.current;
-}
 
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -71,8 +59,6 @@ export function useEditorController() {
     selectedNodeIds,
   } = session;
   const selectedNode = selectSelectedNode(document, editor) ?? null;
-  const selectedNodesRaw = selectSelectedNodes(document, editor);
-  const selectedNodes = useStableArray(selectedNodesRaw);
   const selectedItem = selectSelectedItem(document, editor) ?? null;
   const selectedGroup = selectSelectedGroup(document, editor) ?? null;
   const selectedItems = selectSelectedItems(document, editor);
@@ -155,7 +141,6 @@ export function useEditorController() {
     redo,
     reorderSelectedNode,
     selectParentNode,
-    selectedNodes,
     selectAllNodes,
     setActiveTool,
     undo,
@@ -211,7 +196,6 @@ export function useEditorController() {
       selectedItems,
       selectedNode,
       selectedNodeIds,
-      selectedNodes,
       favorites,
     },
   };

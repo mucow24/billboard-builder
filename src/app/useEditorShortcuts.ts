@@ -8,8 +8,9 @@ import {
 import { isEditableTarget } from './domUtils';
 import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import { cloneCanvasNode } from '../editor/document/sceneGraph';
-import type { CanvasNode, CanvasTool } from '../editor/document/documentTypes';
-import type { EditorStoreState } from '../editor/state/store';
+import type { CanvasTool } from '../editor/document/documentTypes';
+import { useEditorStore, type EditorStoreState } from '../editor/state/store';
+import { selectSelectedNodes } from '../editor/core/selectors';
 
 interface UseEditorShortcutsArgs {
   applyTransaction: EditorStoreState['applyTransaction'];
@@ -21,7 +22,6 @@ interface UseEditorShortcutsArgs {
   redo: EditorStoreState['redo'];
   reorderSelectedNode: EditorStoreState['reorderSelectedNode'];
   selectParentNode: EditorStoreState['selectParentNode'];
-  selectedNodes: CanvasNode[];
   selectAllNodes: EditorStoreState['selectAllNodes'];
   setActiveTool: EditorStoreState['setActiveTool'];
   undo: EditorStoreState['undo'];
@@ -38,7 +38,6 @@ export function useEditorShortcuts({
   redo,
   reorderSelectedNode,
   selectParentNode,
-  selectedNodes,
   selectAllNodes,
   setActiveTool,
   undo,
@@ -47,6 +46,11 @@ export function useEditorShortcuts({
   const pasteStateRef = useRef<{ payload: string; count: number } | null>(null);
 
   useEffect(() => {
+    function getSelectedNodes() {
+      const { editor } = useEditorStore.getState();
+      return selectSelectedNodes(editor.document, editor);
+    }
+
     function clearSelection() {
       applyTransaction([{ family: 'selection', command: { type: 'clear_selection' } }]);
     }
@@ -99,7 +103,7 @@ export function useEditorShortcuts({
         reorderSelectedNode(event.shiftKey ? 'back' : 'backward');
         return;
       }
-      if (!hasModifier && !isEditable && selectedNodes.length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      if (!hasModifier && !isEditable && getSelectedNodes().length > 0 && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
         event.preventDefault();
         const distance = event.shiftKey ? 5 : 1;
         const deltaX = event.key === 'ArrowLeft' ? -distance : event.key === 'ArrowRight' ? distance : 0;
@@ -146,10 +150,11 @@ export function useEditorShortcuts({
     }
 
     function handleCopy(event: ClipboardEvent) {
-      if (isEditableTarget(event.target) || selectedNodes.length === 0) {
+      const nodes = getSelectedNodes();
+      if (isEditableTarget(event.target) || nodes.length === 0) {
         return;
       }
-      if (!writeSelectionToClipboardData(event.clipboardData, selectedNodes)) {
+      if (!writeSelectionToClipboardData(event.clipboardData, nodes)) {
         return;
       }
       pasteStateRef.current = null;
@@ -157,10 +162,11 @@ export function useEditorShortcuts({
     }
 
     function handleCut(event: ClipboardEvent) {
-      if (isEditableTarget(event.target) || selectedNodes.length === 0) {
+      const nodes = getSelectedNodes();
+      if (isEditableTarget(event.target) || nodes.length === 0) {
         return;
       }
-      if (!writeSelectionToClipboardData(event.clipboardData, selectedNodes)) {
+      if (!writeSelectionToClipboardData(event.clipboardData, nodes)) {
         return;
       }
       pasteStateRef.current = null;
@@ -221,7 +227,6 @@ export function useEditorShortcuts({
     redo,
     reorderSelectedNode,
     selectParentNode,
-    selectedNodes,
     selectAllNodes,
     setActiveTool,
     undo,
