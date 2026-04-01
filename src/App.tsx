@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type Konva from 'konva';
 
 import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
 import { useEditorController } from './app/useEditorController';
 import { useSpacebarHeld } from './app/useSpacebarHeld';
+import { useStatusToast } from './app/useStatusToast';
 import { CanvasStage } from './editor/rendering/CanvasStage';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
@@ -12,9 +13,6 @@ import type { InspectorTab } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
 import type { CanvasItem, GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
-
-const FAVORITE_STATUS_DURATION_MS = 1450;
-const FAVORITE_STATUS_FADE_DURATION_MS = 720;
 
 export default function App() {
   const runtimeFlags = readEditorRuntimeFlags();
@@ -26,13 +24,10 @@ export default function App() {
   const [exportButtonHovered, setExportButtonHovered] = useState(false);
   const spacebarHeld = useSpacebarHeld();
   const showExportBoundsCue = exportButtonHovered || spacebarHeld;
-  const [favoriteStatusMessage, setFavoriteStatusMessage] = useState<string | null>(null);
-  const [favoriteStatusFading, setFavoriteStatusFading] = useState(false);
+  const favoriteStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
   const overlaysRef = useRef<HTMLDivElement | null>(null);
-  const favoriteStatusFadeTimeoutRef = useRef<number | null>(null);
-  const favoriteStatusDismissTimeoutRef = useRef<number | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('properties');
   const [panelCollapsed, setPanelCollapsed] = useState(false);
 
@@ -161,37 +156,6 @@ export default function App() {
     }
   }
 
-  useEffect(() => {
-    return () => {
-      if (favoriteStatusFadeTimeoutRef.current !== null) {
-        window.clearTimeout(favoriteStatusFadeTimeoutRef.current);
-      }
-      if (favoriteStatusDismissTimeoutRef.current !== null) {
-        window.clearTimeout(favoriteStatusDismissTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  function showFavoriteStatus(message: string) {
-    if (favoriteStatusFadeTimeoutRef.current !== null) {
-      window.clearTimeout(favoriteStatusFadeTimeoutRef.current);
-    }
-    if (favoriteStatusDismissTimeoutRef.current !== null) {
-      window.clearTimeout(favoriteStatusDismissTimeoutRef.current);
-    }
-    setFavoriteStatusFading(false);
-    setFavoriteStatusMessage(message);
-    favoriteStatusFadeTimeoutRef.current = window.setTimeout(() => {
-      setFavoriteStatusFading(true);
-    }, FAVORITE_STATUS_DURATION_MS - FAVORITE_STATUS_FADE_DURATION_MS);
-    favoriteStatusDismissTimeoutRef.current = window.setTimeout(() => {
-      setFavoriteStatusMessage(null);
-      setFavoriteStatusFading(false);
-      favoriteStatusFadeTimeoutRef.current = null;
-      favoriteStatusDismissTimeoutRef.current = null;
-    }, FAVORITE_STATUS_DURATION_MS);
-  }
-
   return (
     <div className="app-shell">
       <main className="editor-layout editor-layout-overlay">
@@ -218,8 +182,8 @@ export default function App() {
               canUndo={canUndo}
               canRedo={canRedo}
               canSaveFavorite={selectedNodeIds.length > 0}
-              favoriteStatusFading={favoriteStatusFading}
-              favoriteStatusMessage={favoriteStatusMessage}
+              favoriteStatusFading={favoriteStatus.fading}
+              favoriteStatusMessage={favoriteStatus.message}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedNodes}
               onExport={() => handleExport(stageRef.current)}
@@ -237,7 +201,7 @@ export default function App() {
               onSave={handleSave}
               onSaveFavorite={() => {
                 if (saveSelectionAsFavorite()) {
-                  showFavoriteStatus('Added to favorites');
+                  favoriteStatus.show('Added to favorites');
                 }
               }}
               onUndo={undo}
