@@ -27,7 +27,7 @@ function createGeneratorFieldDescriptor(
       sectionKey: 'generator',
       sectionLabel: specLabel,
       sectionOrder: SECTION_ORDER.generator,
-      supportsMultiEdit: false,
+
       valueType: 'custom',
       getValue: (item: CanvasItem) =>
         item.kind === 'generator'
@@ -61,7 +61,7 @@ function createGeneratorFieldDescriptor(
       sectionKey: 'generator',
       sectionLabel: specLabel,
       sectionOrder: SECTION_ORDER.generator,
-      supportsMultiEdit: false,
+
       valueType: 'color',
       getValue: (item: CanvasItem) =>
         item.kind === 'generator'
@@ -85,7 +85,7 @@ function createGeneratorFieldDescriptor(
     sectionKey: 'generator',
     sectionLabel: specLabel,
     sectionOrder: SECTION_ORDER.generator,
-    supportsMultiEdit: false,
+
     valueType: 'number',
     min: field.min,
     max: field.max,

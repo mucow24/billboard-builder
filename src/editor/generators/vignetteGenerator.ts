@@ -6,16 +6,16 @@ export const vignetteGeneratorSpec: GeneratorSpec<VignetteGeneratorParams> = {
   type: 'vignette',
   label: 'Vignette',
   fields: [
-    { key: 'vignette', label: 'Intensity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'intensity', label: 'Intensity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
   ],
   createDefaultParams(): VignetteGeneratorParams {
     return {
       generatorType: 'vignette',
-      vignette: 0.12,
+      intensity: 0.12,
     };
   },
   draw(ctx, w, h, params) {
-    if (params.vignette <= 0) return;
+    if (params.intensity <= 0) return;
     const grad = ctx.createRadialGradient(
       w * 0.5,
       h * 0.5,
@@ -25,7 +25,7 @@ export const vignetteGeneratorSpec: GeneratorSpec<VignetteGeneratorParams> = {
       Math.max(w, h) * 0.75,
     );
     grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, `rgba(0,0,0,${params.vignette})`);
+    grad.addColorStop(1, `rgba(0,0,0,${params.intensity})`);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
   },

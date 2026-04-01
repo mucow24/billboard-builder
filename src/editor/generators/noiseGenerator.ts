@@ -10,18 +10,18 @@ export const noiseGeneratorSpec: GeneratorSpec<NoiseGeneratorParams> = {
   type: 'noise',
   label: 'Noise',
   fields: [
-    { key: 'noise', label: 'Intensity', type: 'range', min: 0, max: 0.2, step: 0.001, textMin: 0, textMax: Infinity },
+    { key: 'intensity', label: 'Intensity', type: 'range', min: 0, max: 0.2, step: 0.001, textMin: 0, textMax: Infinity },
     { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
   ],
   createDefaultParams(): NoiseGeneratorParams {
     return {
       generatorType: 'noise',
-      noise: 0.05,
+      intensity: 0.05,
       seedOverride: null,
     };
   },
   draw(ctx, w, h, params, seed) {
-    if (params.noise <= 0) return;
+    if (params.intensity <= 0) return;
     const rng = mulberry32(params.seedOverride ?? seed);
 
     if (!noiseCanvas) {
@@ -34,7 +34,7 @@ export const noiseGeneratorSpec: GeneratorSpec<NoiseGeneratorParams> = {
 
     const image = noiseCtx.createImageData(w, h);
     const data = image.data;
-    const alpha = Math.round(255 * params.noise);
+    const alpha = Math.round(255 * params.intensity);
     for (let i = 0; i < data.length; i += 4) {
       const n = Math.floor(rng() * 255);
       data[i] = n;

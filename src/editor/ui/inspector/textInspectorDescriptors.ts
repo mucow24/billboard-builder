@@ -45,7 +45,6 @@ function createFontFamilyField(): CustomFieldDescriptor {
     sectionKey: 'text',
     sectionLabel: 'Text',
     sectionOrder: SECTION_ORDER.text,
-    supportsMultiEdit: true,
     valueType: 'select',
   });
 }
@@ -61,7 +60,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+
       valueType: 'color',
     }),
     createBooleanField({
@@ -73,7 +72,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+
       valueType: 'boolean',
     }),
     createColorField({
@@ -89,7 +88,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'fill',
       sectionLabel: 'Fill',
       sectionOrder: SECTION_ORDER.fill,
-      supportsMultiEdit: true,
+
       valueType: 'color',
     }),
     createSwapFillColorsDescriptor(),
@@ -103,7 +102,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+
       valueType: 'text',
     }),
     createFontFamilyField(),
@@ -119,7 +118,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
       step: 1,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createCustomField({
@@ -140,7 +139,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+
       valueType: 'boolean',
     }),
     createCustomField({
@@ -161,7 +160,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+
       valueType: 'boolean',
     }),
     createCustomField({
@@ -177,7 +176,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+
       valueType: 'select',
     }),
     createCustomField({
@@ -193,7 +192,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'text',
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
-      supportsMultiEdit: true,
+
       valueType: 'select',
     }),
     createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
@@ -225,7 +224,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
       step: 0.1,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -239,7 +238,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
       step: 0.5,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -257,7 +256,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -275,7 +274,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -293,7 +292,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -311,7 +310,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
       sectionOrder: SECTION_ORDER.advancedText,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
   ];

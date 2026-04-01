@@ -22,7 +22,7 @@ export function createShapeDescriptors(
       sectionKey: 'stroke',
       sectionLabel: 'Stroke',
       sectionOrder: SECTION_ORDER.stroke,
-      supportsMultiEdit: true,
+
       valueType: 'color',
     }),
     createNumberField({
@@ -36,7 +36,7 @@ export function createShapeDescriptors(
       sectionKey: 'stroke',
       sectionLabel: 'Stroke',
       sectionOrder: SECTION_ORDER.stroke,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
   ];
@@ -52,7 +52,7 @@ export function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+  
         valueType: 'color',
       }),
       createBooleanField({
@@ -65,7 +65,7 @@ export function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+  
         valueType: 'boolean',
       }),
       createColorField({
@@ -82,7 +82,7 @@ export function createShapeDescriptors(
         sectionKey: 'fill',
         sectionLabel: 'Fill',
         sectionOrder: SECTION_ORDER.fill,
-        supportsMultiEdit: true,
+  
         valueType: 'color',
       }),
       createSwapFillColorsDescriptor(),

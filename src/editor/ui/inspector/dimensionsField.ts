@@ -141,7 +141,7 @@ export function createDimensionsField(): CustomFieldDescriptor {
       originalWidth: (item) => (item.kind === 'image' ? item.originalWidth : null),
       originalHeight: (item) => (item.kind === 'image' ? item.originalHeight : null),
     },
-    supportsMultiEdit: true,
+
     valueType: 'number',
   });
 }

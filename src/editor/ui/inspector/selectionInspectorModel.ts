@@ -46,7 +46,7 @@ interface BaseInspectorFieldDescriptor<TValue> {
   sectionKey: string;
   sectionLabel: string;
   sectionOrder: number;
-  supportsMultiEdit: boolean;
+
   valueType: InspectorValueType;
   getDisabled?: (context: InspectorDescriptorContext) => boolean;
   getOptions?: (context: InspectorDescriptorContext) => SelectOption[];
@@ -138,6 +138,7 @@ function getDescriptorKey(descriptor: InspectorFieldDescriptor): string {
   return `${descriptor.sectionKey}:${descriptor.propertyKey}:${descriptor.valueType}`;
 }
 
+
 function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
   switch (item.kind) {
     case 'text':
@@ -184,11 +185,8 @@ export function buildSelectionInspectorSections(
     new Map(descriptors.map((descriptor) => [getDescriptorKey(descriptor), descriptor]))
   );
   const firstDescriptorList = descriptorLists[0] ?? [];
-  const isMultiSelection = selectedItems.length > 1;
+
   const sharedDescriptors = firstDescriptorList.filter((descriptor) => {
-    if (isMultiSelection && !descriptor.supportsMultiEdit) {
-      return false;
-    }
     const descriptorKey = getDescriptorKey(descriptor);
     return descriptorMaps.every((map) => map.has(descriptorKey));
   });

@@ -114,7 +114,7 @@ export function createGeometryField(
     sectionKey: 'geometry',
     sectionLabel: 'Geometry',
     sectionOrder: SECTION_ORDER.geometry,
-    supportsMultiEdit: true,
+
     valueType: 'number',
     ...extra,
   });
@@ -144,7 +144,7 @@ export function createShadowNumberField(
     sectionKey: 'shadow',
     sectionLabel: 'Shadow',
     sectionOrder: SECTION_ORDER.shadow,
-    supportsMultiEdit: true,
+
     valueType: 'number',
     ...extra,
   });
@@ -170,7 +170,7 @@ export function createSwapFillColorsDescriptor(): InspectorFieldDescriptor {
     sectionKey: 'fill',
     sectionLabel: 'Fill',
     sectionOrder: SECTION_ORDER.fill,
-    supportsMultiEdit: true,
+
     valueType: 'custom',
   };
 }
@@ -189,7 +189,7 @@ export const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
     sectionLabel: 'Blur',
     sectionOrder: SECTION_ORDER.blur,
     step: 1,
-    supportsMultiEdit: true,
+
     valueType: 'number',
   }),
 ];
@@ -209,7 +209,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     sectionKey: 'shadow',
     sectionLabel: 'Shadow',
     sectionOrder: SECTION_ORDER.shadow,
-    supportsMultiEdit: true,
+
     valueType: 'color',
   }),
   createShadowNumberField('blur', 'Blur', 20, (item) => item.shadow.blur, (nextValue) => ({

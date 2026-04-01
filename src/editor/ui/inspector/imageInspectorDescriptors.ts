@@ -27,7 +27,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
-      supportsMultiEdit: true,
+
       valueType: 'boolean',
     }),
     createBooleanField({
@@ -39,7 +39,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
-      supportsMultiEdit: true,
+
       valueType: 'boolean',
     }),
     createColorField({
@@ -54,7 +54,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
-      supportsMultiEdit: true,
+
       valueType: 'color',
     }),
     createNumberField({
@@ -75,7 +75,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
       sliderDetentThreshold: 3,
       sliderDetentValue: 100,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -96,7 +96,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
       sliderDetentThreshold: 2,
       sliderDetentValue: 50,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -115,7 +115,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
       slider: true,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createNumberField({
@@ -131,7 +131,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
       step: 0.1,
-      supportsMultiEdit: true,
+
       valueType: 'number',
     }),
     createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
