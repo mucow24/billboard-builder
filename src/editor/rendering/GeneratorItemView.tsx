@@ -38,7 +38,7 @@ export const GeneratorItemView = memo(function GeneratorItemView({
   const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight);
   const interactionEnabled = activeTool === 'select';
   const groupRef = useRef<Konva.Group | null>(null);
-  useBlurEffect(groupRef, item.blurRadius);
+  useBlurEffect(groupRef, item.blurRadius, item);
 
   return (
     <Group
