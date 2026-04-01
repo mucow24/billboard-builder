@@ -38,9 +38,9 @@ import {
   panImageUnderCrop,
   resizeImageCrop,
 } from './imageCropGeometry';
-import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
+import { buildRenderableCanvasItems } from './renderAdapter';
 import { SNAP_THRESHOLD } from './snapping';
-import { getGroupDescendantAtPoint, pointHitsRenderableItem } from './interactionHitTesting';
+import { getGroupDescendantAtPoint } from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
