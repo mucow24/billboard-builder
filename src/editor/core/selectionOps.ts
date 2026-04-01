@@ -1,20 +1,8 @@
-import type { CanvasItem, CanvasNode } from '../document/documentTypes';
-
-export function replaceSelection(nodeIds: string[]): string[] {
-  return Array.from(new Set(nodeIds));
-}
-
-export function clearSelection(): string[] {
-  return [];
-}
-
 export function toggleSelectionNode(selectedNodeIds: string[], nodeId: string): string[] {
   return selectedNodeIds.includes(nodeId)
     ? selectedNodeIds.filter((id) => id !== nodeId)
     : [...selectedNodeIds, nodeId];
 }
-
-export const toggleSelectionItem = toggleSelectionNode;
 
 export function toggleSelectionNodes(selectedNodeIds: string[], nodeIds: string[]): string[] {
   const toggled = new Set(nodeIds);
@@ -23,9 +11,7 @@ export function toggleSelectionNodes(selectedNodeIds: string[], nodeIds: string[
   return [...retained, ...appended];
 }
 
-export const toggleSelectionItems = toggleSelectionNodes;
-
-export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: CanvasNode[]): string[] {
+export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: ReadonlyArray<{ id: string }>): string[] {
   const selectableIds = new Set(nodes.map((node) => node.id));
   const seen = new Set<string>();
   return selectedNodeIds.filter((id) => {
@@ -37,26 +23,6 @@ export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: Can
   });
 }
 
-export function normalizeSelectionForItems(selectedItemIds: string[], items: CanvasItem[]): string[] {
-  const selectableIds = new Set(items.filter((item) => !item.hidden).map((item) => item.id));
-  const seen = new Set<string>();
-  return selectedItemIds.filter((id) => {
-    if (!selectableIds.has(id) || seen.has(id)) {
-      return false;
-    }
-    seen.add(id);
-    return true;
-  });
-}
-
-export function selectAllNodes(nodes: CanvasNode[]): string[] {
+export function selectAllNodes(nodes: ReadonlyArray<{ id: string }>): string[] {
   return nodes.map((node) => node.id);
-}
-
-export function selectAllItems(items: CanvasItem[]): string[] {
-  return items
-    .filter((item) => !item.hidden)
-    .slice()
-    .sort((left, right) => left.zIndex - right.zIndex)
-    .map((item) => item.id);
 }

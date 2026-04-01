@@ -100,7 +100,7 @@ interface UseCanvasDebugSnapshotParams {
   renderedItems: CanvasItem[];
   renderedSelectedItems: CanvasItem[];
   selectedDocumentItem: CanvasItem | null;
-  selectedItemIds: string[];
+  selectedNodeIds: string[];
   selectedItemViewportRect: { left: number; top: number; width: number; height: number } | null;
   selectedLineHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   selectedNode: {
@@ -142,7 +142,7 @@ export function useCanvasDebugSnapshot({
   renderedItems,
   renderedSelectedItems,
   selectedDocumentItem,
-  selectedItemIds,
+  selectedNodeIds,
   selectedItemViewportRect,
   selectedLineHandleRects,
   selectedNode,
@@ -320,7 +320,7 @@ export function useCanvasDebugSnapshot({
       }
 
       const selectedItems = renderedItems
-        .filter((item) => selectedItemIds.includes(item.id))
+        .filter((item) => selectedNodeIds.includes(item.id))
         .map((item) => {
           const node = stage.findOne(`#render-item-${item.id}`);
           if (!node) {
@@ -434,7 +434,7 @@ export function useCanvasDebugSnapshot({
           panX: pan.x,
           panY: pan.y,
         },
-        selectedItemIds: [...selectedItemIds],
+        selectedNodeIds: [...selectedNodeIds],
         selectedItems,
         groupOverlay: canvasOverlay,
         groupHandles: handles,
@@ -461,7 +461,7 @@ export function useCanvasDebugSnapshot({
         delete window.__BB_TEST__;
       }
     };
-  }, [cropSession, pan.x, pan.y, renderedItems, selectedItemIds, session, stageRef, viewportRef, zoom]);
+  }, [cropSession, pan.x, pan.y, renderedItems, selectedNodeIds, session, stageRef, viewportRef, zoom]);
 
   return debugInfo;
 }

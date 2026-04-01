@@ -8,7 +8,7 @@ describe('project file helpers', () => {
 
   it('parses saved project files from uploaded JSON', async () => {
     const projectDocument = createDefaultProjectDocument();
-    projectDocument.items = [createRectangleItem()];
+    projectDocument.nodes = [createRectangleItem()];
     const expectedDocument = normalizeProjectDocument(projectDocument);
     const file = new File([JSON.stringify(projectDocument)], 'billboard-project.json', {
       type: 'application/json',

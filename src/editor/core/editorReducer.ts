@@ -5,7 +5,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
-import { normalizeExistingProjectDocument, normalizeProjectDocument } from '../document/documentNormalizer';
+import { normalizeProjectDocument } from '../document/documentNormalizer';
 import {
   getNodeIds,
   groupNodes,
@@ -31,6 +31,7 @@ import {
   type EditorState,
   type SessionState,
 } from './editorState';
+import { normalizeSelectionForNodes } from './selectionOps';
 import {
   createTransactionAction,
   toEditorAction,
@@ -46,15 +47,10 @@ function normalizeSelectionForDocument(
   selectedNodeIds: string[],
   document: ProjectDocument
 ): string[] {
-  const nodeIds = new Set(getNodeIds(document.nodes));
-  const seenSelectionIds = new Set<string>();
-  return selectedNodeIds.filter((id) => {
-    if (!nodeIds.has(id) || seenSelectionIds.has(id)) {
-      return false;
-    }
-    seenSelectionIds.add(id);
-    return true;
-  });
+  // Use getNodeIds to flatten the tree (includes group IDs), then delegate
+  // to the shared dedup-and-filter logic in selectionOps.
+  const allNodes = getNodeIds(document.nodes).map((id) => ({ id }));
+  return normalizeSelectionForNodes(selectedNodeIds, allNodes);
 }
 
 interface DocumentCommandResult {
@@ -66,8 +62,6 @@ function replaceDocumentNodes(document: ProjectDocument, nodes: ProjectDocument[
   return {
     ...document,
     nodes,
-    // Keep compatibility inputs from reviving stale leaves after normalization.
-    items: [],
   };
 }
 
@@ -82,11 +76,11 @@ function applyDocumentCommandWithEffects(
   document: ProjectDocument,
   command: DocumentCommand
 ): DocumentCommandResult {
-  const currentDocument = normalizeExistingProjectDocument(document);
+  const currentDocument = normalizeProjectDocument(document);
   let result: DocumentCommandResult;
 
   switch (command.type) {
-    case 'add_item':
+    case 'add_node':
       result = {
         nextDocument: replaceDocumentNodes(currentDocument, [...currentDocument.nodes, command.item]),
         selectionOverride: [command.item.id],
@@ -101,14 +95,6 @@ function applyDocumentCommandWithEffects(
         selectionOverride: command.nodes.map((node) => node.id),
       };
       break;
-    case 'delete_items':
-      result = {
-        nextDocument: replaceDocumentNodes(
-          currentDocument,
-          removeNodesByIds(currentDocument.nodes, new Set(command.itemIds))
-        ),
-      };
-      break;
     case 'delete_nodes': {
       const deletedIds = new Set(command.nodeIds);
       result = {
@@ -119,7 +105,7 @@ function applyDocumentCommandWithEffects(
       };
       break;
     }
-    case 'update_item':
+    case 'update_node':
       result = {
         nextDocument: replaceDocumentNodes(
           currentDocument,
@@ -183,22 +169,6 @@ function applyDocumentCommandWithEffects(
         ),
       };
       break;
-    case 'reorder_item':
-      result = {
-        nextDocument: replaceDocumentNodes(
-          currentDocument,
-          reorderNodes(currentDocument.nodes, [command.itemId], command.mode)
-        ),
-      };
-      break;
-    case 'reorder_items':
-      result = {
-        nextDocument: replaceDocumentNodes(
-          currentDocument,
-          reorderNodes(currentDocument.nodes, command.itemIds, command.mode)
-        ),
-      };
-      break;
     case 'reorder_nodes':
       result = {
         nextDocument: replaceDocumentNodes(
@@ -233,7 +203,7 @@ function applyDocumentCommandWithEffects(
 
   return {
     ...result,
-    nextDocument: normalizeExistingProjectDocument(result.nextDocument),
+    nextDocument: normalizeProjectDocument(result.nextDocument),
   };
 }
 
@@ -256,7 +226,6 @@ function applyDocumentSelectionEffects(
   return {
     ...session,
     selectedNodeIds,
-    selectedItemIds: selectedNodeIds,
   };
 }
 
@@ -308,17 +277,7 @@ function reduceSelectionAction(state: EditorState, action: SelectionAction): Edi
       selectedNodeIds: normalizeSelectionForDocument(
         action.command.type === 'select_nodes'
           ? action.command.nodeIds
-          : action.command.type === 'select_items'
-            ? action.command.itemIds
-            : [],
-        state.document
-      ),
-      selectedItemIds: normalizeSelectionForDocument(
-        action.command.type === 'select_nodes'
-          ? action.command.nodeIds
-          : action.command.type === 'select_items'
-            ? action.command.itemIds
-            : [],
+          : [],
         state.document
       ),
     },
@@ -413,10 +372,6 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
                 state.session.selectedNodeIds,
                 previousDocument
               ),
-              selectedItemIds: normalizeSelectionForDocument(
-                state.session.selectedNodeIds,
-                previousDocument
-              ),
             },
             history: {
               past: state.history.past.slice(0, -1),
@@ -435,10 +390,6 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
             session: {
               ...state.session,
               selectedNodeIds: normalizeSelectionForDocument(
-                state.session.selectedNodeIds,
-                nextDocument
-              ),
-              selectedItemIds: normalizeSelectionForDocument(
                 state.session.selectedNodeIds,
                 nextDocument
               ),

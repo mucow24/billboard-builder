@@ -47,11 +47,6 @@ function formatAlpha(alpha: number): string {
   return Number(alpha.toFixed(3)).toString();
 }
 
-export function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const { r, g, b } = parseColorChannels(hex);
-  return { r, g, b };
-}
-
 export function rgba(hex: string, alpha = 1): string {
   const { a, r, g, b } = parseColorChannels(hex);
   const effectiveAlpha = clampUnit(a * alpha);

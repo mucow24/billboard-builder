@@ -14,7 +14,9 @@ import type { PointerGestureSource } from '../interactionSession';
 import { ImageItemNode } from '../ImageItemNode';
 import { useBlurEffect } from '../useBlurEffect';
 import { useImageElement } from '../useImageElement';
+import { NOOP } from '../noop';
 import { getRenderBox } from '../transformGeometry';
+import { createItemPointerDownHandler } from './itemPointerHandlers';
 
 import {
   HANDLE_FILL,
@@ -63,8 +65,6 @@ interface ShapeItemViewProps {
   zoom?: number;
 }
 
-const NOOP_REGISTER_SHAPE_REF = () => {};
-
 export const ShapeItemView = memo(function ShapeItemView({
   activeTool,
   isSelected,
@@ -77,7 +77,7 @@ export const ShapeItemView = memo(function ShapeItemView({
   renderContent = true,
   renderHandles = true,
   renderSelection = true,
-  registerShapeRef = NOOP_REGISTER_SHAPE_REF,
+  registerShapeRef = NOOP,
   startPanDrag,
   toCanvasPointer,
   zoom = 1,
@@ -122,31 +122,13 @@ export const ShapeItemView = memo(function ShapeItemView({
           opacity={item.opacity}
           visible={!item.hidden}
           listening={interactionEnabled}
-          onMouseDown={(event) => {
-            if (!interactionEnabled || item.locked) {
-              return;
-            }
-            const pointer = event.target.getStage()?.getPointerPosition();
-            if (!pointer) {
-              return;
-            }
-            if (event.evt.button === 1) {
-              if (!startPanDrag) {
-                return;
-              }
-              event.cancelBubble = true;
-              startPanDrag(pointer);
-              return;
-            }
-            event.cancelBubble = true;
-            onItemPointerDown(
-              item,
-              selectableNodeId,
-              toCanvasPointer(pointer),
-              event.evt.shiftKey,
-              event.evt,
-            );
-          }}
+          onMouseDown={createItemPointerDownHandler({
+            isInteractive: () => interactionEnabled && !item.locked,
+            startPanDrag,
+            toCanvasPointer,
+            onAction: (pointer, shiftKey, nativeEvent) =>
+              onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
+          })}
           onTap={() => {
             if (interactionEnabled) {
               onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
@@ -244,31 +226,13 @@ export const ShapeItemView = memo(function ShapeItemView({
             x={renderBox.x}
             y={renderBox.y}
             rotation={item.rotation}
-            onMouseDown={(event) => {
-              if (item.locked) {
-                return;
-              }
-              const pointer = event.target.getStage()?.getPointerPosition();
-              if (!pointer) {
-                return;
-              }
-              if (event.evt.button === 1) {
-                if (!startPanDrag) {
-                  return;
-                }
-                event.cancelBubble = true;
-                startPanDrag(pointer);
-                return;
-              }
-              event.cancelBubble = true;
-              onItemPointerDown(
-                item,
-                selectableNodeId,
-                toCanvasPointer(pointer),
-                event.evt.shiftKey,
-                event.evt,
-              );
-            }}
+            onMouseDown={createItemPointerDownHandler({
+              isInteractive: () => !item.locked,
+              startPanDrag,
+              toCanvasPointer,
+              onAction: (pointer, shiftKey, nativeEvent) =>
+                onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
+            })}
             onDblClick={() => {
               if (!interactionEnabled || item.locked) {
                 return;
@@ -316,25 +280,12 @@ export const ShapeItemView = memo(function ShapeItemView({
                     fill={HANDLE_FILL}
                     stroke={HANDLE_STROKE}
                     strokeWidth={overlayMetrics.handleStrokeWidth}
-                    onMouseDown={(event) => {
-                      if (item.locked) {
-                        return;
-                      }
-                      const pointer = event.target.getStage()?.getPointerPosition();
-                      if (!pointer) {
-                        return;
-                      }
-                      if (event.evt.button === 1) {
-                        if (!startPanDrag) {
-                          return;
-                        }
-                        event.cancelBubble = true;
-                        startPanDrag(pointer);
-                        return;
-                      }
-                      event.cancelBubble = true;
-                      onBeginResize(item, handle, toCanvasPointer(pointer), 'overlay');
-                    }}
+                    onMouseDown={createItemPointerDownHandler({
+                      isInteractive: () => !item.locked,
+                      startPanDrag,
+                      toCanvasPointer,
+                      onAction: (pointer) => onBeginResize(item, handle, pointer, 'overlay'),
+                    })}
                   />
                 );
               })}
@@ -345,25 +296,12 @@ export const ShapeItemView = memo(function ShapeItemView({
                 fill={HANDLE_FILL}
                 stroke={HANDLE_STROKE}
                 strokeWidth={overlayMetrics.handleStrokeWidth}
-                onMouseDown={(event) => {
-                  if (item.locked) {
-                    return;
-                  }
-                  const pointer = event.target.getStage()?.getPointerPosition();
-                  if (!pointer) {
-                    return;
-                  }
-                  if (event.evt.button === 1) {
-                    if (!startPanDrag) {
-                      return;
-                    }
-                    event.cancelBubble = true;
-                    startPanDrag(pointer);
-                    return;
-                  }
-                  event.cancelBubble = true;
-                  onBeginRotate(item, toCanvasPointer(pointer), 'overlay');
-                }}
+                onMouseDown={createItemPointerDownHandler({
+                  isInteractive: () => !item.locked,
+                  startPanDrag,
+                  toCanvasPointer,
+                  onAction: (pointer) => onBeginRotate(item, pointer, 'overlay'),
+                })}
               />
             </>
           ) : null}

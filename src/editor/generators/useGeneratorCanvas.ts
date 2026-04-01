@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useReducer, useRef } from 'react';
 
 import type { GeneratorCanvasItem } from '../document/documentTypes';
 
@@ -14,7 +14,7 @@ export function useGeneratorCanvas(
   const prevWidthRef = useRef(0);
   const prevHeightRef = useRef(0);
   const prevSeedRef = useRef(0);
-  const [, setRenderCount] = useState(0);
+  const [, forceRender] = useReducer((x: number) => x + 1, 0);
 
   useEffect(() => {
     if (
@@ -48,7 +48,7 @@ export function useGeneratorCanvas(
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     spec.draw(ctx, canvasWidth, canvasHeight, item.generatorParams, item.seed);
 
-    setRenderCount((n) => n + 1);
+    forceRender();
   }, [item.generatorParams, item.seed, canvasWidth, canvasHeight]);
 
   return canvasRef.current;

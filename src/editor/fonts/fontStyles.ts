@@ -36,22 +36,6 @@ function ensureFontVariantCache(fonts: FontFaceSet) {
   return cache;
 }
 
-export function getCombinedFontStyle(
-  fontStyle: TextCanvasItem['fontStyle'],
-  fontWeight: TextCanvasItem['fontWeight']
-): CombinedFontStyle {
-  if (fontWeight === 'bold' && fontStyle === 'italic') {
-    return 'bold italic';
-  }
-  if (fontWeight === 'bold') {
-    return 'bold';
-  }
-  if (fontStyle === 'italic') {
-    return 'italic';
-  }
-  return 'normal';
-}
-
 function canUseFontVariant(
   family: string,
   weight: TextCanvasItem['fontWeight'],
@@ -103,15 +87,6 @@ export function getRenderableCombinedFontStyle(item: TextCanvasItem): CombinedFo
   }
 
   return 'normal';
-}
-
-export function getCanvasFontDeclaration(item: TextCanvasItem): string {
-  const parts: string[] = [];
-  if (item.fontStyle !== 'normal') parts.push(item.fontStyle);
-  if (item.fontWeight !== 'normal') parts.push(item.fontWeight);
-  parts.push(`${item.fontSize}px`);
-  parts.push(quoteFontFamily(item.fontFamily));
-  return parts.join(' ');
 }
 
 export function getRenderableCanvasFontDeclaration(item: TextCanvasItem): string {

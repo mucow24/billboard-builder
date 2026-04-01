@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildInteractionCommit,
-  buildRenderedItems,
   buildRenderedRenderables,
   createCreateSession,
   createGroupDragSession,
@@ -17,7 +16,6 @@ import {
   createRectangleItem,
 } from '../document/documentDefaults';
 import { buildRenderableCanvasItems } from './renderAdapter';
-import { collectLeafItems } from '../document/sceneGraph';
 import type { ProjectDocument } from '../document/documentTypes';
 
 function createDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
@@ -30,45 +28,12 @@ function createDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
     },
     background: '#ffffff00',
     nodes,
-    items: nodes.flatMap(collectLeafItems),
     fonts: [],
   };
 }
 
 describe('interactionSession', () => {
   const canvasBounds = { x: 0, y: 0, width: 1024, height: 1024 };
-
-  it('builds rendered items by overlaying previews and appending create previews', () => {
-    const first = createRectangleItem({ id: 'first' });
-    const second = createRectangleItem({ id: 'second' });
-    const preview = createRectangleItem({ id: 'second', x: 999, y: 888 });
-    const createPreview = createRectangleItem({ id: 'created' });
-
-    const rendered = buildRenderedItems([first, second], {
-      kind: 'create',
-      tool: 'rectangle',
-      pointerStart: { x: 10, y: 20 },
-      pointerSource: 'stage',
-      previewItem: createPreview,
-      guides: [],
-      snapDisabled: false,
-    });
-    const renderedWithOverlay = buildRenderedItems([first, second], {
-      kind: 'drag',
-      itemId: second.id,
-      originalItem: second,
-      previewItem: preview,
-      siblingItems: [first],
-      pointerStart: { x: 0, y: 0 },
-      pointerSource: 'stage',
-      guides: [],
-      snapDisabled: false,
-      axisLock: undefined,
-    });
-
-    expect(rendered).toEqual([first, second, createPreview]);
-    expect(renderedWithOverlay).toEqual([first, preview]);
-  });
 
   it('keeps unchanged renderables by reference while overlaying previews', () => {
     const first = createRectangleItem({ id: 'first' });

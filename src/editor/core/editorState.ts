@@ -7,7 +7,6 @@ export interface SessionState {
   missingFontFamilies: string[];
   exportScale: number;
   selectedNodeIds: string[];
-  selectedItemIds: string[];
 }
 
 export interface HistoryState {
@@ -28,7 +27,6 @@ export function createDefaultSessionState(): SessionState {
     missingFontFamilies: [],
     exportScale: 1,
     selectedNodeIds: [],
-    selectedItemIds: [],
   };
 }
 

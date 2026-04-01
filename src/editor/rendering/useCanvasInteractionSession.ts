@@ -2,19 +2,15 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import type Konva from 'konva';
 
 import {
-  getShapeHandlePoints,
   isCreateTool,
-  stageToLocal,
   type Point,
   type ResizeHandle,
 } from './interactionGeometry';
 import {
-  getRenderBox,
   getSelectionFrameForRotation,
   getSelectionRenderBounds,
 } from './transformGeometry';
 import {
-  getCommitChanges,
   buildInteractionCommit,
   buildRenderedRenderables,
   createCreateSession,
@@ -33,20 +29,13 @@ import {
   type SessionWithModifiers,
   type ShapeItem,
 } from './interactionSession';
-import {
-  buildCroppedImagePreviewItem,
-  buildFullImageTransformItem,
-  buildSourceTransformFromFullImageItem,
-  panImageUnderCrop,
-  resizeImageCrop,
-} from './imageCropGeometry';
-import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
-import { SNAP_THRESHOLD } from './snapping';
+import { useCropSession } from './useCropSession';
+import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInteractionDerivedState';
+import { getGroupDescendantAtPoint } from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
   getNextDrilldownNodeId,
-  getNodeEntry,
   getNodeById,
   isCanvasItemNode,
   isGroupNode,
@@ -54,9 +43,7 @@ import {
 import type {
   CanvasItem,
   ImageCanvasItem,
-  ImageCropRect,
   CanvasTool,
-  CanvasNode,
   GuideLine,
   LineCanvasItem,
   ProjectDocument,
@@ -65,12 +52,12 @@ import type {
 interface UseCanvasInteractionSessionParams {
   activeTool: CanvasTool;
   document: ProjectDocument;
-  selectedItemIds: string[];
+  selectedNodeIds: string[];
   viewport?: { zoom: number; panX: number; panY: number };
   onGuidesChange: (guides: GuideLine[]) => void;
-  onSelectItem: (itemId?: string) => void;
-  onToggleSelectItem?: (itemId: string) => void;
-  onToggleSelectItems?: (itemIds: string[]) => void;
+  onSelectNode: (itemId?: string) => void;
+  onToggleSelectNode?: (itemId: string) => void;
+  onToggleSelectNodes?: (itemIds: string[]) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
   onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
@@ -105,86 +92,38 @@ interface StageDescendantClickSample {
   button: number;
 }
 
-type CropInteraction =
-  | {
-      kind: 'crop-resize';
-      handle: ResizeHandle;
-      pointerOffset: Point;
-      initialPreviewItem: ImageCanvasItem;
-      source: PointerGestureSource;
-    }
-  | {
-      kind: 'image-pan';
-      pointerStart: Point;
-      initialPreviewItem: ImageCanvasItem;
-      source: PointerGestureSource;
-    }
-  | {
-      kind: 'full-resize';
-      resizeSession: ReturnType<typeof createResizeSession>;
-      initialPreviewItem: ImageCanvasItem;
-      source: PointerGestureSource;
-    }
-  | {
-      kind: 'full-rotate';
-      rotateSession: ReturnType<typeof createRotateSession>;
-      initialPreviewItem: ImageCanvasItem;
-      source: PointerGestureSource;
-    };
-
-interface ImageCropSessionState {
-  itemId: string;
-  originalItem: ImageCanvasItem;
-  previewItem: ImageCanvasItem;
-  fullImageItem: ImageCanvasItem;
-  crop: ImageCropRect;
-  activeInteraction: CropInteraction | null;
-}
-
 const PICKUP_DRAG_THRESHOLD = 3;
 const GROUP_DRILL_DOUBLE_CLICK_MS = 500;
 const GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA = 6;
 
-function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point) {
-  if (item.kind === 'line') {
-    const left = Math.min(item.startX, item.endX) - Math.max(item.strokeWidth / 2, 8);
-    const right = Math.max(item.startX, item.endX) + Math.max(item.strokeWidth / 2, 8);
-    const top = Math.min(item.startY, item.endY) - Math.max(item.strokeWidth / 2, 8);
-    const bottom = Math.max(item.startY, item.endY) + Math.max(item.strokeWidth / 2, 8);
-    return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
-  }
-
-  const renderBox = getRenderBox(item);
-  const local = stageToLocal(point, { x: renderBox.x, y: renderBox.y }, item.rotation);
-  return (
-    local.x >= 0 &&
-    local.x <= renderBox.width &&
-    local.y >= 0 &&
-    local.y <= renderBox.height
-  );
-}
-
-function getGroupDescendantAtPoint(
-  renderedItems: RenderableCanvasItem[],
+function isGroupDrillDoubleClick(
+  lastClick: StageDescendantClickSample | null,
   groupId: string,
-  point: Point,
-) {
-  return renderedItems
-    .filter((item) => item.groupPath.includes(groupId))
-    .slice()
-    .reverse()
-    .find((item) => pointHitsRenderableItem(item, point)) ?? null;
+  itemId: string,
+  currentButton: number,
+  currentTimeMs: number,
+  pointerDelta: number,
+): boolean {
+  return Boolean(
+    lastClick &&
+      lastClick.groupId === groupId &&
+      lastClick.itemId === itemId &&
+      lastClick.button === 0 &&
+      currentButton === 0 &&
+      currentTimeMs - lastClick.recordedAtMs <= GROUP_DRILL_DOUBLE_CLICK_MS &&
+      pointerDelta <= GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA,
+  );
 }
 
 export function useCanvasInteractionSession({
   activeTool,
   document,
-  selectedItemIds,
+  selectedNodeIds,
   viewport = { zoom: 1, panX: 0, panY: 0 },
   onGuidesChange,
-  onSelectItem,
-  onToggleSelectItem,
-  onToggleSelectItems,
+  onSelectNode,
+  onToggleSelectNode,
+  onToggleSelectNodes,
   onUpdateItem,
   onUpdateItems,
   onAddItem,
@@ -196,14 +135,11 @@ export function useCanvasInteractionSession({
   const sessionRafRef = useRef<number | null>(null);
   const guidesRef = useRef<GuideLine[]>([]);
   const guidesRafRef = useRef<number | null>(null);
-  const cropSessionRef = useRef<ImageCropSessionState | null>(null);
-  const cropSessionRafRef = useRef<number | null>(null);
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
   const pendingItemGestureRef = useRef<PendingItemGesture | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
   const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
   const [session, setSession] = useState<InteractionSession | null>(null);
-  const [cropSession, setCropSession] = useState<ImageCropSessionState | null>(null);
   const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
   const [lastDrilldownSource, setLastDrilldownSource] = useState<'item-hit' | 'stage-surface' | null>(null);
   const [hasPendingMarquee, setHasPendingMarquee] = useState(false);
@@ -213,44 +149,62 @@ export function useCanvasInteractionSession({
     return () => {
       if (sessionRafRef.current !== null) cancelAnimationFrame(sessionRafRef.current);
       if (guidesRafRef.current !== null) cancelAnimationFrame(guidesRafRef.current);
-      if (cropSessionRafRef.current !== null) cancelAnimationFrame(cropSessionRafRef.current);
     };
   }, []);
 
-  const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
-  const renderables = useMemo(
-    () => buildRenderableCanvasItems(document, selectedItemIds),
-    [document, selectedItemIds]
+  const {
+    selectedIdSet,
+    renderables,
+    orderedItems,
+    renderableByLeafId,
+    selectedNodes,
+    selectedItems,
+    selectedLeafIdSet,
+    groupBounds,
+    stageBounds,
+  } = useInteractionDerivedState(document, selectedNodeIds);
+
+  const updateGuides = useCallback((nextGuides: GuideLine[]) => {
+    guidesRef.current = nextGuides;
+    if (nextGuides.length === 0) {
+      if (guidesRafRef.current !== null) {
+        cancelAnimationFrame(guidesRafRef.current);
+        guidesRafRef.current = null;
+      }
+      onGuidesChange(nextGuides);
+    } else if (guidesRafRef.current === null) {
+      guidesRafRef.current = requestAnimationFrame(() => {
+        guidesRafRef.current = null;
+        onGuidesChange(guidesRef.current);
+      });
+    }
+  }, [onGuidesChange]);
+
+  const resolveSession = useCallback(
+    (current: InteractionSession, pointer: Point): InteractionSession =>
+      resolveInteractionSession(current as SessionWithModifiers, pointer, { stageBounds, zoom: viewport.zoom }),
+    [stageBounds, viewport.zoom]
   );
-  const orderedItems = useMemo(
-    () => renderables.map(({ selectableNodeId, ...item }) => {
-      void selectableNodeId;
-      return item;
-    }),
-    [renderables]
-  );
-  const renderableByLeafId = useMemo(
-    () => new Map(renderables.map((item) => [item.id, item])),
-    [renderables]
-  );
-  const selectedNodes = useMemo(
-    () =>
-      selectedItemIds
-        .map((nodeId) => getNodeById(document.nodes, nodeId))
-        .filter((node): node is CanvasNode => Boolean(node)),
-    [document.nodes, selectedItemIds]
-  );
-  const selectedItems = useMemo(
-    () =>
-      selectedNodes
-        .flatMap(collectLeafItems)
-        .slice()
-        .sort((left, right) => left.zIndex - right.zIndex),
-    [selectedNodes]
-  );
-  const selectedLeafIdSet = useMemo(() => new Set(selectedItems.map((item) => item.id)), [selectedItems]);
-  const groupBounds = useMemo(() => getSelectionRenderBounds(selectedItems), [selectedItems]);
-  const stageBounds = useMemo(() => ({ x: 0, y: 0, width: document.canvas.width, height: document.canvas.height }), [document.canvas.height, document.canvas.width]);
+
+  const {
+    cropSession,
+    cropSessionRef,
+    startCropSession,
+    commitCropSession,
+    beginCropResize,
+    beginCropPan,
+    beginCropFullResize,
+    beginCropFullRotate,
+    advanceCropInteractionAtPointer,
+    endCropInteraction,
+  } = useCropSession({
+    orderedItems,
+    stageBounds,
+    zoom: viewport.zoom,
+    onUpdateItem,
+    updateGuides,
+    resolveSession,
+  });
 
   const renderedItems = useMemo(
     () => {
@@ -291,51 +245,9 @@ export function useCanvasInteractionSession({
   );
   const selectedItemId = selectedDocumentItem?.id;
   const selectedRenderedItem = renderedItems.find((item) => item.id === selectedItemId) ?? null;
-  const subgroupOutlineFrames = useMemo(() => {
-    const outlineGroupIds = new Set<string>();
-
-    if (selectedNodes.length === 1 && isCanvasItemNode(selectedNodes[0])) {
-      const parentGroupId =
-        getNodeEntry(document.nodes, selectedNodes[0].id)?.parent?.id ?? null;
-      if (parentGroupId) {
-        outlineGroupIds.add(parentGroupId);
-      }
-    } else if (selectedNodes.length > 1) {
-      selectedNodes.filter(isGroupNode).forEach((node) => {
-        outlineGroupIds.add(node.id);
-      });
-    }
-
-    return Array.from(outlineGroupIds)
-      .map((groupId) => {
-        const outlineItems = renderedItems.filter((item) => item.groupPath.includes(groupId));
-        const bounds = getSelectionRenderBounds(outlineItems);
-        return bounds ? { nodeId: groupId, bounds } : null;
-      })
-      .filter(
-        (frame): frame is { nodeId: string; bounds: { x: number; y: number; width: number; height: number } } =>
-          Boolean(frame),
-      );
-  }, [document.nodes, renderedItems, selectedNodes]);
+  const subgroupOutlineFrames = useSubgroupOutlineFrames(document, selectedNodes, renderedItems);
 
   const { resolveModifierKeys } = useModifierKeys({ capture: true });
-
-  const updateGuides = useCallback((nextGuides: GuideLine[]) => {
-    guidesRef.current = nextGuides;
-    if (nextGuides.length === 0) {
-      // Clearing guides: flush synchronously
-      if (guidesRafRef.current !== null) {
-        cancelAnimationFrame(guidesRafRef.current);
-        guidesRafRef.current = null;
-      }
-      onGuidesChange(nextGuides);
-    } else if (guidesRafRef.current === null) {
-      guidesRafRef.current = requestAnimationFrame(() => {
-        guidesRafRef.current = null;
-        onGuidesChange(guidesRef.current);
-      });
-    }
-  }, [onGuidesChange]);
 
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
     sessionRef.current = nextSession;
@@ -351,22 +263,6 @@ export function useCanvasInteractionSession({
       sessionRafRef.current = requestAnimationFrame(() => {
         sessionRafRef.current = null;
         setSession(sessionRef.current);
-      });
-    }
-  }, []);
-
-  const updateCropSession = useCallback((nextSession: ImageCropSessionState | null) => {
-    cropSessionRef.current = nextSession;
-    if (nextSession === null) {
-      if (cropSessionRafRef.current !== null) {
-        cancelAnimationFrame(cropSessionRafRef.current);
-        cropSessionRafRef.current = null;
-      }
-      setCropSession(null);
-    } else if (cropSessionRafRef.current === null) {
-      cropSessionRafRef.current = requestAnimationFrame(() => {
-        cropSessionRafRef.current = null;
-        setCropSession(cropSessionRef.current);
       });
     }
   }, []);
@@ -414,7 +310,6 @@ export function useCanvasInteractionSession({
       clientY <= containerBounds.bottom
     );
   }, [stageRef]);
-
 
   useEffect(() => {
     if ((activeTool === 'select' || activeTool === 'pan' || activeTool === 'zoom') && session?.kind === 'create') {
@@ -467,12 +362,6 @@ export function useCanvasInteractionSession({
     return getCanvasPointerFromClient(event.evt.clientX, event.evt.clientY);
   }, [getCanvasPointerFromClient, viewport.panX, viewport.panY, viewport.zoom]);
 
-  const resolveSession = useCallback(
-    (current: InteractionSession, pointer: Point): InteractionSession =>
-      resolveInteractionSession(current as SessionWithModifiers, pointer, { stageBounds, zoom: viewport.zoom }),
-    [stageBounds, viewport.zoom]
-  );
-
   const createGroupDragSessionForNode = useCallback((
     nodeId: string,
     pointer: Point,
@@ -505,9 +394,9 @@ export function useCanvasInteractionSession({
     source: PointerGestureSource = 'stage',
   ) => {
     const selectedGroupNodeId =
-      selectedItemIds.length === 1 &&
+      selectedNodeIds.length === 1 &&
       (() => {
-        const selectedNode = getNodeById(document.nodes, selectedItemIds[0]);
+        const selectedNode = getNodeById(document.nodes, selectedNodeIds[0]);
         return selectedNode && isGroupNode(selectedNode) ? selectedNode.id : null;
       })();
     const clickedRenderable = renderableByLeafId.get(item.id);
@@ -559,7 +448,7 @@ export function useCanvasInteractionSession({
     orderedItems,
     renderableByLeafId,
     selectedIdSet,
-    selectedItemIds,
+    selectedNodeIds,
     selectedItems,
     selectedLeafIdSet,
   ]);
@@ -603,147 +492,8 @@ export function useCanvasInteractionSession({
     clearPendingMarquee();
     clearPendingItemGesture();
     updateGuides([]);
-    updateCropSession({
-      itemId: item.id,
-      originalItem: item,
-      previewItem: item,
-      fullImageItem: buildFullImageTransformItem(item),
-      crop: item.crop,
-      activeInteraction: null,
-    });
-  }, [clearPendingItemGesture, clearPendingMarquee, updateGuides, updateCropSession, updateSession]);
-
-  const commitCropSession = useCallback(() => {
-    const current = cropSessionRef.current;
-    if (!current) {
-      return false;
-    }
-    updateGuides([]);
-    const originalChanges = getCommitChanges(current.originalItem);
-    const nextChanges = getCommitChanges(current.previewItem);
-    if (JSON.stringify(originalChanges) !== JSON.stringify(nextChanges)) {
-      onUpdateItem(current.itemId, nextChanges);
-    }
-    updateCropSession(null);
-    return true;
-  }, [updateGuides, onUpdateItem, updateCropSession]);
-
-  const cancelCropSession = useCallback(() => {
-    if (!cropSessionRef.current) {
-      return false;
-    }
-    updateGuides([]);
-    updateCropSession(null);
-    return true;
-  }, [updateGuides, updateCropSession]);
-
-  useEffect(() => {
-    if (!cropSession) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      cancelCropSession();
-    }
-
-    window.document.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      window.document.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [cancelCropSession, cropSession]);
-
-  const beginCropResize = useCallback((
-    handle: ResizeHandle,
-    pointer: Point,
-    source: PointerGestureSource = 'stage',
-  ) => {
-    const current = cropSessionRef.current;
-    if (!current) {
-      return;
-    }
-    const handlePoint = getShapeHandlePoints(current.previewItem)[handle];
-    updateCropSession({
-      ...current,
-      activeInteraction: {
-        kind: 'crop-resize',
-        handle,
-        pointerOffset: {
-          x: pointer.x - handlePoint.x,
-          y: pointer.y - handlePoint.y,
-        },
-        initialPreviewItem: current.previewItem,
-        source,
-      },
-    });
-  }, [updateCropSession]);
-
-  const beginCropPan = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    const current = cropSessionRef.current;
-    if (!current) {
-      return;
-    }
-    updateCropSession({
-      ...current,
-      activeInteraction: {
-        kind: 'image-pan',
-        pointerStart: pointer,
-        initialPreviewItem: current.previewItem,
-        source,
-      },
-    });
-  }, [updateCropSession]);
-
-  const beginCropFullResize = useCallback((
-    handle: ResizeHandle,
-    pointer: Point,
-    source: PointerGestureSource = 'stage',
-  ) => {
-    const current = cropSessionRef.current;
-    if (!current) {
-      return;
-    }
-    updateCropSession({
-      ...current,
-      activeInteraction: {
-        kind: 'full-resize',
-        resizeSession: createResizeSession(
-          current.fullImageItem,
-          handle,
-          pointer,
-          orderedItems.filter((entry) => entry.id !== current.itemId),
-          source,
-        ),
-        initialPreviewItem: current.previewItem,
-        source,
-      },
-    });
-  }, [orderedItems, updateCropSession]);
-
-  const beginCropFullRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    const current = cropSessionRef.current;
-    if (!current) {
-      return;
-    }
-    updateCropSession({
-      ...current,
-      activeInteraction: {
-        kind: 'full-rotate',
-        rotateSession: createRotateSession(
-          current.fullImageItem,
-          pointer,
-          orderedItems.filter((entry) => entry.id !== current.itemId),
-          source,
-        ),
-        initialPreviewItem: current.previewItem,
-        source,
-      },
-    });
-  }, [orderedItems, updateCropSession]);
+    startCropSession(item);
+  }, [clearPendingItemGesture, clearPendingMarquee, startCropSession, updateGuides, updateSession]);
 
   const finishSession = useCallback((current: InteractionSession, pointer: Point) => {
     const resolved = resolveSession(current, pointer);
@@ -760,17 +510,17 @@ export function useCanvasInteractionSession({
         onSetActiveTool(commit.nextTool);
         return;
       case 'marquee':
-        if (commit.toggleMode && onToggleSelectItems) {
-          onToggleSelectItems(Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId))));
+        if (commit.toggleMode && onToggleSelectNodes) {
+          onToggleSelectNodes(Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId))));
         } else if (commit.hitIds.length > 0) {
           const selectableIds = Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId)));
-          onSelectItem(selectableIds[0]);
-          if (selectableIds.length > 1 && onToggleSelectItems) {
-            onSelectItem(undefined);
-            onToggleSelectItems(selectableIds);
+          onSelectNode(selectableIds[0]);
+          if (selectableIds.length > 1 && onToggleSelectNodes) {
+            onSelectNode(undefined);
+            onToggleSelectNodes(selectableIds);
           }
         } else {
-          onSelectItem(undefined);
+          onSelectNode(undefined);
         }
         return;
       case 'group':
@@ -785,7 +535,7 @@ export function useCanvasInteractionSession({
         onUpdateItem(commit.itemId, commit.changes);
         return;
     }
-  }, [onAddItem, updateGuides, onSetActiveTool, onSelectItem, onToggleSelectItems, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
+  }, [onAddItem, updateGuides, onSetActiveTool, onSelectNode, onToggleSelectNodes, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
@@ -854,120 +604,6 @@ export function useCanvasInteractionSession({
     [clearPendingItemGesture, clearPendingMarquee, createPendingItemSession, updateGuides, resolveSession, updateSession],
   );
 
-  const advanceCropInteractionAtPointer = useCallback((
-    pointer: Point | null,
-    modifiers: { ctrlKey: boolean; shiftKey: boolean },
-  ) => {
-    const current = cropSessionRef.current;
-    if (!current?.activeInteraction || !pointer) {
-      return;
-    }
-
-    switch (current.activeInteraction.kind) {
-      case 'crop-resize': {
-        const next = resizeImageCrop({
-          baseItem: current.activeInteraction.initialPreviewItem,
-          handle: current.activeInteraction.handle,
-          pointer,
-          pointerOffset: current.activeInteraction.pointerOffset,
-          siblingItems: orderedItems.filter((entry) => entry.id !== current.itemId),
-          snapEnabled: !modifiers.ctrlKey,
-          stageRect: stageBounds,
-          threshold: SNAP_THRESHOLD / viewport.zoom,
-        });
-        updateGuides(next.guides);
-        updateCropSession({
-          ...current,
-          crop: next.crop,
-          previewItem: next.previewItem,
-          fullImageItem: next.fullImageItem,
-        });
-        return;
-      }
-      case 'image-pan': {
-        updateGuides([]);
-        const next = panImageUnderCrop({
-          baseItem: current.activeInteraction.initialPreviewItem,
-          pointerStart: current.activeInteraction.pointerStart,
-          pointer,
-        });
-        updateCropSession({
-          ...current,
-          crop: next.crop,
-          previewItem: next.previewItem,
-          fullImageItem: next.fullImageItem,
-        });
-        return;
-      }
-      case 'full-resize': {
-        const resolved = resolveSession({
-          ...current.activeInteraction.resizeSession,
-          snapDisabled: modifiers.ctrlKey,
-          shiftConstrain: modifiers.shiftKey,
-        } as SessionWithModifiers, pointer);
-        const nextFullImageItem = 'previewItem' in resolved ? resolved.previewItem : null;
-        if (!nextFullImageItem || nextFullImageItem.kind !== 'image') {
-          return;
-        }
-        updateGuides(resolved.guides);
-        const nextSourceTransform = buildSourceTransformFromFullImageItem(
-          current.activeInteraction.initialPreviewItem,
-          nextFullImageItem,
-        );
-        const nextPreviewItem = buildCroppedImagePreviewItem(
-          current.activeInteraction.initialPreviewItem,
-          nextSourceTransform,
-        );
-        updateCropSession({
-          ...current,
-          fullImageItem: nextFullImageItem,
-          previewItem: nextPreviewItem,
-          crop: nextPreviewItem.crop,
-        });
-        return;
-      }
-      case 'full-rotate': {
-        const resolved = resolveSession({
-          ...current.activeInteraction.rotateSession,
-          snapDisabled: modifiers.ctrlKey,
-          shiftConstrain: modifiers.shiftKey,
-        } as SessionWithModifiers, pointer);
-        const nextFullImageItem = 'previewItem' in resolved ? resolved.previewItem : null;
-        if (!nextFullImageItem || nextFullImageItem.kind !== 'image') {
-          return;
-        }
-        updateGuides([]);
-        const nextSourceTransform = buildSourceTransformFromFullImageItem(
-          current.activeInteraction.initialPreviewItem,
-          nextFullImageItem,
-        );
-        const nextPreviewItem = buildCroppedImagePreviewItem(
-          current.activeInteraction.initialPreviewItem,
-          nextSourceTransform,
-        );
-        updateCropSession({
-          ...current,
-          fullImageItem: nextFullImageItem,
-          previewItem: nextPreviewItem,
-          crop: nextPreviewItem.crop,
-        });
-      }
-    }
-  }, [updateGuides, orderedItems, resolveSession, stageBounds, updateCropSession, viewport.zoom]);
-
-  const endCropInteraction = useCallback(() => {
-    const current = cropSessionRef.current;
-    if (!current || !current.activeInteraction) {
-      return false;
-    }
-    updateGuides([]);
-    updateCropSession({
-      ...current,
-      activeInteraction: null,
-    });
-    return true;
-  }, [updateGuides, updateCropSession]);
-
   const handleWindowMouseMove = useEffectEvent((event: MouseEvent) => {
     const modifiers = resolveModifierKeys({
       ctrlKey: event.ctrlKey,
@@ -999,7 +635,7 @@ export function useCanvasInteractionSession({
       clearPendingItemGesture();
       if (!pointer) {
         if (pending.kind === 'shift-toggle') {
-          onToggleSelectItem?.(pending.selectionNodeId);
+          onToggleSelectNode?.(pending.selectionNodeId);
         }
         updateSession(null);
         updateGuides([]);
@@ -1012,7 +648,7 @@ export function useCanvasInteractionSession({
       );
       if (distance < PICKUP_DRAG_THRESHOLD) {
         if (pending.kind === 'shift-toggle') {
-          onToggleSelectItem?.(pending.selectionNodeId);
+          onToggleSelectNode?.(pending.selectionNodeId);
         }
         updateSession(null);
         updateGuides([]);
@@ -1035,7 +671,7 @@ export function useCanvasInteractionSession({
       createPendingItemSession,
       finishSession,
       updateGuides,
-      onToggleSelectItem,
+      onToggleSelectNode,
       updateSession,
     ],
   );
@@ -1207,7 +843,7 @@ export function useCanvasInteractionSession({
     if (selectedSession) {
       clearPendingItemGesture();
       setLastDrilldownSource(null);
-      if (shiftPressed && onToggleSelectItem && selectedIdSet.has(selectionNodeId)) {
+      if (shiftPressed && onToggleSelectNode && selectedIdSet.has(selectionNodeId)) {
         // Defer the toggle until mouseup so shift-drag can still constrain movement.
         setPendingItemGesture({
           kind: 'shift-toggle',
@@ -1222,10 +858,10 @@ export function useCanvasInteractionSession({
       updateSession(selectedSession);
       return;
     }
-    if (shiftPressed && onToggleSelectItem && !selectedIdSet.has(selectionNodeId)) {
+    if (shiftPressed && onToggleSelectNode && !selectedIdSet.has(selectionNodeId)) {
       clearPendingItemGesture();
       setLastDrilldownSource(null);
-      onToggleSelectItem(selectionNodeId);
+      onToggleSelectNode(selectionNodeId);
       return;
     }
     setPendingItemGesture({
@@ -1240,15 +876,16 @@ export function useCanvasInteractionSession({
       updateSession(pickupSession);
     }
     setLastDrilldownSource(null);
-    onSelectItem(selectionNodeId);
+    onSelectNode(selectionNodeId);
   }, [
     clearPendingItemGesture,
     commitCropSession,
+    cropSessionRef,
     createSelectableNodeDragSession,
     createSelectedDragSession,
     resolveModifierKeys,
-    onSelectItem,
-    onToggleSelectItem,
+    onSelectNode,
+    onToggleSelectNode,
     selectedIdSet,
     setPendingItemGesture,
     updateSession,
@@ -1259,7 +896,7 @@ export function useCanvasInteractionSession({
       return;
     }
     const latestHandledItemEvent = lastHandledItemPointerEventRef.current;
-    const currentSelectedNodeId = selectedItemIds.length === 1 ? selectedItemIds[0] : null;
+    const currentSelectedNodeId = selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
     const currentSelectionDrillTarget = currentSelectedNodeId
       ? getNextDrilldownNodeId(document.nodes, currentSelectedNodeId, item.id)
       : null;
@@ -1280,7 +917,7 @@ export function useCanvasInteractionSession({
     const nextNodeId = getNextDrilldownNodeId(document.nodes, effectiveSelectedNodeId, item.id);
     if (nextNodeId && nextNodeId !== effectiveSelectedNodeId) {
       setLastDrilldownSource('item-hit');
-      onSelectItem(nextNodeId);
+      onSelectNode(nextNodeId);
       return;
     }
     if (
@@ -1292,7 +929,7 @@ export function useCanvasInteractionSession({
       setLastDrilldownSource(null);
       startImageCropSession(item);
     }
-  }, [document.nodes, onSelectItem, selectedItemIds, startImageCropSession]);
+  }, [cropSessionRef, document.nodes, onSelectNode, selectedNodeIds, startImageCropSession]);
 
   const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
     const target = event.target;
@@ -1314,7 +951,7 @@ export function useCanvasInteractionSession({
         event.evt?.button !== 1
       ) {
         commitCropSession();
-        onSelectItem(undefined);
+        onSelectNode(undefined);
       }
       return;
     }
@@ -1343,9 +980,9 @@ export function useCanvasInteractionSession({
       isCanvasSurface &&
       activeTool === 'select' &&
       event.evt?.button !== 1 &&
-      selectedItemIds.length === 1
+      selectedNodeIds.length === 1
     ) {
-      const selectedNodeId = selectedItemIds[0];
+      const selectedNodeId = selectedNodeIds[0];
       const selectedNode = getNodeById(document.nodes, selectedNodeId);
       if (selectedNode && isGroupNode(selectedNode)) {
         const drilledItem = getGroupDescendantAtPoint(renderedItems, selectedNodeId, pointer);
@@ -1363,19 +1000,18 @@ export function useCanvasInteractionSession({
                 event.evt.clientY - lastDescendantClick.clientY,
               )
             : Number.POSITIVE_INFINITY;
-          const isStageSurfaceDoubleClick = Boolean(
-            lastDescendantClick &&
-              lastDescendantClick.groupId === selectedNodeId &&
-              lastDescendantClick.itemId === drilledItem.id &&
-              lastDescendantClick.button === 0 &&
-              event.evt.button === 0 &&
-              recordedAtMs - lastDescendantClick.recordedAtMs <= GROUP_DRILL_DOUBLE_CLICK_MS &&
-              pointerDelta <= GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA,
+          const isStageSurfaceDoubleClick = isGroupDrillDoubleClick(
+            lastDescendantClick,
+            selectedNodeId,
+            drilledItem.id,
+            event.evt.button,
+            recordedAtMs,
+            pointerDelta,
           );
           if (isStageSurfaceDoubleClick) {
             lastStageDescendantClickRef.current = null;
             setLastDrilldownSource('stage-surface');
-            onSelectItem(nextNodeId);
+            onSelectNode(nextNodeId);
           } else {
             lastStageDescendantClickRef.current = {
               groupId: selectedNodeId,
@@ -1404,26 +1040,27 @@ export function useCanvasInteractionSession({
     if (activeTool === 'select') {
       setLastDrilldownSource(null);
       updateGuides([]);
-      onSelectItem(undefined);
+      onSelectNode(undefined);
       setPendingMarquee({ pointerStart: pointer, toggleMode: modifiers.shiftKey });
       updateSession(null);
       return;
     }
     setLastDrilldownSource(null);
     updateGuides([]);
-    onSelectItem(undefined);
+    onSelectNode(undefined);
   }, [
     activeTool,
     beginCreate,
     clearPendingItemGesture,
     commitCropSession,
+    cropSessionRef,
     document.nodes,
     getCanvasPointerFromStageEvent,
     updateGuides,
-    onSelectItem,
+    onSelectNode,
     resolveModifierKeys,
     renderedItems,
-    selectedItemIds,
+    selectedNodeIds,
     setPendingMarquee,
     updateSession,
   ]);

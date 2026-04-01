@@ -32,7 +32,7 @@ describe('useCanvasDebugSnapshot', () => {
         renderedItems: [rectangle],
         renderedSelectedItems: [rectangle],
         selectedDocumentItem: rectangle,
-        selectedItemIds: [rectangle.id],
+        selectedNodeIds: [rectangle.id],
         selectedItemViewportRect: { left: 110, top: 140, width: 160, height: 100 },
         selectedLineHandleRects: null,
         selectedNode: {
@@ -187,7 +187,7 @@ describe('useCanvasDebugSnapshot', () => {
         renderedItems: [rectangle, line],
         renderedSelectedItems: [rectangle, line],
         selectedDocumentItem: rectangle,
-        selectedItemIds: ['shape', 'line'],
+        selectedNodeIds: ['shape', 'line'],
         selectedItemViewportRect: null,
         selectedLineHandleRects: { start: { left: 10, top: 20, width: 16, height: 16 } },
         selectedNode: null,

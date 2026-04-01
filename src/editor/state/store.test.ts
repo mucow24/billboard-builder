@@ -8,6 +8,7 @@ import {
   createTextItem,
 } from '../document/documentDefaults';
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
+import { collectLeafItems } from '../document/sceneGraph';
 import { applyEditorCommand, useEditorStore } from './store';
 import { resetEditorStore } from '../../test/editorStore';
 
@@ -21,11 +22,11 @@ describe('editor command reducer', () => {
     const item = createRectangleItem();
 
     const nextDocument = applyEditorCommand(baseDocument, {
-      type: 'add_item',
+      type: 'add_node',
       item,
     });
 
-    expect(nextDocument.items).toHaveLength(1);
+    expect(nextDocument.nodes.flatMap(collectLeafItems)).toHaveLength(1);
   });
 
   it('reorders items and renormalizes z-indices', () => {
@@ -33,20 +34,21 @@ describe('editor command reducer', () => {
     const secondItem = createRectangleItem({ zIndex: 1 });
     const document = {
       ...createDefaultProjectDocument(),
-      items: [firstItem, secondItem],
+      nodes: [firstItem, secondItem],
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'reorder_item',
-      itemId: firstItem.id,
+      type: 'reorder_node',
+      nodeId: firstItem.id,
       mode: 'front',
     });
 
-    expect(nextDocument.items.map((item) => item.id)).toEqual([
+    const items = nextDocument.nodes.flatMap(collectLeafItems);
+    expect(items.map((item) => item.id)).toEqual([
       secondItem.id,
       firstItem.id,
     ]);
-    expect(nextDocument.items.map((item) => item.zIndex)).toEqual([0, 1]);
+    expect(items.map((item) => item.zIndex)).toEqual([0, 1]);
   });
 
   it('updates canvas settings, selection state, and registered fonts', () => {
@@ -54,7 +56,7 @@ describe('editor command reducer', () => {
       fontFamily: 'Test Sans',
     });
     const documentWithItem = applyEditorCommand(createDefaultProjectDocument(), {
-      type: 'add_item',
+      type: 'add_node',
       item,
     });
     const resizedDocument = applyEditorCommand(documentWithItem, {
@@ -83,7 +85,7 @@ describe('editor command reducer', () => {
       presetId: 'custom',
     });
     expect(fontDocument.background).toBe('#101010');
-    expect(getEditorState().session.selectedItemIds).toEqual([]);
+    expect(getEditorState().session.selectedNodeIds).toEqual([]);
     expect(fontDocument.fonts).toHaveLength(1);
   });
 
@@ -92,19 +94,19 @@ describe('editor command reducer', () => {
     const secondItem = createRectangleItem();
     const seededDocument = {
       ...createDefaultProjectDocument(),
-      items: [firstItem, secondItem],
+      nodes: [firstItem, secondItem],
     };
     const prunedDocument = applyEditorCommand(seededDocument, {
-      type: 'delete_items',
-      itemIds: [firstItem.id],
+      type: 'delete_nodes',
+      nodeIds: [firstItem.id],
     });
     const loadedDocument = applyEditorCommand(prunedDocument, {
       type: 'load_document',
       document: createDefaultProjectDocument(),
     });
 
-    expect(prunedDocument.items).toHaveLength(1);
-    expect(loadedDocument.items).toHaveLength(0);
+    expect(prunedDocument.nodes.flatMap(collectLeafItems)).toHaveLength(1);
+    expect(loadedDocument.nodes.flatMap(collectLeafItems)).toHaveLength(0);
   });
 
   it('recomputes line geometry from endpoint updates', () => {
@@ -116,15 +118,15 @@ describe('editor command reducer', () => {
     });
     const document = {
       ...createDefaultProjectDocument(),
-      items: [item],
+      nodes: [item],
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: item.id,
       changes: { endX: 160, endY: 90 },
     });
-    const nextItem = nextDocument.items[0];
+    const nextItem = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
     expect(nextItem.width).toBe(150);
     expect(nextItem.height).toBe(70);
@@ -145,11 +147,11 @@ describe('editor command reducer', () => {
     });
     const document = {
       ...createDefaultProjectDocument(),
-      items: [rectangleItem],
+      nodes: [rectangleItem],
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: rectangleItem.id,
       changes: {
         width: 0,
@@ -162,7 +164,7 @@ describe('editor command reducer', () => {
         },
       },
     });
-    const nextItem = nextDocument.items[0];
+    const nextItem = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
     expect(nextItem.width).toBe(1);
     expect(nextItem.height).toBe(1);
@@ -184,11 +186,11 @@ describe('editor command reducer', () => {
     });
     const document = {
       ...createDefaultProjectDocument(),
-      items: [lineItem],
+      nodes: [lineItem],
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: lineItem.id,
       changes: {
         endX: 5,
@@ -196,7 +198,7 @@ describe('editor command reducer', () => {
         strokeWidth: 0,
       },
     });
-    const nextLine = nextDocument.items[0];
+    const nextLine = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
     expect(nextLine.kind).toBe('line');
     if (nextLine.kind !== 'line') {
@@ -230,26 +232,27 @@ describe('editor command reducer', () => {
     });
     const loadedDocument = {
       ...createDefaultProjectDocument(),
-      items: [orphanedSelection, secondItem],
+      nodes: [orphanedSelection, secondItem],
     };
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: liveItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: liveItem });
     useEditorStore.getState().loadDocument(loadedDocument);
 
     const document = getEditorState().document;
+    const items = document.nodes.flatMap(collectLeafItems);
 
-    expect(document.items.map((item) => item.id)).toEqual(['loaded-1', 'loaded-2']);
-    expect(document.items.map((item) => item.zIndex)).toEqual([0, 1]);
-    expect(getEditorState().session.selectedItemIds).toEqual([]);
-    expect(document.items[1].shadow).toEqual({
+    expect(items.map((item) => item.id)).toEqual(['loaded-1', 'loaded-2']);
+    expect(items.map((item) => item.zIndex)).toEqual([0, 1]);
+    expect(getEditorState().session.selectedNodeIds).toEqual([]);
+    expect(items[1].shadow).toEqual({
       color: '#000000',
       blur: 0,
       offsetX: 0,
       offsetY: 0,
       opacity: 0,
     });
-    expect(document.items[0].opacity).toBe(1);
-    expect(document.items[0].shadow.opacity).toBe(1);
+    expect(items[0].opacity).toBe(1);
+    expect(items[0].shadow.opacity).toBe(1);
     expect(useEditorStore.getState().canUndo()).toBe(false);
   });
 });
@@ -262,23 +265,23 @@ describe('editor store history', () => {
   it('records undo and redo history for document mutations', () => {
     const item = createRectangleItem();
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item });
-    expect(getEditorState().document.items).toHaveLength(1);
+    useEditorStore.getState().dispatch({ type: 'add_node', item });
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
 
     useEditorStore.getState().undo();
-    expect(getEditorState().document.items).toHaveLength(0);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
 
     useEditorStore.getState().redo();
-    expect(getEditorState().document.items).toHaveLength(1);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
   });
 
   it('updates only the selected item through the convenience action', () => {
     const item = createRectangleItem();
-    useEditorStore.getState().dispatch({ type: 'add_item', item });
+    useEditorStore.getState().dispatch({ type: 'add_node', item });
 
     useEditorStore.getState().updateSelectedItem({ width: 512, height: 256 });
 
-    const updatedItem = getEditorState().document.items[0];
+    const updatedItem = getEditorState().document.nodes.flatMap(collectLeafItems)[0];
     expect(updatedItem.width).toBe(512);
     expect(updatedItem.height).toBe(256);
   });
@@ -287,16 +290,16 @@ describe('editor store history', () => {
     const firstItem = createTextItem({ zIndex: 0 });
     const secondItem = createRectangleItem({ zIndex: 1 });
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
-    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: secondItem });
 
-    useEditorStore.getState().selectSingleItem(firstItem.id);
-    useEditorStore.getState().reorderSelectedItem('front');
+    useEditorStore.getState().selectSingleNode(firstItem.id);
+    useEditorStore.getState().reorderSelectedNode('front');
     useEditorStore.getState().setCanvasSize({ width: 800, height: 600 });
     useEditorStore.getState().setExportScale(4);
     useEditorStore.getState().setMissingFontFamilies(['Ghost Font']);
 
-    expect(getEditorState().document.items.at(-1)?.id).toBe(firstItem.id);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems).at(-1)?.id).toBe(firstItem.id);
     expect(getEditorState().document.canvas.width).toBe(800);
     expect(getEditorState().session.exportScale).toBe(4);
     expect(getEditorState().session.missingFontFamilies).toEqual(['Ghost Font']);
@@ -304,12 +307,12 @@ describe('editor store history', () => {
 
     useEditorStore.getState().resetDocument();
 
-    expect(getEditorState().document.items).toHaveLength(0);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
     expect(useEditorStore.getState().canUndo()).toBe(true);
 
     useEditorStore.getState().undo();
 
-    expect(getEditorState().document.items).toHaveLength(2);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(2);
   });
 
   it('deduplicates available fonts and supports explicit document loading', () => {
@@ -337,9 +340,9 @@ describe('editor store history', () => {
   it('creates items by kind and can delete the current selection', () => {
     useEditorStore.getState().setActiveTool('line');
     useEditorStore.getState().createItemAt('line', 10, 20);
-    useEditorStore.getState().deleteSelectedItems();
+    useEditorStore.getState().deleteSelectedNodes();
 
-    expect(getEditorState().document.items).toHaveLength(0);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
     expect(getEditorState().history.past.length).toBeGreaterThan(0);
     expect(getEditorState().session.activeTool).toBe('select');
   });
@@ -353,7 +356,6 @@ describe('editor store history', () => {
       document: {
         ...createDefaultProjectDocument(),
         nodes: [group],
-        items: [child],
       },
       session: {
         selectedNodeIds: [child.id],
@@ -372,7 +374,6 @@ describe('editor store history', () => {
       document: {
         ...createDefaultProjectDocument(),
         nodes: [firstItem, secondItem],
-        items: [firstItem, secondItem],
       },
       session: {
         selectedNodeIds: [firstItem.id, secondItem.id],
@@ -406,7 +407,6 @@ describe('editor store history', () => {
       document: {
         ...createDefaultProjectDocument(),
         nodes: [group],
-        items: [child],
       },
       session: {
         selectedNodeIds: [group.id],
@@ -446,7 +446,6 @@ describe('editor store history', () => {
       document: {
         ...createDefaultProjectDocument(),
         nodes: [group],
-        items: [movable, locked, line],
       },
       session: {
         selectedNodeIds: [group.id],
@@ -455,7 +454,7 @@ describe('editor store history', () => {
 
     useEditorStore.getState().nudgeSelectedNodes(5, -3);
 
-    const nextItems = getEditorState().document.items;
+    const nextItems = getEditorState().document.nodes.flatMap(collectLeafItems);
     expect(nextItems.find((item) => item.id === movable.id)).toMatchObject({
       x: 25,
       y: 27,
@@ -484,7 +483,6 @@ describe('editor store history', () => {
       document: {
         ...createDefaultProjectDocument(),
         nodes: [firstGroup, secondGroup],
-        items: [firstChild, secondChild],
       },
       session: {
         selectedNodeIds: [],
@@ -507,28 +505,28 @@ describe('editor store history', () => {
     const firstItem = createRectangleItem({ zIndex: 0 });
     const secondItem = createTextItem({ zIndex: 1 });
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
-    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
-    useEditorStore.getState().selectSingleItem(secondItem.id);
+    useEditorStore.getState().dispatch({ type: 'add_node', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: secondItem });
+    useEditorStore.getState().selectSingleNode(secondItem.id);
 
-    useEditorStore.getState().deleteItem(firstItem.id);
+    useEditorStore.getState().deleteNode(firstItem.id);
 
-    expect(getEditorState().document.items).toHaveLength(1);
-    expect(getEditorState().document.items[0].id).toBe(secondItem.id);
-    expect(getEditorState().session.selectedItemIds).toEqual([secondItem.id]);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)[0].id).toBe(secondItem.id);
+    expect(getEditorState().session.selectedNodeIds).toEqual([secondItem.id]);
     expect(useEditorStore.getState().canUndo()).toBe(true);
 
     useEditorStore.getState().undo();
 
-    expect(getEditorState().document.items).toHaveLength(2);
+    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(2);
   });
 
   it('treats empty undo, redo, and selection convenience actions as no-ops', () => {
     useEditorStore.getState().undo();
     useEditorStore.getState().redo();
     useEditorStore.getState().updateSelectedItem({ width: 320 });
-    useEditorStore.getState().deleteSelectedItems();
-    useEditorStore.getState().reorderSelectedItem('front');
+    useEditorStore.getState().deleteSelectedNodes();
+    useEditorStore.getState().reorderSelectedNode('front');
 
     expect(getEditorState().document).toEqual(createDefaultProjectDocument());
     expect(useEditorStore.getState().canRedo()).toBe(false);
@@ -540,11 +538,11 @@ describe('editor store history', () => {
       fontFamily: 'Poster Sans',
     });
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: firstItem });
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().canRedo()).toBe(true);
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: secondItem });
     expect(useEditorStore.getState().canRedo()).toBe(false);
 
     useEditorStore.getState().dispatch({
