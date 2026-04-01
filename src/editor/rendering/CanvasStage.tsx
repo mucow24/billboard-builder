@@ -48,14 +48,14 @@ export function CanvasStage({
 
   const onUpdateItem = useCallback(
     (itemId: string, changes: Partial<CanvasItem>) => {
-      dispatch({ type: 'update_item', itemId, changes });
+      dispatch({ type: 'update_node', itemId, changes });
     },
     [dispatch],
   );
 
   const onAddItem = useCallback(
     (item: CanvasItem) => {
-      dispatch({ type: 'add_item', item });
+      dispatch({ type: 'add_node', item });
     },
     [dispatch],
   );

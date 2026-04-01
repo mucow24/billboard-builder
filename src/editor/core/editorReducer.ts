@@ -80,7 +80,7 @@ function applyDocumentCommandWithEffects(
   let result: DocumentCommandResult;
 
   switch (command.type) {
-    case 'add_item':
+    case 'add_node':
       result = {
         nextDocument: replaceDocumentNodes(currentDocument, [...currentDocument.nodes, command.item]),
         selectionOverride: [command.item.id],
@@ -105,7 +105,7 @@ function applyDocumentCommandWithEffects(
       };
       break;
     }
-    case 'update_item':
+    case 'update_node':
       result = {
         nextDocument: replaceDocumentNodes(
           currentDocument,

@@ -19,7 +19,7 @@ describe('editor reducer', () => {
     const item = createRectangleItem();
 
     const nextState = reduceEditorState(state, {
-      ...toEditorAction({ type: 'add_item', item }),
+      ...toEditorAction({ type: 'add_node', item }),
     });
 
     expect(nextState.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
@@ -30,7 +30,7 @@ describe('editor reducer', () => {
   it('treats selection-only commands as session-safe history no-ops', () => {
     const item = createRectangleItem();
     const seeded = reduceEditorState(createDefaultEditorState(), {
-      ...toEditorAction({ type: 'add_item', item }),
+      ...toEditorAction({ type: 'add_node', item }),
     });
 
     const selected = reduceEditorState(seeded, {
@@ -48,7 +48,7 @@ describe('editor reducer', () => {
       nodes: [createTextItem({ id: 'loaded-item' })],
     };
     const seeded = reduceEditorState(createDefaultEditorState(), {
-      ...toEditorAction({ type: 'add_item', item: firstItem }),
+      ...toEditorAction({ type: 'add_node', item: firstItem }),
     });
     const undone = reduceEditorState(seeded, { family: 'history', type: 'undo' });
 
@@ -71,8 +71,8 @@ describe('editor reducer', () => {
     const nextState = reduceEditorState(
       state,
       createTransactionAction([
-        toEditorAction({ type: 'add_item', item: first }),
-        toEditorAction({ type: 'add_item', item: second }),
+        toEditorAction({ type: 'add_node', item: first }),
+        toEditorAction({ type: 'add_node', item: second }),
       ])
     );
 
@@ -85,7 +85,7 @@ describe('editor reducer', () => {
 
   it('does not create history for session-only transactions', () => {
     const seeded = reduceEditorState(createDefaultEditorState(), {
-      ...toEditorAction({ type: 'add_item', item: createRectangleItem() }),
+      ...toEditorAction({ type: 'add_node', item: createRectangleItem() }),
     });
 
     const nextState = reduceEditorState(
@@ -102,7 +102,7 @@ describe('editor reducer', () => {
 
   it('uses reset-document transaction as one undoable clear step', () => {
     const seeded = reduceEditorState(createDefaultEditorState(), {
-      ...toEditorAction({ type: 'add_item', item: createRectangleItem() }),
+      ...toEditorAction({ type: 'add_node', item: createRectangleItem() }),
     });
 
     const cleared = reduceEditorState(seeded, createResetDocumentTransaction());
@@ -117,7 +117,7 @@ describe('editor reducer', () => {
   it('undoes and redoes document mutations', () => {
     const item = createRectangleItem();
     const seeded = reduceEditorState(createDefaultEditorState(), {
-      ...toEditorAction({ type: 'add_item', item }),
+      ...toEditorAction({ type: 'add_node', item }),
     });
 
     const undone = reduceEditorState(seeded, { family: 'history', type: 'undo' });
@@ -144,7 +144,7 @@ describe('editor reducer', () => {
     };
 
     const nextDocument = applyEditorCommand(baseDocument, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: rectangleItem.id,
       changes: {
         width: 0,
@@ -177,7 +177,7 @@ describe('editor reducer', () => {
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: item.id,
       changes: { endX: 160, endY: 90 },
     });

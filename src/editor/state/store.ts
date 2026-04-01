@@ -96,7 +96,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     setActiveTool: (tool) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_active_tool', tool })),
     createItemAt: (kind, x, y) => {
       const item = createItemForKind(kind, x, y);
-      get().dispatch({ type: 'add_item', item });
+      get().dispatch({ type: 'add_node', item });
       get().setActiveTool('select');
     },
     updateSelectedItem: (changes) => {
@@ -108,7 +108,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       if (!selectedNode || selectedNode.kind === 'group') {
         return;
       }
-      get().dispatch({ type: 'update_item', itemId: selectedId, changes });
+      get().dispatch({ type: 'update_node', itemId: selectedId, changes });
     },
     updateSelectedItems: (changesById) => {
       if (changesById.length === 0) {
@@ -117,7 +117,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().applyTransaction(
         changesById.map(({ itemId, changes }) => ({
           family: 'document' as const,
-          command: { type: 'update_item' as const, itemId, changes },
+          command: { type: 'update_node' as const, itemId, changes },
         }))
       );
     },
@@ -288,7 +288,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     registerAvailableFont: (font) => set((state) => applyStoreAction(state, { family: 'session', type: 'register_available_font', font })),
     setMissingFontFamilies: (families) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_missing_font_families', families })),
     loadDocument: (document) => get().dispatch({ type: 'load_document', document }),
-    addImageItem: (item) => get().dispatch({ type: 'add_item', item }),
+    addImageItem: (item) => get().dispatch({ type: 'add_node', item }),
     setCanvasSize: (canvas) => get().dispatch({ type: 'set_canvas_size', canvas }),
     setExportScale: (scale) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_export_scale', scale })),
     resetDocument: () => set((state) => applyStoreAction(state, createResetDocumentTransaction())),

@@ -300,12 +300,12 @@ export interface ProjectDocument {
 export type ReorderMode = 'forward' | 'backward' | 'front' | 'back';
 
 export type EditorCommand =
-  | { type: 'add_item'; item: CanvasItem }
+  | { type: 'add_node'; item: CanvasItem }
   | { type: 'insert_nodes'; nodes: CanvasNode[]; parentId?: string; index?: number }
   | { type: 'delete_nodes'; nodeIds: string[] }
   | { type: 'select_nodes'; nodeIds: string[] }
   | { type: 'clear_selection' }
-  | { type: 'update_item'; itemId: string; changes: Partial<CanvasItem> }
+  | { type: 'update_node'; itemId: string; changes: Partial<CanvasItem> }
   | { type: 'update_group'; groupId: string; changes: Partial<Pick<GroupNode, 'name' | 'opacity' | 'locked' | 'hidden'>> }
   | { type: 'group_nodes'; nodeIds: string[] }
   | { type: 'ungroup_node'; groupId: string }

@@ -7,7 +7,7 @@ import { createTransactionAction, isSelectionCommand, toEditorAction } from './e
 describe('editor action families', () => {
   it('classifies selection commands separately from document commands', () => {
     const selectCommand: EditorCommand = { type: 'select_nodes', nodeIds: ['item-1'] };
-    const addCommand: EditorCommand = { type: 'add_item', item: createRectangleItem() };
+    const addCommand: EditorCommand = { type: 'add_node', item: createRectangleItem() };
 
     expect(isSelectionCommand(selectCommand)).toBe(true);
     expect(isSelectionCommand(addCommand)).toBe(false);
@@ -16,7 +16,7 @@ describe('editor action families', () => {
   });
 
   it('can create grouped transaction actions with a single history mode', () => {
-    const addCommand: EditorCommand = { type: 'add_item', item: createRectangleItem() };
+    const addCommand: EditorCommand = { type: 'add_node', item: createRectangleItem() };
 
     expect(createTransactionAction([toEditorAction(addCommand)], 'single')).toEqual({
       family: 'transaction',

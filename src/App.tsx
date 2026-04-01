@@ -207,7 +207,7 @@ export default function App() {
               onUngroup={ungroupSelectedNode}
               onAddGenerator={(generatorType) => {
                 dispatch({
-                  type: 'add_item',
+                  type: 'add_node',
                   item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
                 });
               }}
@@ -265,7 +265,7 @@ export default function App() {
                   if (isGroupNode(node)) {
                     dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: !node.locked } });
                   } else {
-                    dispatch({ type: 'update_item', itemId: nodeId, changes: { locked: !node.locked } });
+                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: !node.locked } });
                   }
                 }}
                 onToggleNodeHidden={(nodeId) => {
@@ -274,7 +274,7 @@ export default function App() {
                   if (isGroupNode(node)) {
                     dispatch({ type: 'update_group', groupId: nodeId, changes: { hidden: !node.hidden } });
                   } else {
-                    dispatch({ type: 'update_item', itemId: nodeId, changes: { hidden: !node.hidden } });
+                    dispatch({ type: 'update_node', itemId: nodeId, changes: { hidden: !node.hidden } });
                   }
                 }}
                 onReorder={reorderSelectedNode}

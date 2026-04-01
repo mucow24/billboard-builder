@@ -323,7 +323,7 @@ describe('App shell', () => {
     });
 
     act(() => {
-      useEditorStore.getState().dispatch({ type: 'add_item', item: createRectangleItem() });
+      useEditorStore.getState().dispatch({ type: 'add_node', item: createRectangleItem() });
     });
 
     await waitFor(() => {
@@ -356,7 +356,7 @@ describe('App shell', () => {
     };
 
     act(() => {
-      useEditorStore.getState().dispatch({ type: 'add_item', item: imageItem });
+      useEditorStore.getState().dispatch({ type: 'add_node', item: imageItem });
     });
 
     await waitFor(() => {

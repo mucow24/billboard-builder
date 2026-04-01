@@ -22,7 +22,7 @@ describe('editor command reducer', () => {
     const item = createRectangleItem();
 
     const nextDocument = applyEditorCommand(baseDocument, {
-      type: 'add_item',
+      type: 'add_node',
       item,
     });
 
@@ -56,7 +56,7 @@ describe('editor command reducer', () => {
       fontFamily: 'Test Sans',
     });
     const documentWithItem = applyEditorCommand(createDefaultProjectDocument(), {
-      type: 'add_item',
+      type: 'add_node',
       item,
     });
     const resizedDocument = applyEditorCommand(documentWithItem, {
@@ -122,7 +122,7 @@ describe('editor command reducer', () => {
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: item.id,
       changes: { endX: 160, endY: 90 },
     });
@@ -151,7 +151,7 @@ describe('editor command reducer', () => {
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: rectangleItem.id,
       changes: {
         width: 0,
@@ -190,7 +190,7 @@ describe('editor command reducer', () => {
     };
 
     const nextDocument = applyEditorCommand(document, {
-      type: 'update_item',
+      type: 'update_node',
       itemId: lineItem.id,
       changes: {
         endX: 5,
@@ -235,7 +235,7 @@ describe('editor command reducer', () => {
       nodes: [orphanedSelection, secondItem],
     };
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: liveItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: liveItem });
     useEditorStore.getState().loadDocument(loadedDocument);
 
     const document = getEditorState().document;
@@ -265,7 +265,7 @@ describe('editor store history', () => {
   it('records undo and redo history for document mutations', () => {
     const item = createRectangleItem();
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item });
+    useEditorStore.getState().dispatch({ type: 'add_node', item });
     expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
 
     useEditorStore.getState().undo();
@@ -277,7 +277,7 @@ describe('editor store history', () => {
 
   it('updates only the selected item through the convenience action', () => {
     const item = createRectangleItem();
-    useEditorStore.getState().dispatch({ type: 'add_item', item });
+    useEditorStore.getState().dispatch({ type: 'add_node', item });
 
     useEditorStore.getState().updateSelectedItem({ width: 512, height: 256 });
 
@@ -290,8 +290,8 @@ describe('editor store history', () => {
     const firstItem = createTextItem({ zIndex: 0 });
     const secondItem = createRectangleItem({ zIndex: 1 });
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
-    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: secondItem });
 
     useEditorStore.getState().selectSingleNode(firstItem.id);
     useEditorStore.getState().reorderSelectedNode('front');
@@ -505,8 +505,8 @@ describe('editor store history', () => {
     const firstItem = createRectangleItem({ zIndex: 0 });
     const secondItem = createTextItem({ zIndex: 1 });
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
-    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: secondItem });
     useEditorStore.getState().selectSingleNode(secondItem.id);
 
     useEditorStore.getState().deleteNode(firstItem.id);
@@ -538,11 +538,11 @@ describe('editor store history', () => {
       fontFamily: 'Poster Sans',
     });
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: firstItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: firstItem });
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().canRedo()).toBe(true);
 
-    useEditorStore.getState().dispatch({ type: 'add_item', item: secondItem });
+    useEditorStore.getState().dispatch({ type: 'add_node', item: secondItem });
     expect(useEditorStore.getState().canRedo()).toBe(false);
 
     useEditorStore.getState().dispatch({

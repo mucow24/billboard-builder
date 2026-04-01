@@ -457,7 +457,7 @@ describe('App integration', () => {
 
     act(() => {
       useEditorStore.getState().dispatch({
-        type: 'add_item',
+        type: 'add_node',
         item: createRectangleItem({ id: 'persisted-after-debounce' }),
       });
     });
