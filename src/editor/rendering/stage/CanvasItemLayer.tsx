@@ -4,6 +4,7 @@ import type { CanvasItem, CanvasTool, GeneratorCanvasItem, LineCanvasItem } from
 import type { Point, ResizeHandle } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
+import { NOOP } from '../noop';
 import { GeneratorItemView } from '../GeneratorItemView';
 import { LineItemView } from './LineItemView';
 import { ShapeItemView } from './ShapeItemView';
@@ -44,28 +45,20 @@ interface CanvasItemLayerProps {
   toCanvasPointer: (pointer: Point) => Point;
 }
 
-const NOOP_REGISTER_SHAPE_REF = () => {};
-const NOOP_BEGIN_LINE_HANDLE = () => {};
-const NOOP_BEGIN_RESIZE = () => {};
-const NOOP_BEGIN_ROTATE = () => {};
-const NOOP_ITEM_DOUBLE_CLICK = () => {};
-const NOOP_ITEM_POINTER_DOWN = () => {};
-const NOOP_START_PAN_DRAG = () => {};
-
 export function CanvasItemLayer({
   activeTool,
   canvasWidth,
   canvasHeight,
   interactive = true,
   items,
-  onBeginLineHandle = NOOP_BEGIN_LINE_HANDLE,
-  onBeginResize = NOOP_BEGIN_RESIZE,
-  onBeginRotate = NOOP_BEGIN_ROTATE,
-  onItemDoubleClick = NOOP_ITEM_DOUBLE_CLICK,
-  onItemPointerDown = NOOP_ITEM_POINTER_DOWN,
-  registerShapeRef = NOOP_REGISTER_SHAPE_REF,
+  onBeginLineHandle = NOOP,
+  onBeginResize = NOOP,
+  onBeginRotate = NOOP,
+  onItemDoubleClick = NOOP,
+  onItemPointerDown = NOOP,
+  registerShapeRef = NOOP,
   selectedItemId,
-  startPanDrag = NOOP_START_PAN_DRAG,
+  startPanDrag = NOOP,
   toCanvasPointer,
 }: CanvasItemLayerProps) {
   const effectiveTool: CanvasTool = interactive ? activeTool : 'pan';

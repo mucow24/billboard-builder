@@ -17,7 +17,7 @@ import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
 import { useCanvasViewport } from './stage/useCanvasViewport';
 import { useEditorStore } from '../state/store';
 
-const NOOP_TEST_EVENT = () => {};
+import { NOOP } from './noop';
 
 export interface CanvasStageProps {
   debugMode?: boolean;
@@ -296,7 +296,7 @@ export function CanvasStage({
           groupRotaterViewportPoint={groupRotaterViewportPoint}
           handleItemPointerDown={handleItemPointerDown}
           marqueeViewportRect={marqueeViewportRect}
-          onTestEvent={debugMode ? setLastTestHookEvent : NOOP_TEST_EVENT}
+          onTestEvent={debugMode ? setLastTestHookEvent : NOOP}
           selectedItemViewportRect={selectedItemViewportRect}
           selectedLineHandleRects={selectedLineHandleRects}
           selectedRenderedItem={selectedRenderedItem}
