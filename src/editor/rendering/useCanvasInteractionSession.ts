@@ -4,12 +4,10 @@ import type Konva from 'konva';
 import {
   getShapeHandlePoints,
   isCreateTool,
-  stageToLocal,
   type Point,
   type ResizeHandle,
 } from './interactionGeometry';
 import {
-  getRenderBox,
   getSelectionFrameForRotation,
   getSelectionRenderBounds,
 } from './transformGeometry';
@@ -42,6 +40,7 @@ import {
 } from './imageCropGeometry';
 import { buildRenderableCanvasItems, type RenderableCanvasItem } from './renderAdapter';
 import { SNAP_THRESHOLD } from './snapping';
+import { getGroupDescendantAtPoint, pointHitsRenderableItem } from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
@@ -144,37 +143,6 @@ interface ImageCropSessionState {
 const PICKUP_DRAG_THRESHOLD = 3;
 const GROUP_DRILL_DOUBLE_CLICK_MS = 500;
 const GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA = 6;
-
-function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point) {
-  if (item.kind === 'line') {
-    const left = Math.min(item.startX, item.endX) - Math.max(item.strokeWidth / 2, 8);
-    const right = Math.max(item.startX, item.endX) + Math.max(item.strokeWidth / 2, 8);
-    const top = Math.min(item.startY, item.endY) - Math.max(item.strokeWidth / 2, 8);
-    const bottom = Math.max(item.startY, item.endY) + Math.max(item.strokeWidth / 2, 8);
-    return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
-  }
-
-  const renderBox = getRenderBox(item);
-  const local = stageToLocal(point, { x: renderBox.x, y: renderBox.y }, item.rotation);
-  return (
-    local.x >= 0 &&
-    local.x <= renderBox.width &&
-    local.y >= 0 &&
-    local.y <= renderBox.height
-  );
-}
-
-function getGroupDescendantAtPoint(
-  renderedItems: RenderableCanvasItem[],
-  groupId: string,
-  point: Point,
-) {
-  return renderedItems
-    .filter((item) => item.groupPath.includes(groupId))
-    .slice()
-    .reverse()
-    .find((item) => pointHitsRenderableItem(item, point)) ?? null;
-}
 
 export function useCanvasInteractionSession({
   activeTool,
