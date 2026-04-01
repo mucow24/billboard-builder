@@ -312,7 +312,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
-        seed: clampFinite(item.seed, Math.floor(Math.random() * 0xffffffff)),
+        seed: clampFinite(item.seed, 0),
       };
       return normalizedGeneratorItem;
     }
