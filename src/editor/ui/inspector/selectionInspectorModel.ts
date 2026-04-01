@@ -1335,12 +1335,3 @@ export function buildSelectionInspectorSections(
     }));
 }
 
-export function getSelectionDescriptorCoverage(
-  item: CanvasItem
-): Array<Pick<InspectorFieldDescriptor, 'propertyKey' | 'sectionKey' | 'valueType'>> {
-  return getItemFieldDescriptors(item).map((descriptor) => ({
-    propertyKey: descriptor.propertyKey,
-    sectionKey: descriptor.sectionKey,
-    valueType: descriptor.valueType,
-  }));
-}

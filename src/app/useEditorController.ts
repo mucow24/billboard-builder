@@ -6,7 +6,6 @@ import {
   instantiateFavoriteNodes,
   uniquifyFavoriteName,
 } from './favoriteLibrary';
-import { moveArrayItem } from '../editor/document/arrayUtils';
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
@@ -400,7 +399,10 @@ export function useEditorController() {
       return;
     }
     try {
-      persistFavorites(moveArrayItem(favorites, fromIndex, toIndex));
+      const reordered = favorites.slice();
+      const [item] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, item);
+      persistFavorites(reordered);
       setErrorMessage(null);
     } catch (error) {
       setErrorMessage(
