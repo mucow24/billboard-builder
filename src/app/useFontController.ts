@@ -1,6 +1,8 @@
 import { registerFontFile, toFontReference } from '../editor/fonts';
 import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
-import type { DocumentFontReference, SelectionItemChange, UploadedFont } from '../editor/document/documentTypes';
+import type { CanvasItem, DocumentFontReference, SelectionItemChange, UploadedFont } from '../editor/document/documentTypes';
+import { selectSelectedItem } from '../editor/core/selectors';
+import { useEditorStore } from '../editor/state/store';
 import { getErrorMessage } from './errorUtils';
 
 async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
@@ -68,8 +70,19 @@ export function useFontController({
 
   function handleSelectionItemChange(changes: SelectionItemChange) {
     updateSelectionItems(changes);
-    if (typeof changes !== 'function' && 'fontFamily' in changes) {
-      registerDocumentFontForFamily(changes.fontFamily);
+
+    let resolved: Partial<CanvasItem>;
+    if (typeof changes === 'function') {
+      const { editor } = useEditorStore.getState();
+      const item = selectSelectedItem(editor.document, editor);
+      if (!item) return;
+      resolved = changes(item);
+    } else {
+      resolved = changes;
+    }
+
+    if ('fontFamily' in resolved) {
+      registerDocumentFontForFamily(resolved.fontFamily);
     }
   }
 
