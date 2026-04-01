@@ -158,6 +158,9 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
 
+    await clickCanvas(page, { x: 50, y: 50 });
+    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
+
     await dragCanvas(page, { x: 100, y: 100 }, { x: 620, y: 420 });
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeEnabled();
 
