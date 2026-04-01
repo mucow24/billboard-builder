@@ -88,19 +88,17 @@ vi.mock('./editor/io/images', async () => {
 });
 
 vi.mock('./editor/rendering/CanvasStage', () => ({
-  CanvasStage: ({
-    activeTool,
-    document,
-  }: {
-    activeTool: string;
-    document: { nodes: Array<{ id: string; kind: string; children?: unknown[] }> };
-  }) => (
-    <div>
-      <div data-testid="mock-stage">
-        Tool: {activeTool} / Items: {document.nodes.flatMap(collectLeafItems).length}
+  CanvasStage: () => {
+    const activeTool = useEditorStore((s) => s.editor.session.activeTool);
+    const document = useEditorStore((s) => s.editor.document);
+    return (
+      <div>
+        <div data-testid="mock-stage">
+          Tool: {activeTool} / Items: {document.nodes.flatMap(collectLeafItems).length}
+        </div>
       </div>
-    </div>
-  ),
+    );
+  },
 }));
 
 function makeClipboardItem(file: File | null, type = file?.type ?? 'image/png'): DataTransferItem {

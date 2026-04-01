@@ -60,7 +60,6 @@ export default function App() {
       setCanvasSize,
       insertFavorite,
       toggleSelectedNode,
-      toggleSelectedNodes,
       undo,
       ungroupSelectedNode,
       updateSelectedGroup,
@@ -197,23 +196,11 @@ export default function App() {
     <div className="app-shell">
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
-          activeTool={activeTool}
           debugMode={runtimeFlags.debugMode}
           showCanvasTestHooks={runtimeFlags.enableCanvasTestHooks}
           showExportBoundsCue={showExportBoundsCue}
-          document={document}
-          selectedNodeIds={selectedNodeIds}
           guides={guides}
           onGuidesChange={setGuides}
-          onSelectNode={selectSingleNode}
-          onToggleSelectNode={toggleSelectedNode}
-          onToggleSelectNodes={toggleSelectedNodes}
-          onUpdateItem={(itemId, changes) => {
-            dispatch({ type: 'update_item', itemId, changes });
-          }}
-          onUpdateItems={updateSelectedItems}
-          onAddItem={(item) => dispatch({ type: 'add_item', item })}
-          onSetActiveTool={setActiveTool}
           stageRef={stageRef}
         />
 

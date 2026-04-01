@@ -57,6 +57,9 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
+import type { ProjectDocument } from '../document/documentTypes';
+import { resetEditorStore } from '../../test/editorStore';
+import { useEditorStore } from '../state/store';
 import type Konva from 'konva';
 import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
 import { getGroupResizeFrame, getSelectionFrameForRotation } from './transformGeometry';
@@ -164,8 +167,35 @@ vi.mock('./useImageElement', () => ({
   useImageElement: () => null,
 }));
 
-function CanvasStage(props: React.ComponentProps<typeof ActualCanvasStage>) {
-  return <ActualCanvasStage debugMode showCanvasTestHooks {...props} />;
+type StoreOverrides = {
+  activeTool?: 'select' | 'zoom' | 'text' | 'rectangle' | 'ellipse' | 'line';
+  document?: ProjectDocument;
+  selectedNodeIds?: string[];
+};
+
+function setupStore(overrides: StoreOverrides = {}) {
+  const session: Record<string, unknown> = {};
+  if (overrides.selectedNodeIds) session.selectedNodeIds = overrides.selectedNodeIds;
+  if (overrides.activeTool) session.activeTool = overrides.activeTool;
+  resetEditorStore({
+    document: overrides.document,
+    session: Object.keys(session).length > 0 ? session : undefined,
+  });
+}
+
+function CanvasStage(props: Partial<React.ComponentProps<typeof ActualCanvasStage>> & StoreOverrides) {
+  const { activeTool, document, selectedNodeIds, ...rest } = props;
+  setupStore({ activeTool, document, selectedNodeIds });
+  return (
+    <ActualCanvasStage
+      debugMode
+      showCanvasTestHooks
+      guides={[]}
+      onGuidesChange={vi.fn()}
+      stageRef={createRef<Konva.Stage>()}
+      {...rest}
+    />
+  );
 }
 
 describe('CanvasStage viewport controls', () => {
@@ -243,19 +273,13 @@ describe('CanvasStage viewport controls', () => {
   });
 
   it('omits debug snapshot helpers when debug mode is disabled', () => {
+    setupStore();
     render(
       <ActualCanvasStage
-        activeTool="select"
         debugMode={false}
         showCanvasTestHooks={false}
-        document={createDefaultProjectDocument()}
-        selectedNodeIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
         stageRef={createRef<Konva.Stage>()}
       />,
     );
@@ -270,18 +294,7 @@ describe('CanvasStage viewport controls', () => {
 
   it('renders an exact canvas edge treatment and clips the checkerboard to canvas bounds', () => {
     const { container } = render(
-      <CanvasStage
-        activeTool="select"
-        document={createDefaultProjectDocument()}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage />,
     );
 
     const glowRect = container.querySelector('[data-konva-node="Rect"][data-prop-name="export-exclude"]');
@@ -329,17 +342,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         showExportBoundsCue
         document={document}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -398,17 +402,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -468,16 +463,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[previewItem.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -513,18 +500,7 @@ describe('CanvasStage viewport controls', () => {
   it('renders zoom controls and updates the readout', async () => {
     const user = userEvent.setup();
     render(
-      <CanvasStage
-        activeTool="select"
-        document={createDefaultProjectDocument()}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage />,
     );
 
     expect(screen.getByRole('button', { name: 'Fit canvas to viewport' })).toBeInTheDocument();
@@ -559,17 +535,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[first.id, second.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -610,17 +577,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[first.id, second.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -656,17 +614,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[first.id, second.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -699,16 +648,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -741,16 +682,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -788,16 +721,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -843,17 +768,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { rerender } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -904,17 +820,8 @@ describe('CanvasStage viewport controls', () => {
 
     rerender(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1001,17 +908,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { rerender } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1026,17 +924,8 @@ describe('CanvasStage viewport controls', () => {
 
       rerender(
         <CanvasStage
-          activeTool="select"
           document={document}
           selectedNodeIds={['first', 'second']}
-          guides={[]}
-          onGuidesChange={vi.fn()}
-          onSelectItem={vi.fn()}
-          onUpdateItem={vi.fn()}
-          onUpdateItems={vi.fn()}
-          onAddItem={vi.fn()}
-          onSetActiveTool={vi.fn()}
-          stageRef={createRef<Konva.Stage>()}
         />,
       );
 
@@ -1080,16 +969,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[line.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1131,16 +1012,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
         selectedNodeIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1202,16 +1075,7 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1243,16 +1107,7 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1293,19 +1148,11 @@ describe('CanvasStage viewport controls', () => {
 
     const { container, rerender } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedNodeIds={[]}
         guides={[
           { orientation: 'vertical', position: 120 },
           { orientation: 'horizontal', position: 90 },
         ]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1338,14 +1185,6 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="text"
         document={document}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1365,18 +1204,7 @@ describe('CanvasStage viewport controls', () => {
     });
 
     const { container, rerender } = render(
-      <CanvasStage
-        activeTool="select"
-        document={createDefaultProjectDocument()}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage />,
     );
 
     const stage = container.querySelector('[data-konva-node="Stage"]') as HTMLElement | null;
@@ -1407,20 +1235,8 @@ describe('CanvasStage viewport controls', () => {
 
     fireEvent.keyUp(window, { key: 'Shift' });
 
-    const onSetActiveTool = vi.fn();
     rerender(
-      <CanvasStage
-        activeTool="zoom"
-        document={createDefaultProjectDocument()}
-        selectedNodeIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={onSetActiveTool}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage activeTool="zoom" />,
     );
 
     expect(readCursor()).toBe('zoom-in');
@@ -1428,7 +1244,7 @@ describe('CanvasStage viewport controls', () => {
     expect(readCursor()).toBe('zoom-out');
     fireEvent.mouseDown(stage!, { button: 0, altKey: true, clientX: 640, clientY: 360 });
     expect(handleStageMouseDown).toHaveBeenCalledOnce();
-    expect(onSetActiveTool).toHaveBeenCalledWith('select');
+    expect(useEditorStore.getState().editor.session.activeTool).toBe('select');
     fireEvent.keyUp(window, { key: 'Alt' });
   });
 });

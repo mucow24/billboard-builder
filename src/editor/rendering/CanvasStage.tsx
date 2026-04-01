@@ -1,11 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type Konva from 'konva';
 
 import type {
   CanvasItem,
-  CanvasTool,
   GuideLine,
-  ProjectDocument,
 } from '../document/documentTypes';
 import {
 } from './interactionGeometry';
@@ -17,46 +15,51 @@ import { buildStageDerivedState } from './stage/stageDerived';
 import { buildStageSceneHandlers } from './stage/stageHandlers';
 import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
 import { useCanvasViewport } from './stage/useCanvasViewport';
+import { useEditorStore } from '../state/store';
 
 const NOOP_TEST_EVENT = () => {};
 
 export interface CanvasStageProps {
-  activeTool: CanvasTool;
   debugMode?: boolean;
   showCanvasTestHooks?: boolean;
   showExportBoundsCue?: boolean;
-  document: ProjectDocument;
-  selectedNodeIds: string[];
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
-  onSelectNode: (nodeId?: string) => void;
-  onToggleSelectNode?: (nodeId: string) => void;
-  onToggleSelectNodes?: (nodeIds: string[]) => void;
-  onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
-  onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
-  onAddItem: (item: CanvasItem) => void;
-  onSetActiveTool: (tool: CanvasTool) => void;
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
 export function CanvasStage({
-  activeTool,
   debugMode = false,
   showCanvasTestHooks = false,
   showExportBoundsCue = false,
-  document,
-  selectedNodeIds,
   guides,
   onGuidesChange,
-  onSelectNode,
-  onToggleSelectNode,
-  onToggleSelectNodes,
-  onUpdateItem,
-  onUpdateItems,
-  onAddItem,
-  onSetActiveTool,
   stageRef,
 }: CanvasStageProps) {
+  const document = useEditorStore((s) => s.editor.document);
+  const activeTool = useEditorStore((s) => s.editor.session.activeTool);
+  const selectedNodeIds = useEditorStore((s) => s.editor.session.selectedNodeIds);
+  const dispatch = useEditorStore((s) => s.dispatch);
+  const selectSingleNode = useEditorStore((s) => s.selectSingleNode);
+  const toggleSelectedNode = useEditorStore((s) => s.toggleSelectedNode);
+  const toggleSelectedNodes = useEditorStore((s) => s.toggleSelectedNodes);
+  const setActiveTool = useEditorStore((s) => s.setActiveTool);
+  const updateSelectedItems = useEditorStore((s) => s.updateSelectedItems);
+
+  const onUpdateItem = useCallback(
+    (itemId: string, changes: Partial<CanvasItem>) => {
+      dispatch({ type: 'update_item', itemId, changes });
+    },
+    [dispatch],
+  );
+
+  const onAddItem = useCallback(
+    (item: CanvasItem) => {
+      dispatch({ type: 'add_item', item });
+    },
+    [dispatch],
+  );
+
   const [lastTestHookEvent, setLastTestHookEvent] = useState<string | null>(null);
 
   const viewportState = useCanvasViewport({
@@ -101,13 +104,13 @@ export function CanvasStage({
     document,
     selectedNodeIds,
     onGuidesChange,
-    onSelectNode,
-    onToggleSelectNode,
-    onToggleSelectNodes,
+    onSelectNode: selectSingleNode,
+    onToggleSelectNode: toggleSelectedNode,
+    onToggleSelectNodes: toggleSelectedNodes,
     onUpdateItem,
-    onUpdateItems,
+    onUpdateItems: updateSelectedItems,
     onAddItem,
-    onSetActiveTool,
+    onSetActiveTool: setActiveTool,
     stageRef,
     viewport: viewportState.viewport,
   });
@@ -145,7 +148,7 @@ export function CanvasStage({
     activeTool,
     applyZoomToolClick: (point, zoomOut) => {
       viewport.applyZoomToolClick(point, zoomOut);
-      onSetActiveTool('select');
+      setActiveTool('select');
     },
     handleScenePointerMove: viewport.handleStagePointerMove,
     handleScenePointerUp: viewport.handleStagePointerUp,
