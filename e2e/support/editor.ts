@@ -847,6 +847,13 @@ export async function dragCanvasHookToPoint(
 
 export async function releasePointer(page: Page) {
   await page.mouse.up();
+  // Wait for any active interaction session to finalize. The session is settled
+  // when sessionKind is null (no session) or 'image-crop' (crop mode persists
+  // across handle drags within the crop session).
+  await expect.poll(async () => {
+    const kind = (await readStageDebug(page)).sessionKind;
+    return kind === null || kind === undefined || kind === 'image-crop';
+  }).toBe(true);
 }
 
 export async function selectTool(page: Page, name: string) {
