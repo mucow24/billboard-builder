@@ -74,12 +74,14 @@ export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemN
     renderBox.height,
   ]);
 
+  const blurOffset = blurRadius > 0 ? Math.ceil(blurRadius * 2) : 0;
+
   return (
     <Group
-      clipX={0}
-      clipY={0}
-      clipWidth={renderBox.width}
-      clipHeight={renderBox.height}
+      clipX={-blurOffset}
+      clipY={-blurOffset}
+      clipWidth={renderBox.width + blurOffset * 2}
+      clipHeight={renderBox.height + blurOffset * 2}
       listening={false}
     >
       <KonvaImage
