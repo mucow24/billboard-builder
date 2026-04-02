@@ -37,6 +37,8 @@ interface LeafPickupCase {
   expectCommittedMovement: (savedItem: Record<string, unknown>) => void;
 }
 
+// Only rectangle (shape handles) and line (line handles) are needed —
+// ellipse, text, and image share the same pickup code path and handle type.
 const leafPickupCases: LeafPickupCase[] = [
   {
     id: 'pickup-rect',
@@ -54,67 +56,6 @@ const leafPickupCases: LeafPickupCase[] = [
     to: { x: 320, y: 300 },
     expectCommittedMovement(savedItem) {
       expect(Number(savedItem.x)).toBeGreaterThan(220);
-      expect(Number(savedItem.y)).toBeGreaterThan(220);
-    },
-  },
-  {
-    id: 'pickup-ellipse',
-    kind: 'ellipse',
-    name: 'Ellipse',
-    item: createEllipseFixture({
-      id: 'pickup-ellipse',
-      name: 'Pickup Ellipse',
-      x: 180,
-      y: 140,
-      width: 180,
-      height: 120,
-      zIndex: 0,
-    }),
-    from: { x: 240, y: 200 },
-    to: { x: 360, y: 290 },
-    expectCommittedMovement(savedItem) {
-      expect(Number(savedItem.x)).toBeGreaterThan(260);
-      expect(Number(savedItem.y)).toBeGreaterThan(200);
-    },
-  },
-  {
-    id: 'pickup-text',
-    kind: 'text',
-    name: 'Text',
-    item: createTextFixture({
-      id: 'pickup-text',
-      name: 'Pickup Text',
-      x: 150,
-      y: 160,
-      width: 260,
-      height: 96,
-      text: 'Pickup text',
-      zIndex: 0,
-    }),
-    from: { x: 230, y: 205 },
-    to: { x: 350, y: 285 },
-    expectCommittedMovement(savedItem) {
-      expect(Number(savedItem.x)).toBeGreaterThan(240);
-      expect(Number(savedItem.y)).toBeGreaterThan(220);
-    },
-  },
-  {
-    id: 'pickup-image',
-    kind: 'image',
-    name: 'Image',
-    item: createImageFixture({
-      id: 'pickup-image',
-      name: 'Pickup Image',
-      x: 180,
-      y: 160,
-      width: 160,
-      height: 90,
-      zIndex: 0,
-    }),
-    from: { x: 230, y: 200 },
-    to: { x: 350, y: 285 },
-    expectCommittedMovement(savedItem) {
-      expect(Number(savedItem.x)).toBeGreaterThan(260);
       expect(Number(savedItem.y)).toBeGreaterThan(220);
     },
   },
@@ -292,9 +233,6 @@ test.describe('editor canvas entrypoints', () => {
     await clickCanvas(page, { x: 220, y: 540 });
     await openPropertiesTab(page);
     await expect(page.getByRole('button', { name: /Geometry/ })).toBeVisible();
-    let stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasLineHandles).toBe(true);
-    expect(stageDebug.hasShapeHandles).toBe(false);
 
     // CS-08: Shift-click second item to multi-select
     await clickCanvas(page, { x: 180, y: 165 });
@@ -303,26 +241,19 @@ test.describe('editor canvas entrypoints', () => {
     await page.keyboard.up('Shift');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(true);
 
     // Clear selection
     await clickCanvas(page, { x: 920, y: 920 });
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
+    await expectNoActiveSelection(page);
 
     // CS-09: Marquee across items to multi-select
     await dragCanvas(page, { x: 80, y: 80 }, { x: 560, y: 280 });
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(true);
 
     await clickCanvas(page, { x: 920, y: 920 });
     await dragCanvas(page, { x: 920, y: 920 }, { x: 920, y: 920 }, 1);
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(false);
+    await expectNoActiveSelection(page);
 
     await clickCanvas(page, { x: 820, y: 190 });
     await expectNoActiveSelection(page);

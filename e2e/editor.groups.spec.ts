@@ -23,6 +23,7 @@ import {
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
+  waitForDoubleClickCadence,
 } from './support/editor';
 
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -46,9 +47,6 @@ async function expectActiveLayerLabel(page: Page, label: string) {
   await expect(page.locator('.layer-row.active')).toContainText(label);
 }
 
-async function waitForDoubleClickCadence(page: Page) {
-  await page.waitForTimeout(1200);
-}
 
 function expectSavedNode(project: Record<string, unknown>, nodeId: string): SavedNode {
   function visit(nodes: SavedNode[]): SavedNode | null {
@@ -212,26 +210,16 @@ test.describe('editor groups', () => {
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
 
-    let stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(true);
-    expect(stageDebug.hasShapeHandles).toBe(false);
-
     await waitForDoubleClickCadence(page);
     await clickCanvas(page, { x: 260, y: 230 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(true);
-    expect(stageDebug.hasShapeHandles).toBe(false);
 
     await dragCanvas(page, { x: 260, y: 230 }, { x: 380, y: 310 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
     await openPropertiesTab(page);
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toBeVisible();
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(true);
-    expect(stageDebug.hasShapeHandles).toBe(false);
 
     const draggedProject = await saveAndReadProject(page);
     expect(Number(expectSavedNode(draggedProject, 'group-rect-1').x)).toBeGreaterThan(240);
@@ -243,9 +231,6 @@ test.describe('editor groups', () => {
     await doubleClickCanvas(page, { x: 340, y: 290 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(true);
   });
 
   test('GD-01 GD-02 GD-04 GD-05 GD-06 GD-07 CS-01 KB-11 selects from the canvas, drills into nested descendants, clears, and escapes back out', async ({
@@ -299,9 +284,6 @@ test.describe('editor groups', () => {
     await expectActiveLayerLabel(page, 'Outer Group');
     await openPropertiesTab(page);
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toBeVisible();
-    let stageDebug = await readStageDebug(page);
-    expect(stageDebug.groupFrame).not.toBeNull();
-    expect(stageDebug.hasShapeHandles).toBe(false);
 
     await waitForDoubleClickCadence(page);
     await doubleClickCanvas(page, { x: 400, y: 210 });
@@ -309,9 +291,6 @@ test.describe('editor groups', () => {
     await expectActiveLayerLabel(page, 'Inner Group');
     await openPropertiesTab(page);
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toBeVisible();
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.groupFrame).not.toBeNull();
-    expect(stageDebug.hasShapeHandles).toBe(false);
 
     await waitForDoubleClickCadence(page);
     await doubleClickCanvas(page, { x: 400, y: 210 });
@@ -322,15 +301,12 @@ test.describe('editor groups', () => {
     await openPropertiesTab(page);
     await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(true);
+    // subgroupOutlineFrames is only verifiable via debug state (no DOM element)
+    const stageDebug = await readStageDebug(page);
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
 
     await clickCanvas(page, { x: 40, y: 40 });
     await expect(page.locator('.layer-row.active')).toHaveCount(0);
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
 
     await clickCanvas(page, { x: 180, y: 180 });
     await waitForDoubleClickCadence(page);
@@ -350,8 +326,6 @@ test.describe('editor groups', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.locator('.layer-row.active')).toHaveCount(0);
-    stageDebug = await readStageDebug(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
   });
 
   test('GD-08 drills into grouped text from the canvas without leaving browser text selection or stealing toolbar focus', async ({

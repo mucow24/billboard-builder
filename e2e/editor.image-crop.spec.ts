@@ -19,16 +19,8 @@ import {
   setCanvasTestHooksEnabled,
   uploadProject,
   waitForDoubleClickCadence,
+  collectLeafNodes,
 } from './support/editor';
-
-function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
-  return nodes.flatMap((node) => {
-    if (node.kind === 'group' && Array.isArray(node.children)) {
-      return collectLeafNodes(node.children as Array<Record<string, unknown>>);
-    }
-    return [node];
-  });
-}
 
 async function expectActiveLayerId(page: Page, nodeId: string) {
   const rowSelect = page.getByTestId(`layers-row-${nodeId}`);

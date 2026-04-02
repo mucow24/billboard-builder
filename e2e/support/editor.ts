@@ -907,6 +907,15 @@ export async function startToolbarFileChooser(page: Page, triggerName: string, i
   return chooser;
 }
 
+export function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
+  return nodes.flatMap((node) => {
+    if (node.kind === 'group' && Array.isArray(node.children)) {
+      return collectLeafNodes(node.children as Array<Record<string, unknown>>);
+    }
+    return [node];
+  });
+}
+
 function countVisibleLeafNodes(nodes: unknown[]): number {
   let count = 0;
   for (const node of nodes) {

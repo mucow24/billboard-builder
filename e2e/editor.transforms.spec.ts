@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   clickCanvas,
+  collectLeafNodes,
   createImageFixture,
   createLineFixture,
   createProjectDocument,
@@ -19,15 +20,6 @@ import {
   setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
-
-function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
-  return nodes.flatMap((node) => {
-    if (node.kind === 'group' && Array.isArray(node.children)) {
-      return collectLeafNodes(node.children as Array<Record<string, unknown>>);
-    }
-    return [node];
-  });
-}
 
 function rotatePoint(
   point: { x: number; y: number },

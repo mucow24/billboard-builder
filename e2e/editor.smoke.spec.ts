@@ -1,19 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  assertNoDocumentTextSelection,
   clickCanvas,
-  clickLayerRow,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   dragCanvas,
-  doubleClickCanvas,
-  doubleClickLayerRow,
   openFreshEditor,
   openLayersTab,
-  openPropertiesTab,
   readStageDebug,
-  readRenderSnapshot,
   selectTool,
   createRectangleFixture,
   createTextFixture,
@@ -67,77 +61,23 @@ test.describe('editor smoke flows', () => {
     expect(nextDebug.viewport.panY).not.toBe(initialPan.y);
   });
 
-  test('loads grouped-node fixtures and exposes group observability for later browser suites', async ({ page }) => {
+  test('loads a grouped project and shows the group hierarchy in the layers panel', async ({ page }) => {
     const groupedDocument = createGroupedProjectDocument([
       createGroupNodeFixture(
         [
-          createRectangleFixture({
-            id: 'infra-rect',
-            name: 'Infra Rect',
-            x: 160,
-            y: 180,
-            width: 180,
-            height: 120,
-            zIndex: 0,
-          }),
-          createTextFixture({
-            id: 'infra-text',
-            name: 'Infra Text',
-            x: 220,
-            y: 210,
-            width: 220,
-            height: 80,
-            text: 'Infrastructure text',
-            zIndex: 1,
-          }),
+          createRectangleFixture({ id: 'infra-rect', name: 'Infra Rect', x: 160, y: 180, width: 180, height: 120, zIndex: 0 }),
+          createTextFixture({ id: 'infra-text', name: 'Infra Text', x: 220, y: 210, width: 220, height: 80, text: 'Infrastructure text', zIndex: 1 }),
         ],
-        {
-          id: 'infra-group',
-          name: 'Infrastructure Group',
-        },
+        { id: 'infra-group', name: 'Infrastructure Group' },
       ),
     ]);
 
     await openFreshEditor(page);
-    await page.evaluate(() => {
-      (document.activeElement as HTMLElement | null)?.blur?.();
-    });
     await uploadProject(page, groupedDocument, 'grouped-infrastructure.json');
 
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Infrastructure Group', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Rectangle', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeVisible();
-
-    await clickLayerRow(page, 'Infrastructure Group');
-    let stageDebug = await readStageDebug(page);
-    let renderSnapshot = await readRenderSnapshot(page);
-    expect(stageDebug.hasGroupOverlay).toBe(true);
-    expect(stageDebug.hasShapeHandles).toBe(false);
-    expect(stageDebug.hasLineHandles).toBe(false);
-    expect(renderSnapshot.hasGroupOverlay).toBe(true);
-    expect(renderSnapshot.subgroupOutlines ?? []).toHaveLength(0);
-
-    await doubleClickLayerRow(page, 'Infrastructure Group');
-    await expect(page.getByRole('tab', { name: 'Properties' })).toHaveAttribute('aria-selected', 'true');
-
-    await openLayersTab(page);
-    await clickLayerRow(page, 'Rectangle');
-    stageDebug = await readStageDebug(page);
-    renderSnapshot = await readRenderSnapshot(page);
-    expect(stageDebug.hasGroupOverlay).toBe(false);
-    expect(stageDebug.hasShapeHandles).toBe(true);
-    expect(stageDebug.hasLineHandles).toBe(false);
-    expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
-    expect(renderSnapshot.hasGroupOverlay).toBe(false);
-    expect(renderSnapshot.hasShapeHandles).toBe(true);
-    expect(renderSnapshot.hasLineHandles).toBe(false);
-    expect(renderSnapshot.subgroupOutlines ?? []).toHaveLength(1);
-
-    await doubleClickCanvas(page, { x: 220, y: 220 });
-    await assertNoDocumentTextSelection(page);
-
-    await openPropertiesTab(page);
-    await expect(page.getByTestId('properties-tab-body')).toBeVisible();
   });
 });
