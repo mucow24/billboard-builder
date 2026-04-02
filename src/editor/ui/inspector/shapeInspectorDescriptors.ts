@@ -5,6 +5,7 @@ import {
   createGeometryField,
   createNumberField,
   createSwapFillColorsDescriptor,
+  ROTATION_FIELD_EXTRA,
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
@@ -31,11 +32,15 @@ export function createShapeDescriptors(
       fieldOrder: 20,
       getValue: (item) => ('strokeWidth' in item ? item.strokeWidth : 0),
       label: 'Stroke width',
+      max: 50,
       min: itemKind === 'line' ? 1 : 0,
       propertyKey: 'strokeWidth',
       sectionKey: 'stroke',
       sectionLabel: 'Stroke',
       sectionOrder: SECTION_ORDER.stroke,
+      slider: true,
+      step: 1,
+      textMax: Infinity,
 
       valueType: 'number',
     }),
@@ -141,7 +146,7 @@ export function createShapeDescriptors(
         50,
         (item) => item.rotation,
         (_context, nextValue) => ({ rotation: nextValue }),
-        { digits: 0, step: 1 }
+        ROTATION_FIELD_EXTRA,
       )
     );
   }
@@ -154,7 +159,7 @@ export function createShapeDescriptors(
         60,
         (item) => (item.kind === 'rectangle' ? item.cornerRadius : 0),
         (_context, nextValue) => ({ cornerRadius: nextValue }),
-        { digits: 1, min: 0 }
+        { digits: 1, max: 250, min: 0, slider: true, step: 1, textMax: Infinity }
       )
     );
   }

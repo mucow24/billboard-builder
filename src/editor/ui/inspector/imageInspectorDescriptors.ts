@@ -8,6 +8,7 @@ import {
   createDimensionsField,
   createGeometryField,
   createNumberField,
+  ROTATION_FIELD_EXTRA,
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import { buildImageAdjustmentsChange } from './inspectorModel';
@@ -130,6 +131,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       sectionKey: 'image',
       sectionLabel: 'Image',
       sectionOrder: SECTION_ORDER.image,
+      slider: true,
       step: 0.1,
 
       valueType: 'number',
@@ -149,7 +151,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       50,
       (item) => item.rotation,
       (_context, nextValue) => ({ rotation: nextValue }),
-      { digits: 0, step: 1 }
+      ROTATION_FIELD_EXTRA,
     ),
   ];
 }

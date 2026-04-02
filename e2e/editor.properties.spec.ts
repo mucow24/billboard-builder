@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   clickCanvas,
@@ -12,6 +12,19 @@ import {
   saveAndReadProject,
   uploadProject,
 } from './support/editor';
+
+async function expectSliders(page: Page, sectionName: string, labels: string[]) {
+  const toggle = page.locator('button.property-block-toggle').filter({
+    has: page.locator('span', { hasText: new RegExp(`^${sectionName}$`) }),
+  });
+  if (await toggle.getAttribute('aria-expanded') !== 'true') {
+    await toggle.click();
+  }
+  const section = toggle.locator('..');
+  for (const label of labels) {
+    await expect(section.getByRole('slider', { name: label, exact: true })).toBeVisible();
+  }
+}
 
 test.describe('editor properties flows', () => {
   test('PI-01 PI-05 shows the empty state and updates shared opacity for multi-selection', async ({
@@ -441,5 +454,68 @@ test.describe('editor properties flows', () => {
         }),
       }),
     ]);
+  });
+
+  test('numeric properties render slider+input combos', async ({ page }) => {
+    const rectangle = createRectangleFixture({
+      id: 'slider-rect',
+      name: 'Slider Rectangle',
+      x: 140,
+      y: 160,
+      width: 180,
+      height: 120,
+      zIndex: 0,
+    });
+    const text = createTextFixture({
+      id: 'slider-text',
+      name: 'Slider Text',
+      x: 420,
+      y: 160,
+      width: 280,
+      height: 96,
+      zIndex: 1,
+    });
+    const image = createImageFixture({
+      id: 'slider-image',
+      name: 'Slider Image',
+      x: 140,
+      y: 380,
+      width: 160,
+      height: 90,
+      zIndex: 2,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([rectangle, text, image]),
+      'properties-sliders.json',
+    );
+
+    const inspector = page.getByTestId('properties-tab-body');
+
+    // Rectangle: stroke width, corner radius, rotation, blur radius, shadow fields
+    await clickCanvas(page, { x: 230, y: 220 });
+    await openPropertiesTab(page);
+    await expect(inspector.getByText('Slider Rectangle')).toBeVisible();
+    await expectSliders(page, 'Stroke', ['Stroke width']);
+    await expectSliders(page, 'Geometry', ['Rotation', 'Corner radius']);
+    await expectSliders(page, 'Blur', ['Blur radius']);
+    await expectSliders(page, 'Shadow', ['Blur', 'Opacity', 'Offset X', 'Offset Y']);
+
+    // Text: font size, line height, character spacing, rotation
+    await clickCanvas(page, { x: 560, y: 208 });
+    await openPropertiesTab(page);
+    await expect(inspector.getByText('Slider Text')).toBeVisible();
+    await expectSliders(page, 'Text', ['Size']);
+    await expectSliders(page, 'Advanced text', ['Line height', 'Character spacing']);
+    await expectSliders(page, 'Geometry', ['Rotation']);
+
+    // Image: opacity, rotation
+    await clickCanvas(page, { x: 220, y: 420 });
+    await openPropertiesTab(page);
+    await expect(inspector.getByText('Slider Image')).toBeVisible();
+    await expectSliders(page, 'Image', ['Opacity']);
+    await expectSliders(page, 'Geometry', ['Rotation']);
   });
 });
