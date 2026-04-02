@@ -365,6 +365,62 @@ test.describe('editor transforms', () => {
     expect(savedImage?.sourceTransform?.rotation).toBe(0);
   });
 
+  test('ST-13a snaps a rotated item using its AABB, not its unrotated bounds', async ({ page }) => {
+    // A 200x100 rect at (100,300) rotated 45° has AABB right edge ≈ 241.4.
+    // Unrotated right edge would be at 300. Sibling left is at 480.
+    // We drag so AABB right overshoots 480 by ~5px → AABB snap fires.
+    // No unrotated edge is near any snap target, proving AABB is used.
+    const movable = createRectangleFixture({
+      id: 'rotated-snap',
+      x: 100,
+      y: 300,
+      width: 200,
+      height: 100,
+      rotation: 45,
+      zIndex: 0,
+    });
+    const sibling = createRectangleFixture({
+      id: 'snap-target',
+      x: 480,
+      y: 300,
+      width: 240,
+      height: 120,
+      fill: '#0ea5e9',
+      stroke: '#0369a1ff',
+      zIndex: 1,
+    });
+
+    const clickPoint = { x: 135, y: 406 };
+    const dragTarget = { x: clickPoint.x + 244, y: clickPoint.y };
+    const document = createProjectDocument([movable, sibling]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'rotated-snap-enabled.json');
+    await clickCanvas(page, clickPoint);
+    await dragCanvas(page, clickPoint, dragTarget);
+    const snappedProject = await saveAndReadProject(page);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'rotated-snap-disabled.json');
+    await clickCanvas(page, clickPoint);
+    await dragCanvasWithModifier(page, 'Control', clickPoint, dragTarget);
+    const unsnappedProject = await saveAndReadProject(page);
+
+    const snappedItem = collectLeafNodes(snappedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'rotated-snap',
+    );
+    const unsnappedItem = collectLeafNodes(unsnappedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'rotated-snap',
+    );
+
+    expect(snappedItem).toBeDefined();
+    expect(unsnappedItem).toBeDefined();
+    // Snap pulls item leftward to align AABB right edge with sibling left (480)
+    expect(Number(snappedItem?.x)).toBeLessThan(Number(unsnappedItem?.x));
+    // AABB right = item.x + 141.42 for this geometry; snapped AABB right = 480
+    expect(Number(snappedItem?.x)).toBeCloseTo(339, 0);
+  });
+
   test('ST-13 disables snapping during a control-modified item drag', async ({ page }) => {
     const movable = createRectangleFixture({
       id: 'snap-movable',

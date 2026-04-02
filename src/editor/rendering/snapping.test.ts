@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { createLineItem, createRectangleItem } from '../document/documentDefaults';
-import { getItemRect, getResizeSnappedRect, getSnappedRect } from './snapping';
+import { getItemAABB } from './selectionGeometry';
+import { buildCandidateCache, getItemRect, getResizeSnappedRect, getSnappedRect, isMultipleOf90 } from './snapping';
 
 describe('snapping geometry', () => {
   it('snaps to the stage center when the moving item is close enough', () => {
@@ -172,5 +173,95 @@ describe('snapping geometry', () => {
       orientation: 'horizontal',
       position: 330,
     });
+  });
+});
+
+describe('isMultipleOf90', () => {
+  it('returns true for exact multiples of 90', () => {
+    expect(isMultipleOf90(0)).toBe(true);
+    expect(isMultipleOf90(90)).toBe(true);
+    expect(isMultipleOf90(180)).toBe(true);
+    expect(isMultipleOf90(270)).toBe(true);
+    expect(isMultipleOf90(360)).toBe(true);
+  });
+
+  it('returns true for negative multiples of 90', () => {
+    expect(isMultipleOf90(-90)).toBe(true);
+    expect(isMultipleOf90(-180)).toBe(true);
+    expect(isMultipleOf90(-270)).toBe(true);
+  });
+
+  it('returns false for non-multiples of 90', () => {
+    expect(isMultipleOf90(45)).toBe(false);
+    expect(isMultipleOf90(30)).toBe(false);
+    expect(isMultipleOf90(135)).toBe(false);
+    expect(isMultipleOf90(1)).toBe(false);
+  });
+});
+
+describe('getItemAABB', () => {
+  it('returns the same bounds as getRenderBox for an unrotated item', () => {
+    const item = createRectangleItem({ x: 100, y: 200, width: 300, height: 150, rotation: 0 });
+    const aabb = getItemAABB(item);
+    expect(aabb).toEqual({ x: 100, y: 200, width: 300, height: 150 });
+  });
+
+  it('returns swapped dimensions for a 90-degree rotated item', () => {
+    // A 100x60 rect at (200, 100) rotated 90°:
+    // Corners rotate around top-left (200, 100):
+    //   (200,100) → (200,100)
+    //   (300,100) → (200,200)
+    //   (300,160) → (140,200)
+    //   (200,160) → (140,100)
+    // AABB: x=140, y=100, width=60, height=100
+    const item = createRectangleItem({ x: 200, y: 100, width: 100, height: 60, rotation: 90 });
+    const aabb = getItemAABB(item);
+    expect(aabb.x).toBeCloseTo(140, 5);
+    expect(aabb.y).toBeCloseTo(100, 5);
+    expect(aabb.width).toBeCloseTo(60, 5);
+    expect(aabb.height).toBeCloseTo(100, 5);
+  });
+
+  it('returns an expanded AABB for a 45-degree rotated item', () => {
+    // A 100x100 square at (0, 0) rotated 45°:
+    // The diagonal is 100*sqrt(2) ≈ 141.4
+    // The AABB should be larger than the original 100x100
+    const item = createRectangleItem({ x: 0, y: 0, width: 100, height: 100, rotation: 45 });
+    const aabb = getItemAABB(item);
+    // At 45°, a square becomes a diamond; AABB is wider and taller
+    expect(aabb.width).toBeGreaterThan(100);
+    expect(aabb.height).toBeGreaterThan(100);
+    // Both dimensions should be ~141.4 for a square rotated 45°
+    expect(aabb.width).toBeCloseTo(141.42, 0);
+    expect(aabb.height).toBeCloseTo(141.42, 0);
+  });
+
+  it('returns line bounds unchanged (lines have no rotation)', () => {
+    const line = createLineItem({ startX: 100, startY: 50, endX: 300, endY: 200 });
+    const aabb = getItemAABB(line);
+    expect(aabb).toEqual(getItemRect(line));
+  });
+});
+
+describe('buildCandidateCache with rotated siblings', () => {
+  it('uses AABB edges of a rotated sibling as snap candidates', () => {
+    const stageRect = { x: 0, y: 0, width: 1024, height: 1024 };
+    // A 100x60 rect at (200, 100) rotated 90°
+    // AABB: x=140, y=100, w=60, h=100
+    const rotatedSibling = createRectangleItem({
+      x: 200, y: 100, width: 100, height: 60, rotation: 90,
+    });
+    const cache = buildCandidateCache([rotatedSibling], stageRect);
+
+    // Vertical candidates should include AABB left (140), center (170), right (200)
+    expect(cache.vertical).toContain(512); // stage center
+    // Check that the AABB-based values are present (not the unrotated values)
+    const aabb = getItemAABB(rotatedSibling);
+    expect(cache.vertical).toContainEqual(expect.closeTo(aabb.x, 5));
+    expect(cache.vertical).toContainEqual(expect.closeTo(aabb.x + aabb.width / 2, 5));
+    expect(cache.vertical).toContainEqual(expect.closeTo(aabb.x + aabb.width, 5));
+    expect(cache.horizontal).toContainEqual(expect.closeTo(aabb.y, 5));
+    expect(cache.horizontal).toContainEqual(expect.closeTo(aabb.y + aabb.height / 2, 5));
+    expect(cache.horizontal).toContainEqual(expect.closeTo(aabb.y + aabb.height, 5));
   });
 });

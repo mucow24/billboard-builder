@@ -474,6 +474,50 @@ describe('interaction geometry', () => {
     );
   });
 
+  it('snaps resize edges for a 90-degree rotated item', () => {
+    // 200x100 rect at (300, 200) rotated 90°. At 90°, the local right edge
+    // maps to stage horizontal (bottom of AABB at y = origin.y + width = 400).
+    // Place sibling with top edge at y=400 so the right handle snaps to it.
+    const item = createRectangleItem({ x: 300, y: 200, width: 200, height: 100, rotation: 90 });
+    const sibling = createRectangleItem({ x: 480, y: 400, width: 200, height: 100 });
+    const stageRect = { x: 0, y: 0, width: 1024, height: 1024 };
+
+    // Pointer: at 90°, stageToLocal({300, 404}, {300,200}, 90) → local {204, 0}.
+    // middle-right sets rawEdges.right = 204. Stage value = 200 + 204 = 404.
+    // Sibling top is at 400 → 4px away → within threshold 8 → snaps.
+    const result = solveResizeSession(
+      item,
+      'middle-right',
+      { x: 300, y: 404 },
+      { x: 0, y: 0 },
+      [sibling],
+      stageRect,
+      true,
+    );
+
+    expect(result.guides.length).toBeGreaterThan(0);
+    expect(result.guides[0].orientation).toBe('horizontal');
+    expect(result.guides[0].position).toBe(400);
+  });
+
+  it('does not snap resize edges for a 45-degree rotated item', () => {
+    const item = createRectangleItem({ x: 300, y: 200, width: 200, height: 100, rotation: 45 });
+    const sibling = createRectangleItem({ x: 480, y: 200, width: 200, height: 100 });
+    const stageRect = { x: 0, y: 0, width: 1024, height: 1024 };
+
+    const result = solveResizeSession(
+      item,
+      'middle-right',
+      { x: 500, y: 350 },
+      { x: 0, y: 0 },
+      [sibling],
+      stageRect,
+      true,
+    );
+
+    expect(result.guides).toEqual([]);
+  });
+
   it('identifies the supported creation tools explicitly', () => {
     expect(isCreateTool('text')).toBe(true);
     expect(isCreateTool('rectangle')).toBe(true);

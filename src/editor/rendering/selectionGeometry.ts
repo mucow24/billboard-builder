@@ -37,6 +37,21 @@ export function getItemSelectionPoints(item: CanvasItem): Point[] {
   }));
 }
 
+export function getItemAABB(item: CanvasItem): RenderBox {
+  if (item.kind === 'line' || Math.abs(item.rotation) < 0.001) {
+    return getRenderBox(item);
+  }
+  const points = getItemSelectionPoints(item);
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(1, Math.max(...xs) - Math.min(...xs)),
+    height: Math.max(1, Math.max(...ys) - Math.min(...ys)),
+  };
+}
+
 export function getSelectionRenderBounds(items: CanvasItem[]): RenderBox | null {
   if (items.length === 0) {
     return null;

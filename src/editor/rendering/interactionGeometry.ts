@@ -13,8 +13,9 @@ import type {
   SnapRect,
 } from '../document/documentTypes';
 import { scaleImageSourceTransform } from './imagePresentation';
+import { getItemAABB } from './selectionGeometry';
 import { getRenderBox } from './transformGeometry';
-import { getItemRect, getSnappedRect, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
+import { getItemRect, getSnappedRect, isMultipleOf90, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
 import { measureWordWrappedTextHeight } from './textMeasurement';
 
 export interface Point {
@@ -56,6 +57,32 @@ export const RESIZE_HANDLE_NAMES: ResizeHandle[] = [
 
 function toRadians(rotation: number) {
   return (rotation * Math.PI) / 180;
+}
+
+/**
+ * For a local edge at 90-degree-multiple rotations, returns the stage-space
+ * value, snap orientation, and derivative for reverse-mapping snap deltas.
+ */
+function getStageEdgeInfo(
+  localEdgeValue: number,
+  localAxis: 'x' | 'y',
+  origin: Point,
+  rotation: number,
+): { stageValue: number; orientation: 'vertical' | 'horizontal'; derivative: number } {
+  const cos = Math.cos(toRadians(rotation));
+  const sin = Math.sin(toRadians(rotation));
+  if (localAxis === 'x') {
+    // localToStage({localEdge, 0}, origin, rot) → {origin.x + edge*cos, origin.y + edge*sin}
+    if (Math.abs(cos) > Math.abs(sin)) {
+      return { stageValue: origin.x + localEdgeValue * cos, orientation: 'vertical', derivative: cos };
+    }
+    return { stageValue: origin.y + localEdgeValue * sin, orientation: 'horizontal', derivative: sin };
+  }
+  // localToStage({0, localEdge}, origin, rot) → {origin.x - edge*sin, origin.y + edge*cos}
+  if (Math.abs(cos) > Math.abs(sin)) {
+    return { stageValue: origin.y + localEdgeValue * cos, orientation: 'horizontal', derivative: cos };
+  }
+  return { stageValue: origin.x - localEdgeValue * sin, orientation: 'vertical', derivative: -sin };
 }
 
 export function rotateVector(point: Point, rotation: number): Point {
@@ -223,7 +250,7 @@ function buildSnapCandidates(
   const horizontal = [0, stageRect.height / 2, stageRect.height];
 
   for (const sibling of siblingItems) {
-    const rect = getItemRect(sibling);
+    const rect = getItemAABB(sibling);
     vertical.push(rect.x, rect.x + rect.width / 2, rect.x + rect.width);
     horizontal.push(rect.y, rect.y + rect.height / 2, rect.y + rect.height);
   }
@@ -365,19 +392,22 @@ export function solveDragSession(
   }
 
   const renderBox = getRenderBox(item);
-  const rawRect = {
-    x: renderBox.x + deltaX,
-    y: renderBox.y + deltaY,
-    width: renderBox.width,
-    height: renderBox.height,
+  const aabb = getItemAABB(item);
+  const rawAABB = {
+    x: aabb.x + deltaX,
+    y: aabb.y + deltaY,
+    width: aabb.width,
+    height: aabb.height,
   };
-  const snapped = snapEnabled ? getSnappedRect(rawRect, siblingItems, stageRect, threshold, cache) : { rect: rawRect, guides: [] };
+  const snapped = snapEnabled ? getSnappedRect(rawAABB, siblingItems, stageRect, threshold, cache) : { rect: rawAABB, guides: [] };
+  const snapDeltaX = snapped.rect.x - rawAABB.x;
+  const snapDeltaY = snapped.rect.y - rawAABB.y;
 
   return {
     item: {
       ...item,
-      x: snapped.rect.x,
-      y: snapped.rect.y,
+      x: renderBox.x + deltaX + snapDeltaX,
+      y: renderBox.y + deltaY + snapDeltaY,
       scaleX: 1,
       scaleY: 1,
     },
@@ -478,60 +508,37 @@ export function solveResizeSession(
       : rawEdges;
 
   const guides: GuideLine[] = [];
-  if (snapEnabled && Math.abs(item.rotation) < 0.001) {
+  if (snapEnabled && isMultipleOf90(item.rotation)) {
+    const origin = { x: renderBox.x, y: renderBox.y };
     if (handle.includes('left') || handle === 'middle-left') {
-      const snapped = snapValue(
-        renderBox.x + ratioEdges.left,
-        'vertical',
-        siblingItems,
-        stageRect,
-        threshold,
-        cache
-      );
+      const info = getStageEdgeInfo(ratioEdges.left, 'x', origin, item.rotation);
+      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
       if (snapped) {
-        ratioEdges.left = snapped.value - renderBox.x;
+        ratioEdges.left += (snapped.value - info.stageValue) / info.derivative;
         guides.push(snapped.guide);
       }
     }
     if (handle.includes('right') || handle === 'middle-right') {
-      const snapped = snapValue(
-        renderBox.x + ratioEdges.right,
-        'vertical',
-        siblingItems,
-        stageRect,
-        threshold,
-        cache
-      );
+      const info = getStageEdgeInfo(ratioEdges.right, 'x', origin, item.rotation);
+      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
       if (snapped) {
-        ratioEdges.right = snapped.value - renderBox.x;
+        ratioEdges.right += (snapped.value - info.stageValue) / info.derivative;
         guides.push(snapped.guide);
       }
     }
     if (handle.startsWith('top') || handle === 'top-center') {
-      const snapped = snapValue(
-        renderBox.y + ratioEdges.top,
-        'horizontal',
-        siblingItems,
-        stageRect,
-        threshold,
-        cache
-      );
+      const info = getStageEdgeInfo(ratioEdges.top, 'y', origin, item.rotation);
+      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
       if (snapped) {
-        ratioEdges.top = snapped.value - renderBox.y;
+        ratioEdges.top += (snapped.value - info.stageValue) / info.derivative;
         guides.push(snapped.guide);
       }
     }
     if (handle.startsWith('bottom') || handle === 'bottom-center') {
-      const snapped = snapValue(
-        renderBox.y + ratioEdges.bottom,
-        'horizontal',
-        siblingItems,
-        stageRect,
-        threshold,
-        cache
-      );
+      const info = getStageEdgeInfo(ratioEdges.bottom, 'y', origin, item.rotation);
+      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
       if (snapped) {
-        ratioEdges.bottom = snapped.value - renderBox.y;
+        ratioEdges.bottom += (snapped.value - info.stageValue) / info.derivative;
         guides.push(snapped.guide);
       }
     }

@@ -18,6 +18,7 @@ import {
   itemIntersectsSelectionRect,
   type RenderBox,
 } from './transformGeometry';
+import { getSelectionRenderBounds } from './selectionGeometry';
 import { buildCandidateCache, getResizeSnappedRect, getSnappedRect, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
 import type { RenderableCanvasItem } from './renderAdapter';
 import type {
@@ -636,28 +637,39 @@ export function resolveInteractionSession(
     case 'marquee':
       return { ...current, currentPointer: pointer };
     case 'group-drag': {
-      const rawRect = {
-        x: current.bounds.x + (pointer.x - current.pointerStart.x),
-        y: current.bounds.y + (pointer.y - current.pointerStart.y),
-        width: current.bounds.width,
-        height: current.bounds.height,
+      const dragDeltaX = pointer.x - current.pointerStart.x;
+      const dragDeltaY = pointer.y - current.pointerStart.y;
+
+      // When the frame is rotated, current.bounds is NOT the AABB.
+      // Use the items' actual AABB for snap matching.
+      const snapBase = Math.abs(current.frameRotation) >= 0.001
+        ? getSelectionRenderBounds(current.originalItems) ?? current.bounds
+        : current.bounds;
+      const rawSnapRect = {
+        x: snapBase.x + dragDeltaX,
+        y: snapBase.y + dragDeltaY,
+        width: snapBase.width,
+        height: snapBase.height,
       };
       const snapped = current.snapDisabled
-        ? { rect: rawRect, guides: [] }
-        : getSnappedRect(rawRect, current.siblingItems, stageBounds, threshold, cache);
-      const resolvedPointer = {
-        x: current.pointerStart.x + (snapped.rect.x - current.bounds.x),
-        y: current.pointerStart.y + (snapped.rect.y - current.bounds.y),
-      };
+        ? { rect: rawSnapRect, guides: [] }
+        : getSnappedRect(rawSnapRect, current.siblingItems, stageBounds, threshold, cache);
+      const snapDeltaX = snapped.rect.x - rawSnapRect.x;
+      const snapDeltaY = snapped.rect.y - rawSnapRect.y;
+      const totalDeltaX = dragDeltaX + snapDeltaX;
+      const totalDeltaY = dragDeltaY + snapDeltaY;
       return {
         ...current,
         snapCache: cache,
-        currentPointer: resolvedPointer,
+        currentPointer: {
+          x: current.pointerStart.x + totalDeltaX,
+          y: current.pointerStart.y + totalDeltaY,
+        },
         guides: snapped.guides,
         previewItems: buildGroupDragPreviews(
           current.originalItems,
-          snapped.rect.x - current.bounds.x,
-          snapped.rect.y - current.bounds.y
+          totalDeltaX,
+          totalDeltaY
         ),
       };
     }
