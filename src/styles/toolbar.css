@@ -2,21 +2,10 @@
   position: relative;
   z-index: 20;
   width: 100%;
-  --toolbar-shell: rgba(6, 11, 23, 0.84);
-  --toolbar-surface: rgba(19, 28, 46, 0.98);
-  --toolbar-surface-hover: rgba(26, 39, 63, 1);
-  --toolbar-border: rgba(148, 163, 184, 0.28);
-  --toolbar-border-strong: rgba(129, 140, 248, 0.62);
-  --toolbar-border-active: rgba(125, 211, 252, 0.9);
-  --toolbar-text: #f8fbff;
-  --toolbar-text-muted: #c2d1e8;
-  --toolbar-text-disabled: rgba(248, 251, 255, 0.4);
-  --toolbar-disabled-fill: rgba(12, 20, 34, 0.67);
   --toolbar-gap: 6px;
-  --toolbar-control-size: 1.8rem;
   padding: 6px;
   backdrop-filter: blur(18px);
-  background: var(--toolbar-shell);
+  background: var(--surface-shell);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 4px;
   box-shadow:
@@ -43,12 +32,12 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  height: var(--toolbar-control-size);
-  min-height: var(--toolbar-control-size);
-  border-radius: 3px;
-  border-color: var(--toolbar-border);
-  background: var(--toolbar-surface);
-  color: var(--toolbar-text);
+  height: var(--control-size);
+  min-height: var(--control-size);
+  border-radius: var(--radius-base);
+  border-color: var(--border-default);
+  background: var(--surface-base);
+  color: var(--text-primary);
   transition:
     border-color 150ms ease,
     background 150ms ease,
@@ -63,7 +52,7 @@
 
 .top-toolbar .top-toolbar-button,
 .top-toolbar .top-toolbar-field {
-  border: 1px solid var(--toolbar-border);
+  border: 1px solid var(--border-default);
 }
 
 .top-toolbar .top-toolbar-control {
@@ -102,7 +91,7 @@
 }
 
 .top-toolbar-menu-caret {
-  color: var(--toolbar-text-muted);
+  color: var(--text-secondary);
   font-size: 0.72rem;
   line-height: 1;
 }
@@ -129,7 +118,7 @@
   min-height: 2rem;
   padding: 0.32rem 0.7rem;
   border: 1px solid rgba(125, 211, 252, 0.34);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background:
     linear-gradient(135deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.94)),
     rgba(15, 23, 42, 0.96);
@@ -177,11 +166,11 @@
 }
 
 .top-toolbar-popover.open > .top-toolbar-control {
-  border-color: var(--toolbar-border-active);
+  border-color: var(--border-active);
   border-bottom-color: transparent;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
   z-index: 6;
 }
 
@@ -192,7 +181,7 @@
   left: 1px;
   width: calc(100% - 2px);
   height: 1px;
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
   z-index: 6;
 }
 
@@ -206,9 +195,9 @@
   flex-direction: column;
   gap: 0;
   padding: 3px;
-  border: 1px solid var(--toolbar-border-active);
+  border: 1px solid var(--border-active);
   border-radius: 0 0 3px 3px;
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
   box-shadow:
     0 24px 44px rgba(2, 6, 23, 0.42),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -222,7 +211,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--toolbar-border-active);
+  background: var(--border-active);
 }
 
 .top-toolbar .top-toolbar-menu-item {
@@ -233,9 +222,9 @@
   min-height: 0;
   padding: 0.4rem 0.46rem;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-base);
   background: transparent;
-  color: var(--toolbar-text);
+  color: var(--text-primary);
   font-size: 0.82rem;
   font-weight: 600;
   text-align: left;
@@ -284,11 +273,11 @@
 }
 
 .top-toolbar .top-toolbar-icon-button {
-  width: var(--toolbar-control-size);
-  min-width: var(--toolbar-control-size);
-  height: var(--toolbar-control-size);
+  width: var(--control-size);
+  min-width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-base);
 }
 
 .top-toolbar .top-toolbar-size-panel {
@@ -300,7 +289,7 @@
   align-items: center;
   gap: 8px;
   padding: 0.4rem 0.46rem;
-  border-radius: 3px;
+  border-radius: var(--radius-base);
 }
 
 .top-toolbar .top-toolbar-size-menu-label,
@@ -310,7 +299,7 @@
 }
 
 .top-toolbar .top-toolbar-size-menu-label {
-  color: var(--toolbar-text-muted);
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 600;
   white-space: nowrap;
@@ -340,8 +329,8 @@
 .top-toolbar .top-toolbar-field:disabled,
 .top-toolbar .top-toolbar-icon-button:disabled {
   border-color: rgba(148, 163, 184, 0.16);
-  background: var(--toolbar-disabled-fill);
-  color: var(--toolbar-text-disabled);
+  background: var(--surface-disabled);
+  color: var(--text-disabled);
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -385,10 +374,10 @@
   flex: 1 1 0;
   padding: 0 0.55rem;
   border: none;
-  border-left: 1px solid var(--toolbar-border);
+  border-left: 1px solid var(--border-default);
   border-radius: 0;
   background: transparent;
-  color: var(--toolbar-text);
+  color: var(--text-primary);
   font-size: 11px;
   font-weight: 700;
   gap: 5px;
@@ -398,20 +387,20 @@
 }
 
 .top-toolbar .top-toolbar-inspector-tab:hover {
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
 }
 
 /* Active tab: highlighted but not connected to panel */
 .top-toolbar .top-toolbar-inspector-tab.active {
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
 }
 
 /* Connected tab: active + panel open — forms top of unified tab+panel shape */
 .top-toolbar .top-toolbar-inspector-tab.connected {
   position: relative;
-  border: 1px solid var(--toolbar-border-active);
+  border: 1px solid var(--border-active);
   border-bottom: none;
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
   z-index: 22;
 }
 
@@ -423,7 +412,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: var(--toolbar-surface-hover);
+  background: var(--surface-hover);
   z-index: 22;
 }
 
@@ -432,9 +421,9 @@
   height: 14px;
   padding: 0 4px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 3px;
+  border-radius: var(--radius-base);
   background: #273754;
-  color: #f8fbff;
+  color: var(--text-primary);
   font-size: 10px;
   display: inline-flex;
   align-items: center;

@@ -17,9 +17,9 @@
 .inspector-toggle-button,
 .segmented-control-button {
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 14px;
+  border-radius: var(--radius-base);
   background: rgba(12, 18, 32, 0.84);
-  color: #f8fbff;
+  color: var(--text-primary);
   transition:
     border-color 150ms ease,
     background 150ms ease,
