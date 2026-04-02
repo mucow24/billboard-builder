@@ -4,9 +4,9 @@
   width: 100%;
   padding: 0.55rem 0.7rem;
   border: 1px solid rgba(96, 165, 250, 0.26);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(6, 182, 212, 0.18));
-  color: #f8fbff;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
@@ -23,15 +23,6 @@
   gap: 1rem;
   min-width: 280px;
   min-height: 0;
-  /* Inspector variable definitions — used by child controls */
-  --inspector-shell: rgba(6, 11, 23, 0.84);
-  --inspector-surface: rgba(19, 28, 46, 0.98);
-  --inspector-surface-hover: rgba(26, 39, 63, 1);
-  --inspector-border: rgba(148, 163, 184, 0.28);
-  --inspector-border-active: rgba(125, 211, 252, 0.9);
-  --inspector-text: #f8fbff;
-  --inspector-text-muted: #c2d1e8;
-  --inspector-control-size: 1.8rem;
   /* Overlay / rail mode */
   display: flex;
   flex-direction: column;
@@ -57,7 +48,7 @@
   /* Compact rail refresh */
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 10px;
-  background: var(--inspector-shell);
+  background: var(--surface-shell);
   box-shadow:
     0 10px 22px rgba(2, 6, 23, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -152,7 +143,7 @@
   min-width: 2rem;
   height: 2rem;
   padding: 0 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: rgba(99, 102, 241, 0.16);
   color: #bfd3ff;
   font-size: 0.82rem;
@@ -265,18 +256,18 @@
   background:
     /* left edge */
     linear-gradient(
-      var(--toolbar-border-active, rgba(125, 211, 252, 0.9)),
-      var(--toolbar-border-active, rgba(125, 211, 252, 0.9))
+      var(--border-active),
+      var(--border-active)
     ) left top / 1px 100% no-repeat,
     /* right edge */
     linear-gradient(
-      var(--toolbar-border-active, rgba(125, 211, 252, 0.9)),
-      var(--toolbar-border-active, rgba(125, 211, 252, 0.9))
+      var(--border-active),
+      var(--border-active)
     ) right top / 1px 100% no-repeat,
     /* bottom edge */
     linear-gradient(
-      var(--toolbar-border-active, rgba(125, 211, 252, 0.9)),
-      var(--toolbar-border-active, rgba(125, 211, 252, 0.9))
+      var(--border-active),
+      var(--border-active)
     ) left bottom / 100% 1px no-repeat;
 }
 
@@ -292,11 +283,11 @@
   z-index: 20;
   background: linear-gradient(
     to left,
-    var(--toolbar-border-active, rgba(125, 211, 252, 0.9)) 0,
-    var(--toolbar-border-active, rgba(125, 211, 252, 0.9)) var(--connected-tab-right-offset, 0px),
+    var(--border-active) 0,
+    var(--border-active) var(--connected-tab-right-offset, 0px),
     transparent var(--connected-tab-right-offset, 0px),
     transparent calc(var(--connected-tab-right-offset, 0px) + var(--connected-tab-width, 0px)),
-    var(--toolbar-border-active, rgba(125, 211, 252, 0.9)) calc(var(--connected-tab-right-offset, 0px) + var(--connected-tab-width, 0px))
+    var(--border-active) calc(var(--connected-tab-right-offset, 0px) + var(--connected-tab-width, 0px))
   );
 }
 
@@ -305,9 +296,9 @@
   height: 14px;
   padding: 0 4px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 3px;
+  border-radius: var(--radius-base);
   background: #273754;
-  color: #f8fbff;
+  color: var(--text-primary);
   font-size: 10px;
 }
 

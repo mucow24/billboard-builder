@@ -1,9 +1,77 @@
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
 import { getAllGenerators } from '../generators';
 import { ToolbarMenuAction } from './ToolbarPrimitives';
+
+const GENERATOR_ICONS: Record<string, ReactNode> = {
+  bands: (
+    <>
+      <path d="M4 6h12" />
+      <path d="M4 10h12" />
+      <path d="M4 14h12" />
+    </>
+  ),
+  burst: (
+    <>
+      <path d="M10 3v14" />
+      <path d="M3 10h14" />
+      <path d="M5.05 5.05l9.9 9.9" />
+      <path d="M14.95 5.05l-9.9 9.9" />
+    </>
+  ),
+  zigzags: (
+    <>
+      <path d="M3 7l3.5-3.5L10 7l3.5-3.5L17 7" />
+      <path d="M3 13l3.5-3.5L10 13l3.5-3.5L17 13" />
+    </>
+  ),
+  flatGrid: (
+    <>
+      <rect x="4" y="4" width="12" height="12" rx="1" />
+      <path d="M4 10h12" />
+      <path d="M10 4v12" />
+    </>
+  ),
+  perspectiveGrid: (
+    <>
+      <path d="M4 16L10 4l6 12" />
+      <path d="M5.5 13h9" />
+      <path d="M7 10h6" />
+    </>
+  ),
+  scanlines: (
+    <>
+      <path d="M4 5h12" />
+      <path d="M4 8h12" />
+      <path d="M4 11h12" />
+      <path d="M4 14h12" />
+    </>
+  ),
+  noise: (
+    <>
+      <circle cx="6" cy="7" r="1" />
+      <circle cx="14" cy="5" r="1" />
+      <circle cx="10" cy="11" r="1" />
+      <circle cx="15" cy="14" r="1" />
+      <circle cx="5" cy="14" r="1" />
+    </>
+  ),
+  vignette: (
+    <>
+      <rect x="3" y="3" width="14" height="14" rx="2" />
+      <ellipse cx="10" cy="10" rx="5" ry="5" />
+    </>
+  ),
+  shapes: (
+    <>
+      <rect x="3" y="3" width="6" height="6" rx="1" />
+      <circle cx="14" cy="6" r="3" />
+      <path d="M10 17L7 12h6z" />
+    </>
+  ),
+};
 
 interface CanvasMenuProps {
   menuId: string;
@@ -140,7 +208,9 @@ export function GeneratorsMenu({ menuId, onAddGenerator, createMenuActionHandler
           key={spec.type}
           label={spec.label}
           onSelect={createMenuActionHandler(() => onAddGenerator(spec.type))}
-        />
+        >
+          {GENERATOR_ICONS[spec.type]}
+        </ToolbarMenuAction>
       ))}
     </div>
   );

@@ -1,0 +1,27 @@
+:root {
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --surface-shell: rgba(6, 11, 23, 0.84);
+  --surface-base: rgba(19, 28, 46, 0.98);
+  --surface-hover: rgba(26, 39, 63, 1);
+  --surface-disabled: rgba(12, 20, 34, 0.67);
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --text-primary: #f8fbff;
+  --text-secondary: #c2d1e8;
+  --text-disabled: rgba(248, 251, 255, 0.4);
+
+  /* ── Borders ───────────────────────────────────────────────────────────── */
+  --border-default: rgba(148, 163, 184, 0.28);
+  --border-active: rgba(125, 211, 252, 0.9);
+  --border-strong: rgba(129, 140, 248, 0.62);
+
+  /* ── Border radius ─────────────────────────────────────────────────────── */
+  --radius-sm: 2px;
+  --radius-base: 3px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  /* ── Control sizing ────────────────────────────────────────────────────── */
+  --control-size: 1.8rem;
+}
