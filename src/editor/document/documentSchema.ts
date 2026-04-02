@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { fileDtoToDocument, documentToFileDto } from './documentCodec';
 import { normalizeProjectDocument } from './documentNormalizer';
-import type { CanvasItem, CanvasNode, ProjectDocument } from './documentTypes';
+import type { CanvasNode, ProjectDocument } from './documentTypes';
 import type { ProjectFile } from './documentFileDto';
 
 const CanvasShadowSchema = z.object({
@@ -64,20 +64,20 @@ const BurstGeneratorParamsSchema = z.object({
   bandColorB: z.string(),
   burstRays: z.number().int().min(1),
   burstScale: z.number().min(0),
-  burstOpacity: z.number().min(0).max(1),
-  burstOffsetX: z.number(),
-  burstOffsetY: z.number(),
-  burstRotation: z.number(),
+  opacity: z.number().min(0).max(1),
+  offsetX: z.number(),
+  offsetY: z.number(),
+  rotation: z.number(),
 });
 
 const ZigzagsGeneratorParamsSchema = z.object({
   generatorType: z.literal('zigzags'),
   accentColor: z.string(),
   bandColorA: z.string(),
-  zigzagCount: z.number().int().min(0),
+  count: z.number().int().min(0),
   zigzagAmplitude: z.number().min(0),
-  zigzagThickness: z.number().min(0),
-  zigzagOpacity: z.number().min(0).max(1),
+  thickness: z.number().min(0),
+  opacity: z.number().min(0).max(1),
   seedOverride: z.number().nullable(),
 });
 
@@ -86,10 +86,10 @@ const FlatGridGeneratorParamsSchema = z.object({
   accentColor: z.string(),
   gridSpacingX: z.number().min(1),
   gridSpacingY: z.number().min(1),
-  gridThickness: z.number().min(0),
-  gridOffsetX: z.number(),
-  gridOffsetY: z.number(),
-  gridRotation: z.number(),
+  thickness: z.number().min(0),
+  offsetX: z.number(),
+  offsetY: z.number(),
+  rotation: z.number(),
 });
 
 const PerspectiveGridGeneratorParamsSchema = z.object({
@@ -99,26 +99,27 @@ const PerspectiveGridGeneratorParamsSchema = z.object({
   perspectiveDepth: z.number().int().min(1),
   perspectiveNear: z.number(),
   perspectiveExtent: z.number(),
-  perspectiveThickness: z.number().min(0),
+  thickness: z.number().min(0),
   perspectiveThicknessFalloff: z.number().min(0),
   perspectiveRows: z.number().int().min(0),
 });
 
 const ScanlinesGeneratorParamsSchema = z.object({
   generatorType: z.literal('scanlines'),
-  scanlineSpacing: z.number().int().min(1),
-  scanlineOpacity: z.number().min(0).max(1),
+  scanlineColor: z.string(),
+  scanlineHeight: z.number().int().min(1),
+  scanlineSpacing: z.number().int().min(0),
 });
 
 const NoiseGeneratorParamsSchema = z.object({
   generatorType: z.literal('noise'),
-  noise: z.number().min(0).max(1),
+  intensity: z.number().min(0).max(1),
   seedOverride: z.number().nullable(),
 });
 
 const VignetteGeneratorParamsSchema = z.object({
   generatorType: z.literal('vignette'),
-  vignette: z.number().min(0).max(1),
+  intensity: z.number().min(0).max(1),
 });
 
 const ShapeTypesSchema = z.object({
@@ -135,11 +136,11 @@ const ShapesGeneratorParamsSchema = z.object({
   bandColorA: z.string(),
   bandColorB: z.string(),
   shapeTypes: ShapeTypesSchema,
-  shapeCount: z.number().int().min(0),
+  count: z.number().int().min(0),
   shapeMinSize: z.number().min(0),
   shapeMaxSize: z.number().min(0),
-  shapeRotation: z.number().min(0),
-  shapeOpacity: z.number().min(0).max(1),
+  rotation: z.number().min(0),
+  opacity: z.number().min(0).max(1),
   shapeOutline: z.number().min(0),
   shapeMix: z.number().min(0).max(1),
   seedOverride: z.number().nullable(),
@@ -157,7 +158,7 @@ const GeneratorParamsSchema = z.discriminatedUnion('generatorType', [
   ShapesGeneratorParamsSchema,
 ]);
 
-const BaseCanvasItemSchemaV1 = z.object({
+const BaseCanvasItemSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line', 'generator']),
   name: z.string().min(1),
@@ -168,15 +169,15 @@ const BaseCanvasItemSchemaV1 = z.object({
   rotation: z.number(),
   scaleX: z.number(),
   scaleY: z.number(),
-  zIndex: z.number().int().nonnegative(),
   locked: z.boolean(),
   lockAspectRatio: z.boolean().optional(),
   hidden: z.boolean(),
   opacity: z.number().min(0).max(1),
   shadow: CanvasShadowSchema.optional(),
+  blurRadius: z.number().nonnegative().optional(),
 });
 
-const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('text'),
   text: z.string(),
   fontFamily: z.string(),
@@ -193,7 +194,7 @@ const TextCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   padding: TextPaddingSchema.optional(),
 });
 
-const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('image'),
   src: z.string(),
   mimeType: z.string(),
@@ -206,7 +207,7 @@ const ImageCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   adjustments: ImageAdjustmentsSchema.optional(),
 });
 
-const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const RectangleCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('rectangle'),
   fill: z.string(),
   secondaryFill: z.string().optional(),
@@ -216,7 +217,7 @@ const RectangleCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   cornerRadius: z.number().nonnegative(),
 });
 
-const EllipseCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const EllipseCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('ellipse'),
   fill: z.string(),
   secondaryFill: z.string().optional(),
@@ -225,7 +226,7 @@ const EllipseCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   strokeWidth: z.number().nonnegative(),
 });
 
-const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('line'),
   stroke: z.string(),
   strokeWidth: z.number().positive(),
@@ -235,69 +236,35 @@ const LineCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
   endY: z.number().optional(),
 });
 
-const GeneratorCanvasItemSchemaV1 = BaseCanvasItemSchemaV1.extend({
+const GeneratorCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('generator'),
   seed: z.number(),
   generatorParams: GeneratorParamsSchema,
 });
 
-const TextCanvasItemSchemaV2 = TextCanvasItemSchemaV1.omit({ zIndex: true });
-const ImageCanvasItemSchemaV2 = ImageCanvasItemSchemaV1.omit({ zIndex: true });
-const RectangleCanvasItemSchemaV2 = RectangleCanvasItemSchemaV1.omit({ zIndex: true });
-const EllipseCanvasItemSchemaV2 = EllipseCanvasItemSchemaV1.omit({ zIndex: true });
-const LineCanvasItemSchemaV2 = LineCanvasItemSchemaV1.omit({ zIndex: true });
-const GeneratorCanvasItemSchemaV2 = GeneratorCanvasItemSchemaV1.omit({ zIndex: true });
-
-const CanvasItemSchemaV1 = z.discriminatedUnion('kind', [
-  TextCanvasItemSchemaV1,
-  ImageCanvasItemSchemaV1,
-  RectangleCanvasItemSchemaV1,
-  EllipseCanvasItemSchemaV1,
-  LineCanvasItemSchemaV1,
-  GeneratorCanvasItemSchemaV1,
+const CanvasItemSchema = z.discriminatedUnion('kind', [
+  TextCanvasItemSchema,
+  ImageCanvasItemSchema,
+  RectangleCanvasItemSchema,
+  EllipseCanvasItemSchema,
+  LineCanvasItemSchema,
+  GeneratorCanvasItemSchema,
 ]);
 
-const CanvasItemSchemaV2 = z.discriminatedUnion('kind', [
-  TextCanvasItemSchemaV2,
-  ImageCanvasItemSchemaV2,
-  RectangleCanvasItemSchemaV2,
-  EllipseCanvasItemSchemaV2,
-  LineCanvasItemSchemaV2,
-  GeneratorCanvasItemSchemaV2,
-]);
-
-const CanvasNodeSchemaV2: z.ZodTypeAny = z.lazy(() =>
+const CanvasNodeSchema: z.ZodTypeAny = z.lazy(() =>
   z.discriminatedUnion('kind', [
     z.object({
       id: z.string().min(1),
       kind: z.literal('group'),
       name: z.string().min(1),
       opacity: z.number().min(0).max(1),
-      children: z.array(CanvasNodeSchemaV2),
+      children: z.array(CanvasNodeSchema),
     }),
-    CanvasItemSchemaV2,
+    CanvasItemSchema,
   ])
 );
 
-const ProjectFileSchemaV1 = z.object({
-  version: z.literal(1),
-  canvas: z.object({
-    width: z.number().positive(),
-    height: z.number().positive(),
-    presetId: z.string().optional(),
-  }),
-  background: z.string(),
-  items: z.array(CanvasItemSchemaV1),
-  fonts: z.array(
-    z.object({
-      family: z.string(),
-      sourceName: z.string(),
-      kind: z.enum(['system', 'bundled', 'uploaded']),
-    })
-  ),
-});
-
-const ProjectFileSchemaV2 = z.object({
+const ProjectFileSchema = z.object({
   version: z.literal(2),
   canvas: z.object({
     width: z.number().positive(),
@@ -305,8 +272,7 @@ const ProjectFileSchemaV2 = z.object({
     presetId: z.string().optional(),
   }),
   background: z.string(),
-  nodes: z.array(CanvasNodeSchemaV2),
-  items: z.array(CanvasItemSchemaV1).optional(),
+  nodes: z.array(CanvasNodeSchema),
   fonts: z.array(
     z.object({
       family: z.string(),
@@ -316,19 +282,13 @@ const ProjectFileSchemaV2 = z.object({
   ),
 });
 
-const ProjectFileSchema = z.union([ProjectFileSchemaV1, ProjectFileSchemaV2]);
-
 export function parseProjectDocument(input: unknown): ProjectDocument {
   const parsedFile = ProjectFileSchema.parse(input) as ProjectFile;
   return fileDtoToDocument(parsedFile);
 }
 
-export function parseCanvasItems(input: unknown): CanvasItem[] {
-  return z.array(CanvasItemSchemaV1).parse(input) as CanvasItem[];
-}
-
 export function parseCanvasNodes(input: unknown): CanvasNode[] {
-  const parsedNodes = z.array(CanvasNodeSchemaV2).parse(input) as CanvasNode[];
+  const parsedNodes = z.array(CanvasNodeSchema).parse(input) as CanvasNode[];
   return normalizeProjectDocument({ version: 2, nodes: parsedNodes }).nodes;
 }
 

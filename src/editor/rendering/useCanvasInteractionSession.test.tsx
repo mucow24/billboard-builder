@@ -12,7 +12,6 @@ import {
   createLineItem,
   createRectangleItem,
 } from '../document/documentDefaults';
-import { collectLeafItems } from '../document/sceneGraph';
 import type {
   CanvasItem,
   CanvasNode,
@@ -138,7 +137,6 @@ function createDocument(nodes: CanvasNode[] = []) {
   return {
     ...createDefaultProjectDocument(),
     nodes,
-    items: nodes.flatMap(collectLeafItems),
   } satisfies ProjectDocument;
 }
 
@@ -148,11 +146,11 @@ function createHookParamsBase() {
   return {
     activeTool: 'select' as CanvasTool,
     document: createDefaultProjectDocument(),
-    selectedItemIds: [] as string[],
+    selectedNodeIds: [] as string[],
     onGuidesChange: vi.fn(),
-    onSelectItem: vi.fn(),
-    onToggleSelectItem: undefined as undefined | ReturnType<typeof vi.fn>,
-    onToggleSelectItems: undefined as undefined | ReturnType<typeof vi.fn>,
+    onSelectNode: vi.fn(),
+    onToggleSelectNode: undefined as undefined | ReturnType<typeof vi.fn>,
+    onToggleSelectNodes: undefined as undefined | ReturnType<typeof vi.fn>,
     onUpdateItem: vi.fn(),
     onUpdateItems: undefined as undefined | ReturnType<typeof vi.fn>,
     onAddItem: vi.fn(),
@@ -238,7 +236,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleStageMouseDown(makeStageEvent({ x: 10, y: 10 }));
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(undefined);
+    expect(params.onSelectNode).toHaveBeenCalledWith(undefined);
     expect(params.onGuidesChange).toHaveBeenCalledWith([]);
     expect(result.current.session).toBeNull();
   });
@@ -372,7 +370,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
       onUpdateItems: vi.fn(),
     });
     const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), { initialProps: params });
@@ -402,7 +400,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
       onUpdateItems: vi.fn(),
     });
     const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), { initialProps: params });
@@ -441,7 +439,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
       onUpdateItems: vi.fn(),
     });
     const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), {
@@ -532,7 +530,7 @@ describe('useCanvasInteractionSession', () => {
     for (const handle of handles) {
       const params = createHookParams({
         document: createDocument([first, second]),
-        selectedItemIds: [first.id, second.id],
+        selectedNodeIds: [first.id, second.id],
         onUpdateItems: vi.fn(),
       });
       const { result, rerender, unmount } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), {
@@ -621,7 +619,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
       onUpdateItems: vi.fn(),
     });
     const { result, rerender } = renderHook((hookParams) => useCanvasInteractionSession(hookParams), {
@@ -841,7 +839,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      onToggleSelectItems: vi.fn(),
+      onToggleSelectNodes: vi.fn(),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -868,7 +866,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onToggleSelectItems).toHaveBeenCalledWith([first.id, second.id]);
+    expect(params.onToggleSelectNodes).toHaveBeenCalledWith([first.id, second.id]);
   });
 
   it('clears a pending marquee without committing when the pointer never moves', () => {
@@ -1120,7 +1118,7 @@ describe('useCanvasInteractionSession', () => {
     const item = createRectangleItem({ id: 'toggle-me' });
     const params = createHookParams({
       document: createDocument([item]),
-      onToggleSelectItem: vi.fn(),
+      onToggleSelectNode: vi.fn(),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1128,7 +1126,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemPointerDown(item, item.id, { x: 10, y: 20 }, true);
     });
 
-    expect(params.onToggleSelectItem).toHaveBeenCalledWith(item.id);
+    expect(params.onToggleSelectNode).toHaveBeenCalledWith(item.id);
     expect(result.current.session).toBeNull();
   });
 
@@ -1136,8 +1134,8 @@ describe('useCanvasInteractionSession', () => {
     const item = createRectangleItem({ id: 'selected-item', x: 200, y: 120, width: 120, height: 80 });
     const params = createHookParams({
       document: createDocument([item]),
-      selectedItemIds: [item.id],
-      onToggleSelectItem: vi.fn(),
+      selectedNodeIds: [item.id],
+      onToggleSelectNode: vi.fn(),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1145,7 +1143,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemPointerDown(item, item.id, { x: 220, y: 140 }, true);
     });
 
-    expect(params.onToggleSelectItem).not.toHaveBeenCalled();
+    expect(params.onToggleSelectNode).not.toHaveBeenCalled();
     expect(result.current.session).toBeNull();
 
     act(() => {
@@ -1158,7 +1156,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onToggleSelectItem).not.toHaveBeenCalled();
+    expect(params.onToggleSelectNode).not.toHaveBeenCalled();
     expect(result.current.session?.kind).toBe('drag');
 
   });
@@ -1167,8 +1165,8 @@ describe('useCanvasInteractionSession', () => {
     const item = createRectangleItem({ id: 'selected-item', x: 200, y: 120, width: 120, height: 80 });
     const params = createHookParams({
       document: createDocument([item]),
-      selectedItemIds: [item.id],
-      onToggleSelectItem: vi.fn(),
+      selectedNodeIds: [item.id],
+      onToggleSelectNode: vi.fn(),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1184,7 +1182,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onToggleSelectItem).toHaveBeenCalledWith(item.id);
+    expect(params.onToggleSelectNode).toHaveBeenCalledWith(item.id);
     expect(result.current.session).toBeNull();
   });
 
@@ -1193,7 +1191,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1218,7 +1216,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemPointerDown(first, group.id, { x: 120, y: 120 }, false);
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(group.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(group.id);
     expect(result.current.session?.kind).toBe('group-drag');
 
     act(() => {
@@ -1245,12 +1243,12 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemPointerDown(item, item.id, { x: 120, y: 120 }, false);
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(item.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(item.id);
     expect(result.current.session?.kind).toBe('drag');
 
     params = {
       ...params,
-      selectedItemIds: [item.id],
+      selectedNodeIds: [item.id],
     };
 
     rerender();
@@ -1281,12 +1279,12 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemPointerDown(first, group.id, { x: 120, y: 120 }, false);
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(group.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(group.id);
     expect(result.current.session?.kind).toBe('group-drag');
 
     params = {
       ...params,
-      selectedItemIds: [group.id],
+      selectedNodeIds: [group.id],
     };
 
     rerender();
@@ -1316,7 +1314,7 @@ describe('useCanvasInteractionSession', () => {
 
     params = {
       ...params,
-      selectedItemIds: [item.id],
+      selectedNodeIds: [item.id],
     };
     rerender();
 
@@ -1354,7 +1352,7 @@ describe('useCanvasInteractionSession', () => {
 
     params = {
       ...params,
-      selectedItemIds: [group.id],
+      selectedNodeIds: [group.id],
     };
     rerender();
 
@@ -1420,7 +1418,7 @@ describe('useCanvasInteractionSession', () => {
     group.id = 'outer-group';
     const params = createHookParams({
       document: createDocument([group]),
-      selectedItemIds: [first.id],
+      selectedNodeIds: [first.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1449,7 +1447,7 @@ describe('useCanvasInteractionSession', () => {
       {
         initialProps: createHookParams({
           document,
-          selectedItemIds: [leftGroup.id, rightGroup.id],
+          selectedNodeIds: [leftGroup.id, rightGroup.id],
         }),
       },
     );
@@ -1464,7 +1462,7 @@ describe('useCanvasInteractionSession', () => {
     rerender(
       createHookParams({
         document,
-        selectedItemIds: [first.id],
+        selectedNodeIds: [first.id],
       }),
     );
 
@@ -1484,7 +1482,7 @@ describe('useCanvasInteractionSession', () => {
     outerGroup.id = 'outer-group';
     const params = createHookParams({
       document: createDocument([outerGroup]),
-      selectedItemIds: [outerGroup.id],
+      selectedNodeIds: [outerGroup.id],
     });
     const { result } = renderHook(
       (hookParams) => useCanvasInteractionSession(hookParams),
@@ -1495,7 +1493,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemPointerDown(nestedLeaf, nestedGroup.id, { x: 120, y: 120 }, false);
     });
 
-    expect(params.onSelectItem).not.toHaveBeenCalled();
+    expect(params.onSelectNode).not.toHaveBeenCalled();
     expect(result.current.lastDrilldownSource).toBeNull();
   });
 
@@ -1513,7 +1511,7 @@ describe('useCanvasInteractionSession', () => {
     outerGroup.id = 'outer-group';
     const params = createHookParams({
       document: createDocument([outerGroup]),
-      selectedItemIds: [outerGroup.id],
+      selectedNodeIds: [outerGroup.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1523,7 +1521,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onSelectItem).not.toHaveBeenCalled();
+    expect(params.onSelectNode).not.toHaveBeenCalled();
     expect(result.current.session).toBeNull();
     expect(result.current.lastDrilldownSource).toBeNull();
   });
@@ -1535,7 +1533,7 @@ describe('useCanvasInteractionSession', () => {
     group.id = 'group-1';
     const params = createHookParams({
       document: createDocument([group]),
-      selectedItemIds: [group.id],
+      selectedNodeIds: [group.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1561,7 +1559,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onSelectItem).not.toHaveBeenCalled();
+    expect(params.onSelectNode).not.toHaveBeenCalled();
     expect(result.current.lastDrilldownSource).toBeNull();
     expect(params.onUpdateItem).toHaveBeenCalledTimes(2);
     expect(params.onUpdateItem).toHaveBeenNthCalledWith(
@@ -1590,7 +1588,7 @@ describe('useCanvasInteractionSession', () => {
     outerGroup.id = 'outer-group';
     const params = createHookParams({
       document: createDocument([outerGroup]),
-      selectedItemIds: [outerGroup.id],
+      selectedNodeIds: [outerGroup.id],
     });
     const { result, rerender } = renderHook(
       (hookParams) => useCanvasInteractionSession(hookParams),
@@ -1620,13 +1618,13 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemDoubleClick(nestedLeaf);
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(nestedGroup.id);
     expect(result.current.lastDrilldownSource).toBe('item-hit');
 
     const innerParams = {
       ...params,
-      onSelectItem: vi.fn(),
-      selectedItemIds: [nestedGroup.id],
+      onSelectNode: vi.fn(),
+      selectedNodeIds: [nestedGroup.id],
     };
     rerender(innerParams);
 
@@ -1653,7 +1651,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemDoubleClick(nestedLeaf);
     });
 
-    expect(innerParams.onSelectItem).toHaveBeenCalledWith(nestedLeaf.id);
+    expect(innerParams.onSelectNode).toHaveBeenCalledWith(nestedLeaf.id);
     expect(result.current.lastDrilldownSource).toBe('item-hit');
   });
 
@@ -1671,7 +1669,7 @@ describe('useCanvasInteractionSession', () => {
     outerGroup.id = 'outer-group';
     const params = createHookParams({
       document: createDocument([outerGroup]),
-      selectedItemIds: [outerGroup.id],
+      selectedNodeIds: [outerGroup.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1687,7 +1685,7 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(nestedGroup.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(nestedGroup.id);
     expect(result.current.lastDrilldownSource).toBe('stage-surface');
   });
 
@@ -1703,7 +1701,7 @@ describe('useCanvasInteractionSession', () => {
     group.id = 'image-group';
     const params = createHookParams({
       document: createDocument([group]),
-      selectedItemIds: [group.id],
+      selectedNodeIds: [group.id],
     });
     const { result, rerender } = renderHook(
       (hookParams) => useCanvasInteractionSession(hookParams),
@@ -1732,13 +1730,13 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemDoubleClick(groupedImage);
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(groupedImage.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(groupedImage.id);
     expect(result.current.cropSession).toBeNull();
 
     const selectedImageParams = {
       ...params,
-      onSelectItem: vi.fn(),
-      selectedItemIds: [groupedImage.id],
+      onSelectNode: vi.fn(),
+      selectedNodeIds: [groupedImage.id],
     };
     rerender(selectedImageParams);
 
@@ -1764,7 +1762,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemDoubleClick(groupedImage);
     });
 
-    expect(selectedImageParams.onSelectItem).not.toHaveBeenCalled();
+    expect(selectedImageParams.onSelectNode).not.toHaveBeenCalled();
     expect(result.current.cropSession).toMatchObject({
       itemId: groupedImage.id,
       crop: groupedImage.crop,
@@ -1781,7 +1779,7 @@ describe('useCanvasInteractionSession', () => {
     image.id = 'selected-image';
     const params = createHookParams({
       document: createDocument([image]),
-      selectedItemIds: [image.id],
+      selectedNodeIds: [image.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1805,7 +1803,7 @@ describe('useCanvasInteractionSession', () => {
     image.id = 'stale-selection-image';
     const params = createHookParams({
       document: createDocument([image]),
-      selectedItemIds: [],
+      selectedNodeIds: [],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1822,7 +1820,7 @@ describe('useCanvasInteractionSession', () => {
       result.current.handleItemDoubleClick(image);
     });
 
-    expect(params.onSelectItem).toHaveBeenCalledWith(image.id);
+    expect(params.onSelectNode).toHaveBeenCalledWith(image.id);
     expect(result.current.cropSession).toMatchObject({
       itemId: image.id,
       crop: image.crop,
@@ -1839,7 +1837,7 @@ describe('useCanvasInteractionSession', () => {
     image.id = 'selected-image';
     const params = createHookParams({
       document: createDocument([image]),
-      selectedItemIds: [image.id],
+      selectedNodeIds: [image.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1895,7 +1893,7 @@ describe('useCanvasInteractionSession', () => {
     };
     const params = createHookParams({
       document: createDocument([image]),
-      selectedItemIds: [image.id],
+      selectedNodeIds: [image.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -1977,7 +1975,7 @@ describe('useCanvasInteractionSession', () => {
     });
     const params = createHookParams({
       document: createDocument([image, sibling]),
-      selectedItemIds: [image.id],
+      selectedNodeIds: [image.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -2029,7 +2027,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -2069,7 +2067,7 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -2106,7 +2104,7 @@ describe('useCanvasInteractionSession', () => {
     const sibling = createRectangleItem({ id: 'sibling', x: 366, y: 260, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second, sibling]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -2147,7 +2145,7 @@ describe('useCanvasInteractionSession', () => {
     const sibling = createRectangleItem({ id: 'sibling', x: 366, y: 260, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second, sibling]),
-      selectedItemIds: [first.id, second.id],
+      selectedNodeIds: [first.id, second.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -2194,8 +2192,8 @@ describe('useCanvasInteractionSession', () => {
       nonCanvasResult.current.handleStageMouseDown(makeStageEvent({ x: 50, y: 60 }, 'shape'));
     });
 
-    expect(panParams.onSelectItem).toHaveBeenCalledWith(undefined);
-    expect(nonCanvasParams.onSelectItem).not.toHaveBeenCalled();
+    expect(panParams.onSelectNode).toHaveBeenCalledWith(undefined);
+    expect(nonCanvasParams.onSelectNode).not.toHaveBeenCalled();
   });
 
   it('blocks group drag when any selected item is locked', () => {
@@ -2203,7 +2201,7 @@ describe('useCanvasInteractionSession', () => {
     const locked = createRectangleItem({ id: 'locked', x: 220, y: 100, width: 80, height: 40, locked: true });
     const params = createHookParams({
       document: createDocument([unlocked, locked]),
-      selectedItemIds: [unlocked.id, locked.id],
+      selectedNodeIds: [unlocked.id, locked.id],
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 

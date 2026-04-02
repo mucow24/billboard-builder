@@ -15,8 +15,6 @@ export type CanvasLeafKind =
   | 'line'
   | 'generator';
 
-export type CanvasNodeKind = CanvasLeafKind | 'group';
-
 export type TextAlign = 'left' | 'center' | 'right';
 
 export type TextVerticalAlign = 'top' | 'middle' | 'bottom';
@@ -93,6 +91,7 @@ export interface BaseCanvasItem {
   hidden: boolean;
   opacity: number;
   shadow: CanvasShadow;
+  blurRadius: number;
 }
 
 export interface GradientFillItem {
@@ -173,20 +172,20 @@ export interface BurstGeneratorParams {
   bandColorB: string;
   burstRays: number;
   burstScale: number;
-  burstOpacity: number;
-  burstOffsetX: number;
-  burstOffsetY: number;
-  burstRotation: number;
+  opacity: number;
+  offsetX: number;
+  offsetY: number;
+  rotation: number;
 }
 
 export interface ZigzagsGeneratorParams {
   generatorType: 'zigzags';
   accentColor: string;
   bandColorA: string;
-  zigzagCount: number;
+  count: number;
   zigzagAmplitude: number;
-  zigzagThickness: number;
-  zigzagOpacity: number;
+  thickness: number;
+  opacity: number;
   seedOverride: number | null;
 }
 
@@ -195,10 +194,10 @@ export interface FlatGridGeneratorParams {
   accentColor: string;
   gridSpacingX: number;
   gridSpacingY: number;
-  gridThickness: number;
-  gridOffsetX: number;
-  gridOffsetY: number;
-  gridRotation: number;
+  thickness: number;
+  offsetX: number;
+  offsetY: number;
+  rotation: number;
 }
 
 export interface PerspectiveGridGeneratorParams {
@@ -208,26 +207,27 @@ export interface PerspectiveGridGeneratorParams {
   perspectiveDepth: number;
   perspectiveNear: number;
   perspectiveExtent: number;
-  perspectiveThickness: number;
+  thickness: number;
   perspectiveThicknessFalloff: number;
   perspectiveRows: number;
 }
 
 export interface ScanlinesGeneratorParams {
   generatorType: 'scanlines';
+  scanlineColor: string;
+  scanlineHeight: number;
   scanlineSpacing: number;
-  scanlineOpacity: number;
 }
 
 export interface NoiseGeneratorParams {
   generatorType: 'noise';
-  noise: number;
+  intensity: number;
   seedOverride: number | null;
 }
 
 export interface VignetteGeneratorParams {
   generatorType: 'vignette';
-  vignette: number;
+  intensity: number;
 }
 
 export type ShapeTypeKey = 'rect' | 'diamond' | 'triangle' | 'circle' | 'bar';
@@ -238,11 +238,11 @@ export interface ShapesGeneratorParams {
   bandColorA: string;
   bandColorB: string;
   shapeTypes: Record<ShapeTypeKey, boolean>;
-  shapeCount: number;
+  count: number;
   shapeMinSize: number;
   shapeMaxSize: number;
-  shapeRotation: number;
-  shapeOpacity: number;
+  rotation: number;
+  opacity: number;
   shapeOutline: number;
   shapeMix: number;
   seedOverride: number | null;
@@ -285,49 +285,36 @@ export interface GroupNode {
 
 export type CanvasNode = GroupNode | CanvasItem;
 
-export interface LegacyProjectDocumentV1 {
-  version: 1;
-  canvas: CanvasSize;
-  background: string;
-  items: CanvasItem[];
-  fonts: DocumentFontReference[];
-}
+export type SelectionItemChange =
+  | Partial<CanvasItem>
+  | ((item: CanvasItem) => Partial<CanvasItem>);
 
-export interface ProjectDocumentV2 {
+export interface ProjectDocument {
   version: 2;
   canvas: CanvasSize;
   background: string;
   nodes: CanvasNode[];
-  // Derived compatibility view during the scene-graph migration.
-  items: CanvasItem[];
   fonts: DocumentFontReference[];
 }
-
-export type ProjectDocument = ProjectDocumentV2;
-export type ProjectDocumentV1 = LegacyProjectDocumentV1 | ProjectDocumentV2;
 
 export type ReorderMode = 'forward' | 'backward' | 'front' | 'back';
 
 export type EditorCommand =
-  | { type: 'add_item'; item: CanvasItem }
+  | { type: 'add_node'; item: CanvasItem }
   | { type: 'insert_nodes'; nodes: CanvasNode[]; parentId?: string; index?: number }
-  | { type: 'delete_items'; itemIds: string[] }
   | { type: 'delete_nodes'; nodeIds: string[] }
-  | { type: 'select_items'; itemIds: string[] }
   | { type: 'select_nodes'; nodeIds: string[] }
   | { type: 'clear_selection' }
-  | { type: 'update_item'; itemId: string; changes: Partial<CanvasItem> }
+  | { type: 'update_node'; itemId: string; changes: Partial<CanvasItem> }
   | { type: 'update_group'; groupId: string; changes: Partial<Pick<GroupNode, 'name' | 'opacity' | 'locked' | 'hidden'>> }
   | { type: 'group_nodes'; nodeIds: string[] }
   | { type: 'ungroup_node'; groupId: string }
   | { type: 'set_canvas_size'; canvas: CanvasSize }
   | { type: 'set_background'; background: string }
-  | { type: 'reorder_item'; itemId: string; mode: ReorderMode }
   | { type: 'reorder_node'; nodeId: string; mode: ReorderMode }
-  | { type: 'reorder_items'; itemIds: string[]; mode: ReorderMode }
   | { type: 'reorder_nodes'; nodeIds: string[]; mode: ReorderMode }
   | { type: 'register_font'; font: DocumentFontReference }
-  | { type: 'load_document'; document: ProjectDocument | ProjectDocumentV1 };
+  | { type: 'load_document'; document: ProjectDocument };
 
 export interface UploadedFont {
   family: string;

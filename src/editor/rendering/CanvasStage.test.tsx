@@ -57,6 +57,9 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
+import type { ProjectDocument } from '../document/documentTypes';
+import { resetEditorStore } from '../../test/editorStore';
+import { useEditorStore } from '../state/store';
 import type Konva from 'konva';
 import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
 import { getGroupResizeFrame, getSelectionFrameForRotation } from './transformGeometry';
@@ -112,6 +115,7 @@ vi.mock('react-konva', () => {
           Object.assign(node, {
             alpha: noop,
             blue: noop,
+            blurRadius: noop,
             brightness: noop,
             cache: noop,
             clearCache: noop,
@@ -147,6 +151,7 @@ vi.mock('react-konva', () => {
     Layer: make('Layer'),
     Group: make('Group'),
     Rect: make('Rect'),
+    Shape: make('Shape'),
     Line: make('Line'),
     Text: make('Text'),
     Circle: make('Circle'),
@@ -163,8 +168,35 @@ vi.mock('./useImageElement', () => ({
   useImageElement: () => null,
 }));
 
-function CanvasStage(props: React.ComponentProps<typeof ActualCanvasStage>) {
-  return <ActualCanvasStage debugMode showCanvasTestHooks {...props} />;
+type StoreOverrides = {
+  activeTool?: 'select' | 'zoom' | 'text' | 'rectangle' | 'ellipse' | 'line';
+  document?: ProjectDocument;
+  selectedNodeIds?: string[];
+};
+
+function setupStore(overrides: StoreOverrides = {}) {
+  const session: Record<string, unknown> = {};
+  if (overrides.selectedNodeIds) session.selectedNodeIds = overrides.selectedNodeIds;
+  if (overrides.activeTool) session.activeTool = overrides.activeTool;
+  resetEditorStore({
+    document: overrides.document,
+    session: Object.keys(session).length > 0 ? session : undefined,
+  });
+}
+
+function CanvasStage(props: Partial<React.ComponentProps<typeof ActualCanvasStage>> & StoreOverrides) {
+  const { activeTool, document, selectedNodeIds, ...rest } = props;
+  setupStore({ activeTool, document, selectedNodeIds });
+  return (
+    <ActualCanvasStage
+      debugMode
+      showCanvasTestHooks
+      guides={[]}
+      onGuidesChange={vi.fn()}
+      stageRef={createRef<Konva.Stage>()}
+      {...rest}
+    />
+  );
 }
 
 describe('CanvasStage viewport controls', () => {
@@ -242,19 +274,13 @@ describe('CanvasStage viewport controls', () => {
   });
 
   it('omits debug snapshot helpers when debug mode is disabled', () => {
+    setupStore();
     render(
       <ActualCanvasStage
-        activeTool="select"
         debugMode={false}
         showCanvasTestHooks={false}
-        document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
         guides={[]}
         onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
         stageRef={createRef<Konva.Stage>()}
       />,
     );
@@ -267,20 +293,9 @@ describe('CanvasStage viewport controls', () => {
 
 
 
-  it('renders an exact canvas edge treatment and clips the checkerboard to canvas bounds', () => {
+  it('renders an exact canvas edge treatment and draws the checkerboard as a single Shape', () => {
     const { container } = render(
-      <CanvasStage
-        activeTool="select"
-        document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage />,
     );
 
     const glowRect = container.querySelector('[data-konva-node="Rect"][data-prop-name="export-exclude"]');
@@ -293,14 +308,12 @@ describe('CanvasStage viewport controls', () => {
     expect(glowRect).toHaveAttribute('data-prop-stroke', 'rgba(128, 176, 255, 0.18)');
     expect(glowRect).toHaveAttribute('data-prop-shadowcolor', 'rgba(110, 160, 255, 0.14)');
 
-    const checkerboardGroup = container.querySelector(
-      '[data-konva-node="Group"][data-prop-name="checkerboard export-exclude"]',
+    const checkerboardShape = container.querySelector(
+      '[data-konva-node="Shape"][data-prop-name="checkerboard export-exclude"]',
     );
-    expect(checkerboardGroup).not.toBeNull();
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipx', '0');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipy', '0');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipwidth', '2048');
-    expect(checkerboardGroup).toHaveAttribute('data-prop-clipheight', '2048');
+    expect(checkerboardShape).not.toBeNull();
+    expect(checkerboardShape).toHaveAttribute('data-prop-width', '2048');
+    expect(checkerboardShape).toHaveAttribute('data-prop-height', '2048');
 
     const canvasRect = container.querySelector(
       '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
@@ -328,17 +341,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         showExportBoundsCue
         document={document}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -376,7 +380,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40, rotation: 0 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50, rotation: 0 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -397,17 +401,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={['first', 'second']}
       />,
     );
 
@@ -463,20 +458,12 @@ describe('CanvasStage viewport controls', () => {
       selectedItemId: previewItem.id,
     });
     const document = createDefaultProjectDocument();
-    document.items = [previewItem];
+    document.nodes = [previewItem];
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[previewItem.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[previewItem.id]}
       />,
     );
 
@@ -512,18 +499,7 @@ describe('CanvasStage viewport controls', () => {
   it('renders zoom controls and updates the readout', async () => {
     const user = userEvent.setup();
     render(
-      <CanvasStage
-        activeTool="select"
-        document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage />,
     );
 
     expect(screen.getByRole('button', { name: 'Fit canvas to viewport' })).toBeInTheDocument();
@@ -547,7 +523,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -558,17 +534,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[first.id, second.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[first.id, second.id]}
       />,
     );
 
@@ -597,7 +564,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -609,17 +576,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[first.id, second.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[first.id, second.id]}
       />,
     );
 
@@ -643,7 +601,7 @@ describe('CanvasStage viewport controls', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [first, second],
@@ -655,17 +613,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[first.id, second.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[first.id, second.id]}
       />,
     );
 
@@ -684,7 +633,7 @@ describe('CanvasStage viewport controls', () => {
   it('starts a pan drag instead of item drag when middle-clicking the selected item overlay hook', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [rectangle],
@@ -698,16 +647,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[rectangle.id]}
       />,
     );
 
@@ -726,7 +667,7 @@ describe('CanvasStage viewport controls', () => {
   it('forwards shift-modified selected-item overlay drags to the interaction session', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [rectangle],
@@ -740,16 +681,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[rectangle.id]}
       />,
     );
 
@@ -776,7 +709,7 @@ describe('CanvasStage viewport controls', () => {
   it('starts a pan drag instead of item resize when middle-clicking a selected item handle hook', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [rectangle],
@@ -787,16 +720,8 @@ describe('CanvasStage viewport controls', () => {
 
     render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[rectangle.id]}
       />,
     );
 
@@ -820,7 +745,7 @@ describe('CanvasStage viewport controls', () => {
     const draggedSecond = createRectangleItem({ id: 'second', x: 180, y: 100, width: 60, height: 50 });
     const resizedFirst = createRectangleItem({ id: 'first', x: 30, y: 20, width: 110, height: 80 });
     const resizedSecond = createRectangleItem({ id: 'second', x: 170, y: 70, width: 90, height: 90 });
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     Object.assign(mockInteractionSession, {
       renderedItems: [draggedFirst, draggedSecond],
@@ -842,17 +767,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { rerender } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={['first', 'second']}
       />,
     );
 
@@ -903,17 +819,8 @@ describe('CanvasStage viewport controls', () => {
 
     rerender(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={['first', 'second']}
       />,
     );
 
@@ -962,7 +869,7 @@ describe('CanvasStage viewport controls', () => {
       createRectangleItem({ id: 'first', x: 40, y: 35, width: 120, height: 70, rotation: 30 }),
       createRectangleItem({ id: 'second', x: 190, y: 95, width: 90, height: 85, rotation: 30 }),
     ];
-    document.items = [first, second];
+    document.nodes = [first, second];
 
     const cases = [
       {
@@ -1000,17 +907,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { rerender } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={['first', 'second']}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onUpdateItems={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={['first', 'second']}
       />,
     );
 
@@ -1025,17 +923,8 @@ describe('CanvasStage viewport controls', () => {
 
       rerender(
         <CanvasStage
-          activeTool="select"
           document={document}
-          selectedItemIds={['first', 'second']}
-          guides={[]}
-          onGuidesChange={vi.fn()}
-          onSelectItem={vi.fn()}
-          onUpdateItem={vi.fn()}
-          onUpdateItems={vi.fn()}
-          onAddItem={vi.fn()}
-          onSetActiveTool={vi.fn()}
-          stageRef={createRef<Konva.Stage>()}
+          selectedNodeIds={['first', 'second']}
         />,
       );
 
@@ -1066,7 +955,7 @@ describe('CanvasStage viewport controls', () => {
       endX: 360,
       endY: 220,
     });
-    document.items = [line];
+    document.nodes = [line];
     const startHandle = getLineHandleRects(line).start;
 
     Object.assign(mockInteractionSession, {
@@ -1079,16 +968,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[line.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[line.id]}
       />,
     );
 
@@ -1117,7 +998,7 @@ describe('CanvasStage viewport controls', () => {
       width: 160,
       height: 100,
     });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
     const handlePoints = getShapeHandlePoints(rectangle);
 
     Object.assign(mockInteractionSession, {
@@ -1130,16 +1011,8 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[rectangle.id]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        selectedNodeIds={[rectangle.id]}
       />,
     );
 
@@ -1192,7 +1065,7 @@ describe('CanvasStage viewport controls', () => {
       width: 160,
       height: 100,
     });
-    document.items = [rectangle];
+    document.nodes = [rectangle];
     document.nodes = [rectangle];
 
     Object.assign(mockInteractionSession, {
@@ -1201,16 +1074,7 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1242,16 +1106,7 @@ describe('CanvasStage viewport controls', () => {
 
     const { container } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1292,19 +1147,11 @@ describe('CanvasStage viewport controls', () => {
 
     const { container, rerender } = render(
       <CanvasStage
-        activeTool="select"
         document={document}
-        selectedItemIds={[]}
         guides={[
           { orientation: 'vertical', position: 120 },
           { orientation: 'horizontal', position: 90 },
         ]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1337,14 +1184,6 @@ describe('CanvasStage viewport controls', () => {
       <CanvasStage
         activeTool="text"
         document={document}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
       />,
     );
 
@@ -1364,18 +1203,7 @@ describe('CanvasStage viewport controls', () => {
     });
 
     const { container, rerender } = render(
-      <CanvasStage
-        activeTool="select"
-        document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage />,
     );
 
     const stage = container.querySelector('[data-konva-node="Stage"]') as HTMLElement | null;
@@ -1406,20 +1234,8 @@ describe('CanvasStage viewport controls', () => {
 
     fireEvent.keyUp(window, { key: 'Shift' });
 
-    const onSetActiveTool = vi.fn();
     rerender(
-      <CanvasStage
-        activeTool="zoom"
-        document={createDefaultProjectDocument()}
-        selectedItemIds={[]}
-        guides={[]}
-        onGuidesChange={vi.fn()}
-        onSelectItem={vi.fn()}
-        onUpdateItem={vi.fn()}
-        onAddItem={vi.fn()}
-        onSetActiveTool={onSetActiveTool}
-        stageRef={createRef<Konva.Stage>()}
-      />,
+      <CanvasStage activeTool="zoom" />,
     );
 
     expect(readCursor()).toBe('zoom-in');
@@ -1427,7 +1243,7 @@ describe('CanvasStage viewport controls', () => {
     expect(readCursor()).toBe('zoom-out');
     fireEvent.mouseDown(stage!, { button: 0, altKey: true, clientX: 640, clientY: 360 });
     expect(handleStageMouseDown).toHaveBeenCalledOnce();
-    expect(onSetActiveTool).toHaveBeenCalledWith('select');
+    expect(useEditorStore.getState().editor.session.activeTool).toBe('select');
     fireEvent.keyUp(window, { key: 'Alt' });
   });
 });

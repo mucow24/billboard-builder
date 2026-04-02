@@ -336,12 +336,103 @@ test.describe('editor group layers and inspector flows', () => {
     await uploadProject(page, groupedDocument, 'delete-group.json');
 
     await openLayersTab(page);
-    await clickLayerRow(page, 'Delete Group');
-    await page.getByRole('button', { name: 'Delete selected (1)' }).click();
+    const groupRow = page.locator('.layer-row').filter({ hasText: 'Delete Group' });
+    await groupRow.hover();
+    await groupRow.getByRole('button', { name: 'Delete layer' }).click();
     await expect(page.locator('.layer-row')).toHaveCount(0);
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([]);
+  });
+
+  test('deleting a grouped child from Layers collapses the singleton parent group', async ({ page }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'collapse-first-rect',
+            x: 180,
+            y: 200,
+            width: 200,
+            height: 120,
+            zIndex: 0,
+          }),
+          createRectangleFixture({
+            id: 'collapse-second-rect',
+            x: 430,
+            y: 210,
+            width: 180,
+            height: 110,
+            fill: '#0ea5e9',
+            stroke: '#0369a1ff',
+            zIndex: 1,
+          }),
+        ],
+        {
+          id: 'collapse-group',
+          name: 'Collapse Group',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'collapse-singleton-group.json');
+
+    await openLayersTab(page);
+    const targetRow = page.getByTestId('layers-row-collapse-first-rect');
+    await targetRow.hover();
+    await targetRow.getByRole('button', { name: 'Delete layer' }).click();
+
+    await expect(page.getByTestId('layers-row-collapse-first-rect')).toHaveCount(0);
+    await expect(page.getByTestId('layers-row-collapse-group')).toHaveCount(0);
+    await expect(page.getByTestId('layers-row-collapse-second-rect')).toHaveCount(1);
+    await expect(page.getByTestId('layers-row-collapse-second-rect')).toHaveAttribute('data-depth', '0');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({
+        id: 'collapse-second-rect',
+        kind: 'rectangle',
+      }),
+    ]);
+  });
+
+  test('deletes a single layer via its inline delete button', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createRectangleFixture({
+        id: 'keep-rect',
+        x: 100,
+        y: 100,
+        width: 100,
+        height: 100,
+        zIndex: 0,
+      }),
+      createTextFixture({
+        id: 'delete-text',
+        x: 300,
+        y: 100,
+        width: 200,
+        height: 50,
+        zIndex: 1,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'inline-delete.json');
+    await openLayersTab(page);
+
+    await expect(page.locator('.layer-row')).toHaveCount(2);
+
+    const targetRow = page.locator('.layer-row').filter({ hasText: 'Text' });
+    await targetRow.hover();
+    await targetRow.getByRole('button', { name: 'Delete layer' }).click();
+
+    await expect(page.locator('.layer-row')).toHaveCount(1);
+    await expect(page.locator('.layer-row')).toContainText('Rectangle');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toHaveLength(1);
+    expect(savedProject.nodes[0].id).toBe('keep-rect');
   });
 
   test('reorders groups from the layers footer controls as whole top-level nodes', async ({

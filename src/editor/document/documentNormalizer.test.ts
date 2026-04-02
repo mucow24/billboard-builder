@@ -8,7 +8,6 @@ import {
   createTextItem,
 } from './documentDefaults';
 import {
-  normalizeExistingProjectDocument,
   normalizeProjectDocument,
 } from './documentNormalizer';
 import type { ImageCanvasItem } from './documentTypes';
@@ -223,33 +222,25 @@ describe('document normalizer', () => {
     ]);
   });
 
-  it('uses the same canonical normalization for loaded and live documents', () => {
-    const liveDocument = {
-      version: 2 as const,
-      canvas: {
-        width: Number.NaN,
-        height: 0,
-        presetId: 123 as unknown as string,
-      },
-      background: '#abcdef',
-      nodes: [
-        createGroupNode([
-          createRectangleItem({
-            id: 'rectangle',
-            zIndex: 9,
-            width: 0,
-            opacity: 3,
-          }),
-        ]),
-      ],
-      fonts: [
-        { family: 'Poster Sans', sourceName: 'PosterSans.ttf', kind: 'uploaded' as const },
-      ],
-      items: [],
-    };
+  it('defaults missing blurRadius to zero and preserves valid values', () => {
+    const rectangle = createRectangleItem();
+    const withBlur = { ...rectangle, blurRadius: 10 };
+    const withoutBlur = { ...rectangle } as Record<string, unknown>;
+    delete withoutBlur.blurRadius;
 
-    expect(normalizeExistingProjectDocument(liveDocument)).toEqual(
-      normalizeProjectDocument(liveDocument)
-    );
+    const normalizedWithBlur = normalizeProjectDocument({
+      version: 2,
+      nodes: [withBlur],
+      fonts: [],
+    });
+    expect(normalizedWithBlur.nodes[0]).toMatchObject({ blurRadius: 10 });
+
+    const normalizedWithout = normalizeProjectDocument({
+      version: 2,
+      nodes: [withoutBlur as never],
+      fonts: [],
+    });
+    expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
   });
+
 });

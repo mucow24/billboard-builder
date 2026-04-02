@@ -57,12 +57,13 @@ export async function restoreUploadedFontsForReferences({
   references: DocumentFontReference[];
   availableFonts: UploadedFont[];
   registerAvailableFont: (font: UploadedFont) => void;
-}): Promise<void> {
+}): Promise<Set<string>> {
+  const restoredFamilies = new Set<string>();
   const missingReferences = dedupeUploadedFontReferences(references).filter(
     (reference) => !hasAvailableUploadedFont(reference, availableFonts),
   );
   if (missingReferences.length === 0) {
-    return;
+    return restoredFamilies;
   }
 
   const persistedFonts = await defaultUploadedFontPersistenceService.loadByReferences(
@@ -73,8 +74,10 @@ export async function restoreUploadedFontsForReferences({
     try {
       const restoredFont = await registerUploadedFontBytes(persistedFont);
       registerAvailableFont(restoredFont);
+      restoredFamilies.add(restoredFont.family);
     } catch (error) {
       console.warn('Skipping persisted uploaded font that failed to restore.', error);
     }
   }
+  return restoredFamilies;
 }

@@ -550,7 +550,7 @@ test.describe('editor canvas entrypoints', () => {
       await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
 
       const previewSnapshot = await readRenderSnapshot(page);
-      expect(previewSnapshot.selectedItemIds).toEqual([pickupCase.id]);
+      expect(previewSnapshot.selectedNodeIds).toEqual([pickupCase.id]);
       expect(previewSnapshot.selectedItems).toHaveLength(1);
 
       const previewItem = previewSnapshot.selectedItems[0];

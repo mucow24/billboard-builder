@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  clearSelection,
-  normalizeSelectionForItems,
-  replaceSelection,
-  selectAllItems,
-  toggleSelectionItem,
-  toggleSelectionItems,
+  normalizeSelectionForNodes,
+  selectAllNodes,
+  toggleSelectionNode,
+  toggleSelectionNodes,
 } from './selectionOps';
 import {
   createEllipseItem,
@@ -15,38 +13,33 @@ import {
 } from '../document/documentDefaults';
 
 describe('selectionOps', () => {
-  it('deduplicates replacement selections and clears them explicitly', () => {
-    expect(replaceSelection(['a', 'b', 'a'])).toEqual(['a', 'b']);
-    expect(clearSelection()).toEqual([]);
-  });
-
-  it('toggles a single item in and out of the selection', () => {
-    expect(toggleSelectionItem(['a'], 'b')).toEqual(['a', 'b']);
-    expect(toggleSelectionItem(['a', 'b'], 'a')).toEqual(['b']);
+  it('toggles a single node in and out of the selection', () => {
+    expect(toggleSelectionNode(['a'], 'b')).toEqual(['a', 'b']);
+    expect(toggleSelectionNode(['a', 'b'], 'a')).toEqual(['b']);
   });
 
   it('toggles batches by removing selected ids and appending new ids', () => {
-    expect(toggleSelectionItems(['a', 'b', 'c'], ['b', 'd'])).toEqual(['a', 'c', 'd']);
+    expect(toggleSelectionNodes(['a', 'b', 'c'], ['b', 'd'])).toEqual(['a', 'c', 'd']);
   });
 
-  it('normalizes selection ids against visible items and preserves first-seen order', () => {
-    const hidden = createTextItem({ id: 'hidden', zIndex: 0, hidden: true });
-    const visibleA = createRectangleItem({ id: 'visible-a', zIndex: 2 });
-    const visibleB = createEllipseItem({ id: 'visible-b', zIndex: 1 });
+  it('normalizes selection ids against available nodes and preserves first-seen order', () => {
+    const nodeA = createRectangleItem({ id: 'node-a', zIndex: 2 });
+    const nodeB = createEllipseItem({ id: 'node-b', zIndex: 1 });
+    const nodeC = createTextItem({ id: 'node-c', zIndex: 0 });
 
-    const result = normalizeSelectionForItems(
-      ['visible-a', 'missing', 'visible-a', 'visible-b', 'hidden'],
-      [hidden, visibleA, visibleB]
+    const result = normalizeSelectionForNodes(
+      ['node-a', 'missing', 'node-a', 'node-b', 'node-c'],
+      [nodeA, nodeB, nodeC]
     );
 
-    expect(result).toEqual(['visible-a', 'visible-b']);
+    expect(result).toEqual(['node-a', 'node-b', 'node-c']);
   });
 
-  it('selects all visible items in z-index order', () => {
-    const hidden = createTextItem({ id: 'hidden', zIndex: 0, hidden: true });
-    const visibleA = createRectangleItem({ id: 'visible-a', zIndex: 2 });
-    const visibleB = createEllipseItem({ id: 'visible-b', zIndex: 1 });
+  it('selects all nodes in document order', () => {
+    const nodeA = createRectangleItem({ id: 'node-a', zIndex: 2 });
+    const nodeB = createEllipseItem({ id: 'node-b', zIndex: 1 });
+    const nodeC = createTextItem({ id: 'node-c', zIndex: 0 });
 
-    expect(selectAllItems([visibleA, hidden, visibleB])).toEqual(['visible-b', 'visible-a']);
+    expect(selectAllNodes([nodeA, nodeB, nodeC])).toEqual(['node-a', 'node-b', 'node-c']);
   });
 });

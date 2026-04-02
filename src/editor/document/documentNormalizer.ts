@@ -1,3 +1,4 @@
+import { clampFinite } from './clampFinite';
 import {
   createDefaultProjectDocument,
   createFullImageCropRect,
@@ -16,26 +17,9 @@ import type {
   ImageCanvasItem,
   LineCanvasItem,
   ProjectDocument,
-  LegacyProjectDocumentV1,
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
-
-function clampFinite(
-  value: number,
-  fallback: number,
-  min?: number,
-  max?: number
-): number {
-  let nextValue = Number.isFinite(value) ? value : fallback;
-  if (min !== undefined) {
-    nextValue = Math.max(min, nextValue);
-  }
-  if (max !== undefined) {
-    nextValue = Math.min(max, nextValue);
-  }
-  return nextValue;
-}
 
 function clampDimension(value: number): number {
   return clampFinite(value, 1, 1);
@@ -43,10 +27,6 @@ function clampDimension(value: number): number {
 
 function clampOpacity(value: number, fallback = 1): number {
   return clampFinite(value, fallback, 0, 1);
-}
-
-function clampLineStrokeWidth(value: number): number {
-  return clampFinite(value, 1, 1);
 }
 
 function normalizeShadow(shadow: Partial<CanvasShadow> | undefined): CanvasShadow {
@@ -173,6 +153,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         fontSize: clampFinite(item.fontSize, 1, 1),
         lineHeight: clampFinite(item.lineHeight, 1, 0.1),
         letterSpacing: clampFinite(item.letterSpacing ?? 0, 0),
@@ -202,6 +183,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         originalWidth,
         originalHeight,
         crop,
@@ -237,6 +219,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         strokeWidth: clampFinite(item.strokeWidth, 0, 0),
         cornerRadius: clampFinite(item.cornerRadius, 0, 0),
       };
@@ -259,6 +242,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         strokeWidth: clampFinite(item.strokeWidth, 0, 0),
       };
       return normalizedEllipseItem;
@@ -283,11 +267,12 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         startX,
         startY,
         endX,
         endY,
-        strokeWidth: clampLineStrokeWidth(item.strokeWidth),
+        strokeWidth: clampDimension(item.strokeWidth),
       };
       return normalizedLineItem;
     }
@@ -307,7 +292,8 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         hidden: Boolean(item.hidden),
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
-        seed: clampFinite(item.seed, Math.floor(Math.random() * 0xffffffff)),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
+        seed: clampFinite(item.seed, 0),
       };
       return normalizedGeneratorItem;
     }
@@ -348,18 +334,14 @@ function normalizeDocumentFonts(
   return fonts.filter((font) => referencedFamilies.has(font.family));
 }
 
-type ProjectInput = Partial<ProjectDocument> | Partial<LegacyProjectDocumentV1> | undefined;
+type ProjectInput = Partial<ProjectDocument> | undefined;
 
 export function normalizeProjectDocument(
   input: ProjectInput
 ): ProjectDocument {
   const baseDocument = createDefaultProjectDocument();
   const projectInput = input ?? {};
-  const projectNodes = 'nodes' in projectInput
-    ? ((projectInput as Partial<ProjectDocument>).nodes ?? [])
-    : undefined;
-  const legacyItems = (projectInput as Partial<ProjectDocument> & Partial<LegacyProjectDocumentV1>).items ?? [];
-  const rawNodes = projectNodes && projectNodes.length > 0 ? projectNodes : legacyItems;
+  const rawNodes = projectInput.nodes ?? [];
   const normalizedNodes = normalizeCanvasNodes(rawNodes);
   const normalizedFonts = normalizeDocumentFonts(
     normalizedNodes,
@@ -382,11 +364,6 @@ export function normalizeProjectDocument(
     },
     background: input?.background ?? baseDocument.background,
     nodes: normalizedNodes,
-    items: normalizedNodes.flatMap(collectLeafItems),
     fonts: normalizedFonts,
   };
-}
-
-export function normalizeExistingProjectDocument(document: ProjectDocument): ProjectDocument {
-  return normalizeProjectDocument(document);
 }

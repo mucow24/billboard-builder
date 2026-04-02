@@ -131,7 +131,7 @@ export interface RenderSnapshot {
     panX: number;
     panY: number;
   };
-  selectedItemIds: string[];
+  selectedNodeIds: string[];
   selectedItems: RenderSnapshotItem[];
   groupOverlay: {
     x: number;
@@ -385,16 +385,13 @@ export function createImageFixture(overrides: Record<string, unknown> = {}) {
 }
 
 export function createProjectDocument(items: Array<Record<string, unknown>> = []) {
-  // Flat project fixtures are for legacy and temporary multi-select coverage.
-  // True group-node workflows should use createGroupedProjectDocument().
   return {
-    version: 1,
+    version: 2,
     canvas: DEFAULT_CANVAS,
     background: '#ffffff00',
     fonts: [],
-    items: items.map((item, index) => ({
+    nodes: items.map((item) => ({
       ...item,
-      zIndex: Number(item.zIndex ?? index),
     })),
   };
 }
@@ -919,12 +916,15 @@ export function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
   });
 }
 
-function countLeafNodes(nodes: unknown[]): number {
+function countVisibleLeafNodes(nodes: unknown[]): number {
   let count = 0;
   for (const node of nodes) {
-    const n = node as { kind?: string; children?: unknown[] };
+    const n = node as { kind?: string; children?: unknown[]; hidden?: boolean };
+    if (n.hidden) {
+      continue;
+    }
     if (n.kind === 'group' && Array.isArray(n.children)) {
-      count += countLeafNodes(n.children);
+      count += countVisibleLeafNodes(n.children);
     } else {
       count += 1;
     }
@@ -943,7 +943,7 @@ export async function uploadProject(page: Page, document: Record<string, unknown
   // Wait for the canvas to finish rendering the uploaded nodes.
   // Without this, fast canvas interactions right after upload can race
   // against the React render cycle on slower CI runners.
-  const leafCount = countLeafNodes(
+  const leafCount = countVisibleLeafNodes(
     (document as { nodes?: unknown[] }).nodes ?? [],
   );
   if (leafCount > 0) {

@@ -26,22 +26,6 @@ describe('document schema', () => {
     expect(parsed.nodes[0].children.map((node) => node.id)).toEqual([firstItem.id, secondItem.id]);
   });
 
-  it('migrates supported legacy version 1 documents into version 2 trees', () => {
-    const legacy = {
-      version: 1 as const,
-      canvas: { width: 1024, height: 1024 },
-      background: '#ffffff00',
-      fonts: [],
-      items: [createRectangleItem({ id: 'legacy-item', zIndex: 0 })],
-    };
-
-    const parsed = parseProjectDocument(legacy);
-
-    expect(parsed.version).toBe(2);
-    expect(parsed.nodes).toHaveLength(1);
-    expect(parsed.nodes[0]).toMatchObject({ id: 'legacy-item', kind: 'rectangle' });
-  });
-
   it('rejects unsupported document versions', () => {
     expect(() =>
       parseProjectDocument({
@@ -167,11 +151,11 @@ describe('document schema', () => {
     void ignoredGradientEnabled;
 
     const parsed = parseProjectDocument({
-      version: 1,
+      version: 2,
       canvas: { width: 1024, height: 1024 },
       background: '#ffffff00',
       fonts: [],
-      items: [legacyPayload],
+      nodes: [legacyPayload],
     });
 
     expect(parsed.nodes[0]).toMatchObject({
@@ -207,11 +191,11 @@ describe('document schema', () => {
     void ignoredCrop;
 
     const parsed = parseProjectDocument({
-      version: 1,
+      version: 2,
       canvas: { width: 1024, height: 1024 },
       background: '#ffffff00',
       fonts: [],
-      items: [legacyPayload],
+      nodes: [legacyPayload],
     });
 
     expect(parsed.nodes[0]).toMatchObject({
@@ -236,17 +220,38 @@ describe('document schema', () => {
     void ignoredMirrorHorizontal;
 
     const parsed = parseProjectDocument({
-      version: 1,
+      version: 2,
       canvas: { width: 1024, height: 1024 },
       background: '#ffffff00',
       fonts: [],
-      items: [legacyPayload],
+      nodes: [legacyPayload],
     });
 
     expect(parsed.nodes[0]).toMatchObject({
       kind: 'image',
       mirrorHorizontal: false,
     });
+  });
+
+  it('round-trips blurRadius through serialization and defaults missing blurRadius for legacy files', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createRectangleItem({ blurRadius: 15 })];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+    expect(parsed.nodes[0]).toMatchObject({ blurRadius: 15 });
+
+    // Legacy file without blurRadius should normalize to 0
+    const legacy = createRectangleItem({ id: 'legacy-no-blur' });
+    const { blurRadius: _, ...legacyPayload } = legacy;
+    void _;
+    const parsedLegacy = parseProjectDocument({
+      version: 2,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      nodes: [legacyPayload],
+    });
+    expect(parsedLegacy.nodes[0]).toMatchObject({ blurRadius: 0 });
   });
 
   it('defaults missing gradient fields for legacy rectangle payloads', () => {
@@ -260,11 +265,11 @@ describe('document schema', () => {
     void ignoredGradientEnabled;
 
     const parsed = parseProjectDocument({
-      version: 1,
+      version: 2,
       canvas: { width: 1024, height: 1024 },
       background: '#ffffff00',
       fonts: [],
-      items: [legacyPayload],
+      nodes: [legacyPayload],
     });
 
     expect(parsed.nodes[0]).toMatchObject({

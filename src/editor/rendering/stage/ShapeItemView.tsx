@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { Circle, Ellipse, Group, Line, Rect, Text } from 'react-konva';
 import type Konva from 'konva';
 
@@ -12,8 +12,11 @@ import {
 } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import { ImageItemNode } from '../ImageItemNode';
+import { useBlurEffect } from '../useBlurEffect';
 import { useImageElement } from '../useImageElement';
+import { NOOP } from '../noop';
 import { getRenderBox } from '../transformGeometry';
+import { createItemPointerDownHandler } from './itemPointerHandlers';
 
 import {
   HANDLE_FILL,
@@ -62,8 +65,6 @@ interface ShapeItemViewProps {
   zoom?: number;
 }
 
-const NOOP_REGISTER_SHAPE_REF = () => {};
-
 export const ShapeItemView = memo(function ShapeItemView({
   activeTool,
   isSelected,
@@ -76,17 +77,14 @@ export const ShapeItemView = memo(function ShapeItemView({
   renderContent = true,
   renderHandles = true,
   renderSelection = true,
-  registerShapeRef = NOOP_REGISTER_SHAPE_REF,
+  registerShapeRef = NOOP,
   startPanDrag,
   toCanvasPointer,
   zoom = 1,
 }: ShapeItemViewProps) {
   const imageElement = useImageElement(item.kind === 'image' ? item.src : '');
   const renderBox = getRenderBox(item);
-  const handlePoints = getShapeOverlayHandlePoints(item, zoom);
-  const outlinePoints = getSelectionOutlinePoints(item);
   const interactionEnabled = activeTool === 'select';
-  const overlayMetrics = getCanvasOverlayMetrics(zoom);
   const gradientFillProps =
     item.kind === 'text' || item.kind === 'rectangle' || item.kind === 'ellipse'
       ? buildGradientFillProps(item, {
@@ -94,12 +92,15 @@ export const ShapeItemView = memo(function ShapeItemView({
           height: renderBox.height,
         })
       : null;
+  const contentGroupRef = useRef<Konva.Group | null>(null);
   const handleShapeRef = useCallback(
-    (node: Konva.Node | null) => {
+    (node: Konva.Group | null) => {
+      contentGroupRef.current = node;
       registerShapeRef(item.id, node);
     },
     [item.id, registerShapeRef],
   );
+  useBlurEffect(contentGroupRef, item.kind === 'image' ? 0 : item.blurRadius, item);
 
   return (
     <>
@@ -118,31 +119,13 @@ export const ShapeItemView = memo(function ShapeItemView({
           opacity={item.opacity}
           visible={!item.hidden}
           listening={interactionEnabled}
-          onMouseDown={(event) => {
-            if (!interactionEnabled || item.locked) {
-              return;
-            }
-            const pointer = event.target.getStage()?.getPointerPosition();
-            if (!pointer) {
-              return;
-            }
-            if (event.evt.button === 1) {
-              if (!startPanDrag) {
-                return;
-              }
-              event.cancelBubble = true;
-              startPanDrag(pointer);
-              return;
-            }
-            event.cancelBubble = true;
-            onItemPointerDown(
-              item,
-              selectableNodeId,
-              toCanvasPointer(pointer),
-              event.evt.shiftKey,
-              event.evt,
-            );
-          }}
+          onMouseDown={createItemPointerDownHandler({
+            isInteractive: () => interactionEnabled && !item.locked,
+            startPanDrag,
+            toCanvasPointer,
+            onAction: (pointer, shiftKey, nativeEvent) =>
+              onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
+          })}
           onTap={() => {
             if (interactionEnabled) {
               onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
@@ -230,141 +213,102 @@ export const ShapeItemView = memo(function ShapeItemView({
             />
           ) : null}
           {item.kind === 'image' ? (
-            <ImageItemNode item={item} image={imageElement} renderBox={renderBox} />
+            <ImageItemNode item={item} image={imageElement} renderBox={renderBox} blurRadius={item.blurRadius} />
           ) : null}
         </Group>
       ) : null}
-      {renderSelection && isSelected && interactionEnabled ? (
-        <>
-          <Group
-            x={renderBox.x}
-            y={renderBox.y}
-            rotation={item.rotation}
-            onMouseDown={(event) => {
-              if (item.locked) {
-                return;
-              }
-              const pointer = event.target.getStage()?.getPointerPosition();
-              if (!pointer) {
-                return;
-              }
-              if (event.evt.button === 1) {
-                if (!startPanDrag) {
+      {renderSelection && isSelected && interactionEnabled ? (() => {
+        const handlePoints = getShapeOverlayHandlePoints(item, zoom);
+        const outlinePoints = getSelectionOutlinePoints(item);
+        const overlayMetrics = getCanvasOverlayMetrics(zoom);
+        return (
+          <>
+            <Group
+              x={renderBox.x}
+              y={renderBox.y}
+              rotation={item.rotation}
+              onMouseDown={createItemPointerDownHandler({
+                isInteractive: () => !item.locked,
+                startPanDrag,
+                toCanvasPointer,
+                onAction: (pointer, shiftKey, nativeEvent) =>
+                  onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
+              })}
+              onDblClick={() => {
+                if (!interactionEnabled || item.locked) {
                   return;
                 }
-                event.cancelBubble = true;
-                startPanDrag(pointer);
-                return;
-              }
-              event.cancelBubble = true;
-              onItemPointerDown(
-                item,
-                selectableNodeId,
-                toCanvasPointer(pointer),
-                event.evt.shiftKey,
-                event.evt,
-              );
-            }}
-            onDblClick={() => {
-              if (!interactionEnabled || item.locked) {
-                return;
-              }
-              onItemDoubleClick?.(item);
-            }}
-          >
-            <Rect
-              x={0}
-              y={0}
-              width={renderBox.width}
-              height={renderBox.height}
-              fill={SHADOW_MIN_ALPHA_STROKE}
-              strokeEnabled={false}
+                onItemDoubleClick?.(item);
+              }}
+            >
+              <Rect
+                x={0}
+                y={0}
+                width={renderBox.width}
+                height={renderBox.height}
+                fill={SHADOW_MIN_ALPHA_STROKE}
+                strokeEnabled={false}
+              />
+            </Group>
+            <Line
+              points={[...outlinePoints, outlinePoints[0], outlinePoints[1]]}
+              stroke={SELECTION_STROKE}
+              strokeWidth={overlayMetrics.selectionStrokeWidth}
+              dash={overlayMetrics.selectionDash}
+              listening={false}
             />
-          </Group>
-          <Line
-            points={[...outlinePoints, outlinePoints[0], outlinePoints[1]]}
-            stroke={SELECTION_STROKE}
-            strokeWidth={overlayMetrics.selectionStrokeWidth}
-            dash={overlayMetrics.selectionDash}
-            listening={false}
-          />
-          {renderHandles ? (
-            <>
-              <Line
-                points={[
-                  handlePoints['top-center'].x,
-                  handlePoints['top-center'].y,
-                  handlePoints.rotater.x,
-                  handlePoints.rotater.y,
-                ]}
-                stroke={SELECTION_STROKE}
-                strokeWidth={overlayMetrics.selectionStrokeWidth}
-                listening={false}
-              />
-              {RESIZE_HANDLE_NAMES.map((handle) => {
-                const point = handlePoints[handle];
-                return (
-                  <Circle
-                    key={`${item.id}-${handle}`}
-                    x={point.x}
-                    y={point.y}
-                    radius={overlayMetrics.handleRadius}
-                    fill={HANDLE_FILL}
-                    stroke={HANDLE_STROKE}
-                    strokeWidth={overlayMetrics.handleStrokeWidth}
-                    onMouseDown={(event) => {
-                      if (item.locked) {
-                        return;
-                      }
-                      const pointer = event.target.getStage()?.getPointerPosition();
-                      if (!pointer) {
-                        return;
-                      }
-                      if (event.evt.button === 1) {
-                        if (!startPanDrag) {
-                          return;
-                        }
-                        event.cancelBubble = true;
-                        startPanDrag(pointer);
-                        return;
-                      }
-                      event.cancelBubble = true;
-                      onBeginResize(item, handle, toCanvasPointer(pointer), 'overlay');
-                    }}
-                  />
-                );
-              })}
-              <Circle
-                x={handlePoints.rotater.x}
-                y={handlePoints.rotater.y}
-                radius={overlayMetrics.handleRadius}
-                fill={HANDLE_FILL}
-                stroke={HANDLE_STROKE}
-                strokeWidth={overlayMetrics.handleStrokeWidth}
-                onMouseDown={(event) => {
-                  if (item.locked) {
-                    return;
-                  }
-                  const pointer = event.target.getStage()?.getPointerPosition();
-                  if (!pointer) {
-                    return;
-                  }
-                  if (event.evt.button === 1) {
-                    if (!startPanDrag) {
-                      return;
-                    }
-                    event.cancelBubble = true;
-                    startPanDrag(pointer);
-                    return;
-                  }
-                  event.cancelBubble = true;
-                  onBeginRotate(item, toCanvasPointer(pointer), 'overlay');
-                }}
-              />
-            </>
-          ) : null}
-        </>
-      ) : null}
+            {renderHandles ? (
+              <>
+                <Line
+                  points={[
+                    handlePoints['top-center'].x,
+                    handlePoints['top-center'].y,
+                    handlePoints.rotater.x,
+                    handlePoints.rotater.y,
+                  ]}
+                  stroke={SELECTION_STROKE}
+                  strokeWidth={overlayMetrics.selectionStrokeWidth}
+                  listening={false}
+                />
+                {RESIZE_HANDLE_NAMES.map((handle) => {
+                  const point = handlePoints[handle];
+                  return (
+                    <Circle
+                      key={`${item.id}-${handle}`}
+                      x={point.x}
+                      y={point.y}
+                      radius={overlayMetrics.handleRadius}
+                      fill={HANDLE_FILL}
+                      stroke={HANDLE_STROKE}
+                      strokeWidth={overlayMetrics.handleStrokeWidth}
+                      onMouseDown={createItemPointerDownHandler({
+                        isInteractive: () => !item.locked,
+                        startPanDrag,
+                        toCanvasPointer,
+                        onAction: (pointer) => onBeginResize(item, handle, pointer, 'overlay'),
+                      })}
+                    />
+                  );
+                })}
+                <Circle
+                  x={handlePoints.rotater.x}
+                  y={handlePoints.rotater.y}
+                  radius={overlayMetrics.handleRadius}
+                  fill={HANDLE_FILL}
+                  stroke={HANDLE_STROKE}
+                  strokeWidth={overlayMetrics.handleStrokeWidth}
+                  onMouseDown={createItemPointerDownHandler({
+                    isInteractive: () => !item.locked,
+                    startPanDrag,
+                    toCanvasPointer,
+                    onAction: (pointer) => onBeginRotate(item, pointer, 'overlay'),
+                  })}
+                />
+              </>
+            ) : null}
+          </>
+        );
+      })() : null}
     </>
   );
 });

@@ -6,11 +6,14 @@ import {
   writeSelectionToClipboardData,
 } from './clipboard';
 import {
+  createDefaultProjectDocument,
   DUPLICATE_ITEM_OFFSET,
   createLineItem,
   createRectangleItem,
 } from '../editor/document/documentDefaults';
+import type { CanvasItem } from '../editor/document/documentTypes';
 import { useEditorShortcuts } from './useEditorShortcuts';
+import { resetEditorStore } from '../test/editorStore';
 
 function makeClipboardItem(file: File | null, type = file?.type ?? 'image/png'): DataTransferItem {
   return {
@@ -61,20 +64,28 @@ function dispatchKeyDown(target: HTMLElement, options: KeyboardEventInit) {
   return fireEvent(target, event);
 }
 
+function selectItemsInStore(items: CanvasItem[]) {
+  resetEditorStore({
+    document: {
+      ...createDefaultProjectDocument(),
+      nodes: items,
+    },
+    session: {
+      selectedNodeIds: items.map((item) => item.id),
+    },
+  });
+}
+
 function createShortcutHarness() {
   const applyTransaction = vi.fn();
   const deleteSelectedNodes = vi.fn();
   const duplicateSelectedNodes = vi.fn();
   const groupSelectedNodes = vi.fn();
   const nudgeSelectedNodes = vi.fn();
-  const duplicateSelectedItems = vi.fn();
-  const nudgeSelectedItems = vi.fn();
   const onPasteImageFile = vi.fn();
   const redo = vi.fn();
   const reorderSelectedNode = vi.fn();
-  const reorderSelectedItem = vi.fn();
   const selectAllNodes = vi.fn();
-  const selectAllItems = vi.fn();
   const selectParentNode = vi.fn().mockReturnValue(false);
   const setActiveTool = vi.fn();
   const undo = vi.fn();
@@ -83,22 +94,15 @@ function createShortcutHarness() {
   const args: Parameters<typeof useEditorShortcuts>[0] = {
     applyTransaction,
     deleteSelectedNodes,
-    deleteSelectedItems: vi.fn(),
     duplicateSelectedNodes,
-    duplicateSelectedItems,
     groupSelectedNodes,
     nudgeSelectedNodes,
-    nudgeSelectedItems,
     onPasteImageFile,
     redo,
     reorderSelectedNode,
-    reorderSelectedItem,
-    selectedNodes: [],
-    selectedItems: [],
     selectAllNodes,
     selectParentNode,
     setActiveTool,
-    selectAllItems,
     undo,
     ungroupSelectedNode,
   };
@@ -107,18 +111,13 @@ function createShortcutHarness() {
     applyTransaction,
     args,
     deleteSelectedNodes,
-    deleteSelectedItems: args.deleteSelectedItems,
     duplicateSelectedNodes,
-    duplicateSelectedItems,
     groupSelectedNodes,
     nudgeSelectedNodes,
-    nudgeSelectedItems,
     onPasteImageFile,
     redo,
     reorderSelectedNode,
-    reorderSelectedItem,
     selectAllNodes,
-    selectAllItems,
     selectParentNode,
     setActiveTool,
     undo,
@@ -131,8 +130,7 @@ describe('useEditorShortcuts', () => {
     const selectedItem = createRectangleItem({ x: 40, y: 60 });
     const harness = createShortcutHarness();
     const clipboardData = makeClipboardData();
-    harness.args.selectedItems = [selectedItem];
-    harness.args.selectedNodes = [selectedItem];
+    selectItemsInStore([selectedItem]);
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -148,8 +146,7 @@ describe('useEditorShortcuts', () => {
     const selectedItem = createRectangleItem({ x: 40, y: 60 });
     const harness = createShortcutHarness();
     const clipboardData = makeClipboardData();
-    harness.args.selectedItems = [selectedItem];
-    harness.args.selectedNodes = [selectedItem];
+    selectItemsInStore([selectedItem]);
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -162,8 +159,7 @@ describe('useEditorShortcuts', () => {
 
   it('does not delete on cut when clipboard data is unavailable', () => {
     const harness = createShortcutHarness();
-    harness.args.selectedItems = [createRectangleItem({ x: 40, y: 60 })];
-    harness.args.selectedNodes = harness.args.selectedItems;
+    selectItemsInStore([createRectangleItem({ x: 40, y: 60 })]);
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -175,8 +171,7 @@ describe('useEditorShortcuts', () => {
 
   it('does not delete on cut when clipboard writing throws', () => {
     const harness = createShortcutHarness();
-    harness.args.selectedItems = [createRectangleItem({ x: 40, y: 60 })];
-    harness.args.selectedNodes = harness.args.selectedItems;
+    selectItemsInStore([createRectangleItem({ x: 40, y: 60 })]);
     const clipboardData = {
       getData: () => '',
       items: [],
@@ -399,8 +394,7 @@ describe('useEditorShortcuts', () => {
 
   it('nudges selected items through the dedicated store helper', () => {
     const harness = createShortcutHarness();
-    harness.args.selectedItems = [createLineItem(), createRectangleItem()];
-    harness.args.selectedNodes = harness.args.selectedItems;
+    selectItemsInStore([createLineItem(), createRectangleItem()]);
 
     renderHook(() => useEditorShortcuts(harness.args));
 
@@ -433,8 +427,7 @@ describe('useEditorShortcuts', () => {
   it('climbs to the parent selection on Escape before clearing the canvas selection', () => {
     const harness = createShortcutHarness();
     harness.selectParentNode.mockReturnValue(true);
-    harness.args.selectedItems = [createRectangleItem({ id: 'child' })];
-    harness.args.selectedNodes = harness.args.selectedItems;
+    selectItemsInStore([createRectangleItem({ id: 'child' })]);
 
     renderHook(() => useEditorShortcuts(harness.args));
 

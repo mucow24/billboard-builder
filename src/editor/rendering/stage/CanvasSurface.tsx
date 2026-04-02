@@ -1,27 +1,30 @@
-import { Group, Rect } from 'react-konva';
+import { useMemo } from 'react';
+import { Rect, Shape } from 'react-konva';
+import type Konva from 'konva';
 
 import type { ProjectDocument } from '../../document/documentTypes';
 
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 
-function buildCheckerboardTiles(width: number, height: number, cellSize = 20) {
-  const tiles: Array<{ x: number; y: number }> = [];
-  const columns = Math.ceil(width / cellSize);
+function drawCheckerboard(
+  ctx: Konva.Context,
+  width: number,
+  height: number,
+  cellSize = 20,
+) {
+  ctx.beginPath();
+  const cols = Math.ceil(width / cellSize);
   const rows = Math.ceil(height / cellSize);
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < columns; column += 1) {
-      if ((row + column) % 2 !== 0) {
+  for (let r = 0; r < rows; r += 1) {
+    for (let c = 0; c < cols; c += 1) {
+      if ((r + c) % 2 !== 0) {
         continue;
       }
-      tiles.push({
-        x: column * cellSize,
-        y: row * cellSize,
-      });
+      ctx.rect(c * cellSize, r * cellSize, cellSize, cellSize);
     }
   }
-
-  return { cellSize, tiles };
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  ctx.fill();
 }
 
 interface CanvasSurfaceProps {
@@ -42,9 +45,10 @@ export function CanvasWorkspaceBackdrop() {
 }
 
 export function CanvasSurface({ document }: CanvasSurfaceProps) {
-  const checkerboard = buildCheckerboardTiles(
-    document.canvas.width,
-    document.canvas.height,
+  const checkerboardSceneFunc = useMemo(
+    () => (ctx: Konva.Context) =>
+      drawCheckerboard(ctx, document.canvas.width, document.canvas.height),
+    [document.canvas.width, document.canvas.height],
   );
 
   return (
@@ -76,26 +80,15 @@ export function CanvasSurface({ document }: CanvasSurfaceProps) {
         strokeWidth={1}
         listening={false}
       />
-      <Group
+      <Shape
         name="checkerboard export-exclude"
-        clipX={0}
-        clipY={0}
-        clipWidth={document.canvas.width}
-        clipHeight={document.canvas.height}
-      >
-        {checkerboard.tiles.map((tile) => (
-          <Rect
-            key={`checker-${tile.x}-${tile.y}`}
-            x={tile.x}
-            y={tile.y}
-            width={checkerboard.cellSize}
-            height={checkerboard.cellSize}
-            fill="rgba(255,255,255,0.025)"
-            name="canvas-surface"
-            listening={false}
-          />
-        ))}
-      </Group>
+        x={0}
+        y={0}
+        width={document.canvas.width}
+        height={document.canvas.height}
+        sceneFunc={checkerboardSceneFunc}
+        listening={false}
+      />
       <Rect
         x={0}
         y={0}

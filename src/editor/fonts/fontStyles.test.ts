@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  getCanvasFontDeclaration,
-  getCombinedFontStyle,
   getRenderableCanvasFontDeclaration,
   getRenderableCombinedFontStyle,
 } from './fontStyles';
@@ -55,13 +53,6 @@ describe('fontStyles', () => {
       configurable: true,
       value: {},
     });
-  });
-
-  it('combines authoring style flags into canvas font styles', () => {
-    expect(getCombinedFontStyle('normal', 'normal')).toBe('normal');
-    expect(getCombinedFontStyle('normal', 'bold')).toBe('bold');
-    expect(getCombinedFontStyle('italic', 'normal')).toBe('italic');
-    expect(getCombinedFontStyle('italic', 'bold')).toBe('bold italic');
   });
 
   it('falls back through available font variants when bold italic is unavailable', () => {
@@ -121,7 +112,6 @@ describe('fontStyles', () => {
     const check = vi.fn().mockReturnValue(true);
     setFontCheck(check);
 
-    expect(getCanvasFontDeclaration(item)).toBe('italic bold 72px "Poster Sans"');
     expect(getRenderableCanvasFontDeclaration(item)).toBe('italic bold 72px "Poster Sans"');
   });
 

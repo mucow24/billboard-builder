@@ -11,10 +11,10 @@ export const burstGeneratorSpec: GeneratorSpec<BurstGeneratorParams> = {
     { key: 'bandColorB', label: 'Secondary Color', type: 'color' },
     { key: 'burstRays', label: 'Ray Count', type: 'range', min: 2, max: 48, step: 1, textMin: 1, textMax: Infinity },
     { key: 'burstScale', label: 'Scale', type: 'range', min: 0.1, max: 2, step: 0.01, textMin: 0, textMax: Infinity },
-    { key: 'burstOpacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'burstOffsetX', label: 'Offset X', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
-    { key: 'burstOffsetY', label: 'Offset Y', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
-    { key: 'burstRotation', label: 'Rotation', type: 'range', min: -180, max: 180, step: 1, textMin: -Infinity, textMax: Infinity },
+    { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'offsetX', label: 'Offset X', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
+    { key: 'offsetY', label: 'Offset Y', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
+    { key: 'rotation', label: 'Rotation', type: 'range', min: -180, max: 180, step: 1, textMin: -Infinity, textMax: Infinity },
   ],
   createDefaultParams(): BurstGeneratorParams {
     return {
@@ -23,21 +23,21 @@ export const burstGeneratorSpec: GeneratorSpec<BurstGeneratorParams> = {
       bandColorB: '#30f2ff',
       burstRays: 20,
       burstScale: 0.9,
-      burstOpacity: 0.18,
-      burstOffsetX: 0,
-      burstOffsetY: 0,
-      burstRotation: 0,
+      opacity: 0.18,
+      offsetX: 0,
+      offsetY: 0,
+      rotation: 0,
     };
   },
   draw(ctx, w, h, params) {
-    if (params.burstOpacity <= 0 || params.burstRays <= 0) return;
-    const cx = w * 0.5 + params.burstOffsetX;
-    const cy = h * 0.48 + params.burstOffsetY;
+    if (params.opacity <= 0 || params.burstRays <= 0) return;
+    const cx = w * 0.5 + params.offsetX;
+    const cy = h * 0.48 + params.offsetY;
     const maxR = Math.hypot(w, h) * params.burstScale;
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate((params.burstRotation * Math.PI) / 180);
-    ctx.globalAlpha = params.burstOpacity;
+    ctx.rotate((params.rotation * Math.PI) / 180);
+    ctx.globalAlpha = params.opacity;
     for (let i = 0; i < params.burstRays; i++) {
       const a0 = (Math.PI * 2 * i) / params.burstRays;
       const a1 = (Math.PI * 2 * (i + 0.56)) / params.burstRays;

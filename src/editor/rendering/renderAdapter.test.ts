@@ -4,7 +4,6 @@ import {
   createGroupNode,
   createRectangleItem,
 } from '../document/documentDefaults';
-import { collectLeafItems } from '../document/sceneGraph';
 import type { ProjectDocument } from '../document/documentTypes';
 
 import { buildRenderableCanvasItems } from './renderAdapter';
@@ -19,7 +18,6 @@ function createGroupedDocument(nodes: ProjectDocument['nodes']): ProjectDocument
     },
     background: '#ffffff00',
     nodes,
-    items: nodes.flatMap(collectLeafItems),
     fonts: [],
   };
 }
