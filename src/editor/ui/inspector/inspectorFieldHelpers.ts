@@ -122,6 +122,18 @@ export function createGeometryField(
 
 export { createDimensionsField, type DimensionAction } from './dimensionsField';
 
+export const ROTATION_FIELD_EXTRA: Partial<NumberFieldDescriptor> = {
+  digits: 0,
+  max: 180,
+  min: -180,
+  slider: true,
+  sliderDetentThreshold: 5,
+  sliderDetentValue: 0,
+  step: 1,
+  textMax: Infinity,
+  textMin: -Infinity,
+};
+
 export function createShadowNumberField(
   propertyKey: string,
   label: string,
@@ -182,13 +194,15 @@ export const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
     fieldOrder: 10,
     getValue: (item) => item.blurRadius,
     label: 'Blur radius',
-    max: Infinity,
+    max: 100,
     min: 0,
     propertyKey: 'blurRadius',
     sectionKey: 'blur',
     sectionLabel: 'Blur',
     sectionOrder: SECTION_ORDER.blur,
+    slider: true,
     step: 1,
+    textMax: Infinity,
 
     valueType: 'number',
   }),
@@ -216,7 +230,11 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     blur: nextValue,
   }), {
     digits: 1,
+    max: 100,
     min: 0,
+    slider: true,
+    step: 1,
+    textMax: Infinity,
   }),
   createShadowNumberField(
     'opacity',
@@ -228,6 +246,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
       digits: 1,
       max: 1,
       min: 0,
+      slider: true,
       step: 0.1,
     }
   ),
@@ -239,6 +258,14 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     (nextValue) => ({ offsetX: nextValue }),
     {
       digits: 1,
+      max: 100,
+      min: -100,
+      slider: true,
+      sliderDetentThreshold: 2,
+      sliderDetentValue: 0,
+      step: 1,
+      textMax: Infinity,
+      textMin: -Infinity,
     }
   ),
   createShadowNumberField(
@@ -249,6 +276,14 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     (nextValue) => ({ offsetY: nextValue }),
     {
       digits: 1,
+      max: 100,
+      min: -100,
+      slider: true,
+      sliderDetentThreshold: 2,
+      sliderDetentValue: 0,
+      step: 1,
+      textMax: Infinity,
+      textMin: -Infinity,
     }
   ),
 ];
