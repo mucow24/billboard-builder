@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { NumberInput } from './inspectorControls';
 
 describe('NumberInput text vs slider clamping', () => {
-  it('clamps text input to textMin/textMax when provided, not slider min/max', () => {
+  it('clamps text input to textMin/textMax on blur, not slider min/max', () => {
     const onChange = vi.fn();
     const { getByLabelText } = render(
       <NumberInput
@@ -24,11 +24,42 @@ describe('NumberInput text vs slider clamping', () => {
 
     // Typing 500 — beyond slider max (64) but textMax is Infinity, so accepted
     fireEvent.change(textInput, { target: { value: '500' } });
+    fireEvent.blur(textInput);
     expect(onChange).toHaveBeenLastCalledWith(500);
 
     // Typing -5 — below textMin (1), so clamped to 1
     fireEvent.change(textInput, { target: { value: '-5' } });
+    fireEvent.blur(textInput);
     expect(onChange).toHaveBeenLastCalledWith(1);
+  });
+
+  it('does not call onChange while typing, only on blur', () => {
+    const onChange = vi.fn();
+    const { getByLabelText } = render(
+      <NumberInput
+        label="Band Count"
+        min={2}
+        max={64}
+        textMin={1}
+        textMax={Infinity}
+        slider={true}
+        step={1}
+        value={50}
+        onChange={onChange}
+      />,
+    );
+
+    const textInput = getByLabelText('Band Count value');
+
+    fireEvent.focus(textInput);
+    fireEvent.change(textInput, { target: { value: '' } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.change(textInput, { target: { value: '5' } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.blur(textInput);
+    expect(onChange).toHaveBeenCalledWith(5);
   });
 
   it('falls back to min/max when textMin/textMax absent', () => {
@@ -49,6 +80,7 @@ describe('NumberInput text vs slider clamping', () => {
 
     // Typing 150 — beyond max (100), clamped because no textMax override
     fireEvent.change(textInput, { target: { value: '150' } });
+    fireEvent.blur(textInput);
     expect(onChange).toHaveBeenLastCalledWith(100);
   });
 

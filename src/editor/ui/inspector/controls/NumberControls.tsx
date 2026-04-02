@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { formatDisplayedNumber } from '../inspectorModel';
 import { FieldShell } from './FieldShell';
@@ -41,6 +41,37 @@ interface NumberInputProps extends BareNumberInputProps {
   sliderDetentValue?: number;
 }
 
+function useDraftNumber(
+  value: number | null,
+  digits: number,
+  min: number | undefined,
+  max: number | undefined,
+  onChange: (value: number) => void,
+) {
+  const formatted = value === null ? '' : formatDisplayedNumber(value, digits);
+  const [draft, setDraft] = useState(formatted);
+  const isFocusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isFocusedRef.current) {
+      setDraft(formatted);
+    }
+  }, [formatted]);
+
+  function commitDraft() {
+    const num = Number(draft);
+    if (draft === '' || Number.isNaN(num)) {
+      setDraft(formatted);
+      return;
+    }
+    const clamped = clampNumberInputValue(num, min, max);
+    setDraft(formatDisplayedNumber(clamped, digits));
+    onChange(clamped);
+  }
+
+  return { draft, setDraft, isFocusedRef, commitDraft };
+}
+
 export function BareNumberInput({
   disabled = false,
   digits = 1,
@@ -51,12 +82,10 @@ export function BareNumberInput({
   step = 1,
   value,
 }: BareNumberInputProps) {
-  const displayedValue =
-    value === null ? '' : formatDisplayedNumber(value, digits);
-
-  function commitValue(nextValue: number) {
-    onChange(clampNumberInputValue(nextValue, min, max));
-  }
+  const { draft, setDraft, isFocusedRef, commitDraft } = useDraftNumber(
+    value, digits, min, max, onChange,
+  );
+  const formatted = value === null ? '' : formatDisplayedNumber(value, digits);
 
   return (
     <input
@@ -67,12 +96,19 @@ export function BareNumberInput({
       min={min}
       step={step}
       type="number"
-      value={displayedValue}
-      onChange={(event) => {
-        if (event.target.value === '') {
-          return;
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onFocus={() => { isFocusedRef.current = true; }}
+      onBlur={() => { isFocusedRef.current = false; commitDraft(); }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          commitDraft();
+          event.currentTarget.blur();
         }
-        commitValue(Number(event.target.value));
+        if (event.key === 'Escape') {
+          setDraft(formatted);
+          event.currentTarget.blur();
+        }
       }}
     />
   );
@@ -100,12 +136,11 @@ export function NumberInput({
     value === null ? min ?? sliderDetentValue ?? 0 : Number(displayedValue);
   const sliderId = useId();
 
+  const { draft: textDraft, setDraft: setTextDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft } =
+    useDraftNumber(value, digits, textMin ?? min, textMax ?? max, onChange);
+
   function commitValue(nextValue: number) {
     onChange(clampNumberInputValue(nextValue, min, max));
-  }
-
-  function commitTextValue(nextValue: number) {
-    onChange(clampNumberInputValue(nextValue, textMin ?? min, textMax ?? max));
   }
 
   if (slider) {
@@ -144,12 +179,19 @@ export function NumberInput({
               min={Number.isFinite(textMin ?? min) ? (textMin ?? min) : undefined}
               step={step}
               type="number"
-              value={displayedValue}
-              onChange={(event) => {
-                if (event.target.value === '') {
-                  return;
+              value={textDraft}
+              onChange={(event) => setTextDraft(event.target.value)}
+              onFocus={() => { isTextFocusedRef.current = true; }}
+              onBlur={() => { isTextFocusedRef.current = false; commitTextDraft(); }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  commitTextDraft();
+                  event.currentTarget.blur();
                 }
-                commitTextValue(Number(event.target.value));
+                if (event.key === 'Escape') {
+                  setTextDraft(displayedValue);
+                  event.currentTarget.blur();
+                }
               }}
             />
           </div>
