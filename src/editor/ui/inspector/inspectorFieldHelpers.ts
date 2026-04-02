@@ -182,7 +182,7 @@ export const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
     fieldOrder: 10,
     getValue: (item) => item.blurRadius,
     label: 'Blur radius',
-    max: 100,
+    max: Infinity,
     min: 0,
     propertyKey: 'blurRadius',
     sectionKey: 'blur',
