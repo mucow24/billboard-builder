@@ -218,7 +218,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       fieldOrder: 10,
       getValue: (item) => (item.kind === 'text' ? item.lineHeight : 0),
       label: 'Line height',
-      min: 0.5,
+      min: -Infinity,
       propertyKey: 'lineHeight',
       sectionKey: 'advancedText',
       sectionLabel: 'Advanced text',
