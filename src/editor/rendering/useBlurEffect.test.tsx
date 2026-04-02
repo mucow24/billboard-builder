@@ -47,7 +47,7 @@ describe('nativeBlur', () => {
   it('reuses canvases across calls', () => {
     const spy = vi.spyOn(document, 'createElement');
     const mockCtx = createMockCanvasCtx();
-    spy.mockImplementation((tag: string) => {
+    spy.mockImplementation(() => {
       const el = { width: 0, height: 0, getContext: () => mockCtx };
       return el as unknown as HTMLCanvasElement;
     });
@@ -57,7 +57,7 @@ describe('nativeBlur', () => {
     nativeBlur.call(ctx as never, createMockImageData(10, 10));
     nativeBlur.call(ctx as never, createMockImageData(10, 10));
 
-    const canvasCalls = spy.mock.calls.filter(([tag]) => tag === 'canvas');
+    const canvasCalls = spy.mock.calls.filter(([t]) => t === 'canvas');
     expect(canvasCalls).toHaveLength(2); // src + dst created once, reused on second call
 
     spy.mockRestore();
