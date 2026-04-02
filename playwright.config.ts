@@ -10,6 +10,7 @@ delete process.env.NO_COLOR;
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  workers: process.env.CI ? undefined : 12,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
