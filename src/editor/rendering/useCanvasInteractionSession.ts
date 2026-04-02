@@ -393,6 +393,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.kind === 'generator') return null;
     const selectedGroupNodeId =
       selectedNodeIds.length === 1 &&
       (() => {
@@ -459,6 +460,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.kind === 'generator') return null;
     if (selectionNodeId === item.id) {
       return createDragSession(
         item,
@@ -730,6 +732,7 @@ export function useCanvasInteractionSession({
   }, [updateSession]);
 
   const beginDrag = useCallback((item: CanvasItem, pointer: Point, source: PointerGestureSource = 'stage') => {
+    if (item.kind === 'generator') return;
     updateSession(createDragSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
