@@ -569,4 +569,94 @@ test.describe('editor group layers and inspector flows', () => {
     await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeDisabled();
   });
+
+  test('renames a group from the layers panel and persists the new name', async ({ page }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'rename-rect',
+            x: 180,
+            y: 200,
+            width: 200,
+            height: 120,
+            zIndex: 0,
+          }),
+        ],
+        {
+          id: 'rename-group',
+          name: 'Original Name',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'rename-group.json');
+
+    await openLayersTab(page);
+    const groupRow = page.locator('.layer-row').filter({ hasText: 'Original Name' });
+    await groupRow.hover();
+    await groupRow.getByRole('button', { name: 'Rename group' }).click();
+
+    const input = page.locator('.layer-rename-input');
+    await expect(input).toBeVisible();
+    await expect(input).toHaveValue('Original Name');
+
+    await input.fill('Renamed Group');
+    await input.press('Enter');
+
+    await expect(page.locator('.layer-row-label').filter({ hasText: 'Renamed Group' })).toBeVisible();
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({
+        id: 'rename-group',
+        name: 'Renamed Group',
+      }),
+    ]);
+  });
+
+  test('cancels group rename on Escape without changing the name', async ({ page }) => {
+    const groupedDocument = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({
+            id: 'cancel-rename-rect',
+            x: 180,
+            y: 200,
+            width: 200,
+            height: 120,
+            zIndex: 0,
+          }),
+        ],
+        {
+          id: 'cancel-rename-group',
+          name: 'Keep This Name',
+        },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, groupedDocument, 'cancel-rename-group.json');
+
+    await openLayersTab(page);
+    const groupRow = page.locator('.layer-row').filter({ hasText: 'Keep This Name' });
+    await groupRow.hover();
+    await groupRow.getByRole('button', { name: 'Rename group' }).click();
+
+    const input = page.locator('.layer-rename-input');
+    await input.fill('Something Else');
+    await input.press('Escape');
+
+    await expect(page.locator('.layer-rename-input')).toHaveCount(0);
+    await expect(page.locator('.layer-row-label').filter({ hasText: 'Keep This Name' })).toBeVisible();
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({
+        id: 'cancel-rename-group',
+        name: 'Keep This Name',
+      }),
+    ]);
+  });
 });

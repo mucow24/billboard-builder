@@ -255,6 +255,9 @@ export default function App() {
                 }}
                 onDeleteNode={deleteNode}
                 onOpenProperties={() => handleInspectorTabChange('properties')}
+                onRenameGroup={(groupId, name) => {
+                  dispatch({ type: 'update_group', groupId, changes: { name } });
+                }}
                 onItemChange={updateSelectionItems}
                 onInsertFavorite={insertFavorite}
                 onSelectNode={selectSingleNode}

@@ -1,4 +1,4 @@
-import { useMemo, type KeyboardEvent } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 
 import { ColorPickerControl } from '../ColorPickerControl';
 import { isCanvasItemNode } from '../../document/sceneGraph';
@@ -24,6 +24,7 @@ export function LayersInspectorTab({
   onBackgroundChange,
   onDeleteNode,
   onOpenProperties,
+  onRenameGroup,
   onReorder,
   onSelectNode,
   onToggleNode,
@@ -32,6 +33,7 @@ export function LayersInspectorTab({
   onToggleGroupCollapse,
   selectedNodeIds,
 }: LayersInspectorTabProps) {
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const selectedNodeIdSet = new Set(selectedNodeIds);
   const visibleRows = useMemo(
     () => getVisibleLayerRows(rows, collapsedGroupIds),
@@ -273,20 +275,72 @@ export function LayersInspectorTab({
                     className="layer-row-copy compact richer"
                     data-testid={`layers-row-copy-${row.node.id}`}
                   >
-                    <strong
-                      className="layer-row-label"
-                      data-testid={`layers-primary-label-${row.node.id}`}
-                    >
-                      {rowLabel}
-                    </strong>
-                    {secondary ? (
-                      <small data-testid={`layers-secondary-label-${row.node.id}`}>
-                        {secondary}
-                      </small>
-                    ) : null}
+                    {isGroup && editingGroupId === row.node.id ? (
+                      <input
+                        className="layer-rename-input"
+                        defaultValue={row.node.name}
+                        ref={(el) => {
+                          if (el) {
+                            el.focus();
+                            el.select();
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === 'Enter') {
+                            const value = (e.target as HTMLInputElement).value.trim();
+                            if (value && value !== row.node.name) {
+                              onRenameGroup?.(row.node.id, value);
+                            }
+                            setEditingGroupId(null);
+                          } else if (e.key === 'Escape') {
+                            setEditingGroupId(null);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = e.target.value.trim();
+                          if (value && value !== row.node.name) {
+                            onRenameGroup?.(row.node.id, value);
+                          }
+                          setEditingGroupId(null);
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <strong
+                          className="layer-row-label"
+                          data-testid={`layers-primary-label-${row.node.id}`}
+                        >
+                          {rowLabel}
+                        </strong>
+                        {secondary ? (
+                          <small data-testid={`layers-secondary-label-${row.node.id}`}>
+                            {secondary}
+                          </small>
+                        ) : null}
+                      </>
+                    )}
                   </span>
                   {/* Lock & Visibility */}
                   <span className="layer-row-actions">
+                    {isGroup && (
+                      <button
+                        type="button"
+                        className="layer-row-action-btn layer-row-action-btn-rename"
+                        aria-label="Rename group"
+                        title="Rename"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingGroupId(row.node.id);
+                        }}
+                      >
+                        <svg viewBox="0 0 12 12" aria-hidden="true">
+                          <path d="M8.5 1.5l2 2-7 7H1.5v-2z" />
+                          <path d="M7 3l2 2" />
+                        </svg>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={`layer-row-action-btn${row.node.locked ? ' active' : ''}`}

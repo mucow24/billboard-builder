@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -295,6 +295,203 @@ describe('LayersInspectorTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Hide layer' }));
     expect(onToggleNodeHidden).toHaveBeenCalledWith(item.id);
+    expect(onSelectNode).not.toHaveBeenCalled();
+  });
+
+  it('shows a rename button only on group rows, not on item rows', () => {
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+    const topLevelItem = createTextItem({ zIndex: 1 });
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group, topLevelItem])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        onRenameGroup={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    expect(screen.getAllByRole('button', { name: 'Rename group' })).toHaveLength(1);
+  });
+
+  it('shows an input with the current group name when the rename button is clicked', async () => {
+    const user = userEvent.setup();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        onRenameGroup={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rename group' }));
+    expect(screen.getByDisplayValue('Hero Group')).toBeInTheDocument();
+  });
+
+  it('commits the new name on Enter and calls onRenameGroup', async () => {
+    const user = userEvent.setup();
+    const onRenameGroup = vi.fn();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        onRenameGroup={onRenameGroup}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rename group' }));
+    const input = screen.getByDisplayValue('Hero Group');
+    await user.clear(input);
+    await user.type(input, 'New Name{Enter}');
+
+    expect(onRenameGroup).toHaveBeenCalledWith('group-1', 'New Name');
+  });
+
+  it('cancels rename on Escape without calling onRenameGroup', async () => {
+    const user = userEvent.setup();
+    const onRenameGroup = vi.fn();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        onRenameGroup={onRenameGroup}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rename group' }));
+    await user.type(screen.getByDisplayValue('Hero Group'), 'Changed{Escape}');
+
+    expect(onRenameGroup).not.toHaveBeenCalled();
+    expect(screen.getByText('Hero Group')).toBeInTheDocument();
+  });
+
+  it('reverts to the previous name when the input is cleared and submitted', async () => {
+    const user = userEvent.setup();
+    const onRenameGroup = vi.fn();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        onRenameGroup={onRenameGroup}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rename group' }));
+    const input = screen.getByDisplayValue('Hero Group');
+    await user.clear(input);
+    await user.type(input, '{Enter}');
+
+    expect(onRenameGroup).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('Hero Group')).toBeInTheDocument();
+    });
+  });
+
+  it('does not select the row when the rename button is clicked', async () => {
+    const user = userEvent.setup();
+    const onSelectNode = vi.fn();
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Hero Group');
+    group.id = 'group-1';
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([group])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onSelectNode={onSelectNode}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        onRenameGroup={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rename group' }));
     expect(onSelectNode).not.toHaveBeenCalled();
   });
 });
