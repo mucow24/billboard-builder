@@ -29,6 +29,73 @@ function clearMocks() {
   mockBatchDraw.mockClear();
 }
 
+function createMockImageData(width: number, height: number) {
+  return { width, height, data: new Uint8ClampedArray(width * height * 4) } as unknown as ImageData;
+}
+
+function createMockCanvasCtx() {
+  return {
+    putImageData: vi.fn(),
+    drawImage: vi.fn(),
+    getImageData: (_x: number, _y: number, w: number, h: number) =>
+      createMockImageData(w, h),
+    filter: '',
+  } as unknown as CanvasRenderingContext2D;
+}
+
+describe('nativeBlur', () => {
+  it('reuses canvases across calls', () => {
+    const spy = vi.spyOn(document, 'createElement');
+    const mockCtx = createMockCanvasCtx();
+    spy.mockImplementation(() => {
+      const el = { width: 0, height: 0, getContext: () => mockCtx };
+      return el as unknown as HTMLCanvasElement;
+    });
+
+    const ctx = { blurRadius: () => 5 };
+
+    nativeBlur.call(ctx as never, createMockImageData(10, 10));
+    nativeBlur.call(ctx as never, createMockImageData(10, 10));
+
+    const canvasCalls = spy.mock.calls.filter(([t]) => t === 'canvas');
+    expect(canvasCalls).toHaveLength(2); // src + dst created once, reused on second call
+
+    spy.mockRestore();
+  });
+
+  it('handles different dimensions across calls without error', () => {
+    const spy = vi.spyOn(document, 'createElement');
+    const mockCtx = createMockCanvasCtx();
+    spy.mockImplementation(() => {
+      const el = { width: 0, height: 0, getContext: () => mockCtx };
+      return el as unknown as HTMLCanvasElement;
+    });
+
+    const ctx = { blurRadius: () => 5 };
+
+    // Calling with different sizes should not throw
+    expect(() => {
+      nativeBlur.call(ctx as never, createMockImageData(10, 10));
+      nativeBlur.call(ctx as never, createMockImageData(20, 20));
+      nativeBlur.call(ctx as never, createMockImageData(5, 30));
+    }).not.toThrow();
+
+    spy.mockRestore();
+  });
+
+  it('skips processing when blurRadius is 0', () => {
+    const spy = vi.spyOn(document, 'createElement');
+    const ctx = { blurRadius: () => 0 };
+
+    nativeBlur.call(ctx as never, createMockImageData(10, 10));
+
+    const canvasCalls = spy.mock.calls.filter(([tag]) => tag === 'canvas');
+    expect(canvasCalls).toHaveLength(0);
+
+    spy.mockRestore();
+  });
+});
+
 describe('useBlurEffect', () => {
   beforeEach(clearMocks);
 

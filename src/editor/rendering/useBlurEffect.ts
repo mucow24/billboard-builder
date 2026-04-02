@@ -1,6 +1,14 @@
 import Konva from 'konva';
 import { useLayoutEffect, type RefObject } from 'react';
 
+/** Reusable canvas pair for nativeBlur — avoids DOM allocation on every call. */
+let _pool: {
+  src: HTMLCanvasElement;
+  srcCtx: CanvasRenderingContext2D;
+  dst: HTMLCanvasElement;
+  dstCtx: CanvasRenderingContext2D;
+} | null = null;
+
 /**
  * A Konva filter that uses the browser's native CSS `filter: blur()` instead
  * of Konva's built-in stack blur. The native blur operates in premultiplied
@@ -14,19 +22,32 @@ export function nativeBlur(this: Konva.Node, imageData: ImageData): void {
 
   const { width, height } = imageData;
 
-  // Put the source imageData onto a temp canvas
-  const src = document.createElement('canvas');
-  src.width = width;
-  src.height = height;
-  const srcCtx = src.getContext('2d')!;
+  if (!_pool) {
+    const src = document.createElement('canvas');
+    const dst = document.createElement('canvas');
+    _pool = {
+      src,
+      srcCtx: src.getContext('2d')!,
+      dst,
+      dstCtx: dst.getContext('2d')!,
+    };
+  }
+
+  const { src, srcCtx, dst, dstCtx } = _pool;
+
+  // Resize canvases when dimensions differ (this also clears canvas state)
+  if (src.width !== width || src.height !== height) {
+    src.width = width;
+    src.height = height;
+    dst.width = width;
+    dst.height = height;
+  }
+
+  // Put the source imageData onto the src canvas
   srcCtx.putImageData(imageData, 0, 0);
 
-  // Draw onto a second canvas with the browser's native blur filter,
+  // Draw onto dst canvas with the browser's native blur filter,
   // which correctly handles premultiplied alpha compositing
-  const dst = document.createElement('canvas');
-  dst.width = width;
-  dst.height = height;
-  const dstCtx = dst.getContext('2d')!;
   dstCtx.filter = `blur(${radius}px)`;
   dstCtx.drawImage(src, 0, 0);
 
