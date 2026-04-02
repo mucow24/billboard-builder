@@ -566,8 +566,8 @@ test.describe('editor group layers and inspector flows', () => {
 
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
   });
 
   test('renames a group from the layers panel and persists the new name', async ({ page }) => {
