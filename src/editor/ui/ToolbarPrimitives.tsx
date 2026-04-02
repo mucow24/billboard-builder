@@ -49,6 +49,7 @@ interface ToolbarActionButtonProps {
   disabled: boolean;
   label: string;
   onClick: () => void;
+  shortcut?: string;
 }
 
 export function ToolbarActionButton({
@@ -56,13 +57,15 @@ export function ToolbarActionButton({
   disabled,
   label,
   onClick,
+  shortcut,
 }: ToolbarActionButtonProps) {
+  const tooltip = shortcut ? `${label} (${shortcut})` : label;
   return (
     <button
       type="button"
       className="top-toolbar-button top-toolbar-control top-toolbar-icon-button"
-      aria-label={label}
-      title={label}
+      aria-label={tooltip}
+      title={tooltip}
       onClick={onClick}
       disabled={disabled}
     >

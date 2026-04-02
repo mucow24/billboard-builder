@@ -4,7 +4,7 @@ import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton, ToolbarIcon } from './ToolbarPrimitives';
-import { joinClassNames } from './toolbarUtils';
+import { joinClassNames, modKey } from './toolbarUtils';
 import { CanvasMenu, GeneratorsMenu, SizeMenu, UploadMenu } from './ToolbarMenus';
 
 type ToolbarMenuName = 'canvas' | 'size' | 'upload' | 'generators';
@@ -318,11 +318,11 @@ export function Toolbar({
         <div className="top-toolbar-section-divider" aria-hidden="true" />
 
         <div className="top-toolbar-action-strip">
-          <ToolbarActionButton label="Undo" onClick={onUndo} disabled={!canUndo}>
+          <ToolbarActionButton label="Undo" shortcut={`${modKey}+Z`} onClick={onUndo} disabled={!canUndo}>
             <path d="M8 5 3.5 9.5 8 14" />
             <path d="M4 9.5h7a4.5 4.5 0 1 1 0 9" />
           </ToolbarActionButton>
-          <ToolbarActionButton label="Redo" onClick={onRedo} disabled={!canRedo}>
+          <ToolbarActionButton label="Redo" shortcut={`${modKey}+Shift+Z`} onClick={onRedo} disabled={!canRedo}>
             <path d="m12 5 4.5 4.5L12 14" />
             <path d="M16 9.5H9a4.5 4.5 0 1 0 0 9" />
           </ToolbarActionButton>
@@ -331,19 +331,19 @@ export function Toolbar({
         <div className="top-toolbar-section-divider" aria-hidden="true" />
 
         <div className="top-toolbar-action-strip">
-          <ToolbarActionButton label="Delete" onClick={onDelete} disabled={!canDelete}>
+          <ToolbarActionButton label="Delete" shortcut="Del" onClick={onDelete} disabled={!canDelete}>
             <path d="M5 6.5h10" />
             <path d="M7 6.5v9" />
             <path d="M13 6.5v9" />
             <path d="M4.5 6.5 5.5 16h9l1-9.5" />
             <path d="M7.5 4.5h5" />
           </ToolbarActionButton>
-          <ToolbarActionButton label="Group" onClick={onGroup} disabled={!canGroup}>
+          <ToolbarActionButton label="Group" shortcut={`${modKey}+G`} onClick={onGroup} disabled={!canGroup}>
             <rect x="3.5" y="4.5" width="5.5" height="5.5" rx="1" />
             <rect x="11" y="4.5" width="5.5" height="5.5" rx="1" />
             <rect x="7.25" y="10" width="5.5" height="5.5" rx="1" />
           </ToolbarActionButton>
-          <ToolbarActionButton label="Ungroup" onClick={onUngroup} disabled={!canUngroup}>
+          <ToolbarActionButton label="Ungroup" shortcut={`${modKey}+Shift+G`} onClick={onUngroup} disabled={!canUngroup}>
             <rect x="3.5" y="4.5" width="5.5" height="11" rx="1" />
             <rect x="11" y="4.5" width="5.5" height="11" rx="1" />
             <path d="M9.5 10h1" />

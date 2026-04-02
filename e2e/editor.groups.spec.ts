@@ -135,15 +135,15 @@ test.describe('editor groups', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([alpha, beta]), 'ungrouped.json');
 
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
 
     // Select both siblings through the real canvas so the toolbar enablement
     // and grouping commands exercise the app shell instead of store internals.
     await dragCanvas(page, { x: 90, y: 110 }, { x: 500, y: 340 });
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeEnabled();
 
-    await page.getByRole('button', { name: 'Group', exact: true }).click();
+    await page.getByRole('button', { name: /^Group/ }).click();
 
     const groupedDocument = await saveAndReadProject(page);
     expect(groupedDocument.version).toBe(2);
@@ -161,9 +161,9 @@ test.describe('editor groups', () => {
     await uploadProject(page, groupedDocument, 'grouped.json');
 
     await openLayersTab(page);
-    await expect(page.locator('.layer-list').getByRole('button', { name: 'Group', exact: true })).toBeVisible();
+    await expect(page.locator('.layer-list').getByRole('button', { name: /^Group/ })).toBeVisible();
     await clickCanvas(page, { x: 150, y: 170 });
-    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeEnabled();
 
     await page.keyboard.press(`Shift+${modifier}+G`);
 

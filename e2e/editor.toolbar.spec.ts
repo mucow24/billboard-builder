@@ -28,11 +28,11 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Size', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Redo' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Delete' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Undo/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Redo/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Delete/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Canvas', exact: true }).click();
@@ -146,31 +146,31 @@ test.describe('editor toolbar flows', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([first, second]), 'toolbar-actions.json');
 
-    await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Delete' })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Redo/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Delete/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
 
     await clickCanvas(page, { x: 220, y: 200 });
-    await expect(page.getByRole('button', { name: 'Delete' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Delete/ })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
 
     await clickCanvas(page, { x: 50, y: 50 });
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
 
     await dragCanvas(page, { x: 100, y: 100 }, { x: 620, y: 420 });
-    await expect(page.getByRole('button', { name: 'Group', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Group/ })).toBeEnabled();
 
-    await page.getByRole('button', { name: 'Group', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Ungroup', exact: true })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
+    await page.getByRole('button', { name: /^Group/ }).click();
+    await expect(page.getByRole('button', { name: /^Undo/ })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Redo/ })).toBeDisabled();
 
-    await page.getByRole('button', { name: 'Undo' }).click();
-    await expect(page.getByRole('button', { name: 'Redo' })).toBeEnabled();
+    await page.getByRole('button', { name: /^Undo/ }).click();
+    await expect(page.getByRole('button', { name: /^Redo/ })).toBeEnabled();
   });
 
   test('starts load, image upload, and font upload from real toolbar menu items and filechooser events', async ({ page }) => {
@@ -249,10 +249,10 @@ test.describe('editor toolbar flows', () => {
     await uploadProject(page, groupedDocument, 'toolbar-grouped.json');
 
     await clickCanvas(page, { x: 260, y: 240 });
-    await expect(page.getByRole('button', { name: 'Ungroup' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeEnabled();
 
     await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
-    await expect(page.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
   });
 });
 

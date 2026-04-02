@@ -52,11 +52,11 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: 'Size' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
 
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Group' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Ungroup' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Undo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Redo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Delete/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Group/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
   });
 
@@ -156,6 +156,17 @@ describe('Toolbar', () => {
       height: 480,
       presetId: undefined,
     });
+  });
+
+  it('shows keyboard shortcuts in action button tooltips', () => {
+    renderToolbar();
+
+    expect(screen.getByRole('button', { name: /^Undo/ })).toHaveAttribute('title', 'Undo (Ctrl+Z)');
+    expect(screen.getByRole('button', { name: /^Redo/ })).toHaveAttribute('title', 'Redo (Ctrl+Shift+Z)');
+    expect(screen.getByRole('button', { name: /^Delete/ })).toHaveAttribute('title', 'Delete (Del)');
+    expect(screen.getByRole('button', { name: /^Group/ })).toHaveAttribute('title', 'Group (Ctrl+G)');
+    expect(screen.getByRole('button', { name: /^Ungroup/ })).toHaveAttribute('title', 'Ungroup (Ctrl+Shift+G)');
+    expect(screen.getByRole('button', { name: 'Save as favorite' })).toHaveAttribute('title', 'Save as favorite');
   });
 
   it('renders the favorite status bubble beside the save action when present', () => {
