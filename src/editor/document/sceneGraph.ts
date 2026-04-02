@@ -222,6 +222,23 @@ export function normalizeLeafZIndices(nodes: CanvasNode[]): CanvasNode[] {
   return nodes.map(assign);
 }
 
+export function updateGeneratorItemSizes(
+  nodes: CanvasNode[],
+  width: number,
+  height: number,
+): CanvasNode[] {
+  function update(node: CanvasNode): CanvasNode {
+    if (isGroupNode(node)) {
+      return { ...node, children: node.children.map(update) };
+    }
+    if (node.kind === 'generator') {
+      return { ...node, width, height };
+    }
+    return node;
+  }
+  return nodes.map(update);
+}
+
 export function updateItemNode(
   nodes: CanvasNode[],
   itemId: string,

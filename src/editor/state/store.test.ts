@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  createGeneratorItem,
   createGroupNode,
   createDefaultProjectDocument,
   createLineItem,
@@ -87,6 +88,44 @@ describe('editor command reducer', () => {
     expect(fontDocument.background).toBe('#101010');
     expect(getEditorState().session.selectedNodeIds).toEqual([]);
     expect(fontDocument.fonts).toHaveLength(1);
+  });
+
+  it('updates generator item dimensions when canvas is resized', () => {
+    const generator = createGeneratorItem('bands', 1920, 1080);
+    const rect = createRectangleItem();
+    const doc = { ...createDefaultProjectDocument(), nodes: [generator, rect] };
+
+    const resized = applyEditorCommand(doc, {
+      type: 'set_canvas_size',
+      canvas: { width: 640, height: 480 },
+    });
+
+    const items = resized.nodes.flatMap(collectLeafItems);
+    const gen = items.find((i) => i.kind === 'generator')!;
+    const r = items.find((i) => i.kind === 'rectangle')!;
+
+    expect(gen.width).toBe(640);
+    expect(gen.height).toBe(480);
+    expect(r.width).toBe(rect.width);
+    expect(r.height).toBe(rect.height);
+  });
+
+  it('updates generator dimensions inside groups when canvas is resized', () => {
+    const generator = createGeneratorItem('bands', 1920, 1080);
+    const rect = createRectangleItem();
+    const group = createGroupNode([generator, rect]);
+    const doc = { ...createDefaultProjectDocument(), nodes: [group] };
+
+    const resized = applyEditorCommand(doc, {
+      type: 'set_canvas_size',
+      canvas: { width: 800, height: 600 },
+    });
+
+    const items = resized.nodes.flatMap(collectLeafItems);
+    const gen = items.find((i) => i.kind === 'generator')!;
+
+    expect(gen.width).toBe(800);
+    expect(gen.height).toBe(600);
   });
 
   it('deletes selected items and can replace the whole document', () => {
