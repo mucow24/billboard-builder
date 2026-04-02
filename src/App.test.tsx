@@ -407,6 +407,7 @@ describe('App shell', () => {
     const opacityInput = opacityInputs.find((input) => !input.closest('[hidden]'));
     expect(opacityInput).toBeDefined();
     fireEvent.change(opacityInput as HTMLInputElement, { target: { value: '0.5' } });
+    fireEvent.blur(opacityInput as HTMLInputElement);
 
     const updatedItems = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(updatedItems.find((item) => item.id === first.id)?.opacity).toBe(0.5);
@@ -452,6 +453,7 @@ describe('App shell', () => {
     fireEvent.change(within(shadowSection!).getByLabelText('Blur'), {
       target: { value: '12' },
     });
+    fireEvent.blur(within(shadowSection!).getByLabelText('Blur'));
 
     const updatedItems = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(updatedItems.find((item) => item.id === first.id)?.shadow).toEqual({

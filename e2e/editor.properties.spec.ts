@@ -283,12 +283,14 @@ test.describe('editor properties flows', () => {
     await page.getByRole('button', { name: 'Geometry' }).click();
     await page.getByRole('spinbutton', { name: 'Corner radius' }).fill('12');
     await page.getByRole('spinbutton', { name: 'Rotation' }).fill('22');
+    await page.getByRole('spinbutton', { name: 'Rotation' }).press('Enter');
 
     await clickCanvas(page, { x: 220, y: 540 });
     await openPropertiesTab(page);
     await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('9');
     await page.getByRole('spinbutton', { name: 'Start X' }).fill('150');
     await page.getByRole('spinbutton', { name: 'End Y' }).fill('590');
+    await page.getByRole('spinbutton', { name: 'End Y' }).press('Enter');
 
     await clickCanvas(page, { x: 620, y: 220 });
     await openPropertiesTab(page);

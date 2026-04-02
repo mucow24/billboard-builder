@@ -114,6 +114,7 @@ describe('SelectionInspector', () => {
     fireEvent.change(screen.getByLabelText('Size'), {
       target: { value: '1' },
     });
+    fireEvent.blur(screen.getByLabelText('Size'));
     await user.click(screen.getByLabelText('Align center'));
     await user.click(screen.getByLabelText('Align middle'));
 
@@ -251,10 +252,12 @@ describe('SelectionInspector', () => {
     fireEvent.change(screen.getByLabelText('Stroke width'), {
       target: { value: '0' },
     });
+    fireEvent.blur(screen.getByLabelText('Stroke width'));
     await user.click(screen.getByRole('button', { name: 'Shadow' }));
     fireEvent.change(screen.getByLabelText('Blur'), {
       target: { value: '12' },
     });
+    fireEvent.blur(screen.getByLabelText('Blur'));
 
     expect(onItemChange.mock.calls[0]?.[0](lineItem)).toEqual({ strokeWidth: 1 });
     expect(onItemChange.mock.calls[1]?.[0](lineItem)).toEqual({
@@ -286,6 +289,7 @@ describe('SelectionInspector', () => {
     fireEvent.change(screen.getByLabelText('Brightness'), {
       target: { value: '98' },
     });
+    fireEvent.blur(screen.getByLabelText('Brightness'));
     fireEvent.click(screen.getByLabelText('Preserve aspect ratio'));
     await user.click(screen.getByRole('button', { name: 'Mirror' }));
 

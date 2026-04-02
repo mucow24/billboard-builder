@@ -248,6 +248,7 @@ describe('App integration', () => {
     fireEvent.change(screen.getByLabelText('Corner radius'), {
       target: { value: '24' },
     });
+    fireEvent.blur(screen.getByLabelText('Corner radius'));
 
     await waitFor(() => {
       const item = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0];
