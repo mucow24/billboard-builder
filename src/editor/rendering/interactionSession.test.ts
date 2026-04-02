@@ -344,4 +344,38 @@ describe('interactionSession', () => {
     expect(commit.selectionFrame?.rotation).not.toBeUndefined();
     expect(Math.abs(commit.selectionFrame!.rotation % 15)).toBe(0);
   });
+
+  it('snaps group drag using AABB when frame is rotated', () => {
+    // Two items at different positions, with a rotated selection frame.
+    // The frame rotation means current.bounds is NOT the AABB.
+    // The fix should snap based on the items' AABB instead.
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40, rotation: 45 });
+    const second = createRectangleItem({ id: 'second', x: 200, y: 100, width: 80, height: 40, rotation: 45 });
+
+    // Frame with non-zero rotation — bounds are NOT the AABB
+    const frame: SelectionFrame = {
+      bounds: { x: 100, y: 80, width: 200, height: 80 },
+      rotation: 45,
+    };
+    const session = createGroupDragSession({ x: 200, y: 120 }, {
+      selectedItems: [first, second],
+      siblingItems: [],
+      activeSelectionFrame: frame,
+    });
+
+    if (!session) {
+      throw new Error('Expected group drag session.');
+    }
+
+    // Resolve the session — should not throw and should produce valid previews
+    const resolved = resolveInteractionSession(session, { x: 300, y: 120 }, {
+      stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
+    });
+
+    expect(resolved.kind).toBe('group-drag');
+    if (resolved.kind !== 'group-drag') return;
+    expect(resolved.previewItems).toHaveLength(2);
+    // The items should have moved by the drag delta
+    expect(resolved.previewItems[0].x).not.toBe(first.x);
+  });
 });

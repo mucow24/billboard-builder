@@ -1,6 +1,20 @@
 import type { CanvasItem, GuideLine, SnapRect } from '../document/documentTypes';
+import { getItemAABB } from './selectionGeometry';
 
 export const SNAP_THRESHOLD = 8;
+
+const ROTATION_EPSILON = 0.001;
+
+export function isMultipleOf90(degrees: number): boolean {
+  const normalized = ((degrees % 360) + 360) % 360;
+  return (
+    normalized < ROTATION_EPSILON ||
+    Math.abs(normalized - 90) < ROTATION_EPSILON ||
+    Math.abs(normalized - 180) < ROTATION_EPSILON ||
+    Math.abs(normalized - 270) < ROTATION_EPSILON ||
+    Math.abs(normalized - 360) < ROTATION_EPSILON
+  );
+}
 
 type ResizeEdgeKey = 'start' | 'end';
 
@@ -30,7 +44,7 @@ export function buildCandidateCache(
   const vertical = [0, stageRect.width / 2, stageRect.width];
   const horizontal = [0, stageRect.height / 2, stageRect.height];
   for (const sibling of siblingItems) {
-    const rect = getItemRect(sibling);
+    const rect = getItemAABB(sibling);
     vertical.push(rect.x, rect.x + rect.width / 2, rect.x + rect.width);
     horizontal.push(rect.y, rect.y + rect.height / 2, rect.y + rect.height);
   }
@@ -124,7 +138,7 @@ function getStageCandidates(stageRect: SnapRect): SnapLineCandidate[] {
 
 function getItemCandidates(items: CanvasItem[]): SnapLineCandidate[] {
   return items.flatMap((item) => {
-    const rect = getItemRect(item);
+    const rect = getItemAABB(item);
     const guides = getRectGuides(rect);
     return [
       ...guides.vertical.map(({ value }) => ({
