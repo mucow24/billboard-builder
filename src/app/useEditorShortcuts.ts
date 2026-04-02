@@ -15,7 +15,7 @@ import { selectSelectedNodes } from '../editor/core/selectors';
 interface UseEditorShortcutsArgs {
   applyTransaction: EditorStoreState['applyTransaction'];
   deleteSelectedNodes: EditorStoreState['deleteSelectedNodes'];
-  duplicateSelectedNodes: EditorStoreState['duplicateSelectedNodes'];
+  duplicateSelectedNodes: () => void;
   groupSelectedNodes: EditorStoreState['groupSelectedNodes'];
   nudgeSelectedNodes: EditorStoreState['nudgeSelectedNodes'];
   onPasteImageFile: (file: File) => void | Promise<void>;

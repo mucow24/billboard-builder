@@ -160,6 +160,28 @@ describe('PropertiesPanel', () => {
     expect(screen.getByRole('button', { name: 'Rectangle' })).toBeInTheDocument();
   });
 
+  it('collapses groups specified by pendingCollapsedGroupIds', () => {
+    const child = createRectangleItem({ id: 'child-1' });
+    const group = createGroupNode([child], 'Poster Group');
+    group.id = 'group-dup';
+    const onClear = vi.fn();
+
+    render(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="layers"
+        layerRows={flattenLayerRows([group])}
+        pendingCollapsedGroupIds={[group.id]}
+        onClearPendingCollapsedGroupIds={onClear}
+      />,
+    );
+
+    // Group should be collapsed — child should not be visible
+    expect(screen.queryByRole('button', { name: 'Rectangle' })).not.toBeInTheDocument();
+    // Clear callback should have been called
+    expect(onClear).toHaveBeenCalled();
+  });
+
   it('preserves per-tab scroll positions across tab switches', () => {
     const item = createTextItem({ zIndex: 1 });
 
