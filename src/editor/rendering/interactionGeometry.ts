@@ -15,7 +15,7 @@ import type {
 import { scaleImageSourceTransform } from './imagePresentation';
 import { getItemAABB } from './selectionGeometry';
 import { getRenderBox } from './transformGeometry';
-import { getItemRect, getSnappedRect, isMultipleOf90, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
+import { getSnappedRect, isMultipleOf90, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
 import { measureWordWrappedTextHeight } from './textMeasurement';
 
 export interface Point {
