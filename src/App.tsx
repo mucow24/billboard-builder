@@ -46,6 +46,7 @@ export default function App() {
       handleImageUpload,
       handleNewProject,
       handleOpenProject,
+      clearPendingCollapsedGroupIds,
       handleSave,
       redo,
       reorderSelectedNode,
@@ -69,6 +70,7 @@ export default function App() {
       errorMessage,
       layerRows,
       missingFontFamilies,
+      pendingCollapsedGroupIds,
       selectedGroup,
       selectedItem,
       selectedItems,
@@ -246,6 +248,8 @@ export default function App() {
                 selectedItem={selectedItem ?? undefined}
                 selectedItems={selectedItems}
                 selectedNodeIds={selectedNodeIds}
+                pendingCollapsedGroupIds={pendingCollapsedGroupIds}
+                onClearPendingCollapsedGroupIds={clearPendingCollapsedGroupIds}
                 onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onGroupOpacityChange={updateSelectedGroup}
                 onSelectGroupChildren={() => {

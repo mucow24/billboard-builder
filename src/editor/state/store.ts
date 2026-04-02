@@ -65,7 +65,7 @@ export interface EditorStoreState {
   reorderSelectedNode: (mode: ReorderMode) => void;
   groupSelectedNodes: () => void;
   ungroupSelectedNode: () => void;
-  duplicateSelectedNodes: () => void;
+  duplicateSelectedNodes: () => string[];
   nudgeSelectedNodes: (deltaX: number, deltaY: number) => void;
   undo: () => void;
   redo: () => void;
@@ -237,11 +237,11 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         get().editor.document.nodes
       );
       if (selectedIds.length === 0) {
-        return;
+        return [];
       }
       const parentInfo = getSelectionParentInfo(get().editor.document.nodes, selectedIds);
       if (!parentInfo) {
-        return;
+        return [];
       }
       const sortedEntries = parentInfo.entries.slice().sort((left, right) => left.index - right.index);
       const clones = sortedEntries.map(({ node }) => cloneCanvasNode(node));
@@ -252,6 +252,7 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         index: sortedEntries.at(-1)!.index + 1,
       });
       get().dispatch({ type: 'select_nodes', nodeIds: clones.map((node) => node.id) });
+      return clones.filter(isGroupNode).map((node) => node.id);
     },
     nudgeSelectedNodes: (deltaX, deltaY) => {
       const selectedIds = normalizeSelectionForNodes(

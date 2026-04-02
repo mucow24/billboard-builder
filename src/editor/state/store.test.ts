@@ -466,6 +466,45 @@ describe('editor store history', () => {
     expect(getEditorState().session.selectedNodeIds).toEqual([clonedGroup.id]);
   });
 
+  it('returns cloned group IDs from duplicateSelectedNodes', () => {
+    const child = createRectangleItem({ id: 'child', x: 10, y: 20 });
+    const group = createGroupNode([child], 'Banner Group');
+    group.id = 'group-1';
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [group],
+      },
+      session: {
+        selectedNodeIds: [group.id],
+      },
+    });
+
+    const result = useEditorStore.getState().duplicateSelectedNodes();
+
+    const clonedGroup = getEditorState().document.nodes[1];
+    expect(result).toEqual([clonedGroup!.id]);
+  });
+
+  it('returns empty array from duplicateSelectedNodes when duplicating non-group items', () => {
+    const item = createRectangleItem({ id: 'rect-1', x: 10, y: 20 });
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [item],
+      },
+      session: {
+        selectedNodeIds: [item.id],
+      },
+    });
+
+    const result = useEditorStore.getState().duplicateSelectedNodes();
+
+    expect(result).toEqual([]);
+  });
+
   it('nudges selected group descendants while leaving locked items in place', () => {
     const movable = createRectangleItem({ id: 'movable', x: 20, y: 30 });
     const locked = createRectangleItem({ id: 'locked', x: 80, y: 90, locked: true });

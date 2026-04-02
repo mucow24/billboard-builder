@@ -42,6 +42,8 @@ export interface PropertiesPanelProps {
   onToggleNodeLocked: (nodeId: string) => void;
   onToggleNodeHidden: (nodeId: string) => void;
   onReorder: (mode: ReorderMode) => void;
+  pendingCollapsedGroupIds?: string[];
+  onClearPendingCollapsedGroupIds?: () => void;
 }
 
 export interface LayersInspectorTabProps {

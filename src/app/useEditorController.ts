@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
@@ -21,6 +21,7 @@ import { useEditorStore } from '../editor/state/store';
 
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [pendingCollapsedGroupIds, setPendingCollapsedGroupIds] = useState<string[]>([]);
 
   const {
     editor,
@@ -50,6 +51,17 @@ export function useEditorController() {
     updateSelectedGroup,
     updateSelectionItems,
   } = useEditorStore();
+
+  const wrappedDuplicateSelectedNodes = useCallback(() => {
+    const groupIds = duplicateSelectedNodes();
+    if (groupIds.length > 0) {
+      setPendingCollapsedGroupIds(groupIds);
+    }
+  }, [duplicateSelectedNodes]);
+
+  const clearPendingCollapsedGroupIds = useCallback(() => {
+    setPendingCollapsedGroupIds([]);
+  }, []);
 
   const { document, history, session } = editor;
   const {
@@ -134,7 +146,7 @@ export function useEditorController() {
   useEditorShortcuts({
     applyTransaction,
     deleteSelectedNodes,
-    duplicateSelectedNodes,
+    duplicateSelectedNodes: wrappedDuplicateSelectedNodes,
     groupSelectedNodes,
     nudgeSelectedNodes,
     onPasteImageFile: handleImageFile,
@@ -157,7 +169,8 @@ export function useEditorController() {
       reorderFavorite,
       deleteSelectedNodes,
       dispatch,
-      duplicateSelectedNodes,
+      clearPendingCollapsedGroupIds,
+      duplicateSelectedNodes: wrappedDuplicateSelectedNodes,
       groupSelectedNodes,
       handleExport,
       handleFontUpload,
@@ -190,6 +203,7 @@ export function useEditorController() {
       document,
       errorMessage,
       layerRows,
+      pendingCollapsedGroupIds,
       missingFontFamilies,
       selectedGroup,
       selectedItem,

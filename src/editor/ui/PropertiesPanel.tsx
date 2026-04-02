@@ -37,6 +37,8 @@ export function PropertiesPanel({
   onToggleNodeLocked,
   onToggleNodeHidden,
   favorites = [],
+  pendingCollapsedGroupIds = [],
+  onClearPendingCollapsedGroupIds,
 }: PropertiesPanelProps) {
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const layersScrollRef = useRef<HTMLDivElement | null>(null);
@@ -68,6 +70,16 @@ export function PropertiesPanel({
       return changed ? next : current;
     });
   }, [layerRows, selectedNodeIds]);
+
+  useEffect(() => {
+    if (pendingCollapsedGroupIds.length === 0) return;
+    setCollapsedGroupIds((current) => {
+      const next = new Set(current);
+      for (const id of pendingCollapsedGroupIds) next.add(id);
+      return next;
+    });
+    onClearPendingCollapsedGroupIds?.();
+  }, [pendingCollapsedGroupIds, onClearPendingCollapsedGroupIds]);
 
   // Save scroll position of the outgoing tab before it unmounts.
   // We track this via prevTabRef so we know which tab was active before the prop changed.
