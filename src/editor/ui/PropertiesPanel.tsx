@@ -27,6 +27,7 @@ export function PropertiesPanel({
   onGroupOpacityChange,
   onDeleteNode,
   onOpenProperties = () => {},
+  onRenameGroup = () => {},
   onItemChange,
   onInsertFavorite = () => {},
   onReorder,
@@ -135,6 +136,7 @@ export function PropertiesPanel({
               onBackgroundChange={onBackgroundChange}
               onDeleteNode={onDeleteNode}
               onOpenProperties={onOpenProperties}
+              onRenameGroup={onRenameGroup}
               onReorder={onReorder}
               onSelectNode={onSelectNode}
               onToggleNode={onToggleNode}
