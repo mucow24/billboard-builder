@@ -13,6 +13,7 @@ import {
   removeNodesByIds,
   reorderNodes,
   ungroupNode,
+  updateGeneratorItemSizes,
   updateGroupNode,
   updateItemNode,
 } from '../document/sceneGraph';
@@ -150,6 +151,11 @@ function applyDocumentCommandWithEffects(
             height: command.canvas.height,
             presetId: command.canvas.presetId,
           },
+          nodes: updateGeneratorItemSizes(
+            currentDocument.nodes,
+            command.canvas.width,
+            command.canvas.height,
+          ),
         },
       };
       break;
