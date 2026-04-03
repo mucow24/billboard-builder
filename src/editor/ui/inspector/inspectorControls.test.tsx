@@ -33,7 +33,7 @@ describe('NumberInput text vs slider clamping', () => {
     expect(onChange).toHaveBeenLastCalledWith(1);
   });
 
-  it('does not call onChange while typing, only on blur', () => {
+  it('does not commit empty or NaN drafts until blur reverts them', () => {
     const onChange = vi.fn();
     const { getByLabelText } = render(
       <NumberInput
@@ -52,14 +52,13 @@ describe('NumberInput text vs slider clamping', () => {
     const textInput = getByLabelText('Band Count value');
 
     fireEvent.focus(textInput);
+    // Empty value — not committed on change
     fireEvent.change(textInput, { target: { value: '' } });
     expect(onChange).not.toHaveBeenCalled();
 
-    fireEvent.change(textInput, { target: { value: '5' } });
-    expect(onChange).not.toHaveBeenCalled();
-
+    // Blur with empty draft — reverts, no onChange
     fireEvent.blur(textInput);
-    expect(onChange).toHaveBeenCalledWith(5);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('falls back to min/max when textMin/textMax absent', () => {
@@ -82,6 +81,56 @@ describe('NumberInput text vs slider clamping', () => {
     fireEvent.change(textInput, { target: { value: '150' } });
     fireEvent.blur(textInput);
     expect(onChange).toHaveBeenLastCalledWith(100);
+  });
+
+  it('commits immediately when step arrows are clicked', () => {
+    const onChange = vi.fn();
+    const { getByLabelText } = render(
+      <NumberInput
+        label="Band Count"
+        min={2}
+        max={64}
+        textMin={1}
+        textMax={Infinity}
+        slider={true}
+        step={1}
+        value={50}
+        onChange={onChange}
+      />,
+    );
+
+    const textInput = getByLabelText('Band Count value');
+
+    // Step-arrow clicks produce events without inputType.
+    // fireEvent.change in jsdom also lacks inputType, so it exercises this path.
+    fireEvent.change(textInput, { target: { value: '51' } });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(51);
+  });
+
+  it('does not commit empty or invalid values on change', () => {
+    const onChange = vi.fn();
+    const { getByLabelText } = render(
+      <NumberInput
+        label="Band Count"
+        min={2}
+        max={64}
+        textMin={1}
+        textMax={Infinity}
+        slider={true}
+        step={1}
+        value={50}
+        onChange={onChange}
+      />,
+    );
+
+    const textInput = getByLabelText('Band Count value');
+
+    fireEvent.change(textInput, { target: { value: '' } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.change(textInput, { target: { value: 'abc' } });
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('keeps slider range on min/max regardless of textMin/textMax', () => {

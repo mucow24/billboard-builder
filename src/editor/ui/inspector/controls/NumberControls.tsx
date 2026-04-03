@@ -69,7 +69,23 @@ function useDraftNumber(
     onChange(clamped);
   }
 
-  return { draft, setDraft, isFocusedRef, commitDraft };
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const newValue = event.target.value;
+    setDraft(newValue);
+
+    // Step-arrow clicks fire onChange without an inputType on the native event.
+    // Commit immediately so the canvas updates without waiting for blur.
+    if (!(event.nativeEvent as InputEvent).inputType) {
+      const num = Number(newValue);
+      if (newValue !== '' && !Number.isNaN(num)) {
+        const clamped = clampNumberInputValue(num, min, max);
+        setDraft(formatDisplayedNumber(clamped, digits));
+        onChange(clamped);
+      }
+    }
+  }
+
+  return { draft, setDraft, isFocusedRef, commitDraft, handleChange };
 }
 
 export function BareNumberInput({
@@ -82,7 +98,7 @@ export function BareNumberInput({
   step = 1,
   value,
 }: BareNumberInputProps) {
-  const { draft, setDraft, isFocusedRef, commitDraft } = useDraftNumber(
+  const { draft, setDraft, isFocusedRef, commitDraft, handleChange } = useDraftNumber(
     value, digits, min, max, onChange,
   );
   const formatted = value === null ? '' : formatDisplayedNumber(value, digits);
@@ -97,7 +113,7 @@ export function BareNumberInput({
       step={step}
       type="number"
       value={draft}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={handleChange}
       onFocus={() => { isFocusedRef.current = true; }}
       onBlur={() => { isFocusedRef.current = false; commitDraft(); }}
       onKeyDown={(event) => {
@@ -136,7 +152,7 @@ export function NumberInput({
     value === null ? min ?? sliderDetentValue ?? 0 : Number(displayedValue);
   const sliderId = useId();
 
-  const { draft: textDraft, setDraft: setTextDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft } =
+  const { draft: textDraft, setDraft: setTextDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft, handleChange: handleTextChange } =
     useDraftNumber(value, digits, textMin ?? min, textMax ?? max, onChange);
 
   function commitValue(nextValue: number) {
@@ -180,7 +196,7 @@ export function NumberInput({
               step={step}
               type="number"
               value={textDraft}
-              onChange={(event) => setTextDraft(event.target.value)}
+              onChange={handleTextChange}
               onFocus={() => { isTextFocusedRef.current = true; }}
               onBlur={() => { isTextFocusedRef.current = false; commitTextDraft(); }}
               onKeyDown={(event) => {
