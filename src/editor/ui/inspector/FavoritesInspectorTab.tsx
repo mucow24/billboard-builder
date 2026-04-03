@@ -17,7 +17,7 @@ export function FavoritesInspectorTab({
   const { dragIndex, dropTargetIndex, getDragHandleProps } = useListReorder(
     listRef,
     favorites.length,
-    (fromIndex, rawGapIndex, _pointerX) => {
+    (fromIndex, rawGapIndex) => {
       // Adjust raw gap index for flat list: when dropping after the dragged item,
       // the visual position is off by one because the item hasn't been removed yet.
       const adjusted = rawGapIndex > fromIndex ? rawGapIndex - 1 : rawGapIndex;

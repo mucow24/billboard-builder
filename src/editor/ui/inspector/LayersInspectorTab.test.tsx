@@ -8,6 +8,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import type { CanvasNode } from '../../document/sceneGraph';
 import { flattenLayerRows } from '../../document/sceneGraph';
 
 import { LayersInspectorTab } from './LayersInspectorTab';
@@ -532,7 +533,7 @@ describe('LayersInspectorTab', () => {
       <LayersInspectorTab
         background="#ffffff00"
         canReorder
-        rows={flattenLayerRows([rect, gen as any])}
+        rows={flattenLayerRows([rect, gen as unknown as CanvasNode])}
         onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
