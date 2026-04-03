@@ -12,6 +12,12 @@ function drawCheckerboard(
   height: number,
   cellSize = 20,
 ) {
+  const nativeCtx = ctx._context;
+  nativeCtx.save();
+  nativeCtx.beginPath();
+  nativeCtx.rect(0, 0, width, height);
+  nativeCtx.clip();
+
   ctx.beginPath();
   const cols = Math.ceil(width / cellSize);
   const rows = Math.ceil(height / cellSize);
@@ -25,6 +31,8 @@ function drawCheckerboard(
   }
   ctx.fillStyle = 'rgba(255,255,255,0.025)';
   ctx.fill();
+
+  nativeCtx.restore();
 }
 
 interface CanvasSurfaceProps {
