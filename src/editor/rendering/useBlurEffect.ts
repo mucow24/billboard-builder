@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 
-export const CACHE_THROTTLE_MS = 100;
+export const CACHE_THROTTLE_MS = 50;
 
 /** Reusable canvas pair for nativeBlur — avoids DOM allocation on every call. */
 let _pool: {
