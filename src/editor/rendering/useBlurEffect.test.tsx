@@ -1,8 +1,8 @@
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import React, { useRef } from 'react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-import { useBlurEffect, nativeBlur } from './useBlurEffect';
+import { useBlurEffect, nativeBlur, CACHE_THROTTLE_MS } from './useBlurEffect';
 
 const { mockNode, mockBatchDraw } = vi.hoisted(() => {
   const mockBatchDraw = vi.fn();
@@ -97,7 +97,13 @@ describe('nativeBlur', () => {
 });
 
 describe('useBlurEffect', () => {
-  beforeEach(clearMocks);
+  beforeEach(() => {
+    clearMocks();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('caches the node when blurRadius > 0', () => {
     const item = { x: 10, y: 20, rotation: 0, fill: 'red', width: 100 };
@@ -146,6 +152,9 @@ describe('useBlurEffect', () => {
     const updatedItem = { ...item, fill: 'blue' };
     rerender(<TestHarness blurRadius={5} item={updatedItem} />);
 
+    // Throttled — cache fires after the trailing timer
+    act(() => { vi.advanceTimersByTime(CACHE_THROTTLE_MS); });
+
     expect(mockNode.cache).toHaveBeenCalledTimes(1);
   });
 
@@ -157,6 +166,9 @@ describe('useBlurEffect', () => {
 
     const resizedItem = { ...item, width: 200 };
     rerender(<TestHarness blurRadius={5} item={resizedItem} />);
+
+    // Throttled — cache fires after the trailing timer
+    act(() => { vi.advanceTimersByTime(CACHE_THROTTLE_MS); });
 
     expect(mockNode.cache).toHaveBeenCalledTimes(1);
   });

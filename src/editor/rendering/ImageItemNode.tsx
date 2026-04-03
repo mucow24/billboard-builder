@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import Konva from 'konva';
 import { Group } from 'react-konva';
 import { Image as KonvaImage } from 'react-konva';
@@ -6,7 +6,7 @@ import { Image as KonvaImage } from 'react-konva';
 import type { ImageCanvasItem } from '../document/documentTypes';
 import { getRenderableImageAdjustments } from './imageAdjustments';
 import { getImageNodePresentation } from './imagePresentation';
-import { nativeBlur } from './useBlurEffect';
+import { CACHE_THROTTLE_MS, nativeBlur } from './useBlurEffect';
 
 interface ImageItemNodeProps {
   item: ImageCanvasItem;
@@ -17,6 +17,8 @@ interface ImageItemNodeProps {
 
 export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemNodeProps) {
   const imageRef = useRef<Konva.Image | null>(null);
+  const cacheTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCacheTimeRef = useRef(0);
   const adjustments = useMemo(
     () => getRenderableImageAdjustments(item.adjustments),
     [item.adjustments],
@@ -28,37 +30,68 @@ export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemN
   );
 
   useLayoutEffect(() => {
+    if (cacheTimerRef.current !== null) {
+      clearTimeout(cacheTimerRef.current);
+      cacheTimerRef.current = null;
+    }
+
     const node = imageRef.current;
     if (!node) {
       return;
     }
 
-    const filters = [...adjustments.filters];
-    if (blurRadius > 0) {
-      filters.push(nativeBlur);
-    }
-
-    node.filters(filters);
-    node.brightness(adjustments.brightness);
-    node.contrast(adjustments.contrast);
-    node.red(adjustments.tintRed);
-    node.green(adjustments.tintGreen);
-    node.blue(adjustments.tintBlue);
-    node.alpha(adjustments.tintAlpha);
-    node.blurRadius(blurRadius);
-
     const needsCache = adjustments.isActive || blurRadius > 0;
-    if (image && needsCache) {
+
+    /** Apply all filter/adjustment props and cache the node. */
+    function applyAndCache(target: Konva.Image) {
+      const filters = [...adjustments.filters];
+      if (blurRadius > 0) {
+        filters.push(nativeBlur);
+      }
+      target.filters(filters);
+      target.brightness(adjustments.brightness);
+      target.contrast(adjustments.contrast);
+      target.red(adjustments.tintRed);
+      target.green(adjustments.tintGreen);
+      target.blue(adjustments.tintBlue);
+      target.alpha(adjustments.tintAlpha);
+      target.blurRadius(blurRadius);
+
       const offset = blurRadius > 0 ? Math.ceil(blurRadius * 2) : 0;
-      node.cache({ offset });
-    } else {
-      node.clearCache();
+      target.cache({ offset });
+      target.getLayer()?.batchDraw();
+      lastCacheTimeRef.current = Date.now();
     }
 
-    node.getLayer()?.batchDraw();
+    if (image && needsCache) {
+      const now = Date.now();
+      const elapsed = now - lastCacheTimeRef.current;
+
+      if (elapsed >= CACHE_THROTTLE_MS) {
+        applyAndCache(node);
+      } else {
+        // Throttled — leave the stale cache undisturbed. Touching
+        // node.filters() with a new array ref would invalidate it.
+        cacheTimerRef.current = setTimeout(() => {
+          cacheTimerRef.current = null;
+          const n = imageRef.current;
+          if (n) {
+            applyAndCache(n);
+          }
+        }, CACHE_THROTTLE_MS - elapsed);
+      }
+    } else {
+      node.filters([]);
+      node.clearCache();
+      node.getLayer()?.batchDraw();
+      lastCacheTimeRef.current = 0;
+    }
 
     return () => {
-      node.clearCache();
+      if (cacheTimerRef.current !== null) {
+        clearTimeout(cacheTimerRef.current);
+        cacheTimerRef.current = null;
+      }
     };
   }, [
     adjustments,
@@ -73,6 +106,15 @@ export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemN
     renderBox.width,
     renderBox.height,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (cacheTimerRef.current !== null) {
+        clearTimeout(cacheTimerRef.current);
+      }
+      imageRef.current?.clearCache();
+    };
+  }, []);
 
   const blurOffset = blurRadius > 0 ? Math.ceil(blurRadius * 2) : 0;
 
