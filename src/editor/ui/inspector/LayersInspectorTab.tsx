@@ -315,7 +315,7 @@ export function LayersInspectorTab({
                   {isGroup && !isCollapsed && row.hasChildren && (
                     <span
                       className="layer-tree-down"
-                      style={{ left: `${row.depth * 24 + 11}px` }}
+                      style={{ left: `${22 + row.depth * 24 + 11}px` }}
                     />
                   )}
                   {/* Icon */}

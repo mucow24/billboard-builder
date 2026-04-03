@@ -44,7 +44,7 @@
   min-height: 28px;
   padding: 0;
   background: transparent;
-  --tree-line-color: rgba(52, 80, 122, 0.78);
+  --tree-line-color: rgb(52, 80, 122);
   cursor: pointer;
   user-select: none;
 }
