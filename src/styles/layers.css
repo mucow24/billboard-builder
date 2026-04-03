@@ -165,7 +165,7 @@
 .layer-tree-col-line::after {
   content: '';
   position: absolute;
-  left: 11px;
+  left: 10px;
   top: 0;
   bottom: -1px;
   width: 2px;
@@ -176,7 +176,7 @@
 .layer-tree-junc::before {
   content: '';
   position: absolute;
-  left: 11px;
+  left: 10px;
   top: 0;
   height: 50%;
   width: 2px;
@@ -194,7 +194,7 @@
 .layer-tree-junc::after {
   content: '';
   position: absolute;
-  left: 11px;
+  left: 10px;
   top: 50%;
   right: 0;
   height: 2px;
