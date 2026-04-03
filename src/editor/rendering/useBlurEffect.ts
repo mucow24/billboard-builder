@@ -1,7 +1,7 @@
 import Konva from 'konva';
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 
-export const CACHE_THROTTLE_MS = 100;
+export const CACHE_THROTTLE_MS = 50;
 
 /** Reusable canvas pair for nativeBlur — avoids DOM allocation on every call. */
 let _pool: {
@@ -49,7 +49,11 @@ export function nativeBlur(this: Konva.Node, imageData: ImageData): void {
   srcCtx.putImageData(imageData, 0, 0);
 
   // Draw onto dst canvas with the browser's native blur filter,
-  // which correctly handles premultiplied alpha compositing
+  // which correctly handles premultiplied alpha compositing.
+  // clearRect is required because the pooled canvas retains old content;
+  // without it, drawImage composites over stale pixels via source-over,
+  // causing ghosted colors and doubled edges on re-cache.
+  dstCtx.clearRect(0, 0, width, height);
   dstCtx.filter = `blur(${radius}px)`;
   dstCtx.drawImage(src, 0, 0);
 
@@ -79,6 +83,9 @@ export function useBlurEffect(
   const contentKey = blurRadius > 0 ? JSON.stringify(visual) : '';
   const cacheTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastCacheTimeRef = useRef(0);
+  const cachedSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const currentWidth = visual.width as number | undefined;
+  const currentHeight = visual.height as number | undefined;
 
   useLayoutEffect(() => {
     if (cacheTimerRef.current !== null) {
@@ -96,32 +103,53 @@ export function useBlurEffect(
       const elapsed = now - lastCacheTimeRef.current;
 
       if (elapsed >= CACHE_THROTTLE_MS) {
-        // Leading edge — set up filters and cache immediately.
+        // Leading edge — reset any throttle-applied scale, then cache.
+        node.scaleX(1);
+        node.scaleY(1);
         node.filters([nativeBlur]);
         node.blurRadius(blurRadius);
         node.cache({ offset: Math.ceil(blurRadius * 2) });
+        if (currentWidth != null && currentHeight != null) {
+          cachedSizeRef.current = { width: currentWidth, height: currentHeight };
+        }
         node.getLayer()?.batchDraw();
         lastCacheTimeRef.current = now;
       } else {
-        // Throttled — leave the stale cache undisturbed. Touching
-        // node.filters() with a new array ref would invalidate it.
+        // Throttled — stretch the stale cache to match new dimensions so
+        // the opposite edge doesn't bounce while we wait to rebuild.
+        const cached = cachedSizeRef.current;
+        if (cached && currentWidth != null && currentHeight != null
+            && cached.width > 0 && cached.height > 0) {
+          node.scaleX(currentWidth / cached.width);
+          node.scaleY(currentHeight / cached.height);
+          node.getLayer()?.batchDraw();
+        }
+
         cacheTimerRef.current = setTimeout(() => {
           cacheTimerRef.current = null;
           const n = nodeRef.current;
           if (n) {
+            n.scaleX(1);
+            n.scaleY(1);
             n.filters([nativeBlur]);
             n.blurRadius(blurRadius);
             n.cache({ offset: Math.ceil(blurRadius * 2) });
+            if (currentWidth != null && currentHeight != null) {
+              cachedSizeRef.current = { width: currentWidth, height: currentHeight };
+            }
             n.getLayer()?.batchDraw();
             lastCacheTimeRef.current = Date.now();
           }
         }, CACHE_THROTTLE_MS - elapsed);
       }
     } else {
+      node.scaleX(1);
+      node.scaleY(1);
       node.filters([]);
       node.clearCache();
       node.getLayer()?.batchDraw();
       lastCacheTimeRef.current = 0;
+      cachedSizeRef.current = null;
     }
 
     return () => {

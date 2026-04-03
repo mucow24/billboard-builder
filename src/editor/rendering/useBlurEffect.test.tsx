@@ -6,12 +6,16 @@ import { useBlurEffect, nativeBlur, CACHE_THROTTLE_MS } from './useBlurEffect';
 
 const { mockNode, mockBatchDraw } = vi.hoisted(() => {
   const mockBatchDraw = vi.fn();
+  let _scaleX = 1;
+  let _scaleY = 1;
   const mockNode = {
     filters: vi.fn(),
     blurRadius: vi.fn(),
     cache: vi.fn(),
     clearCache: vi.fn(),
     getLayer: vi.fn(() => ({ batchDraw: mockBatchDraw })),
+    scaleX: vi.fn((v?: number) => { if (v !== undefined) { _scaleX = v; } return _scaleX; }),
+    scaleY: vi.fn((v?: number) => { if (v !== undefined) { _scaleY = v; } return _scaleY; }),
   };
   return { mockNode, mockBatchDraw };
 });
@@ -27,6 +31,11 @@ function clearMocks() {
     if (typeof value === 'function') value.mockClear();
   });
   mockBatchDraw.mockClear();
+  // Reset scale state to 1
+  mockNode.scaleX(1);
+  mockNode.scaleX.mockClear();
+  mockNode.scaleY(1);
+  mockNode.scaleY.mockClear();
 }
 
 function createMockImageData(width: number, height: number) {
@@ -35,6 +44,7 @@ function createMockImageData(width: number, height: number) {
 
 function createMockCanvasCtx() {
   return {
+    clearRect: vi.fn(),
     putImageData: vi.fn(),
     drawImage: vi.fn(),
     getImageData: (_x: number, _y: number, w: number, h: number) =>
@@ -59,6 +69,9 @@ describe('nativeBlur', () => {
 
     const canvasCalls = spy.mock.calls.filter(([t]) => t === 'canvas');
     expect(canvasCalls).toHaveLength(2); // src + dst created once, reused on second call
+
+    // dst canvas must be cleared before each draw to avoid ghosting
+    expect(mockCtx.clearRect).toHaveBeenCalledTimes(2);
 
     spy.mockRestore();
   });
@@ -171,6 +184,61 @@ describe('useBlurEffect', () => {
     act(() => { vi.advanceTimersByTime(CACHE_THROTTLE_MS); });
 
     expect(mockNode.cache).toHaveBeenCalledTimes(1);
+  });
+
+  it('scales node to interpolate stale cache during throttled resize', () => {
+    const item = { x: 0, y: 0, rotation: 0, fill: 'red', width: 100, height: 50 };
+
+    const { rerender } = render(<TestHarness blurRadius={5} item={item} />);
+    // Leading edge fires — cache at width=100, height=50
+    expect(mockNode.cache).toHaveBeenCalledTimes(1);
+    clearMocks();
+
+    // Resize within throttle window — should scale, not re-cache
+    const resized = { ...item, width: 110, height: 55 };
+    rerender(<TestHarness blurRadius={5} item={resized} />);
+
+    expect(mockNode.cache).not.toHaveBeenCalled();
+    expect(mockNode.scaleX).toHaveBeenCalledWith(110 / 100);
+    expect(mockNode.scaleY).toHaveBeenCalledWith(55 / 50);
+    expect(mockBatchDraw).toHaveBeenCalled();
+  });
+
+  it('resets scale to 1 when cache rebuilds after throttle', () => {
+    const item = { x: 0, y: 0, rotation: 0, fill: 'red', width: 100, height: 50 };
+
+    const { rerender } = render(<TestHarness blurRadius={5} item={item} />);
+    clearMocks();
+
+    // Throttled resize — sets scale
+    const resized = { ...item, width: 120, height: 60 };
+    rerender(<TestHarness blurRadius={5} item={resized} />);
+
+    // Trailing timer fires — should reset scale and re-cache
+    clearMocks();
+    act(() => { vi.advanceTimersByTime(CACHE_THROTTLE_MS); });
+
+    expect(mockNode.scaleX).toHaveBeenCalledWith(1);
+    expect(mockNode.scaleY).toHaveBeenCalledWith(1);
+    expect(mockNode.cache).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets scale when blur goes to 0', () => {
+    const item = { x: 0, y: 0, rotation: 0, fill: 'red', width: 100, height: 50 };
+
+    const { rerender } = render(<TestHarness blurRadius={5} item={item} />);
+    clearMocks();
+
+    // Throttled resize — sets scale
+    const resized = { ...item, width: 110, height: 55 };
+    rerender(<TestHarness blurRadius={5} item={resized} />);
+    clearMocks();
+
+    // Blur to 0 — should reset scale
+    rerender(<TestHarness blurRadius={0} item={resized} />);
+
+    expect(mockNode.scaleX).toHaveBeenCalledWith(1);
+    expect(mockNode.scaleY).toHaveBeenCalledWith(1);
   });
 
   it('clears cache on unmount', () => {

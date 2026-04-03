@@ -131,6 +131,8 @@ vi.mock('react-konva', () => {
             hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
             name: () => String(props.name ?? ''),
             red: noop,
+            scaleX: noop,
+            scaleY: noop,
           });
         }
         if (typeof ref === 'function') {
