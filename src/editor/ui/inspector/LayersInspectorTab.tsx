@@ -20,13 +20,15 @@ import { useListReorder } from './useListReorder';
 import type { LayersInspectorTabProps } from './types';
 
 const GRIP_ICON = (
-  <svg viewBox="0 0 6 10" className="layer-grip-icon">
+  <svg viewBox="0 0 6 13" className="layer-grip-icon">
     <circle cx="1.5" cy="1.5" r="1" />
     <circle cx="4.5" cy="1.5" r="1" />
     <circle cx="1.5" cy="5" r="1" />
     <circle cx="4.5" cy="5" r="1" />
     <circle cx="1.5" cy="8.5" r="1" />
     <circle cx="4.5" cy="8.5" r="1" />
+    <circle cx="1.5" cy="12" r="1" />
+    <circle cx="4.5" cy="12" r="1" />
   </svg>
 );
 
