@@ -45,6 +45,7 @@
   padding: 0;
   background: transparent;
   --tree-line-color: rgb(52, 80, 122);
+  --tree-line-opacity: 0.78;
   cursor: pointer;
   user-select: none;
 }
@@ -157,6 +158,8 @@
   align-self: stretch;
   position: relative;
   pointer-events: none;
+  isolation: isolate;
+  opacity: var(--tree-line-opacity);
 }
 
 /* Column cell: full-height vertical line. Extends 1px downward only —
@@ -167,7 +170,7 @@
   position: absolute;
   left: 10px;
   top: 0;
-  bottom: -1px;
+  bottom: 0;
   width: 2px;
   background: var(--tree-line-color);
 }
@@ -184,10 +187,10 @@
 }
 
 /* T-shape: drop the height constraint so top+bottom fully determine the
-   extent — this gives 100% cell height + the 1px downward over-reach. */
+   extent — this gives 100% cell height. */
 .layer-tree-junc-t::before {
   height: auto;
-  bottom: -1px;
+  bottom: 0;
 }
 
 /* Junction horizontal — midpoint out to right edge */
@@ -202,16 +205,14 @@
   background: var(--tree-line-color);
 }
 
-/* Downward-start piece — behind an expanded group's toggle, from row
-   midpoint to bottom + 1px to bridge any subpixel gap. No translateX
-   needed: left is set to depth*20+9 in inline style, matching the
-   left edge of the junction ::before/::after lines exactly. */
+/* Downward-start piece — from group header midpoint to bottom. */
 .layer-tree-down {
   position: absolute;
   top: 50%;
-  bottom: -1px;
+  bottom: 0;
   width: 2px;
   background: var(--tree-line-color);
+  opacity: var(--tree-line-opacity);
   pointer-events: none;
 }
 
