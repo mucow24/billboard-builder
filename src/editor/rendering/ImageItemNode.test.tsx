@@ -1,6 +1,6 @@
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('konva', () => ({
   default: {
@@ -107,6 +107,10 @@ describe('ImageItemNode', () => {
       }
     });
     mockBatchDraw.mockClear();
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('applies image adjustments through Konva filters without changing shadow props', () => {
@@ -196,6 +200,9 @@ describe('ImageItemNode', () => {
     rerender(
       <ImageItemNode item={item} image={image} renderBox={{ x: 0, y: 0, width: 120, height: 60 }} blurRadius={0} />,
     );
+
+    // Throttled — cache fires after the trailing timer
+    act(() => { vi.advanceTimersByTime(100); });
 
     expect(mockKonvaImageNode.cache).toHaveBeenCalledTimes(1);
     expect(mockBatchDraw).toHaveBeenCalledTimes(1);
