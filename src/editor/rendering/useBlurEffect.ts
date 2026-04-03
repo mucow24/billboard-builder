@@ -1,5 +1,7 @@
 import Konva from 'konva';
-import { useLayoutEffect, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+
+export const CACHE_THROTTLE_MS = 100;
 
 /** Reusable canvas pair for nativeBlur — avoids DOM allocation on every call. */
 let _pool: {
@@ -75,27 +77,69 @@ export function useBlurEffect(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { x: _x, y: _y, rotation: _rot, ...visual } = contentSource as Record<string, unknown>;
   const contentKey = blurRadius > 0 ? JSON.stringify(visual) : '';
+  const cacheTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastCacheTimeRef = useRef(0);
 
   useLayoutEffect(() => {
+    if (cacheTimerRef.current !== null) {
+      clearTimeout(cacheTimerRef.current);
+      cacheTimerRef.current = null;
+    }
+
     const node = nodeRef.current;
     if (!node || typeof node.filters !== 'function') {
       return;
     }
 
     if (blurRadius > 0) {
-      node.filters([nativeBlur]);
-      node.blurRadius(blurRadius);
-      node.cache({ offset: Math.ceil(blurRadius * 2) });
+      const now = Date.now();
+      const elapsed = now - lastCacheTimeRef.current;
+
+      if (elapsed >= CACHE_THROTTLE_MS) {
+        // Leading edge — set up filters and cache immediately.
+        node.filters([nativeBlur]);
+        node.blurRadius(blurRadius);
+        node.cache({ offset: Math.ceil(blurRadius * 2) });
+        node.getLayer()?.batchDraw();
+        lastCacheTimeRef.current = now;
+      } else {
+        // Throttled — leave the stale cache undisturbed. Touching
+        // node.filters() with a new array ref would invalidate it.
+        cacheTimerRef.current = setTimeout(() => {
+          cacheTimerRef.current = null;
+          const n = nodeRef.current;
+          if (n) {
+            n.filters([nativeBlur]);
+            n.blurRadius(blurRadius);
+            n.cache({ offset: Math.ceil(blurRadius * 2) });
+            n.getLayer()?.batchDraw();
+            lastCacheTimeRef.current = Date.now();
+          }
+        }, CACHE_THROTTLE_MS - elapsed);
+      }
     } else {
       node.filters([]);
       node.clearCache();
+      node.getLayer()?.batchDraw();
+      lastCacheTimeRef.current = 0;
     }
 
-    node.getLayer()?.batchDraw();
-
     return () => {
-      node.clearCache();
+      if (cacheTimerRef.current !== null) {
+        clearTimeout(cacheTimerRef.current);
+        cacheTimerRef.current = null;
+      }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- nodeRef is a stable ref object
   }, [blurRadius, contentKey]);
+
+  useEffect(() => {
+    return () => {
+      if (cacheTimerRef.current !== null) {
+        clearTimeout(cacheTimerRef.current);
+      }
+      nodeRef.current?.clearCache();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- nodeRef is a stable ref object
+  }, []);
 }
