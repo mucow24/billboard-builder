@@ -10,6 +10,7 @@ import {
   getNodeIds,
   groupNodes,
   insertNodesAt,
+  moveNode,
   removeNodesByIds,
   reorderNodes,
   ungroupNode,
@@ -180,6 +181,14 @@ function applyDocumentCommandWithEffects(
         nextDocument: replaceDocumentNodes(
           currentDocument,
           reorderNodes(currentDocument.nodes, command.nodeIds, command.mode)
+        ),
+      };
+      break;
+    case 'move_node':
+      result = {
+        nextDocument: replaceDocumentNodes(
+          currentDocument,
+          moveNode(currentDocument.nodes, command.nodeId, command.targetParentId, command.targetIndex)
         ),
       };
       break;

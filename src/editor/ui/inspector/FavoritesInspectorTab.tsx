@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { FavoriteRow } from './FavoriteRow';
-import { useFavoriteReorder } from './useFavoriteReorder';
+import { useListReorder } from './useListReorder';
 import type { FavoritesInspectorTabProps } from './types';
 
 export function FavoritesInspectorTab({
@@ -14,10 +14,17 @@ export function FavoritesInspectorTab({
 }: FavoritesInspectorTabProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const { dragIndex, dropTargetIndex, getDragHandleProps } = useFavoriteReorder(
+  const { dragIndex, dropTargetIndex, getDragHandleProps } = useListReorder(
     listRef,
     favorites.length,
-    onReorderFavorite,
+    (fromIndex, rawGapIndex) => {
+      // Adjust raw gap index for flat list: when dropping after the dragged item,
+      // the visual position is off by one because the item hasn't been removed yet.
+      const adjusted = rawGapIndex > fromIndex ? rawGapIndex - 1 : rawGapIndex;
+      if (adjusted !== fromIndex) {
+        onReorderFavorite(fromIndex, adjusted);
+      }
+    },
   );
 
   if (favorites.length === 0) {
@@ -49,6 +56,7 @@ export function FavoritesInspectorTab({
       {dropTargetIndex !== null && dragIndex !== null && (
         <div
           className="favorite-drop-indicator"
+          data-drop-indicator
           style={{
             position: 'absolute',
             left: 0,

@@ -8,6 +8,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import type { CanvasNode } from '../../document/sceneGraph';
 import { flattenLayerRows } from '../../document/sceneGraph';
 
 import { LayersInspectorTab } from './LayersInspectorTab';
@@ -493,5 +494,62 @@ describe('LayersInspectorTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Rename group' }));
     expect(onSelectNode).not.toHaveBeenCalled();
+  });
+
+  it('renders a drag grip on each non-generator row', () => {
+    const a = createRectangleItem({ id: 'a' });
+    const b = createTextItem({ id: 'b' });
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([a, b])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onMoveNode={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Reorder Text' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reorder Rectangle' })).toBeInTheDocument();
+  });
+
+  it('renders an inert grip on generator rows', () => {
+    const rect = createRectangleItem({ id: 'rect' });
+    // Create a minimal generator-like node for testing
+    const gen = { ...createRectangleItem({ id: 'gen' }), kind: 'generator' as const, name: 'Scanlines' };
+
+    render(
+      <LayersInspectorTab
+        background="#ffffff00"
+        canReorder
+        rows={flattenLayerRows([rect, gen as unknown as CanvasNode])}
+        onBackgroundChange={vi.fn()}
+        onDeleteNode={vi.fn()}
+        onOpenProperties={vi.fn()}
+        onReorder={vi.fn()}
+        onMoveNode={vi.fn()}
+        onSelectNode={vi.fn()}
+        onToggleNode={vi.fn()}
+        onToggleNodeLocked={vi.fn()}
+        onToggleNodeHidden={vi.fn()}
+        collapsedGroupIds={new Set()}
+        onToggleGroupCollapse={vi.fn()}
+        selectedNodeIds={[]}
+      />,
+    );
+
+    const genGrip = screen.getByRole('button', { name: 'Reorder Scanlines' });
+    expect(genGrip).toHaveAttribute('aria-disabled', 'true');
   });
 });

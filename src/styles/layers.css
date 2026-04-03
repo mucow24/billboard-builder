@@ -6,7 +6,7 @@
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
-  padding: 10px 10px 0;
+  padding: 10px 5px 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -44,7 +44,8 @@
   min-height: 28px;
   padding: 0;
   background: transparent;
-  --tree-line-color: rgba(52, 80, 122, 0.78);
+  --tree-line-color: rgb(52, 80, 122);
+  --tree-line-opacity: 0.78;
   cursor: pointer;
   user-select: none;
 }
@@ -98,6 +99,55 @@
   box-shadow: inset 0 0 0 1px rgba(86, 118, 171, 0.48);
 }
 
+/* ── Layer drag grip ─────────────────────────────────────────────────────── */
+
+.layer-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 12px;
+  width: 12px;
+  align-self: stretch;
+  margin: 0 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64789b;
+  cursor: grab;
+  touch-action: none;
+}
+
+.layer-grip:hover {
+  color: #93a8c9;
+}
+
+.layer-grip:active {
+  cursor: grabbing;
+}
+
+.layer-grip-inert {
+  pointer-events: none;
+  opacity: 0.3;
+  cursor: default;
+}
+
+.layer-grip-icon {
+  width: 6px;
+  height: 13px;
+  fill: currentColor;
+}
+
+.layer-row.dragging {
+  opacity: 0.4;
+}
+
+.layer-drop-indicator {
+  height: 2px;
+  background: rgba(96, 165, 250, 0.7);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
 /* ── Tree connector cells ─────────────────────────────────────────────────── */
 
 /* Shared base: fixed 24px-wide cell, stretches to full row height */
@@ -108,6 +158,8 @@
   align-self: stretch;
   position: relative;
   pointer-events: none;
+  isolation: isolate;
+  opacity: var(--tree-line-opacity);
 }
 
 /* Column cell: full-height vertical line. Extends 1px downward only —
@@ -116,9 +168,9 @@
 .layer-tree-col-line::after {
   content: '';
   position: absolute;
-  left: 11px;
+  left: 10px;
   top: 0;
-  bottom: -1px;
+  bottom: 0;
   width: 2px;
   background: var(--tree-line-color);
 }
@@ -127,7 +179,7 @@
 .layer-tree-junc::before {
   content: '';
   position: absolute;
-  left: 11px;
+  left: 10px;
   top: 0;
   height: 50%;
   width: 2px;
@@ -135,17 +187,17 @@
 }
 
 /* T-shape: drop the height constraint so top+bottom fully determine the
-   extent — this gives 100% cell height + the 1px downward over-reach. */
+   extent — this gives 100% cell height. */
 .layer-tree-junc-t::before {
   height: auto;
-  bottom: -1px;
+  bottom: 0;
 }
 
 /* Junction horizontal — midpoint out to right edge */
 .layer-tree-junc::after {
   content: '';
   position: absolute;
-  left: 11px;
+  left: 10px;
   top: 50%;
   right: 0;
   height: 2px;
@@ -153,16 +205,14 @@
   background: var(--tree-line-color);
 }
 
-/* Downward-start piece — behind an expanded group's toggle, from row
-   midpoint to bottom + 1px to bridge any subpixel gap. No translateX
-   needed: left is set to depth*20+9 in inline style, matching the
-   left edge of the junction ::before/::after lines exactly. */
+/* Downward-start piece — from group header midpoint to bottom. */
 .layer-tree-down {
   position: absolute;
   top: 50%;
-  bottom: -1px;
+  bottom: 0;
   width: 2px;
   background: var(--tree-line-color);
+  opacity: var(--tree-line-opacity);
   pointer-events: none;
 }
 

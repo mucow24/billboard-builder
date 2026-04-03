@@ -1,6 +1,8 @@
-import { type RefObject, useCallback, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 const DRAG_THRESHOLD_PX = 5;
+const AUTOSCROLL_EDGE_PX = 40;
+const AUTOSCROLL_MAX_SPEED = 8;
 
 export interface DragHandleProps {
   onPointerDown: (e: React.PointerEvent) => void;
@@ -10,17 +12,22 @@ export interface DragHandleProps {
   'aria-roledescription': string;
 }
 
-export function useFavoriteReorder(
+export function useListReorder(
   listRef: RefObject<HTMLElement | null>,
   itemCount: number,
-  onReorder: (fromIndex: number, toIndex: number) => void,
+  onReorder: (fromIndex: number, toIndex: number, pointerX: number | null) => void,
+  options?: {
+    scrollContainerRef?: RefObject<HTMLElement | null>;
+  },
 ): {
   dragIndex: number | null;
   dropTargetIndex: number | null;
+  pointerX: number | null;
   getDragHandleProps: (index: number) => DragHandleProps;
 } {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [pointerX, setPointerX] = useState<number | null>(null);
   const dropTargetRef = useRef<number | null>(null);
 
   // Refs for pointer-capture drag session
@@ -31,12 +38,56 @@ export function useFavoriteReorder(
     activated: boolean;
   } | null>(null);
 
+  // Refs for autoscroll and pointer position
+  const clientYRef = useRef<number>(0);
+  const pointerXRef = useRef<number | null>(null);
+  const autoscrollRafRef = useRef<number | null>(null);
+
+  const getScrollContainer = useCallback(() => {
+    return options?.scrollContainerRef?.current ?? listRef.current;
+  }, [listRef, options?.scrollContainerRef]);
+
+  const startAutoscroll = useCallback(() => {
+    const tick = () => {
+      const container = getScrollContainer();
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const y = clientYRef.current;
+      const distFromTop = y - rect.top;
+      const distFromBottom = rect.bottom - y;
+
+      if (distFromTop < AUTOSCROLL_EDGE_PX && distFromTop >= 0) {
+        const speed = Math.ceil(AUTOSCROLL_MAX_SPEED * (1 - distFromTop / AUTOSCROLL_EDGE_PX));
+        container.scrollTop -= speed;
+      } else if (distFromBottom < AUTOSCROLL_EDGE_PX && distFromBottom >= 0) {
+        const speed = Math.ceil(AUTOSCROLL_MAX_SPEED * (1 - distFromBottom / AUTOSCROLL_EDGE_PX));
+        container.scrollTop += speed;
+      }
+
+      autoscrollRafRef.current = requestAnimationFrame(tick);
+    };
+    autoscrollRafRef.current = requestAnimationFrame(tick);
+  }, [getScrollContainer]);
+
+  const stopAutoscroll = useCallback(() => {
+    if (autoscrollRafRef.current !== null) {
+      cancelAnimationFrame(autoscrollRafRef.current);
+      autoscrollRafRef.current = null;
+    }
+  }, []);
+
+  // Clean up autoscroll on unmount
+  useEffect(() => stopAutoscroll, [stopAutoscroll]);
+
   const computeDropTarget = useCallback(
     (clientY: number): number | null => {
       const list = listRef.current;
       if (!list) return null;
 
-      const children = Array.from(list.children) as HTMLElement[];
+      const children = Array.from(list.children).filter(
+        (el) => !(el as HTMLElement).dataset.dropIndicator,
+      ) as HTMLElement[];
       for (let i = 0; i < children.length; i++) {
         const rect = children[i].getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
@@ -57,47 +108,53 @@ export function useFavoriteReorder(
     setDragIndex(null);
     dropTargetRef.current = null;
     setDropTargetIndex(null);
-  }, []);
+    setPointerX(null);
+    stopAutoscroll();
+  }, [stopAutoscroll]);
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       const session = dragSessionRef.current;
       if (!session) return;
 
+      clientYRef.current = e.clientY;
+
       if (!session.activated) {
         const dy = Math.abs(e.clientY - session.startY);
         if (dy < DRAG_THRESHOLD_PX) return;
         session.activated = true;
         setDragIndex(session.fromIndex);
+        startAutoscroll();
       }
 
       const target = computeDropTarget(e.clientY);
       dropTargetRef.current = target;
       setDropTargetIndex(target);
+      pointerXRef.current = e.clientX;
+      setPointerX(e.clientX);
     },
-    [computeDropTarget],
+    [computeDropTarget, startAutoscroll],
   );
 
   const handlePointerUp = useCallback(() => {
     const session = dragSessionRef.current;
     dragSessionRef.current = null;
+    stopAutoscroll();
 
     if (session?.activated) {
       setDragIndex(null);
       const drop = dropTargetRef.current;
+      const lastPointerX = pointerXRef.current;
       dropTargetRef.current = null;
+      pointerXRef.current = null;
       setDropTargetIndex(null);
+      setPointerX(null);
 
-      if (drop !== null && drop !== session.fromIndex) {
-        // When dropping after the dragged item, the visual position is off by one
-        // because the item hasn't been removed yet. Adjust for that.
-        const adjustedTarget = drop > session.fromIndex ? drop - 1 : drop;
-        if (adjustedTarget !== session.fromIndex) {
-          onReorder(session.fromIndex, adjustedTarget);
-        }
+      if (drop !== null) {
+        onReorder(session.fromIndex, drop, lastPointerX);
       }
     }
-  }, [onReorder]);
+  }, [onReorder, stopAutoscroll]);
 
   const handleKeyDownGlobal = useCallback(
     (e: KeyboardEvent) => {
@@ -157,10 +214,10 @@ export function useFavoriteReorder(
 
         if (e.key === 'ArrowUp' && index > 0) {
           e.preventDefault();
-          onReorder(index, index - 1);
+          onReorder(index, index - 1, null);
         } else if (e.key === 'ArrowDown' && index < itemCount - 1) {
           e.preventDefault();
-          onReorder(index, index + 1);
+          onReorder(index, index + 2, null);
         }
       },
 
@@ -171,5 +228,5 @@ export function useFavoriteReorder(
     [itemCount, onReorder, handlePointerMove, handlePointerUp, handleKeyDownGlobal, handleLostPointerCapture],
   );
 
-  return { dragIndex, dropTargetIndex, getDragHandleProps };
+  return { dragIndex, dropTargetIndex, pointerX, getDragHandleProps };
 }

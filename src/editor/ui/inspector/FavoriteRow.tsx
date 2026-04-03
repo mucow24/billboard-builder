@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { collectLeafItems } from '../../document/sceneGraph';
 import { summarizeFavoriteNodes } from '../../document/favoriteLibrary';
 import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
-import type { DragHandleProps } from './useFavoriteReorder';
+import type { DragHandleProps } from './useListReorder';
 
 const GRIP_ICON = (
   <svg viewBox="0 0 6 10" className="favorite-grip-icon">

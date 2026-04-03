@@ -892,6 +892,33 @@ export async function doubleClickLayerRow(page: Page, name: string) {
   await page.getByRole('button', { name, exact: true }).dblclick();
 }
 
+/**
+ * Drags a layer grip handle to a target Y position with a specified X offset.
+ * The X offset controls horizontal depth sensing for cross-parent drops.
+ *
+ * @param gripLabel - the aria-label of the grip (e.g. "Reorder Rectangle")
+ * @param targetY - the page-space Y coordinate to drop at
+ * @param targetX - optional page-space X coordinate (defaults to grip center X)
+ */
+export async function dragLayerGrip(
+  page: Page,
+  gripLabel: string,
+  targetY: number,
+  targetX?: number,
+  steps = 5,
+) {
+  const grip = page.getByRole('button', { name: gripLabel });
+  const box = await grip.boundingBox();
+  expect(box).toBeTruthy();
+  const startX = box!.x + box!.width / 2;
+  const startY = box!.y + box!.height / 2;
+  const endX = targetX ?? startX;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(endX, targetY, { steps });
+  await page.mouse.up();
+}
+
 export async function openToolbarPopover(page: Page, triggerName: string) {
   await page.getByRole('button', { name: triggerName, exact: true }).click();
 }

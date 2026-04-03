@@ -322,6 +322,41 @@ export function removeNodesByIds(nodes: CanvasNode[], nodeIds: Set<string>): Can
   return nextNodes;
 }
 
+/**
+ * Find a specific group by ID and dissolve it if it has fewer than 2 children.
+ * 0 children → remove the group. 1 child → promote the child in place.
+ * Cascades upward: if dissolving the group leaves its own parent deficient,
+ * that parent is dissolved too.
+ */
+function dissolveGroupIfDeficient(nodes: CanvasNode[], groupId: string): CanvasNode[] {
+  const result: CanvasNode[] = [];
+  for (const node of nodes) {
+    if (!isGroupNode(node)) {
+      result.push(node);
+      continue;
+    }
+    if (node.id === groupId) {
+      if (node.children.length === 0) continue; // remove empty group
+      if (node.children.length === 1) {
+        result.push(node.children[0]); // promote sole child
+        continue;
+      }
+      result.push(node); // group is fine
+      continue;
+    }
+    // Recurse into other groups to find the target
+    const nextChildren = dissolveGroupIfDeficient(node.children, groupId);
+    // After dissolving the target inside this group, check if THIS group is now deficient
+    if (nextChildren.length === 0) continue;
+    if (nextChildren.length === 1) {
+      result.push(nextChildren[0]);
+      continue;
+    }
+    result.push({ ...node, children: nextChildren });
+  }
+  return result;
+}
+
 export function getSelectionParentInfo(nodes: CanvasNode[], nodeIds: string[]) {
   const entries = nodeIds.map((nodeId) => getNodeEntry(nodes, nodeId));
   if (entries.some((entry) => !entry)) {
@@ -472,6 +507,60 @@ export function reorderNodes(
   return updateChildren(nodes, groupingParentInfo.parentId, (children) =>
     reorderChildren(children, new Set(nodeIds), mode)
   );
+}
+
+export function moveNode(
+  nodes: CanvasNode[],
+  nodeId: string,
+  targetParentId: string | null,
+  targetIndex: number,
+): CanvasNode[] {
+  const entry = getNodeEntry(nodes, nodeId);
+  if (!entry) {
+    return nodes;
+  }
+
+  // Prevent moving a group into itself or its own descendant
+  if (targetParentId !== null) {
+    if (targetParentId === nodeId) {
+      return nodes;
+    }
+    const targetEntry = getNodeEntry(nodes, targetParentId);
+    if (targetEntry && targetEntry.ancestors.some((a) => a.id === nodeId)) {
+      return nodes;
+    }
+  }
+
+  const sourceParentId = entry.parent?.id ?? null;
+
+  if (sourceParentId === targetParentId) {
+    // Same-parent move: splice within the children array
+    return updateChildren(nodes, sourceParentId, (children) => {
+      const fromIndex = children.findIndex((c) => c.id === nodeId);
+      if (fromIndex === -1) return children;
+      const clampedTarget = Math.max(0, Math.min(targetIndex, children.length - 1));
+      if (fromIndex === clampedTarget) return children;
+      const next = children.slice();
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(clampedTarget, 0, moved);
+      return next;
+    });
+  }
+
+  // Cross-parent move: remove from source, insert at target
+  let result = updateChildren(nodes, sourceParentId, (children) =>
+    children.filter((c) => c.id !== nodeId),
+  );
+
+  // Dissolve source group if it now has fewer than 2 children
+  if (sourceParentId !== null) {
+    result = dissolveGroupIfDeficient(result, sourceParentId);
+  }
+
+  // Insert at target parent
+  result = insertNodesAt(result, [entry.node], targetParentId, targetIndex);
+
+  return result;
 }
 
 export function collectSelectableNodeIds(nodes: CanvasNode[]): string[] {
