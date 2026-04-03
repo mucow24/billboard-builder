@@ -35,6 +35,7 @@ function createMockImageData(width: number, height: number) {
 
 function createMockCanvasCtx() {
   return {
+    clearRect: vi.fn(),
     putImageData: vi.fn(),
     drawImage: vi.fn(),
     getImageData: (_x: number, _y: number, w: number, h: number) =>
@@ -59,6 +60,9 @@ describe('nativeBlur', () => {
 
     const canvasCalls = spy.mock.calls.filter(([t]) => t === 'canvas');
     expect(canvasCalls).toHaveLength(2); // src + dst created once, reused on second call
+
+    // dst canvas must be cleared before each draw to avoid ghosting
+    expect(mockCtx.clearRect).toHaveBeenCalledTimes(2);
 
     spy.mockRestore();
   });

@@ -49,7 +49,11 @@ export function nativeBlur(this: Konva.Node, imageData: ImageData): void {
   srcCtx.putImageData(imageData, 0, 0);
 
   // Draw onto dst canvas with the browser's native blur filter,
-  // which correctly handles premultiplied alpha compositing
+  // which correctly handles premultiplied alpha compositing.
+  // clearRect is required because the pooled canvas retains old content;
+  // without it, drawImage composites over stale pixels via source-over,
+  // causing ghosted colors and doubled edges on re-cache.
+  dstCtx.clearRect(0, 0, width, height);
   dstCtx.filter = `blur(${radius}px)`;
   dstCtx.drawImage(src, 0, 0);
 
