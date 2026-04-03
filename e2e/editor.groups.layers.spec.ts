@@ -765,10 +765,11 @@ test.describe('editor group layers and inspector flows', () => {
         [
           createRectangleFixture({ id: 'escape-rect', name: 'Escape', x: 100, y: 100, width: 80, height: 80, zIndex: 0 }),
           createRectangleFixture({ id: 'stay-rect', name: 'Stay', x: 200, y: 100, width: 80, height: 80, zIndex: 1 }),
+          createRectangleFixture({ id: 'stay-rect-2', name: 'Stay2', x: 250, y: 100, width: 80, height: 80, zIndex: 2 }),
         ],
         { id: 'source-group', name: 'Source Group' },
       ),
-      createRectangleFixture({ id: 'bottom-rect', name: 'Bottom', x: 300, y: 100, width: 80, height: 80, zIndex: 2 }),
+      createRectangleFixture({ id: 'bottom-rect', name: 'Bottom', x: 300, y: 100, width: 80, height: 80, zIndex: 3 }),
     ]);
 
     await openFreshEditor(page);
@@ -783,7 +784,7 @@ test.describe('editor group layers and inspector flows', () => {
     // Drop just above Bottom, cursor far left to indicate root level
     await dragLayerGrip(page, 'Reorder Escape', bottomBox!.y - 2, bottomBox!.x);
 
-    // Escape should now be a root-level node above Bottom
+    // Escape should now be a root-level node; group survives with 2 remaining children
     const savedProject = await saveAndReadProject(page);
     const rootIds = (savedProject.nodes as Array<{ id: string }>).map((n) => n.id);
     expect(rootIds).toContain('escape-rect');

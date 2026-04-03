@@ -150,7 +150,7 @@ export function useListReorder(
       setDropTargetIndex(null);
       setPointerX(null);
 
-      if (drop !== null && drop !== session.fromIndex && drop !== session.fromIndex + 1) {
+      if (drop !== null) {
         onReorder(session.fromIndex, drop, lastPointerX);
       }
     }

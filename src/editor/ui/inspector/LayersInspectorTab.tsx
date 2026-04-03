@@ -92,12 +92,28 @@ export function LayersInspectorTab({
     [visibleRows, onMoveNode, onReorder],
   );
 
-  const { dragIndex, dropTargetIndex, getDragHandleProps } = useListReorder(
+  const { dragIndex, dropTargetIndex, pointerX, getDragHandleProps } = useListReorder(
     listRef,
     visibleRows.length,
     handleReorder,
     { scrollContainerRef },
   );
+
+  // Compute the resolved depth for the drop indicator during drag
+  const dropIndicatorDepth = useMemo(() => {
+    if (dragIndex === null || dropTargetIndex === null || pointerX === null) return 0;
+    const listEl = listRef.current;
+    if (!listEl) return 0;
+    const listRect = listEl.getBoundingClientRect();
+    const relativeX = pointerX - listRect.left;
+    const rowAbove = dropTargetIndex > 0 ? visibleRows[dropTargetIndex - 1] : null;
+    const rowBelow = dropTargetIndex < visibleRows.length ? visibleRows[dropTargetIndex] : null;
+    return resolveDropDepth(
+      rowAbove?.depth ?? 0,
+      rowBelow?.depth ?? null,
+      relativeX,
+    );
+  }, [dragIndex, dropTargetIndex, pointerX, visibleRows]);
   function renderReorderIcon(kind: 'front' | 'forward' | 'backward' | 'back') {
     switch (kind) {
       case 'front':
@@ -480,7 +496,7 @@ export function LayersInspectorTab({
                 data-drop-indicator
                 style={{
                   position: 'absolute',
-                  left: 0,
+                  left: `${12 + dropIndicatorDepth * 24}px`,
                   right: 0,
                   top: 0,
                   transform: `translateY(${getDropIndicatorOffset(listRef.current, dropTargetIndex)}px)`,

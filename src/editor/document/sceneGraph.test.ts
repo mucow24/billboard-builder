@@ -290,7 +290,7 @@ describe('scene graph helpers', () => {
     expect(result[0]!.children.map((n) => n.id)).toEqual(['outsider', 'child']);
   });
 
-  it('moves a node out of a group to root level', () => {
+  it('moves a node out of a group to root level and dissolves the singleton group', () => {
     const child1 = createRectangleItem({ id: 'child1' });
     const child2 = createRectangleItem({ id: 'child2' });
     const group = createGroupNode([child1, child2], 'Group');
@@ -299,25 +299,39 @@ describe('scene graph helpers', () => {
 
     const result = moveNode([group, sibling], 'child1', null, 2);
 
-    expect(result.map((n) => n.id)).toEqual(['group-1', 'sibling', 'child1']);
-    if (result[0]!.kind !== 'group') throw new Error('Expected group');
-    expect(result[0]!.children.map((n) => n.id)).toEqual(['child2']);
+    // group-1 had 2 children; removing child1 leaves 1 → group dissolves, child2 promoted
+    expect(result.map((n) => n.id)).toEqual(['child2', 'sibling', 'child1']);
   });
 
-  it('moves a node between two different groups', () => {
+  it('preserves group when moving out leaves >= 2 children', () => {
+    const child1 = createRectangleItem({ id: 'child1' });
+    const child2 = createRectangleItem({ id: 'child2' });
+    const child3 = createRectangleItem({ id: 'child3' });
+    const group = createGroupNode([child1, child2, child3], 'Group');
+    group.id = 'group-1';
+
+    const result = moveNode([group], 'child1', null, 1);
+
+    expect(result.map((n) => n.id)).toEqual(['group-1', 'child1']);
+    if (result[0]!.kind !== 'group') throw new Error('Expected group');
+    expect(result[0]!.children.map((n) => n.id)).toEqual(['child2', 'child3']);
+  });
+
+  it('moves a node between two different groups, dissolving empty source group', () => {
     const childA = createRectangleItem({ id: 'childA' });
-    const childB = createRectangleItem({ id: 'childB' });
+    const childB1 = createRectangleItem({ id: 'childB1' });
+    const childB2 = createRectangleItem({ id: 'childB2' });
     const groupA = createGroupNode([childA], 'Group A');
     groupA.id = 'groupA';
-    const groupB = createGroupNode([childB], 'Group B');
+    const groupB = createGroupNode([childB1, childB2], 'Group B');
     groupB.id = 'groupB';
 
     const result = moveNode([groupA, groupB], 'childA', 'groupB', 0);
 
+    // groupA had 1 child, removing it makes 0 → group removed entirely
+    expect(result.map((n) => n.id)).toEqual(['groupB']);
     if (result[0]!.kind !== 'group') throw new Error('Expected group');
-    if (result[1]!.kind !== 'group') throw new Error('Expected group');
-    expect(result[0]!.children).toHaveLength(0);
-    expect(result[1]!.children.map((n) => n.id)).toEqual(['childA', 'childB']);
+    expect(result[0]!.children.map((n) => n.id)).toEqual(['childA', 'childB1', 'childB2']);
   });
 
   it('clamps out-of-range target index for moveNode', () => {
@@ -326,6 +340,67 @@ describe('scene graph helpers', () => {
 
     const result = moveNode([a, b], 'a', null, 99);
     expect(result.map((n) => n.id)).toEqual(['b', 'a']);
+  });
+
+  it('dissolves source group via cascade when moving from nested group', () => {
+    // outer(inner(a, b)), where inner has exactly 2 children
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+    const inner = createGroupNode([a, b], 'Inner');
+    inner.id = 'inner';
+    const c = createRectangleItem({ id: 'c' });
+    const outer = createGroupNode([inner, c], 'Outer');
+    outer.id = 'outer';
+
+    // Move 'a' to root — inner left with 1 child → dissolves → b promoted into outer
+    const result = moveNode([outer], 'a', null, 1);
+    expect(result.map((n) => n.id)).toEqual(['outer', 'a']);
+    if (result[0]!.kind !== 'group') throw new Error('Expected group');
+    expect(result[0]!.children.map((n) => n.id)).toEqual(['b', 'c']);
+  });
+
+  it('cascades dissolution when inner dissolve leaves outer with 1 child', () => {
+    // outer(inner(a, b)) — outer has only 1 child (inner)
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+    const inner = createGroupNode([a, b], 'Inner');
+    inner.id = 'inner';
+    const outer = createGroupNode([inner], 'Outer');
+    outer.id = 'outer';
+
+    // Move 'a' to root — inner left with 1 child → dissolves → outer left with 1 child → dissolves
+    const result = moveNode([outer], 'a', null, 1);
+    expect(result.map((n) => n.id)).toEqual(['b', 'a']);
+  });
+
+  it('moves last child out of 2-child group, dissolving the group', () => {
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+    const group = createGroupNode([a, b], 'G');
+    group.id = 'g';
+    const c = createRectangleItem({ id: 'c' });
+
+    // Move 'b' out — group left with 'a' only → dissolves
+    const result = moveNode([group, c], 'b', null, 0);
+    expect(result.map((n) => n.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('handles moving between groups where source dissolves but target survives', () => {
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+    const groupSrc = createGroupNode([a, b], 'Src');
+    groupSrc.id = 'src';
+    const c = createRectangleItem({ id: 'c' });
+    const d = createRectangleItem({ id: 'd' });
+    const groupDst = createGroupNode([c, d], 'Dst');
+    groupDst.id = 'dst';
+
+    // Move 'a' from src to dst at index 1 — src left with 1 child → dissolves
+    const result = moveNode([groupSrc, groupDst], 'a', 'dst', 1);
+    // src dissolved, b promoted; dst gains a
+    expect(result.map((n) => n.id)).toEqual(['b', 'dst']);
+    if (result[1]!.kind !== 'group') throw new Error('Expected group');
+    expect(result[1]!.children.map((n) => n.id)).toEqual(['c', 'a', 'd']);
   });
 
   it('rejects moving a group into itself or its own descendant', () => {
