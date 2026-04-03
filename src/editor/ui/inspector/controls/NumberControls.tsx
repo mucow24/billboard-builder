@@ -98,7 +98,7 @@ export function BareNumberInput({
   step = 1,
   value,
 }: BareNumberInputProps) {
-  const { draft, isFocusedRef, commitDraft, handleChange } = useDraftNumber(
+  const { draft, setDraft, isFocusedRef, commitDraft, handleChange } = useDraftNumber(
     value, digits, min, max, onChange,
   );
   const formatted = value === null ? '' : formatDisplayedNumber(value, digits);
@@ -152,7 +152,7 @@ export function NumberInput({
     value === null ? min ?? sliderDetentValue ?? 0 : Number(displayedValue);
   const sliderId = useId();
 
-  const { draft: textDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft, handleChange: handleTextChange } =
+  const { draft: textDraft, setDraft: setTextDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft, handleChange: handleTextChange } =
     useDraftNumber(value, digits, textMin ?? min, textMax ?? max, onChange);
 
   function commitValue(nextValue: number) {
