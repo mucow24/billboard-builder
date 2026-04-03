@@ -26,6 +26,7 @@ export function PropertiesPanel({
   onBackgroundChange,
   onGroupOpacityChange,
   onDeleteNode,
+  onMoveNode,
   onOpenProperties = () => {},
   onRenameGroup = () => {},
   onItemChange,
@@ -147,6 +148,7 @@ export function PropertiesPanel({
               rows={layerRows}
               onBackgroundChange={onBackgroundChange}
               onDeleteNode={onDeleteNode}
+              onMoveNode={onMoveNode}
               onOpenProperties={onOpenProperties}
               onRenameGroup={onRenameGroup}
               onReorder={onReorder}

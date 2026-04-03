@@ -474,6 +474,56 @@ export function reorderNodes(
   );
 }
 
+export function moveNode(
+  nodes: CanvasNode[],
+  nodeId: string,
+  targetParentId: string | null,
+  targetIndex: number,
+): CanvasNode[] {
+  const entry = getNodeEntry(nodes, nodeId);
+  if (!entry) {
+    return nodes;
+  }
+
+  // Prevent moving a group into itself or its own descendant
+  if (targetParentId !== null) {
+    if (targetParentId === nodeId) {
+      return nodes;
+    }
+    const targetEntry = getNodeEntry(nodes, targetParentId);
+    if (targetEntry && targetEntry.ancestors.some((a) => a.id === nodeId)) {
+      return nodes;
+    }
+  }
+
+  const sourceParentId = entry.parent?.id ?? null;
+
+  if (sourceParentId === targetParentId) {
+    // Same-parent move: splice within the children array
+    return updateChildren(nodes, sourceParentId, (children) => {
+      const fromIndex = children.findIndex((c) => c.id === nodeId);
+      if (fromIndex === -1) return children;
+      const clampedTarget = Math.max(0, Math.min(targetIndex, children.length - 1));
+      if (fromIndex === clampedTarget) return children;
+      const next = children.slice();
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(clampedTarget, 0, moved);
+      return next;
+    });
+  }
+
+  // Cross-parent move: remove from source, insert at target
+  // Remove from source parent without singleton-group collapse
+  let result = updateChildren(nodes, sourceParentId, (children) =>
+    children.filter((c) => c.id !== nodeId),
+  );
+
+  // Insert at target parent
+  result = insertNodesAt(result, [entry.node], targetParentId, targetIndex);
+
+  return result;
+}
+
 export function collectSelectableNodeIds(nodes: CanvasNode[]): string[] {
   return nodes.filter((node) => isGroupNode(node) || !node.hidden).map((node) => node.id);
 }

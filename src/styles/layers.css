@@ -98,6 +98,54 @@
   box-shadow: inset 0 0 0 1px rgba(86, 118, 171, 0.48);
 }
 
+/* ── Layer drag grip ─────────────────────────────────────────────────────── */
+
+.layer-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 12px;
+  width: 12px;
+  align-self: stretch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64789b;
+  cursor: grab;
+  touch-action: none;
+}
+
+.layer-grip:hover {
+  color: #93a8c9;
+}
+
+.layer-grip:active {
+  cursor: grabbing;
+}
+
+.layer-grip-inert {
+  pointer-events: none;
+  opacity: 0.3;
+  cursor: default;
+}
+
+.layer-grip-icon {
+  width: 6px;
+  height: 10px;
+  fill: currentColor;
+}
+
+.layer-row.dragging {
+  opacity: 0.4;
+}
+
+.layer-drop-indicator {
+  height: 2px;
+  background: rgba(96, 165, 250, 0.7);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
 /* ── Tree connector cells ─────────────────────────────────────────────────── */
 
 /* Shared base: fixed 24px-wide cell, stretches to full row height */

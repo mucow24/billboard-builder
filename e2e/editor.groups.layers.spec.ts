@@ -17,6 +17,7 @@ import {
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
+  dragLayerGrip,
 } from './support/editor';
 
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -658,5 +659,170 @@ test.describe('editor group layers and inspector flows', () => {
         name: 'Keep This Name',
       }),
     ]);
+  });
+
+  test('reorders flat siblings via grip drag', async ({ page }) => {
+    // Data order is back-to-front: [A=back, B=middle, C=front]
+    // Visual order is front-to-back: [C, B, A]
+    const document = createGroupedProjectDocument([
+      createRectangleFixture({ id: 'drag-a', name: 'Alpha', x: 100, y: 100, width: 80, height: 80, zIndex: 0 }),
+      createRectangleFixture({ id: 'drag-b', name: 'Beta', x: 200, y: 100, width: 80, height: 80, zIndex: 1 }),
+      createRectangleFixture({ id: 'drag-c', name: 'Charlie', x: 300, y: 100, width: 80, height: 80, zIndex: 2 }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'drag-reorder-flat.json');
+    await openLayersTab(page);
+
+    // Visual order before: C (front), B, A (back)
+    await expect(page.getByTestId('layers-row-drag-c')).toBeVisible();
+    await expect(page.getByTestId('layers-row-drag-b')).toBeVisible();
+    await expect(page.getByTestId('layers-row-drag-a')).toBeVisible();
+
+    // Drag Charlie grip down past Beta (to second position)
+    const betaGrip = page.getByRole('button', { name: 'Reorder Beta' });
+    const betaBox = await betaGrip.boundingBox();
+    await dragLayerGrip(page, 'Reorder Charlie', betaBox!.y + betaBox!.height + 2);
+
+    // Verify persistence: data order should be [A, C, B] (C moved between A and B)
+    const savedProject = await saveAndReadProject(page);
+    expect((savedProject.nodes as Array<{ id: string }>).map((n) => n.id)).toEqual([
+      'drag-a', 'drag-c', 'drag-b',
+    ]);
+  });
+
+  test('reorders children within an expanded group via grip drag', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({ id: 'child-a', name: 'Child A', x: 100, y: 100, width: 80, height: 80, zIndex: 0 }),
+          createRectangleFixture({ id: 'child-b', name: 'Child B', x: 200, y: 100, width: 80, height: 80, zIndex: 1 }),
+          createRectangleFixture({ id: 'child-c', name: 'Child C', x: 300, y: 100, width: 80, height: 80, zIndex: 2 }),
+        ],
+        { id: 'reorder-group', name: 'Reorder Group' },
+      ),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'drag-reorder-group-children.json');
+    await openLayersTab(page);
+
+    await expect(page.getByTestId('layers-row-reorder-group')).toBeVisible();
+
+    // Drag Child C (first child visually) down past Child B
+    const childBGrip = page.getByRole('button', { name: 'Reorder Child B' });
+    const childBBox = await childBGrip.boundingBox();
+    await dragLayerGrip(page, 'Reorder Child C', childBBox!.y + childBBox!.height + 2);
+
+    // Verify: child-c moved from data index 2 to data index 1
+    const savedProject = await saveAndReadProject(page);
+    const group = savedProject.nodes.find((n: { id: string }) => n.id === 'reorder-group') as {
+      id: string;
+      children: Array<{ id: string }>;
+    };
+    expect(group.children.map((c) => c.id)).toEqual(['child-a', 'child-c', 'child-b']);
+  });
+
+  test('drags an item into an expanded group', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({ id: 'inside-rect', name: 'Inside', x: 100, y: 100, width: 80, height: 80, zIndex: 0 }),
+        ],
+        { id: 'target-group', name: 'Target Group' },
+      ),
+      createRectangleFixture({ id: 'outside-rect', name: 'Outside', x: 300, y: 100, width: 80, height: 80, zIndex: 1 }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'drag-into-group.json');
+    await openLayersTab(page);
+
+    await expect(page.getByTestId('layers-row-outside-rect')).toBeVisible();
+    await expect(page.getByTestId('layers-row-target-group')).toBeVisible();
+
+    // Drag Outside down between "Target Group" header and "Inside",
+    // with cursor positioned RIGHT of the group indent to signal "into group"
+    const insideGrip = page.getByRole('button', { name: 'Reorder Inside' });
+    const insideBox = await insideGrip.boundingBox();
+    // Target Y: just above Inside row. Target X: indented right (inside the group)
+    await dragLayerGrip(page, 'Reorder Outside', insideBox!.y - 2, insideBox!.x);
+
+    // Outside should now be inside Target Group
+    const savedProject = await saveAndReadProject(page);
+    const group = savedProject.nodes.find((n: { id: string }) => n.id === 'target-group') as {
+      id: string;
+      children: Array<{ id: string }>;
+    };
+    expect(group.children.map((c) => c.id)).toContain('outside-rect');
+    // The root should only have the group now
+    expect(savedProject.nodes).toHaveLength(1);
+  });
+
+  test('drags an item out of a group to root level', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({ id: 'escape-rect', name: 'Escape', x: 100, y: 100, width: 80, height: 80, zIndex: 0 }),
+          createRectangleFixture({ id: 'stay-rect', name: 'Stay', x: 200, y: 100, width: 80, height: 80, zIndex: 1 }),
+        ],
+        { id: 'source-group', name: 'Source Group' },
+      ),
+      createRectangleFixture({ id: 'bottom-rect', name: 'Bottom', x: 300, y: 100, width: 80, height: 80, zIndex: 2 }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'drag-out-of-group.json');
+    await openLayersTab(page);
+
+    await expect(page.getByTestId('layers-row-escape-rect')).toBeVisible();
+
+    // Drag Escape to after Bottom at root level (cursor far left for shallow depth)
+    const bottomGrip = page.getByRole('button', { name: 'Reorder Bottom' });
+    const bottomBox = await bottomGrip.boundingBox();
+    // Drop just above Bottom, cursor far left to indicate root level
+    await dragLayerGrip(page, 'Reorder Escape', bottomBox!.y - 2, bottomBox!.x);
+
+    // Escape should now be a root-level node above Bottom
+    const savedProject = await saveAndReadProject(page);
+    const rootIds = (savedProject.nodes as Array<{ id: string }>).map((n) => n.id);
+    expect(rootIds).toContain('escape-rect');
+    expect(rootIds).toContain('source-group');
+    expect(rootIds).toContain('bottom-rect');
+  });
+
+  test('drags a flat item past an expanded group with children', async ({ page }) => {
+    const document = createGroupedProjectDocument([
+      createRectangleFixture({ id: 'top-rect', name: 'Top', x: 100, y: 100, width: 80, height: 80, zIndex: 0 }),
+      createGroupNodeFixture(
+        [
+          createRectangleFixture({ id: 'g-child-a', name: 'GChild A', x: 200, y: 100, width: 80, height: 80, zIndex: 1 }),
+          createRectangleFixture({ id: 'g-child-b', name: 'GChild B', x: 300, y: 100, width: 80, height: 80, zIndex: 2 }),
+        ],
+        { id: 'middle-group', name: 'Middle Group' },
+      ),
+      createRectangleFixture({ id: 'bot-rect', name: 'Bot', x: 400, y: 100, width: 80, height: 80, zIndex: 3 }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'drag-past-group.json');
+    await openLayersTab(page);
+
+    await expect(page.getByTestId('layers-row-bot-rect')).toBeVisible();
+    await expect(page.getByTestId('layers-row-top-rect')).toBeVisible();
+
+    // Drag Bot down past the entire group (past GChild A) to after Top at root level
+    const topGrip = page.getByRole('button', { name: 'Reorder Top' });
+    const topBox = await topGrip.boundingBox();
+    // Drop below Top with cursor far left for root level (more steps for longer drag)
+    await dragLayerGrip(page, 'Reorder Bot', topBox!.y + topBox!.height + 2, topBox!.x, 10);
+
+    // Data order: [bot-rect, top-rect, middle-group(g-child-a, g-child-b)]
+    const savedProject = await saveAndReadProject(page);
+    const rootIds = (savedProject.nodes as Array<{ id: string }>).map((n) => n.id);
+    // Bot moved behind Top — both at root level, group still between or before them
+    expect(rootIds.indexOf('bot-rect')).toBeLessThan(rootIds.indexOf('top-rect'));
+    // Group still exists as root node
+    expect(rootIds).toContain('middle-group');
   });
 });

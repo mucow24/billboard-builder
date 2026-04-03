@@ -313,6 +313,7 @@ export type EditorCommand =
   | { type: 'set_background'; background: string }
   | { type: 'reorder_node'; nodeId: string; mode: ReorderMode }
   | { type: 'reorder_nodes'; nodeIds: string[]; mode: ReorderMode }
+  | { type: 'move_node'; nodeId: string; targetParentId: string | null; targetIndex: number }
   | { type: 'register_font'; font: DocumentFontReference }
   | { type: 'load_document'; document: ProjectDocument };
 

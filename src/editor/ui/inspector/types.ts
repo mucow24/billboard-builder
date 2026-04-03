@@ -34,6 +34,7 @@ export interface PropertiesPanelProps {
   onItemChange: (changes: SelectionItemChange) => void;
   onInsertFavorite?: (favoriteId: string) => void;
   onDeleteNode: (nodeId: string) => void;
+  onMoveNode?: (nodeId: string, targetParentId: string | null, targetIndex: number) => void;
   onOpenProperties?: () => void;
   onRenameGroup?: (groupId: string, name: string) => void;
   onSelectNode: (nodeId: string) => void;
@@ -53,6 +54,7 @@ export interface LayersInspectorTabProps {
   rows: LayerRow[];
   onBackgroundChange: (background: string) => void;
   onDeleteNode: (nodeId: string) => void;
+  onMoveNode?: (nodeId: string, targetParentId: string | null, targetIndex: number) => void;
   onOpenProperties: () => void;
   onRenameGroup?: (groupId: string, name: string) => void;
   onReorder: (mode: ReorderMode) => void;

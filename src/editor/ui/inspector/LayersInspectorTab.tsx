@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
 import { ColorPickerControl } from '../ColorPickerControl';
 import { isCanvasItemNode } from '../../document/sceneGraph';
@@ -9,12 +9,26 @@ import {
   getLayerSecondaryLabel,
 } from './inspectorModel';
 import {
+  computeLayerMoveTarget,
   computeRowConnectors,
   formatImmediateChildCount,
   getLayerRowVisualState,
   getVisibleLayerRows,
+  resolveDropDepth,
 } from './layersTabModel';
+import { useListReorder } from './useListReorder';
 import type { LayersInspectorTabProps } from './types';
+
+const GRIP_ICON = (
+  <svg viewBox="0 0 6 10" className="layer-grip-icon">
+    <circle cx="1.5" cy="1.5" r="1" />
+    <circle cx="4.5" cy="1.5" r="1" />
+    <circle cx="1.5" cy="5" r="1" />
+    <circle cx="4.5" cy="5" r="1" />
+    <circle cx="1.5" cy="8.5" r="1" />
+    <circle cx="4.5" cy="8.5" r="1" />
+  </svg>
+);
 
 export function LayersInspectorTab({
   background,
@@ -23,6 +37,7 @@ export function LayersInspectorTab({
   rows,
   onBackgroundChange,
   onDeleteNode,
+  onMoveNode,
   onOpenProperties,
   onRenameGroup,
   onReorder,
@@ -42,6 +57,46 @@ export function LayersInspectorTab({
   const connectorMap = useMemo(
     () => computeRowConnectors(visibleRows),
     [visibleRows],
+  );
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleReorder = useCallback(
+    (fromIndex: number, rawGapIndex: number, ptrX: number | null) => {
+      if (ptrX === null) {
+        // Keyboard reorder: use existing toolbar-style reorder
+        onReorder(rawGapIndex < fromIndex ? 'forward' : 'backward');
+        return;
+      }
+      if (!onMoveNode) return;
+
+      const listEl = listRef.current;
+      if (!listEl) return;
+      const listRect = listEl.getBoundingClientRect();
+      const relativeX = ptrX - listRect.left;
+
+      const rowAbove = rawGapIndex > 0 ? visibleRows[rawGapIndex - 1] : null;
+      const rowBelow = rawGapIndex < visibleRows.length ? visibleRows[rawGapIndex] : null;
+      const depth = resolveDropDepth(
+        rowAbove?.depth ?? 0,
+        rowBelow?.depth ?? null,
+        relativeX,
+      );
+
+      const target = computeLayerMoveTarget(visibleRows, fromIndex, rawGapIndex, depth);
+      if (target) {
+        onMoveNode(target.nodeId, target.targetParentId, target.targetChildrenIndex);
+      }
+    },
+    [visibleRows, onMoveNode, onReorder],
+  );
+
+  const { dragIndex, dropTargetIndex, getDragHandleProps } = useListReorder(
+    listRef,
+    visibleRows.length,
+    handleReorder,
+    { scrollContainerRef },
   );
   function renderReorderIcon(kind: 'front' | 'forward' | 'backward' | 'back') {
     switch (kind) {
@@ -140,11 +195,13 @@ export function LayersInspectorTab({
       <div
         className="layer-list layer-list-tabbed"
         data-testid="layers-layer-list"
+        ref={scrollContainerRef}
       >
         <div className="layer-list-content">
-          <div className="layer-list-rows">
-            {visibleRows.map((row) => {
+          <div className="layer-list-rows" ref={listRef}>
+            {visibleRows.map((row, visualIndex) => {
               const isGroup = row.node.kind === 'group';
+              const isGenerator = isCanvasItemNode(row.node) && row.node.kind === 'generator';
               const isCollapsed = isGroup && collapsedGroupIds.has(row.node.id);
               const rowVisualState = getLayerRowVisualState(row, rows, selectedNodeIdSet);
               const secondary = isGroup
@@ -175,6 +232,9 @@ export function LayersInspectorTab({
                 if (!isCollapsed && row.hasChildren) {
                   rowClassNames.push('layer-row-group-expanded');
                 }
+              }
+              if (dragIndex === visualIndex) {
+                rowClassNames.push('dragging');
               }
 
               function handleRowKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -210,6 +270,15 @@ export function LayersInspectorTab({
                   onKeyDown={handleRowKeyDown}
                   data-testid={`layers-row-${row.node.id}`}
                 >
+                  <button
+                    type="button"
+                    className={`layer-grip${isGenerator ? ' layer-grip-inert' : ''}`}
+                    aria-label={`Reorder ${row.node.name}`}
+                    aria-disabled={isGenerator || undefined}
+                    {...(isGenerator ? { tabIndex: -1 } : getDragHandleProps(visualIndex))}
+                  >
+                    {GRIP_ICON}
+                  </button>
                   {/* One column cell per ancestor depth level (k = 0..depth-2) */}
                   {connector.columnHasLine.map((hasLine, k) => (
                     <div
@@ -405,9 +474,34 @@ export function LayersInspectorTab({
                 </div>
               );
             })}
+            {dropTargetIndex !== null && dragIndex !== null && (
+              <div
+                className="layer-drop-indicator"
+                data-drop-indicator
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  transform: `translateY(${getDropIndicatorOffset(listRef.current, dropTargetIndex)}px)`,
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
     </>
   );
+}
+
+function getDropIndicatorOffset(list: HTMLElement | null, dropIndex: number): number {
+  if (!list) return 0;
+  const children = Array.from(list.children).filter(
+    (el) => !el.classList.contains('layer-drop-indicator'),
+  ) as HTMLElement[];
+  if (dropIndex >= children.length) {
+    const last = children[children.length - 1];
+    return last ? last.offsetTop + last.offsetHeight : 0;
+  }
+  return children[dropIndex]?.offsetTop ?? 0;
 }

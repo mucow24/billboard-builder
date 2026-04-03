@@ -16,6 +16,7 @@ import {
   getNextDrilldownNodeId,
   getParentNodeId,
   groupNodes,
+  moveNode,
   normalizeLeafZIndices,
   removeNodesByIds,
   ungroupNode,
@@ -255,5 +256,91 @@ describe('scene graph helpers', () => {
       throw new Error('Expected surviving group.');
     }
     expect(nextNodes[0].children.map((node) => node.id)).toEqual([first.id, second.id]);
+  });
+
+  it('moves a root node to a different position among root siblings', () => {
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+    const c = createRectangleItem({ id: 'c' });
+
+    const result = moveNode([a, b, c], 'a', null, 2);
+    expect(result.map((n) => n.id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('returns nodes unchanged when target matches current position', () => {
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+    const nodes = [a, b];
+
+    const result = moveNode(nodes, 'a', null, 0);
+    expect(result.map((n) => n.id)).toEqual(['a', 'b']);
+  });
+
+  it('moves a node from root into a group at a specific index', () => {
+    const child = createRectangleItem({ id: 'child' });
+    const group = createGroupNode([child], 'Group');
+    group.id = 'group-1';
+    const outsider = createRectangleItem({ id: 'outsider' });
+
+    const result = moveNode([group, outsider], 'outsider', 'group-1', 0);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.id).toBe('group-1');
+    if (result[0]!.kind !== 'group') throw new Error('Expected group');
+    expect(result[0]!.children.map((n) => n.id)).toEqual(['outsider', 'child']);
+  });
+
+  it('moves a node out of a group to root level', () => {
+    const child1 = createRectangleItem({ id: 'child1' });
+    const child2 = createRectangleItem({ id: 'child2' });
+    const group = createGroupNode([child1, child2], 'Group');
+    group.id = 'group-1';
+    const sibling = createRectangleItem({ id: 'sibling' });
+
+    const result = moveNode([group, sibling], 'child1', null, 2);
+
+    expect(result.map((n) => n.id)).toEqual(['group-1', 'sibling', 'child1']);
+    if (result[0]!.kind !== 'group') throw new Error('Expected group');
+    expect(result[0]!.children.map((n) => n.id)).toEqual(['child2']);
+  });
+
+  it('moves a node between two different groups', () => {
+    const childA = createRectangleItem({ id: 'childA' });
+    const childB = createRectangleItem({ id: 'childB' });
+    const groupA = createGroupNode([childA], 'Group A');
+    groupA.id = 'groupA';
+    const groupB = createGroupNode([childB], 'Group B');
+    groupB.id = 'groupB';
+
+    const result = moveNode([groupA, groupB], 'childA', 'groupB', 0);
+
+    if (result[0]!.kind !== 'group') throw new Error('Expected group');
+    if (result[1]!.kind !== 'group') throw new Error('Expected group');
+    expect(result[0]!.children).toHaveLength(0);
+    expect(result[1]!.children.map((n) => n.id)).toEqual(['childA', 'childB']);
+  });
+
+  it('clamps out-of-range target index for moveNode', () => {
+    const a = createRectangleItem({ id: 'a' });
+    const b = createRectangleItem({ id: 'b' });
+
+    const result = moveNode([a, b], 'a', null, 99);
+    expect(result.map((n) => n.id)).toEqual(['b', 'a']);
+  });
+
+  it('rejects moving a group into itself or its own descendant', () => {
+    const child = createRectangleItem({ id: 'child' });
+    const inner = createGroupNode([child], 'Inner');
+    inner.id = 'inner';
+    const outer = createGroupNode([inner], 'Outer');
+    outer.id = 'outer';
+
+    // Move outer into itself
+    const result1 = moveNode([outer], 'outer', 'outer', 0);
+    expect(result1.map((n) => n.id)).toEqual(['outer']);
+
+    // Move outer into its own descendant (inner)
+    const result2 = moveNode([outer], 'outer', 'inner', 0);
+    expect(result2.map((n) => n.id)).toEqual(['outer']);
   });
 });

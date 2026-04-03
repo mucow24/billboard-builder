@@ -48,6 +48,7 @@ export default function App() {
       handleOpenProject,
       clearPendingCollapsedGroupIds,
       handleSave,
+      moveNode,
       redo,
       reorderSelectedNode,
       saveSelectionAsFavorite,
@@ -258,6 +259,7 @@ export default function App() {
                   }
                 }}
                 onDeleteNode={deleteNode}
+                onMoveNode={moveNode}
                 onOpenProperties={() => handleInspectorTabChange('properties')}
                 onRenameGroup={(groupId, name) => {
                   dispatch({ type: 'update_group', groupId, changes: { name } });

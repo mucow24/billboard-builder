@@ -63,6 +63,7 @@ export interface EditorStoreState {
   deleteNode: (nodeId: string) => void;
   deleteSelectedNodes: () => void;
   reorderSelectedNode: (mode: ReorderMode) => void;
+  moveNode: (nodeId: string, targetParentId: string | null, targetIndex: number) => void;
   groupSelectedNodes: () => void;
   ungroupSelectedNode: () => void;
   duplicateSelectedNodes: () => string[];
@@ -212,6 +213,9 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return;
       }
       get().dispatch({ type: 'reorder_nodes', nodeIds: selectedIds, mode });
+    },
+    moveNode: (nodeId, targetParentId, targetIndex) => {
+      get().dispatch({ type: 'move_node', nodeId, targetParentId, targetIndex });
     },
     groupSelectedNodes: () => {
       const selectedIds = normalizeSelectionForNodes(
