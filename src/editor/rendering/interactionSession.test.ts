@@ -165,6 +165,32 @@ describe('interactionSession', () => {
     });
   });
 
+  it('excludes locked items from marquee selection', () => {
+    const unlocked = createRectangleItem({ id: 'unlocked', x: 100, y: 100, width: 60, height: 40 });
+    const locked = createRectangleItem({ id: 'locked', x: 120, y: 110, width: 60, height: 40, locked: true });
+    const commit = buildInteractionCommit(
+      {
+        kind: 'marquee',
+        pointerStart: { x: 90, y: 90 },
+        pointerSource: 'stage',
+        currentPointer: { x: 200, y: 170 },
+        toggleMode: false,
+        guides: [],
+      },
+      {
+        orderedItems: [unlocked, locked],
+        pointer: { x: 200, y: 170 },
+        canvasBounds,
+      }
+    );
+
+    expect(commit).toEqual({
+      kind: 'marquee',
+      hitIds: ['unlocked'],
+      toggleMode: false,
+    });
+  });
+
   it('selects fully off-canvas items when the marquee stays outside the canvas', () => {
     const offCanvas = createRectangleItem({
       id: 'off-canvas',

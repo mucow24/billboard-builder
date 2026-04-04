@@ -23,6 +23,6 @@ export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: Rea
   });
 }
 
-export function selectAllNodes(nodes: ReadonlyArray<{ id: string }>): string[] {
-  return nodes.map((node) => node.id);
+export function selectAllNodes(nodes: ReadonlyArray<{ id: string; locked?: boolean }>): string[] {
+  return nodes.filter((node) => !node.locked).map((node) => node.id);
 }

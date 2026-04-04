@@ -271,10 +271,14 @@ export default function App() {
                 onToggleNodeLocked={(nodeId) => {
                   const node = getNodeById(document.nodes, nodeId);
                   if (!node) return;
+                  const nowLocked = !node.locked;
                   if (isGroupNode(node)) {
-                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: !node.locked } });
+                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: nowLocked } });
                   } else {
-                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: !node.locked } });
+                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: nowLocked } });
+                  }
+                  if (nowLocked && selectedNodeIds.includes(nodeId)) {
+                    selectSingleNode(undefined);
                   }
                 }}
                 onToggleNodeHidden={(nodeId) => {
