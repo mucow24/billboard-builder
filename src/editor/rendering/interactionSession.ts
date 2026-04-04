@@ -559,6 +559,43 @@ function getOrBuildCache(
   return buildCandidateCache(siblingItems, stageBounds);
 }
 
+function constrainToSquare(start: Point, current: Point): Point {
+  const dx = current.x - start.x;
+  const dy = current.y - start.y;
+  const size = Math.max(Math.abs(dx), Math.abs(dy));
+  return {
+    x: start.x + size * (Math.sign(dx) || 1),
+    y: start.y + size * (Math.sign(dy) || 1),
+  };
+}
+
+function constrainToRatio(anchor: Point, current: Point, ratio: number): Point {
+  const dx = current.x - anchor.x;
+  const dy = current.y - anchor.y;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+  if (absDy === 0 || absDx / absDy > ratio) {
+    return { x: current.x, y: anchor.y + (absDx / ratio) * (Math.sign(dy) || 1) };
+  } else {
+    return { x: anchor.x + absDy * ratio * (Math.sign(dx) || 1), y: current.y };
+  }
+}
+
+function getGroupResizeAnchor(bounds: RenderBox, handle: ResizeHandle): Point | null {
+  if (
+    handle === 'top-center' ||
+    handle === 'middle-left' ||
+    handle === 'middle-right' ||
+    handle === 'bottom-center'
+  ) {
+    return null;
+  }
+  return {
+    x: handle.includes('left') ? bounds.x + bounds.width : bounds.x,
+    y: handle.startsWith('top') ? bounds.y + bounds.height : bounds.y,
+  };
+}
+
 export function resolveInteractionSession(
   current: InteractionSession,
   pointer: Point,
@@ -571,18 +608,21 @@ export function resolveInteractionSession(
 
   switch (current.kind) {
     case 'create': {
+      const shouldSquare = Boolean(currentWithModifiers.shiftConstrain) && current.tool !== 'line';
       if (current.snapDisabled) {
-        return { ...current, previewItem: getCreatePreview(current.tool, current.pointerStart, pointer) };
+        const resolved = shouldSquare ? constrainToSquare(current.pointerStart, pointer) : pointer;
+        return { ...current, previewItem: getCreatePreview(current.tool, current.pointerStart, resolved) };
       }
       const snapped = getSnappedRect(
         { x: pointer.x, y: pointer.y, width: 0, height: 0 },
         current.siblingItems, stageBounds, threshold, cache
       );
       const snappedPointer = { x: snapped.rect.x, y: snapped.rect.y };
+      const resolved = shouldSquare ? constrainToSquare(current.pointerStart, snappedPointer) : snappedPointer;
       return {
         ...current,
         snapCache: cache,
-        previewItem: getCreatePreview(current.tool, current.pointerStart, snappedPointer),
+        previewItem: getCreatePreview(current.tool, current.pointerStart, resolved),
         guides: snapped.guides,
       };
     }
@@ -624,7 +664,8 @@ export function resolveInteractionSession(
         stageBounds,
         !current.snapDisabled,
         threshold,
-        cache
+        cache,
+        Boolean(currentWithModifiers.shiftConstrain)
       );
       return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
     }
@@ -694,21 +735,29 @@ export function resolveInteractionSession(
       // Guide snapping is intentionally disabled for rotated group resize.
       // Computing snap targets for rotated bounding boxes requires projecting
       // rotated corners onto axis-aligned guides, which is not yet implemented.
+      const groupRatioAnchor = currentWithModifiers.shiftConstrain
+        ? getGroupResizeAnchor(current.bounds, current.handle as ResizeHandle)
+        : null;
+      const groupRatio = current.bounds.width / current.bounds.height;
+      const constrainGroupPointer = (p: Point) =>
+        groupRatioAnchor ? constrainToRatio(groupRatioAnchor, p, groupRatio) : p;
+
       if (current.snapDisabled || Math.abs(current.frameRotation) >= 0.001) {
+        const constrained = constrainGroupPointer(pointer);
         return {
           ...current,
-          currentPointer: pointer,
+          currentPointer: constrained,
           guides: [],
           previewItems: buildGroupResizePreviews(
             current.originalItems,
             current.bounds,
             current.handle,
-            pointer,
+            constrained,
             current.frameRotation
           ),
         };
       }
-      const rawRect = getGroupResizeRect(current.bounds, current.handle, pointer);
+      const rawRect = getGroupResizeRect(current.bounds, current.handle, constrainGroupPointer(pointer));
       const snapped = getResizeSnappedRect(
         rawRect,
         current.siblingItems,

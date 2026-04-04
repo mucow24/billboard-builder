@@ -419,6 +419,103 @@ describe('interactionSession', () => {
     expect(resolved.guides).toEqual([]);
   });
 
+  it('constrains create rectangle to square when shiftConstrain is true', () => {
+    const session = {
+      ...createCreateSession('rectangle', { x: 100, y: 100 }),
+      siblingItems: [] as ReturnType<typeof createRectangleItem>[],
+      shiftConstrain: true,
+    };
+    const resolved = resolveInteractionSession(session, { x: 250, y: 180 }, {
+      stageBounds: canvasBounds,
+    });
+
+    if (resolved.kind !== 'create' || !resolved.previewItem) {
+      throw new Error('Expected create preview.');
+    }
+    // Larger dimension is x (150), so both should be 150
+    expect(resolved.previewItem.width).toBe(resolved.previewItem.height);
+    expect(resolved.previewItem.width).toBe(150);
+  });
+
+  it('constrains create ellipse to circle when shiftConstrain is true', () => {
+    const session = {
+      ...createCreateSession('ellipse', { x: 100, y: 100 }),
+      siblingItems: [] as ReturnType<typeof createRectangleItem>[],
+      shiftConstrain: true,
+    };
+    const resolved = resolveInteractionSession(session, { x: 200, y: 260 }, {
+      stageBounds: canvasBounds,
+    });
+
+    if (resolved.kind !== 'create' || !resolved.previewItem) {
+      throw new Error('Expected create preview.');
+    }
+    expect(resolved.previewItem.kind).toBe('ellipse');
+    // Larger dimension is y (160), so both should be 160
+    expect(resolved.previewItem.width).toBe(resolved.previewItem.height);
+    expect(resolved.previewItem.width).toBe(160);
+  });
+
+  it('does not constrain create line with shiftConstrain', () => {
+    const session = {
+      ...createCreateSession('line', { x: 100, y: 100 }),
+      siblingItems: [] as ReturnType<typeof createRectangleItem>[],
+      shiftConstrain: true,
+    };
+    const resolved = resolveInteractionSession(session, { x: 250, y: 180 }, {
+      stageBounds: canvasBounds,
+    });
+
+    if (resolved.kind !== 'create' || !resolved.previewItem || resolved.previewItem.kind !== 'line') {
+      throw new Error('Expected line create preview.');
+    }
+    // Line endpoint should match snapped pointer, not be constrained to 1:1
+    expect(resolved.previewItem.endX).not.toBe(resolved.previewItem.endY);
+  });
+
+  it('constrains group resize to original aspect ratio when shiftConstrain is true', () => {
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+    const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+    const frame: SelectionFrame = {
+      bounds: { x: 100, y: 100, width: 200, height: 40 },
+      rotation: 0,
+    };
+    const session = createGroupResizeSession('bottom-right', { x: 300, y: 140 }, {
+      selectedItems: [first, second],
+      siblingItems: [],
+      activeSelectionFrame: frame,
+    });
+
+    if (!session) {
+      throw new Error('Expected group resize session.');
+    }
+
+    // Drag bottom-right corner: +100 in x, +30 in y
+    const withShift = { ...session, shiftConstrain: true };
+    const resolved = resolveInteractionSession(
+      withShift,
+      { x: 400, y: 170 },
+      { stageBounds: canvasBounds }
+    );
+
+    if (resolved.kind !== 'group-resize') {
+      throw new Error('Expected group-resize session.');
+    }
+
+    // Original ratio is 200/40 = 5. The constrained result should maintain that.
+    const commit = buildInteractionCommit(resolved, {
+      orderedItems: [first, second],
+      pointer: { x: 400, y: 170 },
+      canvasBounds,
+    });
+    if (commit.kind !== 'group') {
+      throw new Error('Expected group commit.');
+    }
+    expect(commit.selectionFrame).toBeTruthy();
+    const b = commit.selectionFrame!.bounds;
+    expect(b.width / b.height).toBeCloseTo(5, 1);
+  });
+
   it('snaps group drag using AABB when frame is rotated', () => {
     // Two items at different positions, with a rotated selection frame.
     // The frame rotation means current.bounds is NOT the AABB.
