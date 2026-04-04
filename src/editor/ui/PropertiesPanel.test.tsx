@@ -12,10 +12,8 @@ import { flattenLayerRows } from '../document/sceneGraph';
 
 const baseProps = {
   availableFonts: [] as [],
-  background: '#ffffff00',
   fonts: [] as [],
   missingFontFamilies: [] as string[],
-  onBackgroundChange: vi.fn(),
   onGroupOpacityChange: vi.fn(),
   onDeleteNode: vi.fn(),
   onItemChange: vi.fn(),
@@ -56,7 +54,6 @@ describe('PropertiesPanel', () => {
     );
 
     expect(screen.getByTestId('layers-tab-body')).toHaveClass('rail-tab-body');
-    expect(screen.getByRole('button', { name: 'Canvas background' })).toBeInTheDocument();
   });
 
   it('renders the favorites tab body when activeTab is favorites', () => {

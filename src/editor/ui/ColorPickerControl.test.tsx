@@ -133,6 +133,29 @@ describe('ColorPickerControl', () => {
     expect(screen.getByLabelText('Canvas background hex')).toHaveValue('#33669980');
   });
 
+  it('opens the picker and accepts color changes in inline mode', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <ColorPickerControl
+        label="Canvas background"
+        value="#33669980"
+        onChange={onChange}
+        variant="compact"
+        inline
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Canvas background' }));
+    const input = screen.getByLabelText('Canvas background hex');
+    expect(input).toHaveValue('#33669980');
+
+    await user.clear(input);
+    await user.type(input, '#aabbccff{Enter}');
+    expect(onChange).toHaveBeenCalledWith('#aabbccff');
+  });
+
   it('closes the picker when clicking outside the control', async () => {
     const user = userEvent.setup();
 

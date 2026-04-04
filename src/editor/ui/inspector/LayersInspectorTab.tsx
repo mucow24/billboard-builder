@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
-import { ColorPickerControl } from '../ColorPickerControl';
 import { isCanvasItemNode } from '../../document/sceneGraph';
 
 import {
@@ -33,11 +32,9 @@ const GRIP_ICON = (
 );
 
 export function LayersInspectorTab({
-  background,
   canReorder,
   collapsedGroupIds,
   rows,
-  onBackgroundChange,
   onDeleteNode,
   onMoveNode,
   onOpenProperties,
@@ -199,13 +196,6 @@ export function LayersInspectorTab({
                 {renderReorderIcon('back')}
               </button>
             </div>
-            <ColorPickerControl
-              label="Canvas background"
-              title="Canvas background color"
-              value={background}
-              onChange={onBackgroundChange}
-              variant="compact"
-            />
           </div>
         </div>
         <div className="footer-rule" />
