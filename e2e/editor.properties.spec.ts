@@ -415,11 +415,8 @@ test.describe('editor properties flows', () => {
     await clickCanvas(page, { x: 270, y: 240 });
     await openPropertiesTab(page);
     let inspector = page.getByTestId('properties-tab-body');
-    await expect(inspector.getByLabel('Secondary fill')).toBeDisabled();
-    await inspector
-      .locator('.inspector-field-shell:has-text("Gradient") input[aria-label="Gradient"]')
-      .evaluate((node: HTMLInputElement) => node.click());
     await expect(inspector.getByLabel('Secondary fill')).toBeEnabled();
+    await inspector.getByRole('button', { name: 'Toggle gradient' }).click();
     await inspector.getByRole('button', { name: 'Secondary fill', exact: true }).click();
     await page.getByLabel('Secondary fill hex').fill('#00ff00ff');
     await page.getByLabel('Secondary fill hex').press('Enter');
@@ -427,9 +424,7 @@ test.describe('editor properties flows', () => {
     await clickCanvas(page, { x: 580, y: 220 });
     await openPropertiesTab(page);
     inspector = page.getByTestId('properties-tab-body');
-    await inspector
-      .locator('.inspector-field-shell:has-text("Gradient") input[aria-label="Gradient"]')
-      .evaluate((node: HTMLInputElement) => node.click());
+    await inspector.getByRole('button', { name: 'Toggle gradient' }).click();
     await inspector.getByRole('button', { name: 'Secondary fill', exact: true }).click();
     await page.getByLabel('Secondary fill hex').fill('#ff00ffff');
     await page.getByLabel('Secondary fill hex').press('Enter');

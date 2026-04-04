@@ -37,12 +37,10 @@ describe('selectionInspectorModel', () => {
       )
     ).toEqual(
       expect.arrayContaining([
-        'fill:fill',
+        'fill:gradientFill',
         'geometry:rotation',
         'geometry:x',
         'shadow:color',
-        'fill:secondaryFill',
-        'fill:gradientEnabled',
       ])
     );
     expect(
@@ -82,25 +80,19 @@ describe('selectionInspectorModel', () => {
     });
     const environment = buildInspectorEnvironment([], []);
     const sections = buildSelectionInspectorSections([first, second], environment);
-    const fillField = sections
+    const gradientFillField = sections
       .find((section) => section.key === 'fill')
-      ?.fields.find((field) => field.descriptor.propertyKey === 'fill');
-    const secondaryFillField = sections
-      .find((section) => section.key === 'fill')
-      ?.fields.find((field) => field.descriptor.propertyKey === 'secondaryFill');
-    const gradientEnabledField = sections
-      .find((section) => section.key === 'fill')
-      ?.fields.find((field) => field.descriptor.propertyKey === 'gradientEnabled');
+      ?.fields.find((field) => field.descriptor.propertyKey === 'gradientFill');
     const shadowBlurField = sections
       .find((section) => section.key === 'shadow')
       ?.fields.find((field) => field.descriptor.propertyKey === 'blur');
 
-    expect(fillField?.state.isMixed).toBe(true);
-    expect(fillField?.state.value).toBeNull();
-    expect(secondaryFillField?.state.isMixed).toBe(false);
-    expect(secondaryFillField?.state.value).toBe(first.secondaryFill);
-    expect(gradientEnabledField?.state.isMixed).toBe(false);
-    expect(gradientEnabledField?.state.value).toBe(false);
+    expect(gradientFillField?.state.isMixed).toBe(true);
+    expect(gradientFillField?.state.value).toBeNull();
+    expect(gradientFillField?.selectorStates.secondaryFill?.isMixed).toBe(false);
+    expect(gradientFillField?.selectorStates.secondaryFill?.value).toBe(first.secondaryFill);
+    expect(gradientFillField?.selectorStates.gradientEnabled?.isMixed).toBe(false);
+    expect(gradientFillField?.selectorStates.gradientEnabled?.value).toBe(false);
     expect(shadowBlurField?.state.isMixed).toBe(true);
     expect(
       shadowBlurField?.descriptor.buildChange(

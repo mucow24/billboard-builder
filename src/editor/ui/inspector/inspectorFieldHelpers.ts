@@ -2,7 +2,7 @@ import type {
   CanvasItem,
 } from '../../document/documentTypes';
 import {
-  renderSwapFillColorsField,
+  renderGradientFillField,
 } from './selectionInspectorRenderers';
 import type {
   BooleanFieldDescriptor,
@@ -162,29 +162,46 @@ export function createShadowNumberField(
   });
 }
 
-export function createSwapFillColorsDescriptor(): InspectorFieldDescriptor {
-  return {
-    buildChange: ({ item }: SelectionFieldChangeContext) => {
-      const fill = 'fill' in item ? item.fill : '';
-      const secondaryFill = 'secondaryFill' in item ? item.secondaryFill : '';
-      return { fill: secondaryFill, secondaryFill: fill };
+export type GradientFillAction =
+  | { kind: 'primaryColor'; value: string }
+  | { kind: 'secondaryColor'; value: string }
+  | { kind: 'swap' }
+  | { kind: 'toggleGradient'; value: boolean };
+
+export function createGradientFillDescriptor(): CustomFieldDescriptor {
+  return createCustomField({
+    buildChange: ({ item }, nextValue) => {
+      const action = nextValue as GradientFillAction;
+      switch (action.kind) {
+        case 'primaryColor':
+          return { fill: action.value };
+        case 'secondaryColor':
+          return { secondaryFill: action.value };
+        case 'swap': {
+          const fill = 'fill' in item ? item.fill : '';
+          const secondaryFill = 'secondaryFill' in item ? item.secondaryFill : '';
+          return { fill: secondaryFill, secondaryFill: fill };
+        }
+        case 'toggleGradient':
+          return { gradientEnabled: action.value };
+      }
     },
-    controlKind: 'custom' as const,
-    fieldOrder: 40,
-    getDisabled: ({ selectedItems }) =>
-      selectedItems.every(
-        (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
-      ),
-    getValue: () => null,
-    label: 'Swap fill colors',
-    propertyKey: 'swapFillColors',
-    render: renderSwapFillColorsField,
+    fieldOrder: 10,
+    getValue: (item) => ('fill' in item ? item.fill : ''),
+    label: 'Fill',
+    propertyKey: 'gradientFill',
+    render: renderGradientFillField,
     sectionKey: 'fill',
     sectionLabel: 'Fill',
     sectionOrder: SECTION_ORDER.fill,
-
+    selectors: {
+      secondaryFill: (item) =>
+        'secondaryFill' in item ? item.secondaryFill : '',
+      gradientEnabled: (item) =>
+        'gradientEnabled' in item ? item.gradientEnabled : false,
+    },
     valueType: 'custom',
-  };
+  });
 }
 
 export const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
