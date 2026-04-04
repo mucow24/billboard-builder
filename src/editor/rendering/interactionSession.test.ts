@@ -11,7 +11,6 @@ import {
   type SelectionFrame,
 } from './interactionSession';
 import {
-  createEllipseItem,
   createGroupNode,
   createLineItem,
   createRectangleItem,
