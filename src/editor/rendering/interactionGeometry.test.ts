@@ -518,6 +518,94 @@ describe('interaction geometry', () => {
     expect(result.guides).toEqual([]);
   });
 
+  it('preserves aspect ratio on shift+corner resize of rectangle', () => {
+    const item = createRectangleItem({
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    });
+    const handle = getShapeHandlePoints(item)['bottom-right'];
+    const result = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: handle.x + 120, y: handle.y + 20 },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      undefined,
+      undefined,
+      true // shiftConstrain
+    );
+
+    expect(result.item.width / result.item.height).toBeCloseTo(2, 5);
+    expect(result.item.width).toBeGreaterThan(item.width);
+  });
+
+  it('does not constrain on shift+edge resize', () => {
+    const item = createRectangleItem({
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    });
+    const handle = getShapeHandlePoints(item)['middle-right'];
+    const result = solveResizeSession(
+      item,
+      'middle-right',
+      { x: handle.x + 80, y: handle.y },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      undefined,
+      undefined,
+      true // shiftConstrain
+    );
+
+    // Edge handle: width changes freely, height stays the same
+    expect(result.item.width).toBeCloseTo(280, 0);
+    expect(result.item.height).toBeCloseTo(100, 0);
+  });
+
+  it('shift+resize on preserveAspectRatio image gives same result as without shift', () => {
+    const item = createImageItem({
+      src: 'data:image/png;base64,abc',
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+      originalWidth: 200,
+      originalHeight: 100,
+      mimeType: 'image/png',
+    });
+    const handle = getShapeHandlePoints(item)['bottom-right'];
+    const withoutShift = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: handle.x + 120, y: handle.y + 20 },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 }
+    );
+    const withShift = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: handle.x + 120, y: handle.y + 20 },
+      { x: 0, y: 0 },
+      [],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      undefined,
+      undefined,
+      true // shiftConstrain
+    );
+
+    expect(withShift.item.width).toBeCloseTo(withoutShift.item.width, 5);
+    expect(withShift.item.height).toBeCloseTo(withoutShift.item.height, 5);
+  });
+
   it('identifies the supported creation tools explicitly', () => {
     expect(isCreateTool('text')).toBe(true);
     expect(isCreateTool('rectangle')).toBe(true);

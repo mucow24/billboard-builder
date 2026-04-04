@@ -8,7 +8,6 @@ import type {
   CanvasItem,
   CanvasTool,
   GuideLine,
-  ImageCanvasItem,
   LineCanvasItem,
   SnapRect,
 } from '../document/documentTypes';
@@ -416,9 +415,10 @@ export function solveDragSession(
 }
 
 function applyAspectRatio(
-  item: ImageCanvasItem,
   handle: ResizeHandle,
-  rawEdges: { left: number; top: number; right: number; bottom: number }
+  rawEdges: { left: number; top: number; right: number; bottom: number },
+  originalWidth: number,
+  originalHeight: number
 ) {
   if (
     handle === 'top-center' ||
@@ -429,9 +429,9 @@ function applyAspectRatio(
     return rawEdges;
   }
 
-  const ratio = item.width / item.height;
-  const fixedX = handle.includes('left') ? item.width : 0;
-  const fixedY = handle.startsWith('top') ? item.height : 0;
+  const ratio = originalWidth / originalHeight;
+  const fixedX = handle.includes('left') ? originalWidth : 0;
+  const fixedY = handle.startsWith('top') ? originalHeight : 0;
   let width = Math.abs(rawEdges.right - rawEdges.left);
   let height = Math.abs(rawEdges.bottom - rawEdges.top);
 
@@ -458,7 +458,8 @@ export function solveResizeSession(
   stageRect: SnapRect,
   snapEnabled = true,
   threshold?: number,
-  cache?: SnapCandidateCache
+  cache?: SnapCandidateCache,
+  shiftConstrain = false
 ): InteractionItemPreview {
   const renderBox = getRenderBox(item);
   const adjustedPointer = {
@@ -502,10 +503,10 @@ export function solveResizeSession(
     rawEdges.right = localPoint.x;
   }
 
-  const ratioEdges =
-    item.kind === 'image' && item.preserveAspectRatio
-      ? applyAspectRatio(item, handle, rawEdges)
-      : rawEdges;
+  const shouldConstrain = shiftConstrain || (item.kind === 'image' && item.preserveAspectRatio);
+  const ratioEdges = shouldConstrain
+    ? applyAspectRatio(handle, rawEdges, renderBox.width, renderBox.height)
+    : rawEdges;
 
   const guides: GuideLine[] = [];
   if (snapEnabled && isMultipleOf90(item.rotation)) {
