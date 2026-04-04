@@ -4,6 +4,7 @@ import {
   createDefaultProjectDocument,
   createGroupNode,
   createImageItem,
+  createNgonItem,
   createRectangleItem,
   createTextItem,
 } from './documentDefaults';
@@ -252,6 +253,33 @@ describe('document schema', () => {
       nodes: [legacyPayload],
     });
     expect(parsedLegacy.nodes[0]).toMatchObject({ blurRadius: 0 });
+  });
+
+  it('round-trips an ngon item and preserves the sides property', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createNgonItem({ sides: 5 })];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+
+    expect(parsed.nodes[0]).toMatchObject({
+      kind: 'ngon',
+      sides: 5,
+      gradientEnabled: false,
+    });
+  });
+
+  it('rejects ngon items with fewer than 3 sides', () => {
+    const ngon = createNgonItem({ sides: 2 });
+
+    expect(() =>
+      parseProjectDocument({
+        version: 2,
+        canvas: { width: 1024, height: 1024 },
+        background: '#ffffff00',
+        fonts: [],
+        nodes: [ngon],
+      })
+    ).toThrow();
   });
 
   it('defaults missing gradient fields for legacy rectangle payloads', () => {

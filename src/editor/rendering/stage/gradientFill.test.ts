@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createEllipseItem,
+  createNgonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -53,6 +54,23 @@ describe('gradientFill', () => {
       fillLinearGradientColorStops: [0, '#ffffff', 1, '#ff0000'],
       fillLinearGradientEndPoint: { x: 0, y: 84 },
       fillLinearGradientStartPoint: { x: 0, y: -12 },
+      fillPriority: 'linear-gradient',
+    });
+  });
+
+  it('derives a vertical gradient for ngon items', () => {
+    const ngon = createNgonItem({
+      fill: '#8b5cf6ff',
+      secondaryFill: '#6d28d9ff',
+      gradientEnabled: true,
+      width: 100,
+      height: 100,
+    });
+
+    expect(buildGradientFillProps(ngon, { width: 100, height: 100 })).toEqual({
+      fillLinearGradientColorStops: [0, '#8b5cf6ff', 1, '#6d28d9ff'],
+      fillLinearGradientEndPoint: { x: 0, y: 100 },
+      fillLinearGradientStartPoint: { x: 0, y: 0 },
       fillPriority: 'linear-gradient',
     });
   });

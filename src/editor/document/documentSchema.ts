@@ -160,7 +160,7 @@ const GeneratorParamsSchema = z.discriminatedUnion('generatorType', [
 
 const BaseCanvasItemSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'line', 'generator']),
+  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'ngon', 'line', 'generator']),
   name: z.string().min(1),
   x: z.number(),
   y: z.number(),
@@ -226,6 +226,16 @@ const EllipseCanvasItemSchema = BaseCanvasItemSchema.extend({
   strokeWidth: z.number().nonnegative(),
 });
 
+const NgonCanvasItemSchema = BaseCanvasItemSchema.extend({
+  kind: z.literal('ngon'),
+  fill: z.string(),
+  secondaryFill: z.string().optional(),
+  gradientEnabled: z.boolean().optional(),
+  stroke: z.string(),
+  strokeWidth: z.number().nonnegative(),
+  sides: z.number().int().min(3),
+});
+
 const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('line'),
   stroke: z.string(),
@@ -247,6 +257,7 @@ const CanvasItemSchema = z.discriminatedUnion('kind', [
   ImageCanvasItemSchema,
   RectangleCanvasItemSchema,
   EllipseCanvasItemSchema,
+  NgonCanvasItemSchema,
   LineCanvasItemSchema,
   GeneratorCanvasItemSchema,
 ]);

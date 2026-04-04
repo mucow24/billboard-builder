@@ -1,10 +1,11 @@
 import type {
   EllipseCanvasItem,
+  NgonCanvasItem,
   RectangleCanvasItem,
   TextCanvasItem,
 } from '../../document/documentTypes';
 
-type GradientCapableItem = RectangleCanvasItem | EllipseCanvasItem | TextCanvasItem;
+type GradientCapableItem = RectangleCanvasItem | EllipseCanvasItem | NgonCanvasItem | TextCanvasItem;
 
 export interface GradientRenderBox {
   width: number;

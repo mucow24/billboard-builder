@@ -7,6 +7,7 @@ const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; icon: string
   { id: 'text', label: 'Text', hotkey: 'T', icon: 'T' },
   { id: 'rectangle', label: 'Rect', hotkey: 'R', icon: '▭' },
   { id: 'ellipse', label: 'Ellipse', hotkey: 'O', icon: '◯' },
+  { id: 'ngon', label: 'Polygon', hotkey: 'G', icon: '⬡' },
   { id: 'line', label: 'Line', hotkey: 'L', icon: '／' },
 ];
 

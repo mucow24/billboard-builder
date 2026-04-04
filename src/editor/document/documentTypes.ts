@@ -5,6 +5,7 @@ export type CanvasTool =
   | 'text'
   | 'rectangle'
   | 'ellipse'
+  | 'ngon'
   | 'line';
 
 export type CanvasLeafKind =
@@ -12,6 +13,7 @@ export type CanvasLeafKind =
   | 'image'
   | 'rectangle'
   | 'ellipse'
+  | 'ngon'
   | 'line'
   | 'generator';
 
@@ -138,6 +140,13 @@ export interface EllipseCanvasItem extends BaseCanvasItem, GradientFillItem {
   kind: 'ellipse';
   stroke: string;
   strokeWidth: number;
+}
+
+export interface NgonCanvasItem extends BaseCanvasItem, GradientFillItem {
+  kind: 'ngon';
+  stroke: string;
+  strokeWidth: number;
+  sides: number;
 }
 
 export interface LineCanvasItem extends BaseCanvasItem {
@@ -270,6 +279,7 @@ export type CanvasItem =
   | ImageCanvasItem
   | RectangleCanvasItem
   | EllipseCanvasItem
+  | NgonCanvasItem
   | LineCanvasItem
   | GeneratorCanvasItem;
 

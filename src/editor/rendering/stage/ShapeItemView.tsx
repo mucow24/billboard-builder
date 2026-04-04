@@ -32,6 +32,29 @@ import { buildGradientFillProps } from './gradientFill';
 
 type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 
+function computeNgonPoints(width: number, height: number, sides: number): number[] {
+  const offset = sides % 2 === 0 ? -Math.PI / 2 - Math.PI / sides : -Math.PI / 2;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i < sides; i++) {
+    const angle = (2 * Math.PI * i) / sides + offset;
+    xs.push(Math.cos(angle));
+    ys.push(Math.sin(angle));
+  }
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const rawW = maxX - minX;
+  const rawH = maxY - minY;
+  const points: number[] = [];
+  for (let i = 0; i < sides; i++) {
+    points.push(((xs[i] - minX) / rawW) * width);
+    points.push(((ys[i] - minY) / rawH) * height);
+  }
+  return points;
+}
+
 interface ShapeItemViewProps {
   activeTool: CanvasTool;
   isSelected: boolean;
@@ -86,7 +109,7 @@ export const ShapeItemView = memo(function ShapeItemView({
   const renderBox = getRenderBox(item);
   const interactionEnabled = activeTool === 'select';
   const gradientFillProps =
-    item.kind === 'text' || item.kind === 'rectangle' || item.kind === 'ellipse'
+    item.kind === 'text' || item.kind === 'rectangle' || item.kind === 'ellipse' || item.kind === 'ngon'
       ? buildGradientFillProps(item, {
           width: renderBox.width,
           height: renderBox.height,
@@ -207,6 +230,23 @@ export const ShapeItemView = memo(function ShapeItemView({
               strokeWidth={item.strokeWidth}
               radiusX={renderBox.width / 2}
               radiusY={renderBox.height / 2}
+              fillPriority={gradientFillProps ? 'linear-gradient' : 'color'}
+              {...gradientFillProps}
+              listening={false}
+            />
+          ) : null}
+          {item.kind === 'ngon' ? (
+            <Line
+              shadowColor={item.shadow.color}
+              shadowBlur={item.shadow.blur}
+              shadowOffsetX={item.shadow.offsetX}
+              shadowOffsetY={item.shadow.offsetY}
+              shadowOpacity={item.shadow.opacity}
+              points={computeNgonPoints(renderBox.width, renderBox.height, item.sides)}
+              closed={true}
+              fill={item.fill}
+              stroke={item.stroke}
+              strokeWidth={item.strokeWidth}
               fillPriority={gradientFillProps ? 'linear-gradient' : 'color'}
               {...gradientFillProps}
               listening={false}

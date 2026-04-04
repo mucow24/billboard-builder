@@ -2,6 +2,7 @@ import {
   createDefaultProjectDocument,
   createEllipseItem,
   createLineItem,
+  createNgonItem,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
@@ -434,6 +435,8 @@ export function createItemForKind(
       return createRectangleItem(position);
     case 'ellipse':
       return createEllipseItem(position);
+    case 'ngon':
+      return createNgonItem(position);
     case 'line':
       return createLineItem(position);
   }

@@ -4,6 +4,7 @@ import {
   createGeneratorItem,
   createImageItem,
   createLineItem,
+  createNgonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -265,6 +266,29 @@ describe('selectionInspectorModel', () => {
     expect(fontField?.options.map((option) => option.label)).toEqual(
       expect.arrayContaining(['Alpha Sans', 'Arial', 'Verdana'])
     );
+  });
+
+  it('includes Sides field for ngon items and omits it for mixed ngon+rectangle selection', () => {
+    const ngon = createNgonItem({ sides: 8 });
+    const rectangle = createRectangleItem();
+    const environment = buildInspectorEnvironment([], []);
+
+    const ngonSections = buildSelectionInspectorSections([ngon], environment);
+    const ngonFieldKeys = ngonSections.flatMap((section) =>
+      section.fields.map((field) => `${section.key}:${field.descriptor.propertyKey}`)
+    );
+    expect(ngonFieldKeys).toContain('geometry:sides');
+    expect(ngonFieldKeys).toContain('fill:gradientFill');
+    expect(ngonFieldKeys).toContain('stroke:stroke');
+    expect(ngonFieldKeys).not.toContain('geometry:cornerRadius');
+
+    const mixedSections = buildSelectionInspectorSections([ngon, rectangle], environment);
+    const mixedFieldKeys = mixedSections.flatMap((section) =>
+      section.fields.map((field) => `${section.key}:${field.descriptor.propertyKey}`)
+    );
+    expect(mixedFieldKeys).not.toContain('geometry:sides');
+    expect(mixedFieldKeys).not.toContain('geometry:cornerRadius');
+    expect(mixedFieldKeys).toContain('stroke:stroke');
   });
 
   it('produces generator section descriptors with correct textMin/textMax bounds', () => {
