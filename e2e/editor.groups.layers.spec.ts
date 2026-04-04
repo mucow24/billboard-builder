@@ -7,7 +7,6 @@ import {
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createImageFixture,
-  createLayersPanelMockParityFixture,
   createRectangleFixture,
   createTextFixture,
   doubleClickLayerRow,
@@ -237,31 +236,19 @@ test.describe('editor group layers and inspector flows', () => {
     await expect(page.getByRole('slider', { name: 'Group Opacity' })).toHaveCount(0);
   });
 
-  test('updates the canvas background from Layers and persists the new value', async ({ page }) => {
+  test('updates the canvas background from the Canvas menu and persists the new value', async ({ page }) => {
     await openFreshEditor(page);
-    await openLayersTab(page);
 
-    await expect(page.locator('.color-picker-trigger-compact')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
     await page.getByRole('button', { name: 'Canvas background' }).click();
     await page.getByLabel('Canvas background hex').fill('#11223344');
     await page.getByLabel('Canvas background hex').press('Enter');
 
+    // Close the Canvas menu so saveAndReadProject can access the toolbar Save flow
+    await page.keyboard.press('Escape');
+
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.background).toBe('#11223344');
-  });
-
-  test('surfaces the compact Layers background trigger in the utility controls for the mock parity fixture', async ({
-    page,
-  }) => {
-    await openFreshEditor(page);
-    await uploadProject(page, createLayersPanelMockParityFixture(), 'layers-panel-mock-parity.json');
-
-    await openLayersTab(page);
-    await expect(page.locator('.layers-panel-utilities .color-picker-trigger-compact')).toHaveCount(
-      1,
-    );
-    await page.getByRole('button', { name: 'Canvas background' }).click();
-    await expect(page.getByLabel('Canvas background hex')).toBeVisible();
   });
 
   test('shows immediate child counts for nested groups', async ({ page }) => {
