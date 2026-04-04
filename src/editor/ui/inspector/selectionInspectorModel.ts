@@ -149,6 +149,8 @@ function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
       return [...createShapeDescriptors('rectangle'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'ellipse':
       return [...createShapeDescriptors('ellipse'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
+    case 'ngon':
+      return [...createShapeDescriptors('ngon'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'line':
       return [...createShapeDescriptors('line'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'generator':

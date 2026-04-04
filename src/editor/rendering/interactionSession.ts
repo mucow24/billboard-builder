@@ -57,7 +57,7 @@ interface InteractionSessionBase {
 
 export interface CreateSession extends InteractionSessionBase {
   kind: 'create';
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>;
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>;
   previewItem: CanvasItem | null;
   siblingItems: CanvasItem[];
 }
@@ -356,7 +356,7 @@ function getGroupResizePointer(
 }
 
 export function createCreateSession(
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>,
   pointer: Point,
   siblingItems: CanvasItem[] = [],
   pointerSource: PointerGestureSource = 'stage',

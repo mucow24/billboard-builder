@@ -126,6 +126,7 @@ export function useEditorShortcuts({
         ['t', 'text'],
         ['r', 'rectangle'],
         ['o', 'ellipse'],
+        ['g', 'ngon'],
         ['l', 'line'],
       ]);
       if (event.key === 'Escape') {

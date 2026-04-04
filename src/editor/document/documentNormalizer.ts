@@ -16,6 +16,7 @@ import type {
   GroupNode,
   ImageCanvasItem,
   LineCanvasItem,
+  NgonCanvasItem,
   ProjectDocument,
   RectangleCanvasItem,
   TextCanvasItem,
@@ -246,6 +247,29 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         strokeWidth: clampFinite(item.strokeWidth, 0, 0),
       };
       return normalizedEllipseItem;
+    }
+    case 'ngon': {
+      const normalizedNgonItem: NgonCanvasItem = {
+        ...item,
+        ...normalizeGradientFill(item),
+        x: clampFinite(item.x, 0),
+        y: clampFinite(item.y, 0),
+        width: clampDimension(item.width),
+        height: clampDimension(item.height),
+        rotation: clampFinite(item.rotation, 0),
+        scaleX: clampFinite(item.scaleX, 1),
+        scaleY: clampFinite(item.scaleY, 1),
+        zIndex: Math.max(0, Math.trunc(clampFinite(item.zIndex, 0, 0))),
+        locked: Boolean(item.locked),
+        lockAspectRatio: Boolean(item.lockAspectRatio),
+        hidden: Boolean(item.hidden),
+        opacity: clampOpacity(item.opacity),
+        shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
+        strokeWidth: clampFinite(item.strokeWidth, 0, 0),
+        sides: Math.max(3, Math.trunc(clampFinite(item.sides, 6, 3))),
+      };
+      return normalizedNgonItem;
     }
     case 'line': {
       const startX = clampFinite(item.startX, item.x);

@@ -13,6 +13,7 @@ import type {
   ImageCropRect,
   ImageCanvasItem,
   LineCanvasItem,
+  NgonCanvasItem,
   ProjectDocument,
   RectangleCanvasItem,
   TextCanvasItem,
@@ -149,6 +150,21 @@ export function createEllipseItem(
     gradientEnabled: false,
     stroke: '#0369a1ff',
     strokeWidth: 0,
+    ...position,
+  };
+}
+
+export function createNgonItem(
+  position?: Partial<NgonCanvasItem>
+): NgonCanvasItem {
+  return {
+    ...createBaseItem('ngon', 'Polygon'),
+    fill: '#8b5cf6',
+    secondaryFill: '#8b5cf6',
+    gradientEnabled: false,
+    stroke: '#6d28d9ff',
+    strokeWidth: 0,
+    sides: 6,
     ...position,
   };
 }

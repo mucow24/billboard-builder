@@ -522,9 +522,43 @@ describe('interaction geometry', () => {
     expect(isCreateTool('text')).toBe(true);
     expect(isCreateTool('rectangle')).toBe(true);
     expect(isCreateTool('ellipse')).toBe(true);
+    expect(isCreateTool('ngon')).toBe(true);
     expect(isCreateTool('line')).toBe(true);
     expect(isCreateTool('select')).toBe(false);
     expect(isCreateTool('pan')).toBe(false);
     expect(isCreateTool('zoom')).toBe(false);
+  });
+
+  it('creates an ngon with default sides when dragged out', () => {
+    const item = buildCreatedItem('ngon', { x: 100, y: 100 }, { x: 300, y: 250 });
+
+    expect(item).toMatchObject({
+      kind: 'ngon',
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 150,
+      sides: 6,
+    });
+  });
+
+  it('creates a centered default ngon for click-without-drag', () => {
+    const item = buildCreatedItem('ngon', { x: 400, y: 240 }, { x: 401, y: 241 });
+
+    expect(item.kind).toBe('ngon');
+    expect(item.x + item.width / 2).toBeCloseTo(400, 0);
+    expect(item.y + item.height / 2).toBeCloseTo(240, 0);
+  });
+
+  it('generates an ngon preview anchored to the drag origin', () => {
+    const item = getCreatePreview('ngon', { x: 200, y: 200 }, { x: 350, y: 300 });
+
+    expect(item).toMatchObject({
+      kind: 'ngon',
+      x: 200,
+      y: 200,
+      width: 150,
+      height: 100,
+    });
   });
 });

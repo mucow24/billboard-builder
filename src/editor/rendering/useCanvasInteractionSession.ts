@@ -728,7 +728,7 @@ export function useCanvasInteractionSession({
     };
   }, [hasActiveSession, hasCropInteraction, handleWindowMouseMove, handleWindowMouseUp, hasPendingItemGesture, hasPendingMarquee]);
 
-  const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
+  const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>, pointer: Point) => {
     updateSession(createCreateSession(tool, pointer, orderedItems));
   }, [orderedItems, updateSession]);
 

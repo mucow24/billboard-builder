@@ -1,6 +1,7 @@
 import {
   createEllipseItem,
   createLineItem,
+  createNgonItem,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
@@ -697,12 +698,12 @@ function finalizeCreatedItem<T extends CanvasItem>(item: T): T {
 
 export function isCreateTool(
   tool: CanvasTool
-): tool is Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'> {
-  return tool === 'text' || tool === 'rectangle' || tool === 'ellipse' || tool === 'line';
+): tool is Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'> {
+  return tool === 'text' || tool === 'rectangle' || tool === 'ellipse' || tool === 'ngon' || tool === 'line';
 }
 
 export function buildCreatedItem(
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>,
   startPointer: Point,
   currentPointer: Point
 ): CanvasItem {
@@ -718,6 +719,8 @@ export function buildCreatedItem(
         return centerDefaultItem(createRectangleItem(), startPointer);
       case 'ellipse':
         return centerDefaultItem(createEllipseItem(), startPointer);
+      case 'ngon':
+        return centerDefaultItem(createNgonItem(), startPointer);
       case 'line':
         return centerDefaultItem(createLineItem(), startPointer);
     }
@@ -748,11 +751,13 @@ export function buildCreatedItem(
       return createRectangleItem(rect);
     case 'ellipse':
       return createEllipseItem(rect);
+    case 'ngon':
+      return createNgonItem(rect);
   }
 }
 
 export function getCreatePreview(
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>,
   startPointer: Point,
   currentPointer: Point
 ) {
@@ -781,5 +786,7 @@ export function getCreatePreview(
       return createRectangleItem(rect);
     case 'ellipse':
       return createEllipseItem(rect);
+    case 'ngon':
+      return createNgonItem(rect);
   }
 }

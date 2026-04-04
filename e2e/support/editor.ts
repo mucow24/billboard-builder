@@ -284,6 +284,34 @@ export function createEllipseFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+export function createNgonFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ngon-item',
+    kind: 'ngon',
+    name: 'Polygon',
+    x: 200,
+    y: 200,
+    width: 200,
+    height: 200,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    zIndex: 0,
+    locked: false,
+    lockAspectRatio: false,
+    hidden: false,
+    opacity: 1,
+    shadow: DEFAULT_SHADOW,
+    fill: '#8b5cf6',
+    secondaryFill: '#8b5cf6',
+    gradientEnabled: false,
+    stroke: '#6d28d9ff',
+    strokeWidth: 0,
+    sides: 6,
+    ...overrides,
+  };
+}
+
 export function createLineFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: 'line-item',

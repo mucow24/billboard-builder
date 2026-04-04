@@ -10,7 +10,7 @@ import {
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
 
 export function createShapeDescriptors(
-  itemKind: 'ellipse' | 'line' | 'rectangle'
+  itemKind: 'ellipse' | 'line' | 'ngon' | 'rectangle'
 ): InspectorFieldDescriptor[] {
   const descriptors: InspectorFieldDescriptor[] = [
     createColorField({
@@ -115,6 +115,19 @@ export function createShapeDescriptors(
         (item) => (item.kind === 'rectangle' ? item.cornerRadius : 0),
         (_context, nextValue) => ({ cornerRadius: nextValue }),
         { digits: 1, max: 250, min: 0, slider: true, step: 1, textMax: Infinity }
+      )
+    );
+  }
+
+  if (itemKind === 'ngon') {
+    descriptors.push(
+      createGeometryField(
+        'sides',
+        'Sides',
+        55,
+        (item) => (item.kind === 'ngon' ? item.sides : 6),
+        (_context, nextValue) => ({ sides: Math.max(3, Math.trunc(nextValue)) }),
+        { digits: 0, max: 12, min: 3, slider: true, step: 1, textMax: Infinity }
       )
     );
   }
