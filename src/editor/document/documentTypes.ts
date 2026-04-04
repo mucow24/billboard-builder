@@ -100,6 +100,7 @@ export interface GradientFillItem {
   fill: string;
   secondaryFill: string;
   gradientEnabled: boolean;
+  gradientAngle: number;
 }
 
 export interface TextCanvasItem extends BaseCanvasItem, GradientFillItem {

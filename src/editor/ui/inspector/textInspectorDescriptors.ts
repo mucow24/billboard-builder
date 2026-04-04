@@ -14,6 +14,7 @@ import {
   createCustomField,
   createDimensionsField,
   createGeometryField,
+  createGradientAngleDescriptor,
   createGradientFillDescriptor,
   createNumberField,
   createTextField,
@@ -51,6 +52,7 @@ function createFontFamilyField(): CustomFieldDescriptor {
 export function createTextDescriptors(): InspectorFieldDescriptor[] {
   return [
     createGradientFillDescriptor(),
+    createGradientAngleDescriptor(),
     createTextField({
       buildChange: (_context, nextValue) => ({ text: nextValue }),
       fieldOrder: 10,
