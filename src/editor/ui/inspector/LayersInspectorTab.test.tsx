@@ -8,7 +8,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
-import type { CanvasNode } from '../../document/sceneGraph';
+import type { CanvasNode } from '../../document/documentTypes';
 import { flattenLayerRows } from '../../document/sceneGraph';
 
 import { LayersInspectorTab } from './LayersInspectorTab';

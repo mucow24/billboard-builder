@@ -11,13 +11,11 @@ import {
 } from './selectionInspectorRenderers';
 import {
   ALIGN_OPTIONS,
-  createBooleanField,
-  createColorField,
   createCustomField,
   createDimensionsField,
   createGeometryField,
+  createGradientFillDescriptor,
   createNumberField,
-  createSwapFillColorsDescriptor,
   createTextField,
   ROTATION_FIELD_EXTRA,
   SECTION_ORDER,
@@ -52,47 +50,7 @@ function createFontFamilyField(): CustomFieldDescriptor {
 
 export function createTextDescriptors(): InspectorFieldDescriptor[] {
   return [
-    createColorField({
-      buildChange: (_context, nextValue) => ({ fill: nextValue }),
-      fieldOrder: 10,
-      getValue: (item) => (item.kind === 'text' ? item.fill : ''),
-      label: 'Fill',
-      propertyKey: 'fill',
-      sectionKey: 'fill',
-      sectionLabel: 'Fill',
-      sectionOrder: SECTION_ORDER.fill,
-
-      valueType: 'color',
-    }),
-    createBooleanField({
-      buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
-      fieldOrder: 20,
-      getValue: (item) => item.kind === 'text' && item.gradientEnabled,
-      label: 'Gradient',
-      propertyKey: 'gradientEnabled',
-      sectionKey: 'fill',
-      sectionLabel: 'Fill',
-      sectionOrder: SECTION_ORDER.fill,
-
-      valueType: 'boolean',
-    }),
-    createColorField({
-      buildChange: (_context, nextValue) => ({ secondaryFill: nextValue }),
-      fieldOrder: 30,
-      getDisabled: ({ selectedItems }) =>
-        selectedItems.every(
-          (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
-        ),
-      getValue: (item) => (item.kind === 'text' ? item.secondaryFill : ''),
-      label: 'Secondary fill',
-      propertyKey: 'secondaryFill',
-      sectionKey: 'fill',
-      sectionLabel: 'Fill',
-      sectionOrder: SECTION_ORDER.fill,
-
-      valueType: 'color',
-    }),
-    createSwapFillColorsDescriptor(),
+    createGradientFillDescriptor(),
     createTextField({
       buildChange: (_context, nextValue) => ({ text: nextValue }),
       fieldOrder: 10,
