@@ -1,10 +1,9 @@
 import {
-  createBooleanField,
   createColorField,
   createDimensionsField,
   createGeometryField,
+  createGradientFillDescriptor,
   createNumberField,
-  createSwapFillColorsDescriptor,
   ROTATION_FIELD_EXTRA,
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
@@ -47,51 +46,7 @@ export function createShapeDescriptors(
   ];
 
   if (itemKind !== 'line') {
-    descriptors.unshift(
-      createColorField({
-        buildChange: (_context, nextValue) => ({ fill: nextValue }),
-        fieldOrder: 10,
-        getValue: (item) => ('fill' in item ? item.fill : ''),
-        label: 'Fill',
-        propertyKey: 'fill',
-        sectionKey: 'fill',
-        sectionLabel: 'Fill',
-        sectionOrder: SECTION_ORDER.fill,
-  
-        valueType: 'color',
-      }),
-      createBooleanField({
-        buildChange: (_context, nextValue) => ({ gradientEnabled: nextValue }),
-        fieldOrder: 20,
-        getValue: (item) =>
-          (item.kind === 'rectangle' || item.kind === 'ellipse') && item.gradientEnabled,
-        label: 'Gradient',
-        propertyKey: 'gradientEnabled',
-        sectionKey: 'fill',
-        sectionLabel: 'Fill',
-        sectionOrder: SECTION_ORDER.fill,
-  
-        valueType: 'boolean',
-      }),
-      createColorField({
-        buildChange: (_context, nextValue) => ({ secondaryFill: nextValue }),
-        fieldOrder: 30,
-        getDisabled: ({ selectedItems }) =>
-          selectedItems.every(
-            (item) => !('gradientEnabled' in item) || !item.gradientEnabled,
-          ),
-        getValue: (item) =>
-          item.kind === 'rectangle' || item.kind === 'ellipse' ? item.secondaryFill : '',
-        label: 'Secondary fill',
-        propertyKey: 'secondaryFill',
-        sectionKey: 'fill',
-        sectionLabel: 'Fill',
-        sectionOrder: SECTION_ORDER.fill,
-  
-        valueType: 'color',
-      }),
-      createSwapFillColorsDescriptor(),
-    );
+    descriptors.unshift(createGradientFillDescriptor());
   }
 
   if (itemKind === 'line') {

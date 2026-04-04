@@ -59,6 +59,7 @@ export interface CreateSession extends InteractionSessionBase {
   kind: 'create';
   tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>;
   previewItem: CanvasItem | null;
+  siblingItems: CanvasItem[];
 }
 
 interface ItemSession extends InteractionSessionBase {
@@ -357,6 +358,7 @@ function getGroupResizePointer(
 export function createCreateSession(
   tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>,
   pointer: Point,
+  siblingItems: CanvasItem[] = [],
   pointerSource: PointerGestureSource = 'stage',
 ): CreateSession {
   return {
@@ -365,6 +367,7 @@ export function createCreateSession(
     pointerStart: pointer,
     pointerSource,
     previewItem: null,
+    siblingItems,
     guides: [],
     snapDisabled: false,
   };
@@ -567,8 +570,22 @@ export function resolveInteractionSession(
   const cache = getOrBuildCache(current, stageBounds);
 
   switch (current.kind) {
-    case 'create':
-      return { ...current, previewItem: getCreatePreview(current.tool, current.pointerStart, pointer) };
+    case 'create': {
+      if (current.snapDisabled) {
+        return { ...current, previewItem: getCreatePreview(current.tool, current.pointerStart, pointer) };
+      }
+      const snapped = getSnappedRect(
+        { x: pointer.x, y: pointer.y, width: 0, height: 0 },
+        current.siblingItems, stageBounds, threshold, cache
+      );
+      const snappedPointer = { x: snapped.rect.x, y: snapped.rect.y };
+      return {
+        ...current,
+        snapCache: cache,
+        previewItem: getCreatePreview(current.tool, current.pointerStart, snappedPointer),
+        guides: snapped.guides,
+      };
+    }
     case 'drag': {
       let resolvedPointer = pointer;
       let axisLock = current.axisLock;

@@ -313,16 +313,16 @@ describe('SelectionInspector', () => {
     });
   });
 
-  it('shows gradient controls for eligible items and keeps the secondary fill disabled until enabled', async () => {
+  it('shows gradient fill widget with both color pickers, swap, and toggle buttons', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
     const rectangleItem = createRectangleItem({
       fill: '#123456ff',
       secondaryFill: '#abcdef12',
-      gradientEnabled: false,
+      gradientEnabled: true,
     });
 
-    const { rerender } = render(
+    render(
       <SelectionInspector
         availableFonts={[]}
         fonts={[]}
@@ -334,28 +334,10 @@ describe('SelectionInspector', () => {
       />
     );
 
-    expect(screen.getByLabelText('Secondary fill')).toBeDisabled();
-    expect(screen.getByLabelText('Gradient')).not.toBeChecked();
-
-    await user.click(screen.getByLabelText('Gradient'));
-
-    expect(expectLatestChange(onItemChange, rectangleItem)).toEqual({
-      gradientEnabled: true,
-    });
-
-    rerender(
-      <SelectionInspector
-        availableFonts={[]}
-        fonts={[]}
-        onGroupOpacityChange={vi.fn()}
-        onItemChange={onItemChange}
-        selectedItem={{ ...rectangleItem, gradientEnabled: true }}
-        selectedNodeCount={1}
-        selectedItems={[{ ...rectangleItem, gradientEnabled: true }]}
-      />
-    );
-
+    expect(screen.getByLabelText('Fill')).toBeEnabled();
     expect(screen.getByLabelText('Secondary fill')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Toggle gradient' })).toBeEnabled();
 
     await user.click(screen.getByRole('button', { name: 'Secondary fill' }));
     fireEvent.change(screen.getByLabelText('Secondary fill hex'), {
@@ -367,6 +349,36 @@ describe('SelectionInspector', () => {
 
     expect(expectLatestChange(onItemChange, rectangleItem)).toEqual({
       secondaryFill: '#fedcba98',
+    });
+  });
+
+  it('toggles gradient on via toggle button', () => {
+    const onItemChange = vi.fn();
+    const rectangleItem = createRectangleItem({
+      fill: '#ff0000ff',
+      secondaryFill: '#0000ffff',
+      gradientEnabled: false,
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={rectangleItem}
+        selectedNodeCount={1}
+        selectedItems={[rectangleItem]}
+      />
+    );
+
+    const toggleBtn = screen.getByRole('button', { name: 'Toggle gradient' });
+    expect(toggleBtn).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggleBtn);
+
+    expect(expectLatestChange(onItemChange, rectangleItem)).toEqual({
+      gradientEnabled: true,
     });
   });
 
@@ -466,7 +478,7 @@ describe('SelectionInspector', () => {
     expect(screen.getByRole('button', { name: 'Geometry' })).toBeInTheDocument();
     expect(screen.getByLabelText('Fill')).toBeInTheDocument();
     expect(screen.getByLabelText('Secondary fill')).toBeInTheDocument();
-    expect(screen.getByLabelText('Gradient')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Toggle gradient' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Geometry' }));
     expect(screen.getByLabelText('X')).toBeInTheDocument();
     expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
@@ -494,7 +506,7 @@ describe('SelectionInspector', () => {
     expect(screen.queryByText('2 items selected')).not.toBeInTheDocument();
   });
 
-  it('orders fill section fields as Fill, Gradient, Secondary fill, Swap fill colors', () => {
+  it('renders the gradient fill widget with all controls in a single field', () => {
     const rectangleItem = createRectangleItem({
       fill: '#ff0000ff',
       secondaryFill: '#0000ffff',
@@ -515,15 +527,14 @@ describe('SelectionInspector', () => {
 
     const fillToggle = screen.getByRole('button', { name: 'Fill', expanded: true });
     const fillSection = fillToggle.closest('section')!;
-    const labels = Array.from(fillSection.querySelectorAll('.inspector-field-shell'))
-      .map((el) => {
-        const fieldLabel = el.querySelector('.inspector-field-label');
-        const button = el.querySelector('.inspector-action-button');
-        return fieldLabel?.textContent?.replace(/:$/, '') ?? button?.textContent ?? '';
-      })
-      .filter(Boolean);
+    const widget = fillSection.querySelector('.gradient-fill-widget');
+    expect(widget).toBeInTheDocument();
 
-    expect(labels).toEqual(['Fill', 'Gradient', 'Secondary fill', 'Swap fill colors']);
+    // All controls live inside the single widget
+    expect(screen.getByLabelText('Fill')).toBeInTheDocument();
+    expect(screen.getByLabelText('Secondary fill')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Toggle gradient' })).toBeInTheDocument();
   });
 
   it('swaps fill and secondary fill colors when the swap button is clicked', async () => {
@@ -555,7 +566,7 @@ describe('SelectionInspector', () => {
     });
   });
 
-  it('disables the swap fill colors button when gradient is not enabled', () => {
+  it('keeps the swap fill colors button enabled even when gradient is off', () => {
     const rectangleItem = createRectangleItem({
       fill: '#ff0000ff',
       secondaryFill: '#0000ffff',
@@ -574,7 +585,7 @@ describe('SelectionInspector', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeEnabled();
   });
 
   it('swaps fill colors for text items', async () => {

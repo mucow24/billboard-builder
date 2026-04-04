@@ -88,6 +88,7 @@ describe('interactionSession', () => {
       pointerStart: { x: 10, y: 20 },
       pointerSource: 'stage',
       previewItem: createPreview,
+      siblingItems: [],
       guides: [],
       snapDisabled: false,
     });
@@ -343,6 +344,53 @@ describe('interactionSession', () => {
     // The committed frame rotation must be a multiple of 15°
     expect(commit.selectionFrame?.rotation).not.toBeUndefined();
     expect(Math.abs(commit.selectionFrame!.rotation % 15)).toBe(0);
+  });
+
+  it('snaps create session preview to stage guides', () => {
+    const session = {
+      ...createCreateSession('rectangle', { x: 50, y: 50 }),
+      siblingItems: [] as ReturnType<typeof createRectangleItem>[],
+    };
+    // Pointer x=515 is 3px from canvas center (512) — within snap threshold
+    const resolved = resolveInteractionSession(session, { x: 515, y: 200 }, {
+      stageBounds: canvasBounds,
+    });
+
+    expect(resolved.guides).toEqual(
+      expect.arrayContaining([{ orientation: 'vertical', position: 512 }])
+    );
+    if (resolved.kind === 'create' && resolved.previewItem) {
+      // The right edge of the rect should snap to 512
+      expect(resolved.previewItem.x + resolved.previewItem.width).toBe(512);
+    }
+  });
+
+  it('snaps create session line endpoint to stage guides', () => {
+    const session = {
+      ...createCreateSession('line', { x: 100, y: 100 }),
+      siblingItems: [] as ReturnType<typeof createRectangleItem>[],
+    };
+    // Pointer y=515 is 3px from canvas center (512)
+    const resolved = resolveInteractionSession(session, { x: 400, y: 515 }, {
+      stageBounds: canvasBounds,
+    });
+
+    expect(resolved.guides).toEqual(
+      expect.arrayContaining([{ orientation: 'horizontal', position: 512 }])
+    );
+  });
+
+  it('does not snap create session when snapDisabled is true', () => {
+    const session = {
+      ...createCreateSession('rectangle', { x: 50, y: 50 }),
+      siblingItems: [] as ReturnType<typeof createRectangleItem>[],
+      snapDisabled: true,
+    };
+    const resolved = resolveInteractionSession(session, { x: 515, y: 200 }, {
+      stageBounds: canvasBounds,
+    });
+
+    expect(resolved.guides).toEqual([]);
   });
 
   it('snaps group drag using AABB when frame is rotated', () => {

@@ -1,5 +1,6 @@
 import type { FontOption } from '../FontFamilyPicker';
 
+import { GradientFillWidget } from './GradientFillWidget';
 import {
   FontPickerInput,
   SegmentedSelectInput,
@@ -107,19 +108,21 @@ export function renderAlignField({ field, onCommit }: CustomFieldRenderProps) {
   );
 }
 
-export function renderSwapFillColorsField({
+export function renderGradientFillField({
   field,
   onCommit,
 }: CustomFieldRenderProps) {
   return (
-    <button
-      type="button"
-      className="inspector-action-button"
+    <GradientFillWidget
       disabled={field.disabled}
-      onClick={() => onCommit(null)}
-    >
-      Swap fill colors
-    </button>
+      gradientEnabled={Boolean(field.selectorStates.gradientEnabled?.firstValue)}
+      gradientMixed={field.selectorStates.gradientEnabled?.isMixed ?? false}
+      primaryColor={String(field.state.firstValue ?? '#000000')}
+      primaryMixed={field.state.isMixed}
+      secondaryColor={String(field.selectorStates.secondaryFill?.firstValue ?? '#000000')}
+      secondaryMixed={field.selectorStates.secondaryFill?.isMixed ?? false}
+      onCommit={onCommit}
+    />
   );
 }
 
