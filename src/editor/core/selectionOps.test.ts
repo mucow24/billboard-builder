@@ -42,4 +42,12 @@ describe('selectionOps', () => {
 
     expect(selectAllNodes([nodeA, nodeB, nodeC])).toEqual(['node-a', 'node-b', 'node-c']);
   });
+
+  it('excludes locked nodes from select all', () => {
+    const nodeA = createRectangleItem({ id: 'node-a' });
+    const nodeB = createEllipseItem({ id: 'node-b', locked: true });
+    const nodeC = createTextItem({ id: 'node-c' });
+
+    expect(selectAllNodes([nodeA, nodeB, nodeC])).toEqual(['node-a', 'node-c']);
+  });
 });

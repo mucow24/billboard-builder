@@ -93,7 +93,7 @@ export const LineItemView = memo(function LineItemView({
           opacity={item.opacity}
           visible={!item.hidden}
           hitStrokeWidth={Math.max(item.strokeWidth + 12, 20)}
-          listening={interactionEnabled}
+          listening={interactionEnabled && !item.locked}
           onMouseDown={createItemPointerDownHandler({
             isInteractive: () => interactionEnabled && !item.locked,
             startPanDrag,

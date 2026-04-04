@@ -768,7 +768,7 @@ export function buildInteractionCommit(
   if (resolved.kind === 'marquee') {
     const rect = normalizeRectFromPoints(resolved.pointerStart, resolved.currentPointer);
     const hitIds = orderedItems
-      .filter((item) => !item.hidden && itemIntersectsSelectionRect(item, rect))
+      .filter((item) => !item.hidden && !item.locked && itemIntersectsSelectionRect(item, rect))
       .map((item) => item.id);
     return {
       kind: 'marquee',

@@ -118,7 +118,7 @@ export const ShapeItemView = memo(function ShapeItemView({
           rotation={item.rotation}
           opacity={item.opacity}
           visible={!item.hidden}
-          listening={interactionEnabled}
+          listening={interactionEnabled && !item.locked}
           onMouseDown={createItemPointerDownHandler({
             isInteractive: () => interactionEnabled && !item.locked,
             startPanDrag,
