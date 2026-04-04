@@ -22,6 +22,7 @@ interface GeneratorItemViewProps {
     shiftKey: boolean,
     nativeEvent?: MouseEvent,
   ) => void;
+  spacebarHeld?: boolean;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
@@ -33,6 +34,7 @@ export const GeneratorItemView = memo(function GeneratorItemView({
   item,
   selectableNodeId,
   onItemPointerDown,
+  spacebarHeld = false,
   startPanDrag,
   toCanvasPointer,
 }: GeneratorItemViewProps) {
@@ -53,6 +55,7 @@ export const GeneratorItemView = memo(function GeneratorItemView({
       listening={interactionEnabled}
       onMouseDown={createItemPointerDownHandler({
         isInteractive: () => interactionEnabled,
+        panModifierHeld: spacebarHeld,
         startPanDrag,
         toCanvasPointer,
         onAction: (pointer, shiftKey, nativeEvent) =>

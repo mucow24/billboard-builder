@@ -54,6 +54,7 @@ interface GroupSelectionOverlayProps {
     nativeEvent?: MouseEvent,
   ) => void;
   renderedSelectedItems: RenderableCanvasItem[];
+  spacebarHeld?: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   zoom: number;
@@ -70,6 +71,7 @@ export function GroupSelectionOverlay({
   handleItemDoubleClick,
   handleItemPointerDown,
   renderedSelectedItems,
+  spacebarHeld = false,
   startPanDrag,
   toCanvasPointer,
   zoom,
@@ -168,7 +170,7 @@ export function GroupSelectionOverlay({
                   if (!pointer) {
                     return;
                   }
-                  if (event.evt.button === 1) {
+                  if (event.evt.button === 1 || spacebarHeld) {
                     event.cancelBubble = true;
                     startPanDrag(pointer);
                     return;

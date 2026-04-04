@@ -39,6 +39,7 @@ interface LineItemViewProps {
   renderHandles?: boolean;
   renderSelection?: boolean;
   registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
+  spacebarHeld?: boolean;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   zoom?: number;
@@ -56,6 +57,7 @@ export const LineItemView = memo(function LineItemView({
   renderHandles = true,
   renderSelection = true,
   registerShapeRef = NOOP,
+  spacebarHeld = false,
   startPanDrag,
   toCanvasPointer,
   zoom = 1,
@@ -96,6 +98,7 @@ export const LineItemView = memo(function LineItemView({
           listening={interactionEnabled && !item.locked}
           onMouseDown={createItemPointerDownHandler({
             isInteractive: () => interactionEnabled && !item.locked,
+            panModifierHeld: spacebarHeld,
             startPanDrag,
             toCanvasPointer,
             onAction: (pointer, shiftKey, nativeEvent) =>
@@ -126,6 +129,7 @@ export const LineItemView = memo(function LineItemView({
             )}
             onMouseDown={createItemPointerDownHandler({
               isInteractive: () => !item.locked,
+              panModifierHeld: spacebarHeld,
               startPanDrag,
               toCanvasPointer,
               onAction: (pointer, shiftKey, nativeEvent) =>
@@ -152,6 +156,7 @@ export const LineItemView = memo(function LineItemView({
                     strokeWidth={overlayMetrics.handleStrokeWidth}
                     onMouseDown={createItemPointerDownHandler({
                       isInteractive: () => !item.locked,
+                      panModifierHeld: spacebarHeld,
                       startPanDrag,
                       toCanvasPointer,
                       onAction: (pointer) => onBeginLineHandle(item, handle, pointer, 'overlay'),

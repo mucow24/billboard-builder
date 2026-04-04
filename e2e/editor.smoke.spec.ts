@@ -39,7 +39,7 @@ test.describe('editor smoke flows', () => {
     await expect(page.getByRole('button', { name: 'Line', exact: true })).toBeVisible();
   });
 
-  test('updates zoom from the HUD and pans with the shift-drag gesture', async ({ page }) => {
+  test('updates zoom from the HUD and pans with the spacebar-drag gesture', async ({ page }) => {
     await openFreshEditor(page);
 
     const initialDebug = await readStageDebug(page);
@@ -52,9 +52,9 @@ test.describe('editor smoke flows', () => {
     await page.getByRole('button', { name: 'Zoom in' }).click();
     await expect(page.getByTestId('viewport-zoom')).not.toContainText(`Zoom: ${Math.round(initialZoom * 100)}%`);
 
-    await page.keyboard.down('Shift');
+    await page.keyboard.down(' ');
     await dragCanvas(page, { x: 220, y: 220 }, { x: 320, y: 300 });
-    await page.keyboard.up('Shift');
+    await page.keyboard.up(' ');
 
     const nextDebug = await readStageDebug(page);
     expect(nextDebug.viewport.panX).not.toBe(initialPan.x);

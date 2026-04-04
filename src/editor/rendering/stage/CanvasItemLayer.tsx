@@ -41,6 +41,7 @@ interface CanvasItemLayerProps {
   ) => void;
   registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
   selectedItemId?: string;
+  spacebarHeld?: boolean;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
 }
@@ -58,6 +59,7 @@ export function CanvasItemLayer({
   onItemPointerDown = NOOP,
   registerShapeRef = NOOP,
   selectedItemId,
+  spacebarHeld = false,
   startPanDrag = NOOP,
   toCanvasPointer,
 }: CanvasItemLayerProps) {
@@ -75,6 +77,7 @@ export function CanvasItemLayer({
             item={item}
             selectableNodeId={item.selectableNodeId}
             onItemPointerDown={onItemPointerDown}
+            spacebarHeld={spacebarHeld}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />
@@ -96,6 +99,7 @@ export function CanvasItemLayer({
             ) => void}
             renderSelection={false}
             registerShapeRef={registerShapeRef}
+            spacebarHeld={spacebarHeld}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />
@@ -118,6 +122,7 @@ export function CanvasItemLayer({
             ) => void}
             renderSelection={false}
             registerShapeRef={registerShapeRef}
+            spacebarHeld={spacebarHeld}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
           />

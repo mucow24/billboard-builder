@@ -74,6 +74,7 @@ interface CanvasTestHooksProps {
     previewItem?: { kind: string; x: number; y: number; width: number; height: number };
   } | null;
   showGroupInteractionHooks: boolean;
+  spacebarHeld?: boolean;
   startPanDrag: (pointer: { x: number; y: number }) => void;
   toCanvasPointer: (pointer: { x: number; y: number }) => { x: number; y: number };
   toViewportRect: (rect: { x: number; y: number; width: number; height: number }) => {
@@ -113,6 +114,7 @@ export function CanvasTestHooks({
   selectedShapeHandleRects,
   session,
   showGroupInteractionHooks,
+  spacebarHeld = false,
   startPanDrag,
   toCanvasPointer,
   toViewportRect,
@@ -272,7 +274,7 @@ export function CanvasTestHooks({
           <div
             data-testid="canvas-selected-item-overlay"
             onMouseDown={(event) => {
-              if (event.button === 1) {
+              if (event.button === 1 || spacebarHeld) {
                 const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
                 if (pointer) {
                   startPanDrag(pointer);
@@ -315,7 +317,7 @@ export function CanvasTestHooks({
                   ) {
                     return;
                   }
-                  if (event.button === 1) {
+                  if (event.button === 1 || spacebarHeld) {
                     const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
                     if (pointer) {
                       startPanDrag(pointer);
@@ -360,7 +362,7 @@ export function CanvasTestHooks({
                   ) {
                     return;
                   }
-                  if (event.button === 1) {
+                  if (event.button === 1 || spacebarHeld) {
                     const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
                     if (pointer) {
                       startPanDrag(pointer);
@@ -392,7 +394,7 @@ export function CanvasTestHooks({
           <div
             data-testid="canvas-group-overlay"
             onMouseDown={(event) => {
-              if (event.button === 1) {
+              if (event.button === 1 || spacebarHeld) {
                 const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
                 if (pointer) {
                   startPanDrag(pointer);
@@ -422,7 +424,7 @@ export function CanvasTestHooks({
                 key={`group-handle-${handle}`}
                 data-testid={`canvas-group-handle-${handle}`}
                 onMouseDown={(event) => {
-                  if (event.button === 1) {
+                  if (event.button === 1 || spacebarHeld) {
                     const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
                     if (pointer) {
                       startPanDrag(pointer);
@@ -452,7 +454,7 @@ export function CanvasTestHooks({
           <div
             data-testid="canvas-group-rotater"
             onMouseDown={(event) => {
-              if (event.button === 1) {
+              if (event.button === 1 || spacebarHeld) {
                 const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
                 if (pointer) {
                   startPanDrag(pointer);

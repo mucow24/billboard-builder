@@ -233,6 +233,7 @@ export function CanvasStage({
         size={viewport.viewportSize}
         stageCursor={viewport.getStageCursor(Boolean(session))}
         stageRef={stageRef}
+        spacebarHeld={viewport.spacebarHeld}
         startPanDrag={viewport.startPanDrag}
         subgroupOutlineFrames={subgroupOutlineFrames}
         toCanvasPointer={viewport.toCanvasPointer}
@@ -303,6 +304,7 @@ export function CanvasStage({
           selectedShapeHandleRects={selectedShapeHandleRects}
           session={session as never}
           showGroupInteractionHooks={showGroupInteractionHooks}
+          spacebarHeld={viewport.spacebarHeld}
           startPanDrag={viewport.startPanDrag}
           toCanvasPointer={viewport.toCanvasPointer}
           toViewportRect={viewport.toViewportRect}

@@ -93,6 +93,7 @@ interface CanvasSceneProps {
   } | null;
   showGroupSelection: boolean;
   size: { width: number; height: number };
+  spacebarHeld: boolean;
   stageCursor: string;
   stageRef: React.RefObject<Konva.Stage | null>;
   startPanDrag: (pointer: Point) => void;
@@ -136,6 +137,7 @@ export function CanvasScene({
   session,
   showGroupSelection,
   size,
+  spacebarHeld,
   stageCursor,
   stageRef,
   startPanDrag,
@@ -186,6 +188,7 @@ export function CanvasScene({
               onItemPointerDown={handleItemPointerDown}
               registerShapeRef={registerShapeRef}
               selectedItemId={selectedItemId}
+              spacebarHeld={spacebarHeld}
               startPanDrag={startPanDrag}
               toCanvasPointer={toCanvasPointer}
             />
@@ -221,6 +224,7 @@ export function CanvasScene({
                 handleItemDoubleClick={handleItemDoubleClick}
                 handleItemPointerDown={handleItemPointerDown}
                 renderedSelectedItems={renderedSelectedItems}
+                spacebarHeld={spacebarHeld}
                 startPanDrag={startPanDrag}
                 toCanvasPointer={toCanvasPointer}
                 zoom={zoom}
@@ -250,6 +254,7 @@ export function CanvasScene({
                 handleItemPointerDown={handleItemPointerDown}
                 selectedItemId={selectedItemId}
                 selectedRenderedItem={selectedRenderedItem}
+                spacebarHeld={spacebarHeld}
                 startPanDrag={startPanDrag}
                 toCanvasPointer={toCanvasPointer}
                 zoom={zoom}
