@@ -2,6 +2,7 @@ import {
   createColorField,
   createDimensionsField,
   createGeometryField,
+  createGradientAngleDescriptor,
   createGradientFillDescriptor,
   createNumberField,
   ROTATION_FIELD_EXTRA,
@@ -46,7 +47,7 @@ export function createShapeDescriptors(
   ];
 
   if (itemKind !== 'line') {
-    descriptors.unshift(createGradientFillDescriptor());
+    descriptors.unshift(createGradientFillDescriptor(), createGradientAngleDescriptor());
   }
 
   if (itemKind === 'line') {

@@ -125,13 +125,14 @@ function normalizeImageSourceTransform(
   };
 }
 
-function normalizeGradientFill<T extends { fill: string; secondaryFill?: string; gradientEnabled?: boolean }>(
+function normalizeGradientFill<T extends { fill: string; secondaryFill?: string; gradientEnabled?: boolean; gradientAngle?: number }>(
   item: T,
-): Pick<T, 'fill'> & { secondaryFill: string; gradientEnabled: boolean } {
+): Pick<T, 'fill'> & { secondaryFill: string; gradientEnabled: boolean; gradientAngle: number } {
   return {
     fill: item.fill,
     secondaryFill: typeof item.secondaryFill === 'string' ? item.secondaryFill : item.fill,
     gradientEnabled: Boolean(item.gradientEnabled),
+    gradientAngle: clampFinite(item.gradientAngle ?? 0, 0),
   };
 }
 

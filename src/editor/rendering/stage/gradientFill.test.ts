@@ -28,14 +28,14 @@ describe('gradientFill', () => {
 
     expect(buildGradientFillProps(rectangle, { width: 80, height: 40 })).toEqual({
       fillLinearGradientColorStops: [0, '#112233ff', 1, '#aabbccff'],
-      fillLinearGradientEndPoint: { x: 0, y: 40 },
-      fillLinearGradientStartPoint: { x: 0, y: 0 },
+      fillLinearGradientStartPoint: { x: 40, y: 0 },
+      fillLinearGradientEndPoint: { x: 40, y: 40 },
       fillPriority: 'linear-gradient',
     });
     expect(buildGradientFillProps(ellipse, { width: 120, height: 70 })).toEqual({
       fillLinearGradientColorStops: [0, '#123456ff', 1, '#fedcbaff'],
-      fillLinearGradientEndPoint: { x: 0, y: 70 },
-      fillLinearGradientStartPoint: { x: 0, y: 0 },
+      fillLinearGradientStartPoint: { x: 60, y: 0 },
+      fillLinearGradientEndPoint: { x: 60, y: 70 },
       fillPriority: 'linear-gradient',
     });
   });
@@ -52,8 +52,8 @@ describe('gradientFill', () => {
 
     expect(buildGradientFillProps(text, { width: 320, height: 96 })).toEqual({
       fillLinearGradientColorStops: [0, '#ffffff', 1, '#ff0000'],
-      fillLinearGradientEndPoint: { x: 0, y: 84 },
-      fillLinearGradientStartPoint: { x: 0, y: -12 },
+      fillLinearGradientStartPoint: { x: 160, y: -12 },
+      fillLinearGradientEndPoint: { x: 160, y: 84 },
       fillPriority: 'linear-gradient',
     });
   });
@@ -69,10 +69,63 @@ describe('gradientFill', () => {
 
     expect(buildGradientFillProps(ngon, { width: 100, height: 100 })).toEqual({
       fillLinearGradientColorStops: [0, '#8b5cf6ff', 1, '#6d28d9ff'],
-      fillLinearGradientEndPoint: { x: 0, y: 100 },
-      fillLinearGradientStartPoint: { x: 0, y: 0 },
+      fillLinearGradientStartPoint: { x: 50, y: 0 },
+      fillLinearGradientEndPoint: { x: 50, y: 100 },
       fillPriority: 'linear-gradient',
     });
+  });
+
+  it('rotates gradient to left-to-right at 90 degrees', () => {
+    const rectangle = createRectangleItem({
+      fill: '#ff0000',
+      secondaryFill: '#0000ff',
+      gradientEnabled: true,
+      gradientAngle: 90,
+      width: 100,
+      height: 60,
+    });
+
+    const result = buildGradientFillProps(rectangle, { width: 100, height: 60 })!;
+    expect(result.fillLinearGradientColorStops).toEqual([0, '#ff0000', 1, '#0000ff']);
+    expect(result.fillLinearGradientStartPoint.x).toBeCloseTo(0);
+    expect(result.fillLinearGradientStartPoint.y).toBeCloseTo(30);
+    expect(result.fillLinearGradientEndPoint.x).toBeCloseTo(100);
+    expect(result.fillLinearGradientEndPoint.y).toBeCloseTo(30);
+    expect(result.fillPriority).toBe('linear-gradient');
+  });
+
+  it('rotates gradient to right-to-left at -90 degrees', () => {
+    const rectangle = createRectangleItem({
+      fill: '#ff0000',
+      secondaryFill: '#0000ff',
+      gradientEnabled: true,
+      gradientAngle: -90,
+      width: 100,
+      height: 60,
+    });
+
+    const result = buildGradientFillProps(rectangle, { width: 100, height: 60 })!;
+    expect(result.fillLinearGradientStartPoint.x).toBeCloseTo(100);
+    expect(result.fillLinearGradientStartPoint.y).toBeCloseTo(30);
+    expect(result.fillLinearGradientEndPoint.x).toBeCloseTo(0);
+    expect(result.fillLinearGradientEndPoint.y).toBeCloseTo(30);
+  });
+
+  it('rotates gradient diagonally at 45 degrees on a square', () => {
+    const rectangle = createRectangleItem({
+      fill: '#ff0000',
+      secondaryFill: '#0000ff',
+      gradientEnabled: true,
+      gradientAngle: 45,
+      width: 100,
+      height: 100,
+    });
+
+    const result = buildGradientFillProps(rectangle, { width: 100, height: 100 })!;
+    expect(result.fillLinearGradientStartPoint.x).toBeCloseTo(0);
+    expect(result.fillLinearGradientStartPoint.y).toBeCloseTo(0);
+    expect(result.fillLinearGradientEndPoint.x).toBeCloseTo(100);
+    expect(result.fillLinearGradientEndPoint.y).toBeCloseTo(100);
   });
 
   it('returns no gradient props when the item stays in solid-fill mode', () => {

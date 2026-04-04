@@ -1,5 +1,6 @@
 import type {
   CanvasItem,
+  GradientFillItem,
 } from '../../document/documentTypes';
 import {
   renderGradientFillField,
@@ -201,6 +202,34 @@ export function createGradientFillDescriptor(): CustomFieldDescriptor {
         'gradientEnabled' in item ? item.gradientEnabled : false,
     },
     valueType: 'custom',
+  });
+}
+
+export function createGradientAngleDescriptor(): NumberFieldDescriptor {
+  return createNumberField({
+    buildChange: (_context, nextValue) => ({ gradientAngle: nextValue }),
+    digits: 0,
+    fieldOrder: 20,
+    getDisabled: ({ selectedItems }) =>
+      selectedItems.every(
+        (item) => !('gradientEnabled' in item && item.gradientEnabled),
+      ),
+    getValue: (item) =>
+      'gradientAngle' in item ? (item as GradientFillItem).gradientAngle : 0,
+    label: 'Angle',
+    max: 180,
+    min: -180,
+    propertyKey: 'gradientAngle',
+    sectionKey: 'fill',
+    sectionLabel: 'Fill',
+    sectionOrder: SECTION_ORDER.fill,
+    slider: true,
+    sliderDetentThreshold: 5,
+    sliderDetentValue: 0,
+    step: 1,
+    textMax: Infinity,
+    textMin: -Infinity,
+    valueType: 'number',
   });
 }
 

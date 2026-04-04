@@ -145,11 +145,13 @@ describe('document schema', () => {
       padding: ignoredPadding,
       secondaryFill: ignoredSecondaryFill,
       gradientEnabled: ignoredGradientEnabled,
+      gradientAngle: ignoredGradientAngle,
       ...legacyPayload
     } = legacyTextItem;
     void ignoredPadding;
     void ignoredSecondaryFill;
     void ignoredGradientEnabled;
+    void ignoredGradientAngle;
 
     const parsed = parseProjectDocument({
       version: 2,
@@ -287,10 +289,12 @@ describe('document schema', () => {
     const {
       secondaryFill: ignoredSecondaryFill,
       gradientEnabled: ignoredGradientEnabled,
+      gradientAngle: ignoredGradientAngle,
       ...legacyPayload
     } = rectangle;
     void ignoredSecondaryFill;
     void ignoredGradientEnabled;
+    void ignoredGradientAngle;
 
     const parsed = parseProjectDocument({
       version: 2,
@@ -304,7 +308,21 @@ describe('document schema', () => {
       kind: 'rectangle',
       fill: '#123456ff',
       gradientEnabled: false,
+      gradientAngle: 0,
       secondaryFill: '#123456ff',
+    });
+  });
+
+  it('round-trips gradientAngle through serialization', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createRectangleItem({ gradientAngle: 45, gradientEnabled: true })];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+
+    expect(parsed.nodes[0]).toMatchObject({
+      kind: 'rectangle',
+      gradientAngle: 45,
+      gradientEnabled: true,
     });
   });
 });
