@@ -591,6 +591,7 @@ export function useCanvasInteractionSession({
       const next = resolveSession({
         ...current,
         snapDisabled:
+          current.kind === 'create' ||
           current.kind === 'drag' ||
           current.kind === 'line-handle' ||
           current.kind === 'group-drag' ||
@@ -728,8 +729,8 @@ export function useCanvasInteractionSession({
   }, [hasActiveSession, hasCropInteraction, handleWindowMouseMove, handleWindowMouseUp, hasPendingItemGesture, hasPendingMarquee]);
 
   const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'line'>, pointer: Point) => {
-    updateSession(createCreateSession(tool, pointer));
-  }, [updateSession]);
+    updateSession(createCreateSession(tool, pointer, orderedItems));
+  }, [orderedItems, updateSession]);
 
   const beginDrag = useCallback((item: CanvasItem, pointer: Point, source: PointerGestureSource = 'stage') => {
     if (item.kind === 'generator') return;
