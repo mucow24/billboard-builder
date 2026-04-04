@@ -3,7 +3,7 @@ import type Konva from 'konva';
 
 import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
 import { useEditorController } from './app/useEditorController';
-import { useSpacebarHeld } from './app/useSpacebarHeld';
+import { useKeyHeld } from './app/useKeyHeld';
 import { useStatusToast } from './app/useStatusToast';
 import { CanvasStage } from './editor/rendering/CanvasStage';
 import { ToolPalette } from './editor/ui/ToolPalette';
@@ -22,8 +22,8 @@ export default function App() {
   const openInputRef = useRef<HTMLInputElement | null>(null);
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [exportButtonHovered, setExportButtonHovered] = useState(false);
-  const spacebarHeld = useSpacebarHeld();
-  const showExportBoundsCue = exportButtonHovered || spacebarHeld;
+  const boundsKeyHeld = useKeyHeld('b');
+  const showExportBoundsCue = exportButtonHovered || boundsKeyHeld;
   const favoriteStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);

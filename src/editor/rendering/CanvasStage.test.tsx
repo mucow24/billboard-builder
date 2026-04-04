@@ -666,6 +666,44 @@ describe('CanvasStage viewport controls', () => {
     expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
   });
 
+  it('starts a pan drag instead of item drag when spacebar-clicking the selected item overlay hook', () => {
+    const document = createDefaultProjectDocument();
+    const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
+    document.nodes = [rectangle];
+
+    Object.assign(mockInteractionSession, {
+      renderedItems: [rectangle],
+      renderedSelectedItems: [rectangle],
+      selectedItemId: rectangle.id,
+      selectedRenderedItem: {
+        ...rectangle,
+        selectableNodeId: rectangle.id,
+      },
+    });
+
+    render(
+      <CanvasStage
+        document={document}
+        selectedNodeIds={[rectangle.id]}
+      />,
+    );
+
+    const overlayHook = screen.getByTestId('canvas-selected-item-overlay');
+    const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+
+    fireEvent.keyDown(window, { key: ' ' });
+    fireEvent.mouseDown(overlayHook, { button: 0, clientX: 240, clientY: 160 });
+    fireEvent.mouseMove(window, { clientX: 300, clientY: 220 });
+
+    const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
+    expect(mockInteractionSession.handleItemPointerDown).not.toHaveBeenCalled();
+    expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
+    expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
+
+    fireEvent.mouseUp(window, { button: 0, clientX: 300, clientY: 220 });
+    fireEvent.keyUp(window, { key: ' ' });
+  });
+
   it('forwards shift-modified selected-item overlay drags to the interaction session', () => {
     const document = createDefaultProjectDocument();
     const rectangle = createRectangleItem({ id: 'shape', x: 120, y: 80, width: 160, height: 100 });
@@ -1222,10 +1260,10 @@ describe('CanvasStage viewport controls', () => {
     expect(handleStageMouseDown).toHaveBeenCalledOnce();
     expect(handleStageMouseUp).toHaveBeenCalledOnce();
 
-    fireEvent.keyDown(window, { key: 'Shift' });
+    fireEvent.keyDown(window, { key: ' ' });
     expect(readCursor()).toBe('grab');
 
-    fireEvent.mouseDown(stage!, { button: 0, shiftKey: true, clientX: 640, clientY: 360 });
+    fireEvent.mouseDown(stage!, { button: 0, clientX: 640, clientY: 360 });
     expect(document.body.style.cursor).toBe('grabbing');
 
     fireEvent.mouseMove(stage!, { clientX: 700, clientY: 420 });
@@ -1234,7 +1272,7 @@ describe('CanvasStage viewport controls', () => {
     expect(document.body.style.cursor).toBe('');
     expect(handleStageMouseUp).toHaveBeenCalledOnce();
 
-    fireEvent.keyUp(window, { key: 'Shift' });
+    fireEvent.keyUp(window, { key: ' ' });
 
     rerender(
       <CanvasStage activeTool="zoom" />,

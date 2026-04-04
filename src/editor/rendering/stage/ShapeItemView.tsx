@@ -60,6 +60,7 @@ interface ShapeItemViewProps {
   renderHandles?: boolean;
   renderSelection?: boolean;
   registerShapeRef?: (itemId: string, node: Konva.Node | null) => void;
+  spacebarHeld?: boolean;
   startPanDrag?: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   zoom?: number;
@@ -78,6 +79,7 @@ export const ShapeItemView = memo(function ShapeItemView({
   renderHandles = true,
   renderSelection = true,
   registerShapeRef = NOOP,
+  spacebarHeld = false,
   startPanDrag,
   toCanvasPointer,
   zoom = 1,
@@ -121,6 +123,7 @@ export const ShapeItemView = memo(function ShapeItemView({
           listening={interactionEnabled}
           onMouseDown={createItemPointerDownHandler({
             isInteractive: () => interactionEnabled && !item.locked,
+            panModifierHeld: spacebarHeld,
             startPanDrag,
             toCanvasPointer,
             onAction: (pointer, shiftKey, nativeEvent) =>
@@ -229,6 +232,7 @@ export const ShapeItemView = memo(function ShapeItemView({
               rotation={item.rotation}
               onMouseDown={createItemPointerDownHandler({
                 isInteractive: () => !item.locked,
+                panModifierHeld: spacebarHeld,
                 startPanDrag,
                 toCanvasPointer,
                 onAction: (pointer, shiftKey, nativeEvent) =>
@@ -283,6 +287,7 @@ export const ShapeItemView = memo(function ShapeItemView({
                       strokeWidth={overlayMetrics.handleStrokeWidth}
                       onMouseDown={createItemPointerDownHandler({
                         isInteractive: () => !item.locked,
+                        panModifierHeld: spacebarHeld,
                         startPanDrag,
                         toCanvasPointer,
                         onAction: (pointer) => onBeginResize(item, handle, pointer, 'overlay'),
@@ -299,6 +304,7 @@ export const ShapeItemView = memo(function ShapeItemView({
                   strokeWidth={overlayMetrics.handleStrokeWidth}
                   onMouseDown={createItemPointerDownHandler({
                     isInteractive: () => !item.locked,
+                    panModifierHeld: spacebarHeld,
                     startPanDrag,
                     toCanvasPointer,
                     onAction: (pointer) => onBeginRotate(item, pointer, 'overlay'),

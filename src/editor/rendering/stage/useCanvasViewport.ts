@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useKeyHeld } from '../../../app/useKeyHeld';
 import type { CanvasTool } from '../../document/documentTypes';
 import type { Point } from '../interactionGeometry';
 import { useModifierKeys } from '../useModifierKeys';
@@ -33,6 +34,7 @@ export function useCanvasViewport({
   const panDragRef = useRef<{ startPointer: Point; startPan: Point } | null>(null);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
+  const spacebarHeld = useKeyHeld(' ');
   const { modifierKeys } = useModifierKeys({
     onBlur: () => {
       panDragRef.current = null;
@@ -210,15 +212,15 @@ export function useCanvasViewport({
 
   const isPanGesture = useCallback(
     (event: MouseEvent, hasActiveSession: boolean) =>
-      activeTool === 'pan' || event.button === 1 || (event.shiftKey && !hasActiveSession),
-    [activeTool],
+      activeTool === 'pan' || event.button === 1 || (spacebarHeld && !hasActiveSession),
+    [activeTool, spacebarHeld],
   );
 
   const getStageCursor = useCallback(
     (hasActiveSession: boolean) =>
       panDragRef.current
         ? 'grabbing'
-        : activeTool === 'pan' || (modifierKeys.shiftKey && !hasActiveSession)
+        : activeTool === 'pan' || (spacebarHeld && !hasActiveSession)
           ? 'grab'
           : activeTool === 'zoom'
             ? modifierKeys.altKey
@@ -227,7 +229,7 @@ export function useCanvasViewport({
             : activeTool === 'select'
               ? 'default'
               : 'crosshair',
-    [activeTool, modifierKeys.altKey, modifierKeys.shiftKey],
+    [activeTool, modifierKeys.altKey, spacebarHeld],
   );
 
   const handleStagePointerMove = useCallback((pointer: ViewportPoint | null) => {
@@ -291,6 +293,7 @@ export function useCanvasViewport({
     pan,
     setZoomFromHud,
     getStageCursor,
+    spacebarHeld,
     startPanDrag,
     toCanvasPointer: stableToCanvasPointer,
     toViewportPoint: stableToViewportPoint,

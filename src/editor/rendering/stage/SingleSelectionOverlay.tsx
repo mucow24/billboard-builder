@@ -41,6 +41,7 @@ interface SingleSelectionOverlayProps {
   ) => void;
   selectedItemId?: string;
   selectedRenderedItem: RenderableCanvasItem;
+  spacebarHeld?: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   zoom: number;
@@ -55,6 +56,7 @@ export function SingleSelectionOverlay({
   handleItemPointerDown,
   selectedItemId,
   selectedRenderedItem,
+  spacebarHeld = false,
   startPanDrag,
   toCanvasPointer,
   zoom,
@@ -86,6 +88,7 @@ export function SingleSelectionOverlay({
       onBeginLineHandle={beginLineHandle}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
+      spacebarHeld={spacebarHeld}
       startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
       zoom={zoom}
@@ -102,6 +105,7 @@ export function SingleSelectionOverlay({
       onBeginRotate={beginRotate}
       onItemPointerDown={handleItemPointerDown as SingleSelectionOverlayProps['handleItemPointerDown']}
       renderContent={false}
+      spacebarHeld={spacebarHeld}
       startPanDrag={startPanDrag}
       toCanvasPointer={toCanvasPointer}
       zoom={zoom}
