@@ -23,10 +23,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([backItem, frontItem])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={onDeleteNode}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -64,10 +62,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([item])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={onOpenProperties}
         onReorder={onReorder}
@@ -89,17 +85,13 @@ describe('LayersInspectorTab', () => {
     expect(onReorder).toHaveBeenCalledWith('front');
   });
 
-  it('disables reorder controls without a selection and updates the canvas background', async () => {
-    const user = userEvent.setup();
-    const onBackgroundChange = vi.fn();
+  it('disables reorder controls without a selection', () => {
     const item = createRectangleItem();
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder={false}
         rows={flattenLayerRows([item])}
-        onBackgroundChange={onBackgroundChange}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -114,15 +106,6 @@ describe('LayersInspectorTab', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Move to top' })).toBeDisabled();
-
-    await user.click(screen.getByRole('button', { name: 'Canvas background' }));
-    await user.clear(screen.getByLabelText('Canvas background hex'));
-    await user.type(
-      screen.getByLabelText('Canvas background hex'),
-      '#11223344{Enter}',
-    );
-
-    expect(onBackgroundChange).toHaveBeenCalledWith('#11223344');
   });
 
   it('renders an image thumbnail preview for image rows instead of the fallback glyph', () => {
@@ -135,10 +118,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([item])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -169,10 +150,8 @@ describe('LayersInspectorTab', () => {
 
     const { container, rerender } = render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -196,10 +175,8 @@ describe('LayersInspectorTab', () => {
 
     rerender(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -218,10 +195,8 @@ describe('LayersInspectorTab', () => {
 
     rerender(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -247,10 +222,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([item])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -277,10 +250,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([item])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -307,10 +278,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group, topLevelItem])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -336,10 +305,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -367,10 +334,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -402,10 +367,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -436,10 +399,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -474,10 +435,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([group])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -502,10 +461,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([a, b])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}
@@ -531,10 +488,8 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        background="#ffffff00"
         canReorder
         rows={flattenLayerRows([rect, gen as unknown as CanvasNode])}
-        onBackgroundChange={vi.fn()}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
         onReorder={vi.fn()}

@@ -3,6 +3,7 @@ import type { ChangeEvent, ReactNode } from 'react';
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
 import { getAllGenerators } from '../generators';
+import { ColorPickerControl } from './ColorPickerControl';
 import { ToolbarMenuAction } from './ToolbarPrimitives';
 
 const GENERATOR_ICONS: Record<string, ReactNode> = {
@@ -74,14 +75,16 @@ const GENERATOR_ICONS: Record<string, ReactNode> = {
 };
 
 interface CanvasMenuProps {
+  background: string;
   menuId: string;
+  onBackgroundChange: (background: string) => void;
   onLoad: () => void;
   onSave: () => void;
   onNewProject: () => void;
   createMenuActionHandler: (action: () => void) => () => void;
 }
 
-export function CanvasMenu({ menuId, onLoad, onSave, onNewProject, createMenuActionHandler }: CanvasMenuProps) {
+export function CanvasMenu({ background, menuId, onBackgroundChange, onLoad, onSave, onNewProject, createMenuActionHandler }: CanvasMenuProps) {
   return (
     <div id={menuId} className="top-toolbar-popover-panel" role="group" aria-label="Canvas actions">
       <ToolbarMenuAction label="Load..." onSelect={createMenuActionHandler(onLoad)}>
@@ -97,6 +100,17 @@ export function CanvasMenu({ menuId, onLoad, onSave, onNewProject, createMenuAct
         <path d="M10 4a6 6 0 1 1-4.24 1.76" />
         <path d="M4 4.5h4v4" />
       </ToolbarMenuAction>
+      <div className="top-toolbar-menu-divider" aria-hidden="true" />
+      <div className="top-toolbar-size-menu-row">
+        <span className="top-toolbar-size-menu-label">Color</span>
+        <ColorPickerControl
+          label="Canvas background"
+          value={background}
+          onChange={onBackgroundChange}
+          variant="compact"
+          inline
+        />
+      </div>
     </div>
   );
 }

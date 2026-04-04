@@ -6,9 +6,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { Toolbar } from './Toolbar';
 import type { InspectorTab } from './inspector/types';
 
+vi.mock('@uiw/react-color', async () => {
+  const actual =
+    await vi.importActual<typeof import('@uiw/react-color')>(
+      '@uiw/react-color',
+    );
+  return {
+    ...actual,
+    Wheel: ({
+      onChange,
+      ...props
+    }: {
+      onChange?: (color: { hexa: string }) => void;
+    }) => (
+      <button
+        type="button"
+        {...props}
+        onClick={() => onChange?.({ hexa: '#12345678' })}
+      >
+        Mock wheel
+      </button>
+    ),
+  };
+});
+
 function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) {
   const props: ComponentProps<typeof Toolbar> = {
     activeInspectorTab: 'properties' satisfies InspectorTab,
+    background: '#ffffff00',
     canvas: { width: 2048, height: 1024, presetId: 'landscape' },
     canDelete: false,
     canGroup: false,
@@ -18,6 +43,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     canUngroup: false,
     favoriteCount: 0,
     itemCount: 0,
+    onBackgroundChange: vi.fn(),
     onCanvasSizeChange: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
@@ -216,5 +242,23 @@ describe('Toolbar', () => {
     await user.click(widthField);
     expect(widthField).toHaveFocus();
     expect(screen.getByRole('button', { name: '1024 x 1024' })).toBeVisible();
+  });
+
+  it('shows a background color picker in the canvas menu and fires onBackgroundChange', async () => {
+    const user = userEvent.setup();
+    const onBackgroundChange = vi.fn();
+
+    renderToolbar({ onBackgroundChange });
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    expect(screen.getByText('Color')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas background' }));
+    expect(screen.getByLabelText('Canvas background hex')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+
+    await user.clear(screen.getByLabelText('Canvas background hex'));
+    await user.type(screen.getByLabelText('Canvas background hex'), '#11223344{Enter}');
+    expect(onBackgroundChange).toHaveBeenCalledWith('#11223344');
   });
 });

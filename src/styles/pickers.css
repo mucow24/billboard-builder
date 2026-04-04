@@ -291,3 +291,11 @@
   background: var(--surface-hover);
   z-index: 6;
 }
+
+/* Inline mode — render panel in DOM tree instead of portal */
+.color-picker-panel.color-picker-panel-inline {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+}

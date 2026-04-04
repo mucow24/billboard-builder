@@ -177,6 +177,7 @@ export default function App() {
         >
           <div ref={topbarRef} className="overlay-topbar">
             <Toolbar
+              background={document.background}
               canvas={document.canvas}
               canDelete={selectedNodeIds.length > 0}
               canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
@@ -186,6 +187,7 @@ export default function App() {
               canSaveFavorite={selectedNodeIds.length > 0}
               favoriteStatusFading={favoriteStatus.fading}
               favoriteStatusMessage={favoriteStatus.message}
+              onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedNodes}
               onExport={() => handleExport(stageRef.current)}
@@ -237,7 +239,6 @@ export default function App() {
               <PropertiesPanel
                 activeTab={inspectorTab}
                 availableFonts={availableFonts}
-                background={document.background}
                 fonts={document.fonts}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
@@ -251,7 +252,6 @@ export default function App() {
                 selectedNodeIds={selectedNodeIds}
                 pendingCollapsedGroupIds={pendingCollapsedGroupIds}
                 onClearPendingCollapsedGroupIds={clearPendingCollapsedGroupIds}
-                onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
                 onGroupOpacityChange={updateSelectedGroup}
                 onSelectGroupChildren={() => {
                   if (selectedGroup) {

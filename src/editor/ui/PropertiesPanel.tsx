@@ -11,7 +11,6 @@ export type { InspectorTab } from './inspector/types';
 export function PropertiesPanel({
   activeTab,
   availableFonts,
-  background,
   fonts,
   layerRows,
   missingFontFamilies,
@@ -23,7 +22,6 @@ export function PropertiesPanel({
   selectedItem,
   selectedItems = selectedItem ? [selectedItem] : [],
   selectedNodeIds,
-  onBackgroundChange,
   onGroupOpacityChange,
   onDeleteNode,
   onMoveNode,
@@ -142,11 +140,9 @@ export function PropertiesPanel({
             data-testid="layers-tab-body"
           >
             <LayersInspectorTab
-              background={background}
               canReorder={selectedNodeIds.length > 0}
               collapsedGroupIds={collapsedGroupIds}
               rows={layerRows}
-              onBackgroundChange={onBackgroundChange}
               onDeleteNode={onDeleteNode}
               onMoveNode={onMoveNode}
               onOpenProperties={onOpenProperties}

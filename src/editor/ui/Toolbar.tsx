@@ -10,6 +10,7 @@ import { CanvasMenu, GeneratorsMenu, SizeMenu, UploadMenu } from './ToolbarMenus
 type ToolbarMenuName = 'canvas' | 'size' | 'upload' | 'generators';
 
 interface ToolbarProps {
+  background: string;
   canvas: CanvasSize;
   canDelete: boolean;
   canUndo: boolean;
@@ -19,6 +20,7 @@ interface ToolbarProps {
   canUngroup: boolean;
   favoriteStatusFading?: boolean;
   favoriteStatusMessage?: string | null;
+  onBackgroundChange: (background: string) => void;
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
@@ -42,6 +44,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({
+  background,
   canvas,
   canDelete,
   canUndo,
@@ -51,6 +54,7 @@ export function Toolbar({
   canUngroup,
   favoriteStatusFading = false,
   favoriteStatusMessage = null,
+  onBackgroundChange,
   onCanvasSizeChange,
   onDelete,
   onExport,
@@ -236,7 +240,9 @@ export function Toolbar({
           </button>
           {openMenu === 'canvas' ? (
             <CanvasMenu
+              background={background}
               menuId={canvasMenuId}
+              onBackgroundChange={onBackgroundChange}
               onLoad={onLoad}
               onSave={onSave}
               onNewProject={onNewProject}
