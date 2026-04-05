@@ -230,7 +230,7 @@ export function SelectionInspector({
             }
             title={section.label}
           >
-            <div className="inspector-section-fields">
+            <div className="inspector-section-fields" data-section={section.key}>
               {section.fields.map((field) => (
                 <div
                   key={field.key}

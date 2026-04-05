@@ -239,7 +239,7 @@ export const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
     digits: 0,
     fieldOrder: 10,
     getValue: (item) => item.blurRadius,
-    label: 'Blur radius',
+    label: 'Radius',
     max: 100,
     min: 0,
     propertyKey: 'blurRadius',
@@ -264,7 +264,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     }),
     fieldOrder: 10,
     getValue: (item) => item.shadow.color,
-    label: 'Shadow color',
+    label: 'Color',
     propertyKey: 'color',
     sectionKey: 'shadow',
     sectionLabel: 'Shadow',
@@ -272,7 +272,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
 
     valueType: 'color',
   }),
-  createShadowNumberField('blur', 'Blur', 20, (item) => item.shadow.blur, (nextValue) => ({
+  createShadowNumberField('blur', 'Blur Radius', 20, (item) => item.shadow.blur, (nextValue) => ({
     blur: nextValue,
   }), {
     digits: 1,
