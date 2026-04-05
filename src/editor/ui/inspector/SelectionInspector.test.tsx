@@ -249,15 +249,15 @@ describe('SelectionInspector', () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText('Stroke width'), {
+    fireEvent.change(screen.getByLabelText('Width'), {
       target: { value: '0' },
     });
-    fireEvent.blur(screen.getByLabelText('Stroke width'));
+    fireEvent.blur(screen.getByLabelText('Width'));
     await user.click(screen.getByRole('button', { name: 'Shadow' }));
-    fireEvent.change(screen.getByLabelText('Blur'), {
+    fireEvent.change(screen.getByLabelText('Blur Radius'), {
       target: { value: '12' },
     });
-    fireEvent.blur(screen.getByLabelText('Blur'));
+    fireEvent.blur(screen.getByLabelText('Blur Radius'));
 
     expect(onItemChange.mock.calls[0]?.[0](lineItem)).toEqual({ strokeWidth: 1 });
     expect(onItemChange.mock.calls[1]?.[0](lineItem)).toEqual({
@@ -430,7 +430,7 @@ describe('SelectionInspector', () => {
     expect(screen.getByLabelText('Bold')).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: 'Font' })).toHaveTextContent('Mixed fonts');
     expect(screen.getAllByText('Mixed').length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stroke' })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Shared headline' },
@@ -481,7 +481,7 @@ describe('SelectionInspector', () => {
     expect(screen.getByRole('button', { name: 'Toggle gradient' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Geometry' }));
     expect(screen.getByLabelText('X')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stroke' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Font')).not.toBeInTheDocument();
   });
 

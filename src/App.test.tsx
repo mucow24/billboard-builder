@@ -450,10 +450,10 @@ describe('App shell', () => {
     expect(shadowSection).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Shadow' }));
 
-    fireEvent.change(within(shadowSection!).getByLabelText('Blur'), {
+    fireEvent.change(within(shadowSection!).getByLabelText('Blur Radius'), {
       target: { value: '12' },
     });
-    fireEvent.blur(within(shadowSection!).getByLabelText('Blur'));
+    fireEvent.blur(within(shadowSection!).getByLabelText('Blur Radius'));
 
     const updatedItems = useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems);
     expect(updatedItems.find((item) => item.id === first.id)?.shadow).toEqual({
