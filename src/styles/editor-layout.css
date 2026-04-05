@@ -68,29 +68,6 @@
   pointer-events: auto;
 }
 
-.overlay-properties {
-  position: absolute;
-  top: calc(var(--overlay-edge) + var(--overlay-topbar-height));
-  right: var(--overlay-edge);
-  bottom: var(--overlay-edge);
-  width: var(--panel-width);
-  pointer-events: none;
-}
-
-.overlay-properties > * {
-  height: 100%;
-  pointer-events: auto;
-}
-
-.overlay-properties-panel {
-  height: 100%;
-}
-
-/* Compact width for right rail */
-.overlay-properties {
-  width: var(--panel-width);
-}
-
 .editor-stage-fullscreen {
   position: absolute;
   inset: 0;

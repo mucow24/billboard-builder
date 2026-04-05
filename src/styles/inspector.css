@@ -1,7 +1,7 @@
 /* ── Property blocks ─────────────────────────────────────────────────────── */
 
 .property-block + .property-block {
-  margin-top: 1rem;
+  margin-top: 0.22rem;
 }
 
 .property-block h3 {
@@ -20,11 +20,6 @@
 .property-block .field-label-group:first-child,
 .property-block .checkbox-row:first-child {
   margin-top: 0;
-}
-
-/* Compact rail mode — property blocks have no extra spacing */
-.property-block + .property-block {
-  margin-top: 0.22rem;
 }
 
 .property-block {
