@@ -22,8 +22,9 @@ export default function App() {
   const openInputRef = useRef<HTMLInputElement | null>(null);
   const [guides, setGuides] = useState<GuideLine[]>([]);
   const [exportButtonHovered, setExportButtonHovered] = useState(false);
-  const boundsKeyHeld = useKeyHeld('b');
-  const showExportBoundsCue = exportButtonHovered || boundsKeyHeld;
+  const [canvasFocusActive, setCanvasFocusActive] = useState(false);
+  const boundsKeyHeld = useKeyHeld('f');
+  const showExportBoundsCue = canvasFocusActive || exportButtonHovered || boundsKeyHeld;
   const favoriteStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +105,10 @@ export default function App() {
     setExportButtonHovered(active);
   }, []);
 
+  const handleCanvasFocusToggle = useCallback(() => {
+    setCanvasFocusActive((prev) => !prev);
+  }, []);
+
   function handleInspectorTabChange(tab: InspectorTab) {
     if (tab === inspectorTab) {
       setPanelCollapsed((c) => !c);
@@ -141,6 +146,8 @@ export default function App() {
               canSaveFavorite={selectedNodeIds.length > 0}
               favoriteStatusFading={favoriteStatus.fading}
               favoriteStatusMessage={favoriteStatus.message}
+              canvasFocusActive={canvasFocusActive}
+              onCanvasFocusToggle={handleCanvasFocusToggle}
               onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
               onCanvasSizeChange={setCanvasSize}
               onDelete={deleteSelectedNodes}

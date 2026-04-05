@@ -46,9 +46,10 @@ export function ToolbarMenuAction({
 
 interface ToolbarActionButtonProps {
   children: ReactNode;
-  disabled: boolean;
+  disabled?: boolean;
   label: string;
   onClick: () => void;
+  pressed?: boolean;
   shortcut?: string;
 }
 
@@ -57,6 +58,7 @@ export function ToolbarActionButton({
   disabled,
   label,
   onClick,
+  pressed,
   shortcut,
 }: ToolbarActionButtonProps) {
   const tooltip = shortcut ? `${label} (${shortcut})` : label;
@@ -65,6 +67,7 @@ export function ToolbarActionButton({
       type="button"
       className="top-toolbar-button top-toolbar-control top-toolbar-icon-button"
       aria-label={tooltip}
+      aria-pressed={pressed}
       title={tooltip}
       onClick={onClick}
       disabled={disabled}

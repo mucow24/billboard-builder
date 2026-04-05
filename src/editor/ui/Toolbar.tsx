@@ -18,6 +18,8 @@ interface ToolbarProps {
   canGroup: boolean;
   canSaveFavorite: boolean;
   canUngroup: boolean;
+  canvasFocusActive: boolean;
+  onCanvasFocusToggle: () => void;
   favoriteStatusFading?: boolean;
   favoriteStatusMessage?: string | null;
   onBackgroundChange: (background: string) => void;
@@ -53,6 +55,8 @@ export function Toolbar({
   canGroup,
   canSaveFavorite,
   canUngroup,
+  canvasFocusActive,
+  onCanvasFocusToggle,
   favoriteStatusFading = false,
   favoriteStatusMessage = null,
   onBackgroundChange,
@@ -321,6 +325,17 @@ export function Toolbar({
               createMenuActionHandler={createMenuActionHandler}
             />
           ) : null}
+        </div>
+
+        <div className="top-toolbar-section-divider" aria-hidden="true" />
+
+        <div className="top-toolbar-action-strip">
+          <ToolbarActionButton label="Canvas focus" shortcut="F" onClick={onCanvasFocusToggle} pressed={canvasFocusActive}>
+            <path d="M4 8V5a1 1 0 0 1 1-1h3" />
+            <path d="M16 8V5a1 1 0 0 0-1-1h-3" />
+            <path d="M4 12v3a1 1 0 0 0 1 1h3" />
+            <path d="M16 12v3a1 1 0 0 1-1 1h-3" />
+          </ToolbarActionButton>
         </div>
 
         <div className="top-toolbar-section-divider" aria-hidden="true" />

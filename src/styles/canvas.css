@@ -163,6 +163,7 @@
 .canvas-export-bounds-panel {
   position: absolute;
   background: rgba(6, 10, 20, 0.82);
+  backdrop-filter: blur(18px);
 }
 
 .canvas-hud {

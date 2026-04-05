@@ -254,6 +254,25 @@ test.describe('editor toolbar flows', () => {
     await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
   });
+
+  test('toggles the canvas-focus overlay on and off via the toolbar button', async ({ page }) => {
+    await openFreshEditor(page);
+
+    const focusButton = page.getByRole('button', { name: /Canvas focus/ });
+    const exportCue = page.getByTestId('export-bounds-cue');
+
+    await expect(focusButton).toBeVisible();
+    await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
+    await expect(exportCue).not.toHaveClass(/active/);
+
+    await focusButton.click();
+    await expect(focusButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(exportCue).toHaveClass(/active/);
+
+    await focusButton.click();
+    await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
+    await expect(exportCue).not.toHaveClass(/active/);
+  });
 });
 
 function isPointInsideRect(
