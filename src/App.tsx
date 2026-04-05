@@ -27,7 +27,6 @@ export default function App() {
   const favoriteStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
-  const overlaysRef = useRef<HTMLDivElement | null>(null);
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('properties');
   const [panelCollapsed, setPanelCollapsed] = useState(false);
 
@@ -100,50 +99,6 @@ export default function App() {
     };
   }, []);
 
-  // Measure the connected tab's position relative to the panel so CSS can draw the gapped top border
-  useLayoutEffect(() => {
-    const overlays = overlaysRef.current;
-
-    function clearNudge() {
-      if (!overlays) return;
-      overlays.style.removeProperty('--connected-tab-right-offset');
-      overlays.style.removeProperty('--connected-tab-width');
-      const pc = overlays.querySelector('.overlay-properties') as HTMLElement | null;
-      if (pc) pc.style.transform = '';
-    }
-
-    function measure() {
-      if (!overlays || panelCollapsed) {
-        clearNudge();
-        return;
-      }
-      const tab = overlays.querySelector('.top-toolbar-inspector-tab.connected');
-      const panelContainer = overlays.querySelector('.overlay-properties') as HTMLElement | null;
-      const tabsContainer = overlays.querySelector('.top-toolbar-inspector-tabs');
-      if (!tab || !panelContainer || !tabsContainer) return;
-      // Reset any previous nudge before measuring so we get clean values
-      panelContainer.style.transform = '';
-      const tabRect = tab.getBoundingClientRect();
-      const panelRect = panelContainer.getBoundingClientRect();
-      const tabsRight = tabsContainer.getBoundingClientRect().right;
-      // Nudge the panel so its right edge aligns with the tabs container's right edge
-      // (compensates for sub-pixel toolbar border rendering at varying DPRs)
-      const rightDrift = panelRect.right - tabsRight;
-      if (Math.abs(rightDrift) > 0.01) {
-        panelContainer.style.transform = `translateX(${-rightDrift}px)`;
-      }
-      // Gap position: after the nudge, panel right == tabs right.
-      // Inset the gap by 1px on each side so the panel top border meets the tab's side borders cleanly.
-      const rightOffset = tabsRight - tabRect.right + 1;
-      const width = tabRect.width - 2;
-      overlays.style.setProperty('--connected-tab-right-offset', `${rightOffset}px`);
-      overlays.style.setProperty('--connected-tab-width', `${width}px`);
-    }
-
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [inspectorTab, panelCollapsed]);
 
   const handleExportIntentChange = useCallback((active: boolean) => {
     setExportButtonHovered(active);
@@ -171,7 +126,6 @@ export default function App() {
         />
 
         <div
-          ref={overlaysRef}
           className="editor-overlays"
           style={{ ['--overlay-topbar-height' as string]: `${topbarHeight}px` }}
         >
@@ -221,6 +175,65 @@ export default function App() {
               onInspectorTabChange={handleInspectorTabChange}
               itemCount={layerRows.length}
               favoriteCount={favorites.length}
+              inspectorPanel={
+                <PropertiesPanel
+                  activeTab={inspectorTab}
+                  availableFonts={availableFonts}
+                  fonts={document.fonts}
+                  layerRows={layerRows}
+                  missingFontFamilies={missingFontFamilies}
+                  onDeleteFavorite={deleteFavorite}
+                  onRenameFavorite={renameFavorite}
+                  onRecolorFavorite={recolorFavorite}
+                  onReorderFavorite={reorderFavorite}
+                  selectedGroup={selectedGroup ?? undefined}
+                  selectedItem={selectedItem ?? undefined}
+                  selectedItems={selectedItems}
+                  selectedNodeIds={selectedNodeIds}
+                  pendingCollapsedGroupIds={pendingCollapsedGroupIds}
+                  onClearPendingCollapsedGroupIds={clearPendingCollapsedGroupIds}
+                  onGroupOpacityChange={updateSelectedGroup}
+                  onSelectGroupChildren={() => {
+                    if (selectedGroup) {
+                      dispatch({ type: 'select_nodes', nodeIds: selectedGroup.children.map((c) => c.id) });
+                    }
+                  }}
+                  onDeleteNode={deleteNode}
+                  onMoveNode={moveNode}
+                  onOpenProperties={() => handleInspectorTabChange('properties')}
+                  onRenameGroup={(groupId, name) => {
+                    dispatch({ type: 'update_group', groupId, changes: { name } });
+                  }}
+                  onItemChange={updateSelectionItems}
+                  onInsertFavorite={insertFavorite}
+                  onSelectNode={selectSingleNode}
+                  onToggleNode={toggleSelectedNode}
+                  onToggleNodeLocked={(nodeId) => {
+                    const node = getNodeById(document.nodes, nodeId);
+                    if (!node) return;
+                    const nowLocked = !node.locked;
+                    if (isGroupNode(node)) {
+                      dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: nowLocked } });
+                    } else {
+                      dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: nowLocked } });
+                    }
+                    if (nowLocked && selectedNodeIds.includes(nodeId)) {
+                      selectSingleNode(undefined);
+                    }
+                  }}
+                  onToggleNodeHidden={(nodeId) => {
+                    const node = getNodeById(document.nodes, nodeId);
+                    if (!node) return;
+                    if (isGroupNode(node)) {
+                      dispatch({ type: 'update_group', groupId: nodeId, changes: { hidden: !node.hidden } });
+                    } else {
+                      dispatch({ type: 'update_node', itemId: nodeId, changes: { hidden: !node.hidden } });
+                    }
+                  }}
+                  onReorder={reorderSelectedNode}
+                  favorites={favorites}
+                />
+              }
             />
           </div>
 
@@ -232,68 +245,6 @@ export default function App() {
 
           <div className="overlay-tools">
             <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
-          </div>
-
-          <div className="overlay-properties" style={{ display: panelCollapsed ? 'none' : undefined }}>
-            <div className="overlay-properties-panel">
-              <PropertiesPanel
-                activeTab={inspectorTab}
-                availableFonts={availableFonts}
-                fonts={document.fonts}
-                layerRows={layerRows}
-                missingFontFamilies={missingFontFamilies}
-                onDeleteFavorite={deleteFavorite}
-                onRenameFavorite={renameFavorite}
-                onRecolorFavorite={recolorFavorite}
-                onReorderFavorite={reorderFavorite}
-                selectedGroup={selectedGroup ?? undefined}
-                selectedItem={selectedItem ?? undefined}
-                selectedItems={selectedItems}
-                selectedNodeIds={selectedNodeIds}
-                pendingCollapsedGroupIds={pendingCollapsedGroupIds}
-                onClearPendingCollapsedGroupIds={clearPendingCollapsedGroupIds}
-                onGroupOpacityChange={updateSelectedGroup}
-                onSelectGroupChildren={() => {
-                  if (selectedGroup) {
-                    dispatch({ type: 'select_nodes', nodeIds: selectedGroup.children.map((c) => c.id) });
-                  }
-                }}
-                onDeleteNode={deleteNode}
-                onMoveNode={moveNode}
-                onOpenProperties={() => handleInspectorTabChange('properties')}
-                onRenameGroup={(groupId, name) => {
-                  dispatch({ type: 'update_group', groupId, changes: { name } });
-                }}
-                onItemChange={updateSelectionItems}
-                onInsertFavorite={insertFavorite}
-                onSelectNode={selectSingleNode}
-                onToggleNode={toggleSelectedNode}
-                onToggleNodeLocked={(nodeId) => {
-                  const node = getNodeById(document.nodes, nodeId);
-                  if (!node) return;
-                  const nowLocked = !node.locked;
-                  if (isGroupNode(node)) {
-                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: nowLocked } });
-                  } else {
-                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: nowLocked } });
-                  }
-                  if (nowLocked && selectedNodeIds.includes(nodeId)) {
-                    selectSingleNode(undefined);
-                  }
-                }}
-                onToggleNodeHidden={(nodeId) => {
-                  const node = getNodeById(document.nodes, nodeId);
-                  if (!node) return;
-                  if (isGroupNode(node)) {
-                    dispatch({ type: 'update_group', groupId: nodeId, changes: { hidden: !node.hidden } });
-                  } else {
-                    dispatch({ type: 'update_node', itemId: nodeId, changes: { hidden: !node.hidden } });
-                  }
-                }}
-                onReorder={reorderSelectedNode}
-                favorites={favorites}
-              />
-            </div>
           </div>
         </div>
       </main>

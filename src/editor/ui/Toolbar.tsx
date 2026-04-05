@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
@@ -41,6 +41,7 @@ interface ToolbarProps {
   onInspectorTabChange: (tab: InspectorTab) => void;
   itemCount: number;
   favoriteCount: number;
+  inspectorPanel?: ReactNode;
 }
 
 export function Toolbar({
@@ -75,6 +76,7 @@ export function Toolbar({
   onInspectorTabChange,
   itemCount,
   favoriteCount,
+  inspectorPanel,
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
   const canvasTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -379,29 +381,37 @@ export function Toolbar({
 
         <div className="top-toolbar-spacer" />
 
-        <div className="top-toolbar-inspector-tabs" role="tablist" aria-label="Inspector panels">
-          {(['properties', 'layers', 'favorites'] as const).map((tab) => {
-            const isActive = activeInspectorTab === tab;
-            const isConnected = isActive && !panelCollapsed;
-            return (
-              <button
-                key={tab}
-                type="button"
-                role="tab"
-                aria-selected={isConnected}
-                className={joinClassNames(
-                  'top-toolbar-inspector-tab',
-                  isConnected && 'active',
-                  isConnected && 'connected',
-                )}
-                onClick={() => onInspectorTabChange(tab)}
-              >
-                <span>{tab === 'properties' ? 'Properties' : tab === 'layers' ? 'Layers' : 'Favorites'}</span>
-                {tab === 'layers' && <span className="top-toolbar-inspector-badge">{itemCount}</span>}
-                {tab === 'favorites' && <span className="top-toolbar-inspector-badge">{favoriteCount}</span>}
-              </button>
-            );
-          })}
+        <div className={joinClassNames('top-toolbar-inspector', !panelCollapsed && 'open')}>
+          <div className="top-toolbar-inspector-tabs" role="tablist" aria-label="Inspector panels">
+            {(['properties', 'layers', 'favorites'] as const).map((tab) => {
+              const isActive = activeInspectorTab === tab;
+              const isConnected = isActive && !panelCollapsed;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={isConnected}
+                  className={joinClassNames(
+                    'top-toolbar-inspector-tab',
+                    isConnected && 'active',
+                    isConnected && 'connected',
+                  )}
+                  onClick={() => onInspectorTabChange(tab)}
+                >
+                  <span>{tab === 'properties' ? 'Properties' : tab === 'layers' ? 'Layers' : 'Favorites'}</span>
+                  {tab === 'layers' && <span className="top-toolbar-inspector-badge">{itemCount}</span>}
+                  {tab === 'favorites' && <span className="top-toolbar-inspector-badge">{favoriteCount}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="top-toolbar-inspector-panel"
+            style={{ display: panelCollapsed ? 'none' : undefined }}
+          >
+            {inspectorPanel}
+          </div>
         </div>
       </div>
     </header>

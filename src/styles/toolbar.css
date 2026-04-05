@@ -1,19 +1,29 @@
 .top-toolbar {
   position: relative;
-  z-index: 20;
+  z-index: 30;
   width: 100%;
   --toolbar-gap: 6px;
   padding: 6px;
-  backdrop-filter: blur(18px);
-  background: var(--surface-shell);
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 4px;
   box-shadow:
     0 10px 22px rgba(2, 6, 23, 0.26),
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
   overflow: visible;
-  /* Raised above editor overlays in overlay mode */
-  z-index: 30;
+}
+
+/* Frosted glass on a pseudo-element so the toolbar itself isn't a backdrop root —
+   this allows descendant elements (the inspector panel) to have their own
+   independent backdrop-filter that sees through to the canvas. */
+.top-toolbar::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  backdrop-filter: blur(18px);
+  background: var(--surface-shell);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .top-toolbar-row {
@@ -350,20 +360,28 @@
   margin: 0;
 }
 
-/* ── Inspector tabs (right-aligned in toolbar) ─────────────────────────── */
+/* ── Inspector section (right-aligned in toolbar) ──────────────────────── */
 
 .top-toolbar-spacer {
   flex: 1 0 0;
 }
 
+/* Wrapper: contains tabs + panel, follows the popover pattern */
+.top-toolbar-inspector {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  width: var(--panel-width);
+  /* Bleed past toolbar padding + border so tabs are flush with toolbar edge */
+  margin: -6px -7px -7px 0;
+}
+
 .top-toolbar-inspector-tabs {
   display: flex;
   align-items: stretch;
+  flex: 1 0 auto;
   gap: 0;
-  align-self: stretch;
-  width: var(--panel-width);
-  /* Bleed past toolbar padding + border so tabs align with panel below */
-  margin: -6px -7px -7px 0;
   padding: 0;
 }
 
@@ -390,30 +408,41 @@
   background: var(--surface-hover);
 }
 
-/* Active tab: highlighted but not connected to panel */
 .top-toolbar .top-toolbar-inspector-tab.active {
   background: var(--surface-hover);
 }
 
-/* Connected tab: active + panel open — forms top of unified tab+panel shape */
+/* Connected tab: 3-side border, no bottom — same pattern as popover triggers.
+   z-index 6 matches .top-toolbar-popover.open to paint over the panel's border. */
 .top-toolbar .top-toolbar-inspector-tab.connected {
   position: relative;
+  z-index: 6;
   border: 1px solid var(--border-active);
-  border-bottom: none;
+  border-bottom-color: transparent;
   background: var(--surface-hover);
-  z-index: 22;
 }
 
-/* Bridge: covers the junction between tab and panel */
+/* Bridge: covers the panel's top border beneath the connected tab.
+   Same technique as .top-toolbar-popover.open::after */
 .top-toolbar .top-toolbar-inspector-tab.connected::after {
   content: '';
   position: absolute;
-  bottom: -4px;
+  bottom: -1px;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 1px;
   background: var(--surface-hover);
-  z-index: 22;
+  z-index: 6;
+}
+
+/* Panel: structural positioning only — visual appearance in panel.css */
+.top-toolbar-inspector-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: calc(100dvh - var(--overlay-topbar-height) - 2 * var(--overlay-edge));
+  z-index: 5;
 }
 
 .top-toolbar-inspector-badge {
