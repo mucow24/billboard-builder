@@ -230,7 +230,8 @@ test.describe('editor properties flows', () => {
         verticalAlign: 'middle',
         lineHeight: 1.4,
         letterSpacing: 2,
-        x: 260,
+        x: expect.closeTo(282.66, 0),
+        y: expect.closeTo(132.91, 0),
         rotation: 18,
         padding: expect.objectContaining({ top: 8 }),
         shadow: expect.objectContaining({

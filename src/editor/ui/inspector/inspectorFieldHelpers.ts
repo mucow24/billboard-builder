@@ -2,6 +2,8 @@ import type {
   CanvasItem,
   GradientFillItem,
 } from '../../document/documentTypes';
+import { localToStage, rotateVector } from '../../rendering/interactionGeometry';
+import { getRenderBox } from '../../rendering/transformGeometry';
 import {
   renderGradientFillField,
 } from './selectionInspectorRenderers';
@@ -134,6 +136,28 @@ export const ROTATION_FIELD_EXTRA: Partial<NumberFieldDescriptor> = {
   textMax: Infinity,
   textMin: -Infinity,
 };
+
+export function createRotationField(): NumberFieldDescriptor {
+  return createGeometryField(
+    'rotation',
+    'Rotation',
+    50,
+    (item) => item.rotation,
+    ({ item }, nextValue) => {
+      if (item.kind === 'line') return { rotation: nextValue };
+      const renderBox = getRenderBox(item);
+      const half = { x: renderBox.width / 2, y: renderBox.height / 2 };
+      const center = localToStage(half, renderBox, item.rotation);
+      const newHalf = rotateVector(half, nextValue);
+      return {
+        x: center.x - newHalf.x,
+        y: center.y - newHalf.y,
+        rotation: nextValue,
+      };
+    },
+    ROTATION_FIELD_EXTRA,
+  );
+}
 
 export function createShadowNumberField(
   propertyKey: string,
