@@ -17,8 +17,8 @@ import {
   createGradientAngleDescriptor,
   createGradientFillDescriptor,
   createNumberField,
+  createRotationField,
   createTextField,
-  ROTATION_FIELD_EXTRA,
   SECTION_ORDER,
   VERTICAL_ALIGN_OPTIONS,
 } from './inspectorFieldHelpers';
@@ -168,14 +168,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       step: 0.1,
     }),
     createDimensionsField(),
-    createGeometryField(
-      'rotation',
-      'Rotation',
-      50,
-      (item) => item.rotation,
-      (_context, nextValue) => ({ rotation: nextValue }),
-      ROTATION_FIELD_EXTRA,
-    ),
+    createRotationField(),
     createNumberField({
       buildChange: (_context, nextValue) => ({ lineHeight: nextValue }),
       digits: 1,

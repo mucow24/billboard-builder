@@ -5,7 +5,7 @@ import {
   createGradientAngleDescriptor,
   createGradientFillDescriptor,
   createNumberField,
-  ROTATION_FIELD_EXTRA,
+  createRotationField,
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
@@ -96,14 +96,7 @@ export function createShapeDescriptors(
         step: 0.1,
       }),
       createDimensionsField(),
-      createGeometryField(
-        'rotation',
-        'Rotation',
-        50,
-        (item) => item.rotation,
-        (_context, nextValue) => ({ rotation: nextValue }),
-        ROTATION_FIELD_EXTRA,
-      )
+      createRotationField()
     );
   }
 

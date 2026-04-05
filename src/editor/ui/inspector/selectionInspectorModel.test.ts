@@ -8,6 +8,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import { rotateVector } from '../../rendering/interactionGeometry';
 
 import {
   buildInspectorEnvironment,
@@ -341,6 +342,27 @@ describe('selectionInspectorModel', () => {
     expect(patch).toEqual({
       generatorParams: { ...generator.generatorParams, stripeCount: 100 },
     });
+  });
+
+  it('rotation buildChange preserves the visual center', () => {
+    const item = createRectangleItem({ x: 200, y: 120, width: 240, height: 120 });
+    const originalCenter = { x: 200 + 120, y: 120 + 60 };
+    const environment = buildInspectorEnvironment([], []);
+    const sections = buildSelectionInspectorSections([item], environment);
+    const rotationField = sections
+      .find((s) => s.key === 'geometry')
+      ?.fields.find((f) => f.descriptor.propertyKey === 'rotation');
+
+    expect(rotationField).toBeDefined();
+
+    const change = rotationField!.descriptor.buildChange({ item }, 90 as never);
+    const newX = (change as { x: number }).x;
+    const newY = (change as { y: number }).y;
+    const half = rotateVector({ x: 120, y: 60 }, 90);
+
+    expect(newX + half.x).toBeCloseTo(originalCenter.x, 0);
+    expect(newY + half.y).toBeCloseTo(originalCenter.y, 0);
+    expect((change as { rotation: number }).rotation).toBe(90);
   });
 
   it('produces scanlines descriptors with color, height, and gap-size spacing bounds', () => {
