@@ -114,7 +114,7 @@ export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasIt
     fontStyle: 'normal',
     fontWeight: 'normal',
     fill: '#ffffff',
-    secondaryFill: '#ffffff',
+    secondaryFill: '#000000',
     gradientEnabled: false,
     gradientAngle: 0,
     align: 'left',
@@ -131,8 +131,8 @@ export function createRectangleItem(
 ): RectangleCanvasItem {
   return {
     ...createBaseItem('rectangle', 'Rectangle'),
-    fill: '#f97316',
-    secondaryFill: '#f97316',
+    fill: '#ffffff',
+    secondaryFill: '#000000',
     gradientEnabled: false,
     gradientAngle: 0,
     stroke: '#c2410cff',
@@ -147,8 +147,8 @@ export function createEllipseItem(
 ): EllipseCanvasItem {
   return {
     ...createBaseItem('ellipse', 'Ellipse'),
-    fill: '#0ea5e9',
-    secondaryFill: '#0ea5e9',
+    fill: '#ffffff',
+    secondaryFill: '#000000',
     gradientEnabled: false,
     gradientAngle: 0,
     stroke: '#0369a1ff',
@@ -162,8 +162,8 @@ export function createNgonItem(
 ): NgonCanvasItem {
   return {
     ...createBaseItem('ngon', 'Polygon'),
-    fill: '#8b5cf6',
-    secondaryFill: '#8b5cf6',
+    fill: '#ffffff',
+    secondaryFill: '#000000',
     gradientEnabled: false,
     gradientAngle: 0,
     stroke: '#6d28d9ff',
@@ -178,7 +178,7 @@ export function createLineItem(position?: Partial<LineCanvasItem>): LineCanvasIt
     ...createBaseItem('line', 'Line'),
     width: 240,
     height: 24,
-    stroke: '#111827ff',
+    stroke: '#ffffffff',
     strokeWidth: 6,
     startX: position?.x ?? 160,
     startY: position?.y ?? 160,

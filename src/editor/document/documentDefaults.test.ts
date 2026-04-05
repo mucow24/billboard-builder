@@ -44,14 +44,14 @@ describe('document defaults', () => {
     expect(textItem.verticalAlign).toBe('top');
     expect(textItem.fontWeight).toBe('normal');
     expect(textItem.fill).toBe('#ffffff');
-    expect(textItem.secondaryFill).toBe(textItem.fill);
+    expect(textItem.secondaryFill).toBe('#000000');
     expect(textItem.gradientEnabled).toBe(false);
     expect(textItem.padding).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
     expect(rectangleItem.cornerRadius).toBe(0);
-    expect(rectangleItem.secondaryFill).toBe(rectangleItem.fill);
+    expect(rectangleItem.secondaryFill).toBe('#000000');
     expect(rectangleItem.gradientEnabled).toBe(false);
     expect(ellipseItem.kind).toBe('ellipse');
-    expect(ellipseItem.secondaryFill).toBe(ellipseItem.fill);
+    expect(ellipseItem.secondaryFill).toBe('#000000');
     expect(ellipseItem.gradientEnabled).toBe(false);
     expect(lineItem.strokeWidth).toBeGreaterThan(0);
     expect(lineItem.endX).toBeGreaterThan(lineItem.startX);
