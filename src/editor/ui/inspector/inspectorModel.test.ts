@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createGeneratorItem,
   createImageItem,
   createLineItem,
   createRectangleItem,
@@ -12,6 +13,7 @@ import {
   buildImageAdjustmentsChange,
   formatDisplayedNumber,
   getGeometrySummary,
+  getInspectorHeadingSubtitle,
   getLayerPreviewStyle,
   getLayerPrimaryLabel,
   getLayerSecondaryLabel,
@@ -189,5 +191,31 @@ describe('inspectorModel', () => {
       isMultiSelection: true,
       opacityValue: 0.5,
     });
+  });
+
+  it('returns null subtitle for shapes and text, filename for images, and "Generator" for generators', () => {
+    expect(getInspectorHeadingSubtitle(createRectangleItem())).toBeNull();
+    expect(getInspectorHeadingSubtitle(createTextItem())).toBeNull();
+    expect(getInspectorHeadingSubtitle(createLineItem())).toBeNull();
+
+    const defaultImage = createImageItem({
+      src: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+      originalWidth: 10,
+      originalHeight: 10,
+    });
+    expect(getInspectorHeadingSubtitle(defaultImage)).toBeNull();
+
+    const namedImage = createImageItem({
+      src: 'data:image/png;base64,abc',
+      mimeType: 'image/png',
+      originalWidth: 10,
+      originalHeight: 10,
+      name: 'photo.jpg',
+    });
+    expect(getInspectorHeadingSubtitle(namedImage)).toBe('photo.jpg');
+
+    const generator = createGeneratorItem('noise', 1024, 768);
+    expect(getInspectorHeadingSubtitle(generator)).toBe('Generator');
   });
 });

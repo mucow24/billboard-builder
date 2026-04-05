@@ -39,7 +39,9 @@ export function isCanvasItemNode(node: CanvasNode): node is CanvasItem {
   return node.kind !== 'group';
 }
 
-export function createGroupNode(children: CanvasNode[] = [], name = 'Group'): GroupNode {
+export const DEFAULT_GROUP_NAME = 'Group';
+
+export function createGroupNode(children: CanvasNode[] = [], name = DEFAULT_GROUP_NAME): GroupNode {
   return {
     id: crypto.randomUUID(),
     kind: 'group',
@@ -408,7 +410,7 @@ export function canGroupNodes(nodes: CanvasNode[], nodeIds: string[]): boolean {
 export function groupNodes(
   nodes: CanvasNode[],
   nodeIds: string[],
-  groupName = 'Group'
+  groupName = DEFAULT_GROUP_NAME
 ): { nextNodes: CanvasNode[]; groupId: string } | null {
   const groupingParentInfo = getSelectionParentInfo(nodes, nodeIds);
   if (!groupingParentInfo) {

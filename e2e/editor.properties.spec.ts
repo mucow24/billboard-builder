@@ -493,7 +493,7 @@ test.describe('editor properties flows', () => {
     // Rectangle: stroke width, corner radius, rotation, blur radius, shadow fields
     await clickCanvas(page, { x: 230, y: 220 });
     await openPropertiesTab(page);
-    await expect(inspector.getByText('Slider Rectangle')).toBeVisible();
+    await expect(inspector.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
     await expectSliders(page, 'Stroke', ['Width']);
     await expectSliders(page, 'Geometry', ['Rotation', 'Corner radius']);
     await expectSliders(page, 'Blur', ['Radius']);
@@ -502,7 +502,7 @@ test.describe('editor properties flows', () => {
     // Text: font size, line height, character spacing, rotation
     await clickCanvas(page, { x: 560, y: 208 });
     await openPropertiesTab(page);
-    await expect(inspector.getByText('Slider Text')).toBeVisible();
+    await expect(inspector.getByRole('heading', { name: 'Text' })).toBeVisible();
     await expectSliders(page, 'Text', ['Size']);
     await expectSliders(page, 'Advanced text', ['Line height', 'Character spacing']);
     await expectSliders(page, 'Geometry', ['Rotation']);
