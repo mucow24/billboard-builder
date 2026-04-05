@@ -19,9 +19,10 @@ interface ColorPickerControlProps {
   label: string;
   mixed?: boolean;
   title?: string;
+  triggerLabel?: string;
   value: string;
   onChange: (value: string) => void;
-  variant?: 'default' | 'compact';
+  variant?: 'default' | 'compact' | 'menu-item';
 }
 
 function clampSliderValue(value: number, min: number, max: number): number {
@@ -34,6 +35,7 @@ export function ColorPickerControl({
   label,
   mixed = false,
   title,
+  triggerLabel,
   value,
   onChange,
   variant = 'default',
@@ -126,9 +128,9 @@ export function ColorPickerControl({
     <div
       ref={rootRef}
       className={[
-        variant === 'compact'
-          ? 'color-picker-control color-picker-control-compact'
-          : 'color-picker-control',
+        'color-picker-control',
+        variant === 'compact' ? 'color-picker-control-compact' : '',
+        variant === 'menu-item' ? 'color-picker-control-menu-item' : '',
         mixed ? 'color-picker-control-mixed' : '',
       ]
         .filter(Boolean)
@@ -142,14 +144,16 @@ export function ColorPickerControl({
         title={title}
         className={
           variant === 'compact'
-          ? 'color-picker-trigger color-picker-trigger-compact'
-          : 'color-picker-trigger'
+            ? 'color-picker-trigger color-picker-trigger-compact'
+            : variant === 'menu-item'
+              ? 'top-toolbar-menu-item color-picker-trigger-menu-item'
+              : 'color-picker-trigger'
         }
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen((open) => !open)}
       >
-        <span className="color-picker-swatch" aria-hidden="true">
+        <span className={variant === 'menu-item' ? 'color-picker-swatch color-picker-swatch-menu-item' : 'color-picker-swatch'} aria-hidden="true">
           <span
             className="color-picker-swatch-fill"
             style={{
@@ -161,6 +165,8 @@ export function ColorPickerControl({
         </span>
         {variant === 'compact' ? (
           <span className="color-picker-trigger-caret" aria-hidden="true" />
+        ) : variant === 'menu-item' ? (
+          <span>{triggerLabel ?? label}</span>
         ) : (
           <span className="color-picker-trigger-copy">
             <span className="color-picker-trigger-label">{label}</span>

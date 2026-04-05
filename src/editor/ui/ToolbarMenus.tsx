@@ -101,16 +101,14 @@ export function CanvasMenu({ background, menuId, onBackgroundChange, onLoad, onS
         <path d="M4 4.5h4v4" />
       </ToolbarMenuAction>
       <div className="top-toolbar-menu-divider" aria-hidden="true" />
-      <div className="top-toolbar-size-menu-row">
-        <span className="top-toolbar-size-menu-label">Color</span>
-        <ColorPickerControl
-          label="Canvas background"
-          value={background}
-          onChange={onBackgroundChange}
-          variant="compact"
-          inline
-        />
-      </div>
+      <ColorPickerControl
+        label="Canvas background"
+        triggerLabel="Color"
+        value={background}
+        onChange={onBackgroundChange}
+        variant="menu-item"
+        inline
+      />
     </div>
   );
 }
