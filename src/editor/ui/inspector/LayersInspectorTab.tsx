@@ -209,7 +209,6 @@ export function LayersInspectorTab({
           <div className="layer-list-rows" ref={listRef}>
             {visibleRows.map((row, visualIndex) => {
               const isGroup = row.node.kind === 'group';
-              const isGenerator = isCanvasItemNode(row.node) && row.node.kind === 'generator';
               const isCollapsed = isGroup && collapsedGroupIds.has(row.node.id);
               const rowVisualState = getLayerRowVisualState(row, rows, selectedNodeIdSet);
               const secondary = isGroup
@@ -280,10 +279,9 @@ export function LayersInspectorTab({
                 >
                   <button
                     type="button"
-                    className={`layer-grip${isGenerator ? ' layer-grip-inert' : ''}`}
+                    className="layer-grip"
                     aria-label={`Reorder ${row.node.name}`}
-                    aria-disabled={isGenerator || undefined}
-                    {...(isGenerator ? { tabIndex: -1 } : getDragHandleProps(visualIndex))}
+                    {...getDragHandleProps(visualIndex)}
                   >
                     {GRIP_ICON}
                   </button>

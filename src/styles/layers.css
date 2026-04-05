@@ -125,11 +125,6 @@
   cursor: grabbing;
 }
 
-.layer-grip-inert {
-  pointer-events: none;
-  opacity: 0.3;
-  cursor: default;
-}
 
 .layer-grip-icon {
   width: 6px;

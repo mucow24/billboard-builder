@@ -481,7 +481,7 @@ describe('LayersInspectorTab', () => {
     expect(screen.getByRole('button', { name: 'Reorder Rectangle' })).toBeInTheDocument();
   });
 
-  it('renders an inert grip on generator rows', () => {
+  it('renders a draggable grip on generator rows', () => {
     const rect = createRectangleItem({ id: 'rect' });
     // Create a minimal generator-like node for testing
     const gen = { ...createRectangleItem({ id: 'gen' }), kind: 'generator' as const, name: 'Scanlines' };
@@ -505,6 +505,6 @@ describe('LayersInspectorTab', () => {
     );
 
     const genGrip = screen.getByRole('button', { name: 'Reorder Scanlines' });
-    expect(genGrip).toHaveAttribute('aria-disabled', 'true');
+    expect(genGrip).not.toHaveAttribute('aria-disabled');
   });
 });
