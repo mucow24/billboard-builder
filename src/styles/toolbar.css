@@ -290,6 +290,11 @@
   border-radius: var(--radius-base);
 }
 
+.top-toolbar .top-toolbar-icon-button[aria-pressed='true'] {
+  border-color: var(--border-active);
+  background: var(--surface-hover);
+}
+
 .top-toolbar .top-toolbar-size-panel {
   min-width: 226px;
 }
