@@ -191,7 +191,7 @@
   gap: 0;
   padding: 0.95rem;
   border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-base);
   background: rgba(17, 26, 42, 0.98);
   box-shadow: 0 24px 44px rgba(2, 6, 23, 0.42);
   /* Compact rail mode */
@@ -232,6 +232,44 @@
 
 .color-picker-panel input[type='range'] {
   padding: 0;
+}
+
+/* ── Menu-item color picker (canvas menu) ────────────────────────────────── */
+
+.color-picker-control-menu-item {
+  position: relative;
+}
+
+.color-picker-swatch-menu-item {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  flex: 0 0 auto;
+}
+
+.color-picker-submenu-arrow {
+  margin-left: auto;
+  width: 0;
+  height: 0;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  border-left: 5px solid currentColor;
+  opacity: 0.72;
+}
+
+.color-picker-trigger-menu-item[aria-expanded='true'] {
+  background: rgba(68, 143, 224, 0.24);
+}
+
+.color-picker-control-menu-item .color-picker-panel.color-picker-panel-inline {
+  top: 0;
+  left: calc(100% + 3px);
+  border: 1px solid var(--border-active);
+}
+
+.color-picker-swatch-menu-item .color-picker-swatch-fill {
+  border-radius: var(--radius-sm);
 }
 
 /* ── Compact color picker (layers toolbar) ───────────────────────────────── */
