@@ -201,7 +201,7 @@
   left: 0;
   z-index: 5;
   display: flex;
-  min-width: 170px;
+  min-width: 120px;
   flex-direction: column;
   gap: 0;
   padding: 3px;
@@ -238,6 +238,7 @@
   font-size: 0.82rem;
   font-weight: 600;
   text-align: left;
+  white-space: nowrap;
 }
 
 .top-toolbar .top-toolbar-menu-item:hover,
@@ -249,6 +250,10 @@
 .top-toolbar .top-toolbar-menu-item.selected {
   background: rgba(50, 132, 214, 0.24);
   color: #f7fbff;
+}
+
+.top-toolbar-generators-panel {
+  padding-right: 30px;
 }
 
 .top-toolbar-menu-divider {

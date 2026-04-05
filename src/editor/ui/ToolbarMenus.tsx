@@ -214,7 +214,7 @@ interface GeneratorsMenuProps {
 
 export function GeneratorsMenu({ menuId, onAddGenerator, createMenuActionHandler }: GeneratorsMenuProps) {
   return (
-    <div id={menuId} className="top-toolbar-popover-panel" role="group" aria-label="Generator types">
+    <div id={menuId} className="top-toolbar-popover-panel top-toolbar-generators-panel" role="group" aria-label="Generator types">
       {getAllGenerators().map((spec) => (
         <ToolbarMenuAction
           key={spec.type}

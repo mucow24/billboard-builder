@@ -248,13 +248,23 @@
   flex: 0 0 auto;
 }
 
+.color-picker-submenu-arrow {
+  margin-left: auto;
+  width: 0;
+  height: 0;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  border-left: 5px solid currentColor;
+  opacity: 0.72;
+}
+
 .color-picker-trigger-menu-item[aria-expanded='true'] {
   background: rgba(68, 143, 224, 0.24);
 }
 
 .color-picker-control-menu-item .color-picker-panel.color-picker-panel-inline {
   top: 0;
-  left: calc(100% + 4px);
+  left: calc(100% + 3px);
   border: 1px solid var(--border-active);
 }
 
