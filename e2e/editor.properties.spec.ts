@@ -128,19 +128,19 @@ test.describe('editor properties flows', () => {
     await expect(page.getByRole('button', { name: 'Geometry' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Shadow' })).toBeVisible();
     await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Stroke width')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Stroke' })).toHaveCount(0);
     await expect(page.getByLabel('Font')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Geometry' }).click();
     await expect(page.getByRole('spinbutton', { name: 'X' })).toBeVisible();
     await page.getByRole('button', { name: 'Shadow' }).click();
-    await expect(page.getByRole('spinbutton', { name: 'Blur' })).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'Blur Radius' })).toBeVisible();
 
     await page.getByLabel('Fill', { exact: true }).click();
     await page.getByLabel('Fill hex').fill('#33669980');
     await page.getByLabel('Fill hex').press('Enter');
     await page.getByRole('spinbutton', { name: 'X', exact: true }).fill('280');
-    await page.getByRole('spinbutton', { name: 'Blur' }).fill('12');
+    await page.getByRole('spinbutton', { name: 'Blur Radius' }).fill('12');
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([
@@ -212,10 +212,10 @@ test.describe('editor properties flows', () => {
     await expect(page.getByRole('spinbutton', { name: 'X' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Shadow' }).click();
-    await page.getByRole('button', { name: 'Shadow color' }).click();
-    await page.getByLabel('Shadow color hex').fill('#33669980');
-    await page.getByLabel('Shadow color hex').press('Enter');
-    await page.getByRole('spinbutton', { name: 'Blur' }).fill('12');
+    await page.getByRole('button', { name: 'Color', exact: true }).click();
+    await page.getByLabel('Color hex', { exact: true }).fill('#33669980');
+    await page.getByLabel('Color hex', { exact: true }).press('Enter');
+    await page.getByRole('spinbutton', { name: 'Blur Radius' }).fill('12');
     await page.getByRole('spinbutton', { name: 'Offset X' }).fill('6');
 
     const savedProject = await saveAndReadProject(page);
@@ -289,10 +289,10 @@ test.describe('editor properties flows', () => {
     await page.getByLabel('Fill', { exact: true }).click();
     await page.getByLabel('Fill hex').fill('#123456ff');
     await page.getByLabel('Fill hex').press('Enter');
-    await page.getByLabel('Stroke', { exact: true }).click();
-    await page.getByLabel('Stroke hex').fill('#abcdef80');
-    await page.getByLabel('Stroke hex').press('Enter');
-    await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('5');
+    await page.getByLabel('Color', { exact: true }).first().click();
+    await page.getByLabel('Color hex').first().fill('#abcdef80');
+    await page.getByLabel('Color hex').first().press('Enter');
+    await page.getByRole('spinbutton', { name: 'Width value' }).fill('5');
     await page.getByRole('button', { name: 'Geometry' }).click();
     await page.getByRole('spinbutton', { name: 'Corner radius' }).fill('12');
     await page.getByRole('spinbutton', { name: 'Rotation' }).fill('22');
@@ -300,7 +300,7 @@ test.describe('editor properties flows', () => {
 
     await clickCanvas(page, { x: 220, y: 540 });
     await openPropertiesTab(page);
-    await page.getByRole('spinbutton', { name: 'Stroke width' }).fill('9');
+    await page.getByRole('spinbutton', { name: 'Width value' }).fill('9');
     await page.getByRole('spinbutton', { name: 'Start X' }).fill('150');
     await page.getByRole('spinbutton', { name: 'End Y' }).fill('590');
     await page.getByRole('spinbutton', { name: 'End Y' }).press('Enter');
@@ -369,7 +369,7 @@ test.describe('editor properties flows', () => {
     await openPropertiesTab(page);
 
     await page.getByRole('button', { name: 'Blur' }).click();
-    await page.getByRole('spinbutton', { name: 'Blur radius' }).fill('10');
+    await page.getByRole('spinbutton', { name: 'Radius' }).fill('10');
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([
@@ -493,10 +493,10 @@ test.describe('editor properties flows', () => {
     await clickCanvas(page, { x: 230, y: 220 });
     await openPropertiesTab(page);
     await expect(inspector.getByText('Slider Rectangle')).toBeVisible();
-    await expectSliders(page, 'Stroke', ['Stroke width']);
+    await expectSliders(page, 'Stroke', ['Width']);
     await expectSliders(page, 'Geometry', ['Rotation', 'Corner radius']);
-    await expectSliders(page, 'Blur', ['Blur radius']);
-    await expectSliders(page, 'Shadow', ['Blur', 'Opacity', 'Offset X', 'Offset Y']);
+    await expectSliders(page, 'Blur', ['Radius']);
+    await expectSliders(page, 'Shadow', ['Blur Radius', 'Opacity', 'Offset X', 'Offset Y']);
 
     // Text: font size, line height, character spacing, rotation
     await clickCanvas(page, { x: 560, y: 208 });

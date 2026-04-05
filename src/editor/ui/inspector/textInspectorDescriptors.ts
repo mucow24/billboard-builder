@@ -150,7 +150,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       fieldOrder: 70,
       getOptions: () => VERTICAL_ALIGN_OPTIONS,
       getValue: (item) => (item.kind === 'text' ? item.verticalAlign : 'top'),
-      label: 'Vertical align',
+      label: 'V. Align',
       propertyKey: 'verticalAlign',
       render: renderVerticalAlignField,
       sectionKey: 'text',
