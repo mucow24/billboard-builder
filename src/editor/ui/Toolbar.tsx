@@ -1,13 +1,10 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton, ToolbarIcon } from './ToolbarPrimitives';
 import { joinClassNames, modKey } from './toolbarUtils';
-import { CanvasMenu, GeneratorsMenu, SizeMenu, UploadMenu } from './ToolbarMenus';
-
-type ToolbarMenuName = 'canvas' | 'size' | 'upload' | 'generators';
+import { CanvasMenu } from './ToolbarMenus';
 
 interface ToolbarProps {
   background: string;
@@ -27,9 +24,7 @@ interface ToolbarProps {
   onDelete: () => void;
   onExport: () => void;
   onExportIntentChange?: (active: boolean) => void;
-  onFontUpload: () => void;
   onGroup: () => void;
-  onImageUpload: () => void;
   onLoad: () => void;
   onNewProject: () => void;
   onRedo: () => void;
@@ -37,7 +32,6 @@ interface ToolbarProps {
   onSaveFavorite: () => void;
   onUndo: () => void;
   onUngroup: () => void;
-  onAddGenerator: (generatorType: string) => void;
   activeInspectorTab: InspectorTab;
   panelCollapsed: boolean;
   onInspectorTabChange: (tab: InspectorTab) => void;
@@ -64,9 +58,7 @@ export function Toolbar({
   onDelete,
   onExport,
   onExportIntentChange,
-  onFontUpload,
   onGroup,
-  onImageUpload,
   onLoad,
   onNewProject,
   onRedo,
@@ -74,7 +66,6 @@ export function Toolbar({
   onSaveFavorite,
   onUndo,
   onUngroup,
-  onAddGenerator,
   activeInspectorTab,
   panelCollapsed,
   onInspectorTabChange,
@@ -84,16 +75,10 @@ export function Toolbar({
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
   const canvasTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const sizeTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const uploadTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const generatorsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [openMenu, setOpenMenu] = useState<ToolbarMenuName | null>(null);
+  const [openMenu, setOpenMenu] = useState<'canvas' | null>(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
   const [isExportFocused, setIsExportFocused] = useState(false);
   const canvasMenuId = useId();
-  const sizeMenuId = useId();
-  const uploadMenuId = useId();
-  const generatorsMenuId = useId();
 
   useEffect(() => {
     onExportIntentChange?.(isExportHovered || isExportFocused);
@@ -122,26 +107,11 @@ export function Toolbar({
       return;
     }
 
-    function restoreFocus(menu: ToolbarMenuName) {
-      const triggerByMenu: Record<ToolbarMenuName, HTMLButtonElement | null> = {
-        canvas: canvasTriggerRef.current,
-        size: sizeTriggerRef.current,
-        upload: uploadTriggerRef.current,
-        generators: generatorsTriggerRef.current,
-      };
-      window.requestAnimationFrame(() => {
-        triggerByMenu[menu]?.focus();
-      });
-    }
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        const activeMenu = openMenu;
         setOpenMenu(null);
-        if (activeMenu) {
-          restoreFocus(activeMenu);
-        }
+        window.requestAnimationFrame(() => canvasTriggerRef.current?.focus());
         return;
       }
 
@@ -154,8 +124,8 @@ export function Toolbar({
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [openMenu]);
 
-  function toggleMenu(menu: ToolbarMenuName) {
-    setOpenMenu((currentMenu) => (currentMenu === menu ? null : menu));
+  function toggleMenu() {
+    setOpenMenu((current) => (current === 'canvas' ? null : 'canvas'));
   }
 
   function closeMenu() {
@@ -168,48 +138,6 @@ export function Toolbar({
       action();
     };
   }
-
-  function handleCanvasSizeChange(nextSize: CanvasSize) {
-    onCanvasSizeChange(nextSize);
-  }
-
-  function handlePresetSelect(nextPresetId: string) {
-    closeMenu();
-
-    if (nextPresetId === 'custom') {
-      handleCanvasSizeChange({ ...canvas, presetId: undefined });
-      return;
-    }
-
-    const preset = CANVAS_PRESETS.find((entry) => entry.id === nextPresetId);
-    if (!preset) {
-      return;
-    }
-
-    handleCanvasSizeChange({
-      width: preset.width,
-      height: preset.height,
-      presetId: preset.id,
-    });
-  }
-
-  function handleCustomWidthChange(event: ChangeEvent<HTMLInputElement>) {
-    handleCanvasSizeChange({
-      width: Number(event.target.value),
-      height: canvas.height,
-      presetId: undefined,
-    });
-  }
-
-  function handleCustomHeightChange(event: ChangeEvent<HTMLInputElement>) {
-    handleCanvasSizeChange({
-      width: canvas.width,
-      height: Number(event.target.value),
-      presetId: undefined,
-    });
-  }
-
-  const selectedPresetId = canvas.presetId ?? 'custom';
 
   return (
     <header ref={rootRef} className="top-toolbar">
@@ -239,7 +167,7 @@ export function Toolbar({
             aria-controls={canvasMenuId}
             aria-expanded={openMenu === 'canvas'}
             aria-haspopup="true"
-            onClick={() => toggleMenu('canvas')}
+            onClick={toggleMenu}
           >
             <span>Canvas</span>
             <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
@@ -247,81 +175,13 @@ export function Toolbar({
           {openMenu === 'canvas' ? (
             <CanvasMenu
               background={background}
+              canvas={canvas}
               menuId={canvasMenuId}
               onBackgroundChange={onBackgroundChange}
+              onCanvasSizeChange={onCanvasSizeChange}
               onLoad={onLoad}
               onSave={onSave}
               onNewProject={onNewProject}
-              createMenuActionHandler={createMenuActionHandler}
-            />
-          ) : null}
-        </div>
-
-        <div className={openMenu === 'size' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
-          <button
-            ref={sizeTriggerRef}
-            type="button"
-            className="top-toolbar-button top-toolbar-control top-toolbar-menu-trigger"
-            aria-controls={sizeMenuId}
-            aria-expanded={openMenu === 'size'}
-            aria-haspopup="true"
-            onClick={() => toggleMenu('size')}
-          >
-            <span>Size</span>
-            <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
-          </button>
-          {openMenu === 'size' ? (
-            <SizeMenu
-              menuId={sizeMenuId}
-              canvas={canvas}
-              selectedPresetId={selectedPresetId}
-              onPresetSelect={handlePresetSelect}
-              onCustomWidthChange={handleCustomWidthChange}
-              onCustomHeightChange={handleCustomHeightChange}
-            />
-          ) : null}
-        </div>
-
-        <div className={openMenu === 'upload' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
-          <button
-            ref={uploadTriggerRef}
-            type="button"
-            className="top-toolbar-button top-toolbar-control top-toolbar-menu-trigger"
-            aria-controls={uploadMenuId}
-            aria-expanded={openMenu === 'upload'}
-            aria-haspopup="true"
-            onClick={() => toggleMenu('upload')}
-          >
-            <span>Upload</span>
-            <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
-          </button>
-          {openMenu === 'upload' ? (
-            <UploadMenu
-              menuId={uploadMenuId}
-              onImageUpload={onImageUpload}
-              onFontUpload={onFontUpload}
-              createMenuActionHandler={createMenuActionHandler}
-            />
-          ) : null}
-        </div>
-
-        <div className={openMenu === 'generators' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
-          <button
-            ref={generatorsTriggerRef}
-            type="button"
-            className="top-toolbar-button top-toolbar-control top-toolbar-menu-trigger"
-            aria-controls={generatorsMenuId}
-            aria-expanded={openMenu === 'generators'}
-            aria-haspopup="true"
-            onClick={() => toggleMenu('generators')}
-          >
-            <span>Generators</span>
-            <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
-          </button>
-          {openMenu === 'generators' ? (
-            <GeneratorsMenu
-              menuId={generatorsMenuId}
-              onAddGenerator={onAddGenerator}
               createMenuActionHandler={createMenuActionHandler}
             />
           ) : null}

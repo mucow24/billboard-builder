@@ -49,9 +49,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onCanvasSizeChange: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
-    onFontUpload: vi.fn(),
     onGroup: vi.fn(),
-    onImageUpload: vi.fn(),
     onInspectorTabChange: vi.fn(),
     onLoad: vi.fn(),
     onNewProject: vi.fn(),
@@ -60,7 +58,6 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onSaveFavorite: vi.fn(),
     onUndo: vi.fn(),
     onUngroup: vi.fn(),
-    onAddGenerator: vi.fn(),
     panelCollapsed: false,
     ...overrides,
   };
@@ -77,8 +74,6 @@ describe('Toolbar', () => {
 
     expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Size' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: /^Undo/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Redo/ })).toBeDisabled();
@@ -88,21 +83,13 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
   });
 
-  it('routes canvas and upload popover actions through the existing callbacks', async () => {
+  it('routes canvas popover actions through the existing callbacks', async () => {
     const user = userEvent.setup();
     const onLoad = vi.fn();
     const onSave = vi.fn();
     const onNewProject = vi.fn();
-    const onImageUpload = vi.fn();
-    const onFontUpload = vi.fn();
 
-    renderToolbar({
-      onFontUpload,
-      onImageUpload,
-      onLoad,
-      onNewProject,
-      onSave,
-    });
+    renderToolbar({ onLoad, onNewProject, onSave });
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Load...' }));
@@ -115,14 +102,6 @@ describe('Toolbar', () => {
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     expect(onNewProject).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole('button', { name: 'Upload' }));
-    await user.click(screen.getByRole('button', { name: 'Image...' }));
-    expect(onImageUpload).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole('button', { name: 'Upload' }));
-    await user.click(screen.getByRole('button', { name: 'Font...' }));
-    expect(onFontUpload).toHaveBeenCalledOnce();
   });
 
   it('publishes export-intent activity on hover and focus for the export button', async () => {
@@ -146,7 +125,7 @@ describe('Toolbar', () => {
     expect(onExportIntentChange).toHaveBeenLastCalledWith(false);
   });
 
-  it('updates preset and custom canvas dimensions through the size menu callbacks', async () => {
+  it('updates preset and custom canvas dimensions through the canvas menu size submenu', async () => {
     const user = userEvent.setup();
     const onCanvasSizeChange = vi.fn();
 
@@ -158,10 +137,11 @@ describe('Toolbar', () => {
       onCanvasSizeChange,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Size' }));
-    await user.click(screen.getByRole('button', { name: '1024 x 1024' }));
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.hover(await screen.findByRole('button', { name: 'Size' }));
+    await user.click(await screen.findByRole('button', { name: '1024 x 1024' }));
 
-    await user.click(screen.getByRole('button', { name: 'Size' }));
+    // Canvas menu and size flyout are still open after preset click
     fireEvent.change(screen.getByLabelText('Canvas width'), {
       target: { value: '640' },
     });
@@ -213,7 +193,7 @@ describe('Toolbar', () => {
     expect(screen.getByRole('status')).toHaveClass('fading');
   });
 
-  it('keeps the size menu open while editing custom fields and closes popovers on outside click, escape, and tab', async () => {
+  it('closes popovers on outside click, escape, and tab', async () => {
     const user = userEvent.setup();
     renderToolbar();
 
@@ -237,13 +217,6 @@ describe('Toolbar', () => {
 
     await user.tab();
     expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
-
-    const sizeTrigger = screen.getByRole('button', { name: 'Size' });
-    await user.click(sizeTrigger);
-    const widthField = screen.getByLabelText('Canvas width');
-    await user.click(widthField);
-    expect(widthField).toHaveFocus();
-    expect(screen.getByRole('button', { name: '1024 x 1024' })).toBeVisible();
   });
 
   it('shows a background color picker in the canvas menu and fires onBackgroundChange', async () => {

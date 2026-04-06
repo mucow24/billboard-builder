@@ -1,12 +1,11 @@
-import type { ChangeEvent, ReactNode } from 'react';
+import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
-import { getAllGenerators } from '../generators';
 import { ColorPickerControl } from './ColorPickerControl';
-import { ToolbarMenuAction } from './ToolbarPrimitives';
+import { ToolbarIcon, ToolbarMenuAction } from './ToolbarPrimitives';
 
-const GENERATOR_ICONS: Record<string, ReactNode> = {
+export const GENERATOR_ICONS: Record<string, ReactNode> = {
   bands: (
     <>
       <path d="M4 6h12" />
@@ -74,17 +73,145 @@ const GENERATOR_ICONS: Record<string, ReactNode> = {
   ),
 };
 
+interface SizeSubmenuProps {
+  canvas: CanvasSize;
+  onCanvasSizeChange: (canvas: CanvasSize) => void;
+}
+
+function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  const selectedPresetId = canvas.presetId ?? 'custom';
+
+  function handlePresetSelect(presetId: string) {
+    if (presetId === 'custom') {
+      onCanvasSizeChange({ ...canvas, presetId: undefined });
+      return;
+    }
+    const preset = CANVAS_PRESETS.find((entry) => entry.id === presetId);
+    if (!preset) return;
+    onCanvasSizeChange({ width: preset.width, height: preset.height, presetId: preset.id });
+  }
+
+  function handleCustomWidthChange(event: ChangeEvent<HTMLInputElement>) {
+    onCanvasSizeChange({ width: Number(event.target.value), height: canvas.height, presetId: undefined });
+  }
+
+  function handleCustomHeightChange(event: ChangeEvent<HTMLInputElement>) {
+    onCanvasSizeChange({ width: canvas.width, height: Number(event.target.value), presetId: undefined });
+  }
+
+  return (
+    <div
+      className="size-submenu"
+      onMouseEnter={() => {
+        if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+        setIsOpen(true);
+      }}
+      onMouseLeave={() => {
+        closeTimerRef.current = setTimeout(() => setIsOpen(false), 250);
+      }}
+    >
+      <button
+        type="button"
+        className="top-toolbar-menu-item size-submenu-trigger"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen(true)}
+      >
+        <ToolbarIcon>
+          <path d="M3.5 10h13" />
+          <path d="M5.5 8l-2 2 2 2" />
+          <path d="M14.5 8l2 2-2 2" />
+          <path d="M10 3.5v13" />
+          <path d="M8 5.5l2-2 2 2" />
+          <path d="M8 14.5l2 2 2-2" />
+        </ToolbarIcon>
+        <span>Size</span>
+        <span className="color-picker-submenu-arrow" aria-hidden="true" />
+      </button>
+      {isOpen ? (
+        <div
+          className="top-toolbar-popover-panel size-submenu-panel top-toolbar-size-panel"
+          role="group"
+          aria-label="Canvas size"
+        >
+          {CANVAS_PRESETS.map((preset) => {
+            const maxDim = Math.max(preset.width, preset.height);
+            const w = (preset.width / maxDim) * 12;
+            const h = (preset.height / maxDim) * 12;
+            const x = 10 - w / 2;
+            const y = 10 - h / 2;
+            return (
+              <ToolbarMenuAction
+                key={preset.id}
+                label={preset.label}
+                selected={selectedPresetId === preset.id}
+                pressed={selectedPresetId === preset.id}
+                onSelect={() => handlePresetSelect(preset.id)}
+              >
+                <rect x={x} y={y} width={w} height={h} rx="1" />
+              </ToolbarMenuAction>
+            );
+          })}
+          <div className="top-toolbar-menu-divider" aria-hidden="true" />
+          <div className="top-toolbar-size-menu-row">
+            <span className="top-toolbar-size-menu-label">Custom:</span>
+            <div className="top-toolbar-size-menu-fields">
+              <input
+                className="top-toolbar-field top-toolbar-size-menu-input"
+                aria-label="Canvas width"
+                type="number"
+                min={1}
+                value={canvas.width}
+                onChange={handleCustomWidthChange}
+              />
+              <span className="top-toolbar-size-menu-separator" aria-hidden="true">x</span>
+              <input
+                className="top-toolbar-field top-toolbar-size-menu-input"
+                aria-label="Canvas height"
+                type="number"
+                min={1}
+                value={canvas.height}
+                onChange={handleCustomHeightChange}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 interface CanvasMenuProps {
   background: string;
+  canvas: CanvasSize;
   menuId: string;
   onBackgroundChange: (background: string) => void;
+  onCanvasSizeChange: (canvas: CanvasSize) => void;
   onLoad: () => void;
   onSave: () => void;
   onNewProject: () => void;
   createMenuActionHandler: (action: () => void) => () => void;
 }
 
-export function CanvasMenu({ background, menuId, onBackgroundChange, onLoad, onSave, onNewProject, createMenuActionHandler }: CanvasMenuProps) {
+export function CanvasMenu({
+  background,
+  canvas,
+  menuId,
+  onBackgroundChange,
+  onCanvasSizeChange,
+  onLoad,
+  onSave,
+  onNewProject,
+  createMenuActionHandler,
+}: CanvasMenuProps) {
   return (
     <div id={menuId} className="top-toolbar-popover-panel" role="group" aria-label="Canvas actions">
       <ToolbarMenuAction label="Load..." onSelect={createMenuActionHandler(onLoad)}>
@@ -109,121 +236,7 @@ export function CanvasMenu({ background, menuId, onBackgroundChange, onLoad, onS
         variant="menu-item"
         inline
       />
-    </div>
-  );
-}
-
-interface SizeMenuProps {
-  menuId: string;
-  canvas: CanvasSize;
-  selectedPresetId: string;
-  onPresetSelect: (presetId: string) => void;
-  onCustomWidthChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  onCustomHeightChange: (event: ChangeEvent<HTMLInputElement>) => void;
-}
-
-export function SizeMenu({
-  menuId,
-  canvas,
-  selectedPresetId,
-  onPresetSelect,
-  onCustomWidthChange,
-  onCustomHeightChange,
-}: SizeMenuProps) {
-  return (
-    <div
-      id={menuId}
-      className="top-toolbar-popover-panel top-toolbar-size-panel"
-      role="group"
-      aria-label="Canvas size"
-    >
-      {CANVAS_PRESETS.map((preset) => {
-        const maxDim = Math.max(preset.width, preset.height);
-        const w = (preset.width / maxDim) * 12;
-        const h = (preset.height / maxDim) * 12;
-        const x = 10 - w / 2;
-        const y = 10 - h / 2;
-        return (
-          <ToolbarMenuAction
-            key={preset.id}
-            label={preset.label}
-            selected={selectedPresetId === preset.id}
-            pressed={selectedPresetId === preset.id}
-            onSelect={() => onPresetSelect(preset.id)}
-          >
-            <rect x={x} y={y} width={w} height={h} rx="1" />
-          </ToolbarMenuAction>
-        );
-      })}
-      <div className="top-toolbar-menu-divider" aria-hidden="true" />
-      <div className="top-toolbar-size-menu-row">
-        <span className="top-toolbar-size-menu-label">Custom:</span>
-        <div className="top-toolbar-size-menu-fields">
-          <input
-            className="top-toolbar-field top-toolbar-size-menu-input"
-            aria-label="Canvas width"
-            type="number"
-            min={1}
-            value={canvas.width}
-            onChange={onCustomWidthChange}
-          />
-          <span className="top-toolbar-size-menu-separator" aria-hidden="true">x</span>
-          <input
-            className="top-toolbar-field top-toolbar-size-menu-input"
-            aria-label="Canvas height"
-            type="number"
-            min={1}
-            value={canvas.height}
-            onChange={onCustomHeightChange}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface UploadMenuProps {
-  menuId: string;
-  onImageUpload: () => void;
-  onFontUpload: () => void;
-  createMenuActionHandler: (action: () => void) => () => void;
-}
-
-export function UploadMenu({ menuId, onImageUpload, onFontUpload, createMenuActionHandler }: UploadMenuProps) {
-  return (
-    <div id={menuId} className="top-toolbar-popover-panel" role="group" aria-label="Upload actions">
-      <ToolbarMenuAction label="Image..." onSelect={createMenuActionHandler(onImageUpload)}>
-        <rect x="3.5" y="4.5" width="13" height="11" rx="1.5" />
-        <path d="m6 12 2.4-2.5 2.3 2.2 2.8-3 2.5 3.3" />
-        <path d="M7 8h.01" />
-      </ToolbarMenuAction>
-      <ToolbarMenuAction label="Font..." onSelect={createMenuActionHandler(onFontUpload)}>
-        <path d="M5 15.5 8.5 4.5" />
-        <path d="M11.5 15.5 15 4.5" />
-        <path d="M6.4 11.2h6.9" />
-      </ToolbarMenuAction>
-    </div>
-  );
-}
-
-interface GeneratorsMenuProps {
-  menuId: string;
-  onAddGenerator: (generatorType: string) => void;
-  createMenuActionHandler: (action: () => void) => () => void;
-}
-
-export function GeneratorsMenu({ menuId, onAddGenerator, createMenuActionHandler }: GeneratorsMenuProps) {
-  return (
-    <div id={menuId} className="top-toolbar-popover-panel top-toolbar-generators-panel" role="group" aria-label="Generator types">
-      {getAllGenerators().map((spec) => (
-        <ToolbarMenuAction
-          key={spec.type}
-          label={spec.label}
-          onSelect={createMenuActionHandler(() => onAddGenerator(spec.type))}
-        >
-          {GENERATOR_ICONS[spec.type]}
-        </ToolbarMenuAction>
-      ))}
+      <SizeSubmenu canvas={canvas} onCanvasSizeChange={onCanvasSizeChange} />
     </div>
   );
 }

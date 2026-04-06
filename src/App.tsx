@@ -153,9 +153,7 @@ export default function App() {
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
             onExportIntentChange={handleExportIntentChange}
-            onFontUpload={() => fontInputRef.current?.click()}
             onGroup={groupSelectedNodes}
-            onImageUpload={() => imageInputRef.current?.click()}
             onLoad={() => openInputRef.current?.click()}
             onNewProject={() => {
               handleNewProject(() => {
@@ -171,12 +169,6 @@ export default function App() {
             }}
             onUndo={undo}
             onUngroup={ungroupSelectedNode}
-            onAddGenerator={(generatorType) => {
-              dispatch({
-                type: 'add_node',
-                item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
-              });
-            }}
             activeInspectorTab={inspectorTab}
             panelCollapsed={panelCollapsed}
             onInspectorTabChange={handleInspectorTabChange}

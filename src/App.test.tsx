@@ -164,8 +164,6 @@ describe('App shell', () => {
 
     expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Size' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
   });
 
   it('switches into rectangle creation mode from the tool palette', async () => {
@@ -675,7 +673,8 @@ describe('App shell', () => {
     const user = userEvent.setup();
     await renderApp();
 
-    await user.click(screen.getByRole('button', { name: 'Size' }));
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.hover(await screen.findByRole('button', { name: 'Size' }));
 
     fireEvent.change(screen.getByLabelText('Canvas width'), {
       target: { value: '900' },

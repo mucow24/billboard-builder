@@ -252,8 +252,25 @@
   color: #f7fbff;
 }
 
-.top-toolbar-generators-panel {
-  padding-right: 30px;
+.size-submenu {
+  position: relative;
+}
+
+.size-submenu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.size-submenu-trigger[aria-expanded='true'] {
+  background: rgba(68, 143, 224, 0.24);
+}
+
+.size-submenu-panel {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 3px);
+  border: 1px solid var(--border-active);
 }
 
 .top-toolbar-menu-divider {
