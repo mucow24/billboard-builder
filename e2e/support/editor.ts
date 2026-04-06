@@ -829,6 +829,11 @@ export async function beginCanvasDrag(page: Page, from: CanvasPoint) {
 export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint, steps = 18) {
   const end = await canvasPointToPage(page, destination);
   await page.mouse.move(end.x, end.y, { steps });
+  // Store position so releasePointer can dispatch mouseup at the correct
+  // coordinates via JS (see releasePointer for why).
+  await page.evaluate(([x, y]) => {
+    (window as any).__lastPointerPos = { x, y };
+  }, [end.x, end.y]);
 }
 
 export async function clickCanvasHook(page: Page, testId: string) {
@@ -874,7 +879,23 @@ export async function dragCanvasHookToPoint(
 }
 
 export async function releasePointer(page: Page) {
-  await page.mouse.up();
+  // Dispatch mouseup via JS on window instead of page.mouse.up().
+  // beginCanvasHookDrag uses locator.dispatchEvent('mousedown') which
+  // bypasses Playwright's CDP mouse state.  A subsequent page.mouse.up()
+  // sends mouseReleased for a button Chrome never saw pressed, and Chrome
+  // silently drops the DOM event.  Dispatching directly on window avoids
+  // this and reliably triggers the app's capture-phase mouseup listener.
+  const pos = await page.evaluate(() => (window as any).__lastPointerPos ?? { x: 0, y: 0 });
+  await page.evaluate(({ x, y }) => {
+    window.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 0,
+    }));
+  }, pos);
   // Wait for any active interaction session to finalize. The session is settled
   // when sessionKind is null (no session) or 'image-crop' (crop mode persists
   // across handle drags within the crop session).
