@@ -131,127 +131,130 @@ export default function App() {
         />
 
         <div
-          className="editor-overlays"
+          ref={topbarRef}
+          className="overlay-topbar"
           style={{ ['--overlay-topbar-height' as string]: `${topbarHeight}px` }}
         >
-          <div ref={topbarRef} className="overlay-topbar">
-            <Toolbar
-              background={document.background}
-              canvas={document.canvas}
-              canDelete={selectedNodeIds.length > 0}
-              canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
-              canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              canSaveFavorite={selectedNodeIds.length > 0}
-              favoriteStatusFading={favoriteStatus.fading}
-              favoriteStatusMessage={favoriteStatus.message}
-              canvasFocusActive={canvasFocusActive}
-              onCanvasFocusToggle={handleCanvasFocusToggle}
-              onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
-              onCanvasSizeChange={setCanvasSize}
-              onDelete={deleteSelectedNodes}
-              onExport={() => handleExport(stageRef.current)}
-              onExportIntentChange={handleExportIntentChange}
-              onFontUpload={() => fontInputRef.current?.click()}
-              onGroup={groupSelectedNodes}
-              onImageUpload={() => imageInputRef.current?.click()}
-              onLoad={() => openInputRef.current?.click()}
-              onNewProject={() => {
-                handleNewProject(() => {
-                  setGuides([]);
-                });
-              }}
-              onRedo={redo}
-              onSave={handleSave}
-              onSaveFavorite={() => {
-                if (saveSelectionAsFavorite()) {
-                  favoriteStatus.show('Added to favorites');
-                }
-              }}
-              onUndo={undo}
-              onUngroup={ungroupSelectedNode}
-              onAddGenerator={(generatorType) => {
-                dispatch({
-                  type: 'add_node',
-                  item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
-                });
-              }}
-              activeInspectorTab={inspectorTab}
-              panelCollapsed={panelCollapsed}
-              onInspectorTabChange={handleInspectorTabChange}
-              itemCount={layerRows.length}
-              favoriteCount={favorites.length}
-              inspectorPanel={
-                <PropertiesPanel
-                  activeTab={inspectorTab}
-                  availableFonts={availableFonts}
-                  fonts={document.fonts}
-                  layerRows={layerRows}
-                  missingFontFamilies={missingFontFamilies}
-                  onDeleteFavorite={deleteFavorite}
-                  onRenameFavorite={renameFavorite}
-                  onRecolorFavorite={recolorFavorite}
-                  onReorderFavorite={reorderFavorite}
-                  selectedGroup={selectedGroup ?? undefined}
-                  selectedItem={selectedItem ?? undefined}
-                  selectedItems={selectedItems}
-                  selectedNodeIds={selectedNodeIds}
-                  pendingCollapsedGroupIds={pendingCollapsedGroupIds}
-                  onClearPendingCollapsedGroupIds={clearPendingCollapsedGroupIds}
-                  onGroupOpacityChange={updateSelectedGroup}
-                  onSelectGroupChildren={() => {
-                    if (selectedGroup) {
-                      dispatch({ type: 'select_nodes', nodeIds: selectedGroup.children.map((c) => c.id) });
-                    }
-                  }}
-                  onDeleteNode={deleteNode}
-                  onMoveNode={moveNode}
-                  onOpenProperties={() => handleInspectorTabChange('properties')}
-                  onRenameGroup={(groupId, name) => {
-                    dispatch({ type: 'update_group', groupId, changes: { name } });
-                  }}
-                  onItemChange={updateSelectionItems}
-                  onInsertFavorite={insertFavorite}
-                  onSelectNode={selectSingleNode}
-                  onToggleNode={toggleSelectedNode}
-                  onToggleNodeLocked={(nodeId) => {
-                    const node = getNodeById(document.nodes, nodeId);
-                    if (!node) return;
-                    const nowLocked = !node.locked;
-                    if (isGroupNode(node)) {
-                      dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: nowLocked } });
-                    } else {
-                      dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: nowLocked } });
-                    }
-                    if (nowLocked && selectedNodeIds.includes(nodeId)) {
-                      selectSingleNode(undefined);
-                    }
-                  }}
-                  onToggleNodeHidden={(nodeId) => {
-                    const node = getNodeById(document.nodes, nodeId);
-                    if (!node) return;
-                    if (isGroupNode(node)) {
-                      dispatch({ type: 'update_group', groupId: nodeId, changes: { hidden: !node.hidden } });
-                    } else {
-                      dispatch({ type: 'update_node', itemId: nodeId, changes: { hidden: !node.hidden } });
-                    }
-                  }}
-                  onReorder={reorderSelectedNode}
-                  favorites={favorites}
-                />
+          <Toolbar
+            background={document.background}
+            canvas={document.canvas}
+            canDelete={selectedNodeIds.length > 0}
+            canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
+            canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            canSaveFavorite={selectedNodeIds.length > 0}
+            favoriteStatusFading={favoriteStatus.fading}
+            favoriteStatusMessage={favoriteStatus.message}
+            canvasFocusActive={canvasFocusActive}
+            onCanvasFocusToggle={handleCanvasFocusToggle}
+            onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
+            onCanvasSizeChange={setCanvasSize}
+            onDelete={deleteSelectedNodes}
+            onExport={() => handleExport(stageRef.current)}
+            onExportIntentChange={handleExportIntentChange}
+            onFontUpload={() => fontInputRef.current?.click()}
+            onGroup={groupSelectedNodes}
+            onImageUpload={() => imageInputRef.current?.click()}
+            onLoad={() => openInputRef.current?.click()}
+            onNewProject={() => {
+              handleNewProject(() => {
+                setGuides([]);
+              });
+            }}
+            onRedo={redo}
+            onSave={handleSave}
+            onSaveFavorite={() => {
+              if (saveSelectionAsFavorite()) {
+                favoriteStatus.show('Added to favorites');
               }
-            />
-          </div>
+            }}
+            onUndo={undo}
+            onUngroup={ungroupSelectedNode}
+            onAddGenerator={(generatorType) => {
+              dispatch({
+                type: 'add_node',
+                item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
+              });
+            }}
+            activeInspectorTab={inspectorTab}
+            panelCollapsed={panelCollapsed}
+            onInspectorTabChange={handleInspectorTabChange}
+            itemCount={layerRows.length}
+            favoriteCount={favorites.length}
+            inspectorPanel={
+              <PropertiesPanel
+                activeTab={inspectorTab}
+                availableFonts={availableFonts}
+                fonts={document.fonts}
+                layerRows={layerRows}
+                missingFontFamilies={missingFontFamilies}
+                onDeleteFavorite={deleteFavorite}
+                onRenameFavorite={renameFavorite}
+                onRecolorFavorite={recolorFavorite}
+                onReorderFavorite={reorderFavorite}
+                selectedGroup={selectedGroup ?? undefined}
+                selectedItem={selectedItem ?? undefined}
+                selectedItems={selectedItems}
+                selectedNodeIds={selectedNodeIds}
+                pendingCollapsedGroupIds={pendingCollapsedGroupIds}
+                onClearPendingCollapsedGroupIds={clearPendingCollapsedGroupIds}
+                onGroupOpacityChange={updateSelectedGroup}
+                onSelectGroupChildren={() => {
+                  if (selectedGroup) {
+                    dispatch({ type: 'select_nodes', nodeIds: selectedGroup.children.map((c) => c.id) });
+                  }
+                }}
+                onDeleteNode={deleteNode}
+                onMoveNode={moveNode}
+                onOpenProperties={() => handleInspectorTabChange('properties')}
+                onRenameGroup={(groupId, name) => {
+                  dispatch({ type: 'update_group', groupId, changes: { name } });
+                }}
+                onItemChange={updateSelectionItems}
+                onInsertFavorite={insertFavorite}
+                onSelectNode={selectSingleNode}
+                onToggleNode={toggleSelectedNode}
+                onToggleNodeLocked={(nodeId) => {
+                  const node = getNodeById(document.nodes, nodeId);
+                  if (!node) return;
+                  const nowLocked = !node.locked;
+                  if (isGroupNode(node)) {
+                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: nowLocked } });
+                  } else {
+                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: nowLocked } });
+                  }
+                  if (nowLocked && selectedNodeIds.includes(nodeId)) {
+                    selectSingleNode(undefined);
+                  }
+                }}
+                onToggleNodeHidden={(nodeId) => {
+                  const node = getNodeById(document.nodes, nodeId);
+                  if (!node) return;
+                  if (isGroupNode(node)) {
+                    dispatch({ type: 'update_group', groupId: nodeId, changes: { hidden: !node.hidden } });
+                  } else {
+                    dispatch({ type: 'update_node', itemId: nodeId, changes: { hidden: !node.hidden } });
+                  }
+                }}
+                onReorder={reorderSelectedNode}
+                favorites={favorites}
+              />
+            }
+          />
+        </div>
 
-          {errorMessage ? (
-            <div className="app-status app-status-error overlay-status" role="alert">
-              {errorMessage}
+        <div className="editor-canvas-area">
+          <div className="editor-overlays">
+            {errorMessage ? (
+              <div className="app-status app-status-error overlay-status" role="alert">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            <div className="overlay-tools">
+              <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
             </div>
-          ) : null}
-
-          <div className="overlay-tools">
-            <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
           </div>
         </div>
       </main>

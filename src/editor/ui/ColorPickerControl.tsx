@@ -90,7 +90,7 @@ export function ColorPickerControl({
 
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => document.removeEventListener('pointerdown', handlePointerDown, true);
-  }, [isOpen]);
+  }, [isOpen, inline]);
 
   function commitDraftHex(closeAfterCommit = false) {
     const committedValue = commitHexColorInput(draftHex, hsva.a);

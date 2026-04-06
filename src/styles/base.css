@@ -79,7 +79,7 @@ button {
 
 .app-shell {
   min-height: 100vh;
-  min-width: 960px;
+  min-width: max-content;
   display: flex;
   flex-direction: column;
   position: relative;

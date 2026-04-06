@@ -1,6 +1,8 @@
 import { ColorPickerControl } from '../ColorPickerControl';
 
+import { DEFAULT_GROUP_NAME } from '../../document/sceneGraph';
 import {
+  getInspectorHeadingSubtitle,
   getItemGlyph,
   getLayerPrimaryLabel,
 } from './inspectorModel';
@@ -25,7 +27,7 @@ function SelectionHeading({
   title,
 }: {
   kind: string;
-  subtitle: string;
+  subtitle?: string | null;
   title: string;
 }) {
   return (
@@ -35,7 +37,7 @@ function SelectionHeading({
       </span>
       <div className="panel-heading-stack compact slim-item-heading-stack">
         <h2>{title}</h2>
-        <span className="slim-item-subtitle">{subtitle}</span>
+        {subtitle ? <span className="slim-item-subtitle">{subtitle}</span> : null}
       </div>
     </div>
   );
@@ -150,6 +152,13 @@ export function SelectionInspector({
   if (selectedGroup && !isMultiNodeSelection) {
     return (
       <div className="selection-inspector">
+        <div className="selection-inspector-header">
+          <SelectionHeading
+            kind="⊞"
+            subtitle={selectedGroup.name !== DEFAULT_GROUP_NAME ? 'Group' : null}
+            title={selectedGroup.name}
+          />
+        </div>
         <SectionBlock title="Group">
           <NumberInput
             label="Group Opacity"
@@ -206,7 +215,7 @@ export function SelectionInspector({
         <div className="selection-inspector-header">
           <SelectionHeading
             kind={getItemGlyph(primaryItem.kind)}
-            subtitle={primaryItem.name || primaryItem.kind}
+            subtitle={getInspectorHeadingSubtitle(primaryItem)}
             title={getLayerPrimaryLabel(primaryItem)}
           />
         </div>
