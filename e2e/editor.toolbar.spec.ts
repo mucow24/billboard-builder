@@ -255,6 +255,21 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
   });
 
+  test('scrollbar covers full toolbar width at narrow viewports so inspector tabs are reachable', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 800 });
+    await openFreshEditor(page);
+
+    const favoritesTab = page.getByRole('tab', { name: 'Favorites' });
+    await expect(favoritesTab).toBeAttached();
+
+    const { scrollWidth, tabRightEdge } = await favoritesTab.evaluate((el) => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      tabRightEdge: el.getBoundingClientRect().right + window.scrollX,
+    }));
+
+    expect(scrollWidth).toBeGreaterThanOrEqual(tabRightEdge);
+  });
+
   test('toggles the canvas-focus overlay on and off via the toolbar button', async ({ page }) => {
     await openFreshEditor(page);
 
