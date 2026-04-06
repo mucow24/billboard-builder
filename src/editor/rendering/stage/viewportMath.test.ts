@@ -10,9 +10,9 @@ import {
 
 describe('viewportMath', () => {
   it('clamps zoom within the supported range', () => {
-    expect(clampZoom(0.1)).toBe(0.2);
+    expect(clampZoom(0.01)).toBe(0.05);
     expect(clampZoom(2)).toBe(2);
-    expect(clampZoom(5)).toBe(4);
+    expect(clampZoom(20)).toBe(16);
   });
 
   it('converts points between viewport and canvas spaces', () => {
