@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 
 import { expect, type Page } from '@playwright/test';
 
-import { startToolbarFileChooser } from './editor';
+
 
 export async function readPersistedCanvasDocument(page: Page) {
   return page.evaluate(async () => {
@@ -99,7 +99,11 @@ export async function uploadNamedFontFromPath(
   filePath: string,
   uploadedName: string,
 ) {
-  const chooser = await startToolbarFileChooser(page, 'Upload', 'Font...');
+  await page.getByTestId('font-family-picker-trigger').click();
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Import font…' }).click(),
+  ]);
   await chooser.setFiles({
     name: uploadedName,
     mimeType: 'font/ttf',

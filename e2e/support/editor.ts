@@ -956,8 +956,14 @@ export async function clickToolbarPopoverItem(page: Page, triggerName: string, i
   await page.getByRole('button', { name: itemName, exact: true }).click();
 }
 
+export async function addGenerator(page: Page, generatorName: string) {
+  await page.getByRole('button', { name: 'Add generator', exact: true }).click();
+  await page.getByRole('button', { name: generatorName, exact: true }).click();
+}
+
 export async function chooseCanvasPreset(page: Page, presetName: string) {
-  await page.getByRole('button', { name: 'Size', exact: true }).click();
+  await openToolbarPopover(page, 'Canvas');
+  await page.getByRole('button', { name: 'Size', exact: true }).hover();
   await page.getByRole('button', { name: presetName, exact: true }).click();
 }
 
@@ -1021,7 +1027,10 @@ export async function uploadProject(page: Page, document: Record<string, unknown
 export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
   const svg = buildSvgFixture();
 
-  const chooser = await startToolbarFileChooser(page, 'Upload', 'Image...');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Add image', exact: true }).click(),
+  ]);
   await chooser.setFiles({
     name,
     mimeType: 'image/svg+xml',
@@ -1030,7 +1039,11 @@ export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
 }
 
 export async function uploadFont(page: Page, filePath: string) {
-  const chooser = await startToolbarFileChooser(page, 'Upload', 'Font...');
+  await page.getByTestId('font-family-picker-trigger').click();
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Import font…' }).click(),
+  ]);
   await chooser.setFiles(filePath);
 }
 
