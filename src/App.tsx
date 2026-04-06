@@ -11,6 +11,7 @@ import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { InspectorTab } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
+import { FontImportProvider } from './editor/ui/FontImportContext';
 import type { GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
@@ -120,6 +121,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <FontImportProvider onImportFont={() => fontInputRef.current?.click()}>
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
           debugMode={runtimeFlags.debugMode}
@@ -260,6 +262,7 @@ export default function App() {
           </div>
         </div>
       </main>
+      </FontImportProvider>
 
       <input
         ref={imageInputRef}
