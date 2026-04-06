@@ -502,8 +502,67 @@ describe('SelectionInspector', () => {
       />
     );
 
+    expect(screen.getByRole('heading', { name: 'Hero Group' })).toBeInTheDocument();
     expect(screen.getByLabelText('Group Opacity')).toBeInTheDocument();
     expect(screen.queryByText('2 items selected')).not.toBeInTheDocument();
+  });
+
+  it('renders group heading without subtitle for default-named groups', () => {
+    const child = createRectangleItem();
+    const group = createGroupNode([child]);
+
+    const { container } = render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedGroup={group}
+        selectedNodeCount={1}
+        selectedItems={[child]}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'Group' })).toBeInTheDocument();
+    expect(container.querySelector('.slim-item-subtitle')).toBeNull();
+  });
+
+  it('renders single rectangle heading without subtitle', () => {
+    const rect = createRectangleItem();
+
+    const { container } = render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={rect}
+        selectedNodeCount={1}
+        selectedItems={[rect]}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'Rectangle' })).toBeInTheDocument();
+    expect(container.querySelector('.slim-item-subtitle')).toBeNull();
+  });
+
+  it('renders single text heading without subtitle', () => {
+    const text = createTextItem();
+
+    const { container } = render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={text}
+        selectedNodeCount={1}
+        selectedItems={[text]}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'Text' })).toBeInTheDocument();
+    expect(container.querySelector('.slim-item-subtitle')).toBeNull();
   });
 
   it('renders the gradient fill widget with all controls in a single field', () => {

@@ -162,12 +162,12 @@ export function useBlurEffect(
   }, [blurRadius, contentKey]);
 
   useEffect(() => {
+    const ref = nodeRef.current;
     return () => {
       if (cacheTimerRef.current !== null) {
         clearTimeout(cacheTimerRef.current);
       }
-      nodeRef.current?.clearCache();
+      ref?.clearCache();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- nodeRef is a stable ref object
-  }, []);
+  }, [nodeRef]);
 }

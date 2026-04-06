@@ -108,11 +108,12 @@ export function ImageItemNode({ item, image, renderBox, blurRadius }: ImageItemN
   ]);
 
   useEffect(() => {
+    const ref = imageRef.current;
     return () => {
       if (cacheTimerRef.current !== null) {
         clearTimeout(cacheTimerRef.current);
       }
-      imageRef.current?.clearCache();
+      ref?.clearCache();
     };
   }, []);
 

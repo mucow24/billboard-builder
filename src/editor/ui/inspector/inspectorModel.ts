@@ -166,6 +166,16 @@ export function getLayerSecondaryLabel(item: CanvasItem): string | null {
   return null;
 }
 
+export function getInspectorHeadingSubtitle(item: CanvasItem): string | null {
+  if (item.kind === 'image') {
+    return item.name && item.name !== 'Image' ? item.name : null;
+  }
+  if (item.kind === 'generator') {
+    return 'Generator';
+  }
+  return null;
+}
+
 export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
   if (item.kind === 'line') {
     return {
