@@ -245,7 +245,17 @@ export default function App() {
             ) : null}
 
             <div className="overlay-tools">
-              <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
+              <ToolPalette
+                activeTool={activeTool}
+                onChange={setActiveTool}
+                onImageUpload={() => imageInputRef.current?.click()}
+                onAddGenerator={(generatorType) => {
+                  dispatch({
+                    type: 'add_node',
+                    item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
+                  });
+                }}
+              />
             </div>
           </div>
         </div>
