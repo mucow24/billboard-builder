@@ -117,6 +117,20 @@ export const ShapeItemView = memo(function ShapeItemView({
           height: renderBox.height,
         })
       : null;
+  // Konva's Ellipse origin is at its center, not top-left — shift gradient points
+  const ellipseGradientProps = gradientFillProps && item.kind === 'ellipse'
+    ? {
+        ...gradientFillProps,
+        fillLinearGradientStartPoint: {
+          x: gradientFillProps.fillLinearGradientStartPoint.x - renderBox.width / 2,
+          y: gradientFillProps.fillLinearGradientStartPoint.y - renderBox.height / 2,
+        },
+        fillLinearGradientEndPoint: {
+          x: gradientFillProps.fillLinearGradientEndPoint.x - renderBox.width / 2,
+          y: gradientFillProps.fillLinearGradientEndPoint.y - renderBox.height / 2,
+        },
+      }
+    : null;
   const contentGroupRef = useRef<Konva.Group | null>(null);
   const handleShapeRef = useCallback(
     (node: Konva.Group | null) => {
@@ -233,8 +247,8 @@ export const ShapeItemView = memo(function ShapeItemView({
               strokeWidth={item.strokeWidth}
               radiusX={renderBox.width / 2}
               radiusY={renderBox.height / 2}
-              fillPriority={gradientFillProps ? 'linear-gradient' : 'color'}
-              {...gradientFillProps}
+              fillPriority={ellipseGradientProps ? 'linear-gradient' : 'color'}
+              {...ellipseGradientProps}
               listening={false}
             />
           ) : null}
