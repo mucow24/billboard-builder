@@ -59,6 +59,38 @@
   z-index: 14;
 }
 
+.font-family-picker-import {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.38rem 0.44rem;
+  margin-bottom: 4px;
+  padding-bottom: 0.5rem;
+  border: none;
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.font-family-picker-import::after {
+  content: '';
+  position: absolute;
+  left: 0.44rem;
+  right: 0.44rem;
+  bottom: 0;
+  height: 1px;
+  background: rgba(68, 143, 224, 0.32);
+}
+
+.font-family-picker-import:hover {
+  background: rgba(68, 143, 224, 0.16);
+}
+
 .font-family-picker-listbox {
   max-height: 260px;
   overflow: auto;

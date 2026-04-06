@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  addGenerator,
   clickLayerRow,
-  clickToolbarPopoverItem,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
@@ -12,7 +12,7 @@ test.describe('generator layers', () => {
   test('adds a Diagonal Bands generator from the toolbar and shows its properties', async ({ page }) => {
     await openFreshEditor(page);
 
-    await clickToolbarPopoverItem(page, 'Generators', 'Diagonal Bands');
+    await addGenerator(page,'Diagonal Bands');
 
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Diagonal Bands', exact: true })).toBeVisible();
@@ -29,7 +29,7 @@ test.describe('generator layers', () => {
     await openFreshEditor(page);
 
     // Scanlines is cheap to render — height=1 and spacing=0 fills every row
-    await clickToolbarPopoverItem(page, 'Generators', 'Scanlines');
+    await addGenerator(page,'Scanlines');
     await openLayersTab(page);
     await clickLayerRow(page, 'Scanlines');
     await openPropertiesTab(page);
@@ -59,7 +59,7 @@ test.describe('generator layers', () => {
   test('shapes generator shows toggle buttons for shape types', async ({ page }) => {
     await openFreshEditor(page);
 
-    await clickToolbarPopoverItem(page, 'Generators', 'Shapes');
+    await addGenerator(page,'Shapes');
     await openLayersTab(page);
     await clickLayerRow(page, 'Shapes');
     await openPropertiesTab(page);
@@ -83,7 +83,7 @@ test.describe('generator layers', () => {
   test('generator layer row shows G icon with primary and secondary colors', async ({ page }) => {
     await openFreshEditor(page);
 
-    await clickToolbarPopoverItem(page, 'Generators', 'Diagonal Bands');
+    await addGenerator(page,'Diagonal Bands');
     await openLayersTab(page);
 
     const icon = page.locator('.layer-row-generator-icon').first();
@@ -103,7 +103,7 @@ test.describe('generator layers', () => {
   test('colorless generator shows muted fallback G icon', async ({ page }) => {
     await openFreshEditor(page);
 
-    await clickToolbarPopoverItem(page, 'Generators', 'Noise');
+    await addGenerator(page,'Noise');
     await openLayersTab(page);
 
     const icon = page.locator('.layer-row-generator-icon').first();
@@ -118,7 +118,7 @@ test.describe('generator layers', () => {
   test('generator layer icon updates when color parameter changes', async ({ page }) => {
     await openFreshEditor(page);
 
-    await clickToolbarPopoverItem(page, 'Generators', 'Diagonal Bands');
+    await addGenerator(page,'Diagonal Bands');
     await openLayersTab(page);
 
     const icon = page.locator('.layer-row-generator-icon').first();

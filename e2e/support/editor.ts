@@ -829,6 +829,10 @@ export async function beginCanvasDrag(page: Page, from: CanvasPoint) {
 export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint, steps = 18) {
   const end = await canvasPointToPage(page, destination);
   await page.mouse.move(end.x, end.y, { steps });
+  // Store position so releasePointer can dispatch mouseup at the correct
+  // coordinates via JS (see releasePointer for why).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only page global
+  await page.evaluate(([x, y]) => { (window as any).__lastPointerPos = { x, y }; }, [end.x, end.y]);
 }
 
 export async function clickCanvasHook(page: Page, testId: string) {
@@ -874,7 +878,24 @@ export async function dragCanvasHookToPoint(
 }
 
 export async function releasePointer(page: Page) {
-  await page.mouse.up();
+  // Dispatch mouseup via JS on window instead of page.mouse.up().
+  // beginCanvasHookDrag uses locator.dispatchEvent('mousedown') which
+  // bypasses Playwright's CDP mouse state.  A subsequent page.mouse.up()
+  // sends mouseReleased for a button Chrome never saw pressed, and Chrome
+  // silently drops the DOM event.  Dispatching directly on window avoids
+  // this and reliably triggers the app's capture-phase mouseup listener.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only page global
+  const pos = await page.evaluate(() => (window as any).__lastPointerPos ?? { x: 0, y: 0 });
+  await page.evaluate(({ x, y }) => {
+    window.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      button: 0,
+      buttons: 0,
+    }));
+  }, pos);
   // Wait for any active interaction session to finalize. The session is settled
   // when sessionKind is null (no session) or 'image-crop' (crop mode persists
   // across handle drags within the crop session).
@@ -956,8 +977,14 @@ export async function clickToolbarPopoverItem(page: Page, triggerName: string, i
   await page.getByRole('button', { name: itemName, exact: true }).click();
 }
 
+export async function addGenerator(page: Page, generatorName: string) {
+  await page.getByRole('button', { name: 'Add generator', exact: true }).click();
+  await page.getByRole('button', { name: generatorName, exact: true }).click();
+}
+
 export async function chooseCanvasPreset(page: Page, presetName: string) {
-  await page.getByRole('button', { name: 'Size', exact: true }).click();
+  await openToolbarPopover(page, 'Canvas');
+  await page.getByRole('button', { name: 'Size', exact: true }).hover();
   await page.getByRole('button', { name: presetName, exact: true }).click();
 }
 
@@ -1021,7 +1048,10 @@ export async function uploadProject(page: Page, document: Record<string, unknown
 export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
   const svg = buildSvgFixture();
 
-  const chooser = await startToolbarFileChooser(page, 'Upload', 'Image...');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Add image', exact: true }).click(),
+  ]);
   await chooser.setFiles({
     name,
     mimeType: 'image/svg+xml',
@@ -1030,7 +1060,11 @@ export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
 }
 
 export async function uploadFont(page: Page, filePath: string) {
-  const chooser = await startToolbarFileChooser(page, 'Upload', 'Font...');
+  await page.getByTestId('font-family-picker-trigger').click();
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Import font…' }).click(),
+  ]);
   await chooser.setFiles(filePath);
 }
 

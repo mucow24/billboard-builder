@@ -1,6 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 
+import { useFontImport } from './FontImportContext';
+
 export interface FontOption {
   family: string;
   sourceName: string;
@@ -182,6 +184,8 @@ export function FontFamilyPicker({
     }
   }
 
+  const onImportFont = useFontImport();
+
   return (
     <div
       ref={rootRef}
@@ -248,6 +252,18 @@ export function FontFamilyPicker({
             tabIndex={0}
             onKeyDown={handleListboxKeyDown}
           >
+            {onImportFont ? (
+              <button
+                type="button"
+                className="font-family-picker-import"
+                onClick={() => {
+                  onImportFont();
+                  closePicker(true);
+                }}
+              >
+                Import font…
+              </button>
+            ) : null}
             {fonts.map((font, index) => {
               const isSelected = !mixed && font.family === value;
               const isActive = index === activeIndex;

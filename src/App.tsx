@@ -11,6 +11,7 @@ import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import type { InspectorTab } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
+import { FontImportProvider } from './editor/ui/FontImportContext';
 import type { GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
@@ -120,6 +121,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <FontImportProvider onImportFont={() => fontInputRef.current?.click()}>
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
           debugMode={runtimeFlags.debugMode}
@@ -153,9 +155,7 @@ export default function App() {
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
             onExportIntentChange={handleExportIntentChange}
-            onFontUpload={() => fontInputRef.current?.click()}
             onGroup={groupSelectedNodes}
-            onImageUpload={() => imageInputRef.current?.click()}
             onLoad={() => openInputRef.current?.click()}
             onNewProject={() => {
               handleNewProject(() => {
@@ -171,12 +171,6 @@ export default function App() {
             }}
             onUndo={undo}
             onUngroup={ungroupSelectedNode}
-            onAddGenerator={(generatorType) => {
-              dispatch({
-                type: 'add_node',
-                item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
-              });
-            }}
             activeInspectorTab={inspectorTab}
             panelCollapsed={panelCollapsed}
             onInspectorTabChange={handleInspectorTabChange}
@@ -253,11 +247,22 @@ export default function App() {
             ) : null}
 
             <div className="overlay-tools">
-              <ToolPalette activeTool={activeTool} onChange={setActiveTool} />
+              <ToolPalette
+                activeTool={activeTool}
+                onChange={setActiveTool}
+                onImageUpload={() => imageInputRef.current?.click()}
+                onAddGenerator={(generatorType) => {
+                  dispatch({
+                    type: 'add_node',
+                    item: createGeneratorItem(generatorType, document.canvas.width, document.canvas.height),
+                  });
+                }}
+              />
             </div>
           </div>
         </div>
       </main>
+      </FontImportProvider>
 
       <input
         ref={imageInputRef}

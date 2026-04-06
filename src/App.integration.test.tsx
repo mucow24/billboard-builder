@@ -340,7 +340,7 @@ describe('App integration', () => {
       expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0]?.id).toBe('opened-text');
     });
 
-    clickToolbarPopoverItem('Upload', 'Image...');
+    fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
       target: {
         files: [new File(['<svg/>'], 'fixture.svg', { type: 'image/svg+xml' })],
@@ -351,7 +351,8 @@ describe('App integration', () => {
       expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems).some((item) => item.kind === 'image')).toBe(true);
     });
 
-    clickToolbarPopoverItem('Upload', 'Font...');
+    // Font upload UI path (font picker → Import font…) is covered by e2e tests;
+    // here we verify the processing pipeline via the hidden input directly.
     fireEvent.change(screen.getByTestId('font-upload-input'), {
       target: {
         files: [new File(['font'], 'CalSans-Regular.ttf', { type: 'font/ttf' })],
@@ -389,7 +390,7 @@ describe('App integration', () => {
     render(<App />);
     await screen.findByRole('button', { name: 'Canvas' });
 
-    clickToolbarPopoverItem('Upload', 'Image...');
+    fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
       target: {
         files: [new File(['bad'], 'broken.svg', { type: 'image/svg+xml' })],
@@ -398,7 +399,7 @@ describe('App integration', () => {
     await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to import image: Broken image');
 
-    clickToolbarPopoverItem('Upload', 'Image...');
+    fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
       target: {
         files: [new File(['ok'], 'fixed.svg', { type: 'image/svg+xml' })],
@@ -427,7 +428,7 @@ describe('App integration', () => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
 
-    clickToolbarPopoverItem('Upload', 'Font...');
+    // Font upload UI path covered by e2e tests; verify processing pipeline directly.
     fireEvent.change(screen.getByTestId('font-upload-input'), {
       target: {
         files: [new File(['bad'], 'broken.ttf', { type: 'font/ttf' })],
@@ -436,7 +437,6 @@ describe('App integration', () => {
     await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to register font: Broken font');
 
-    clickToolbarPopoverItem('Upload', 'Font...');
     fireEvent.change(screen.getByTestId('font-upload-input'), {
       target: {
         files: [new File(['ok'], 'fixed.ttf', { type: 'font/ttf' })],

@@ -26,8 +26,6 @@ test.describe('editor toolbar flows', () => {
 
     await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Size', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Undo/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Redo/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Delete/ })).toBeVisible();
@@ -43,14 +41,8 @@ test.describe('editor toolbar flows', () => {
     await page.mouse.click(24, 220);
     await expect(page.getByRole('button', { name: 'Load...' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Upload', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Image...', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Font...', exact: true })).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Image...' })).toHaveCount(0);
-
-    await page.getByRole('button', { name: 'Size', exact: true }).click();
+    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+    await page.getByRole('button', { name: 'Size', exact: true }).hover();
     await expect(page.getByLabel('Canvas width')).toBeVisible();
     await expect(page.getByLabel('Canvas height')).toBeVisible();
   });
@@ -59,7 +51,7 @@ test.describe('editor toolbar flows', () => {
     await openFreshEditor(page);
 
     await chooseCanvasPreset(page, '1024 x 1024');
-    await page.getByRole('button', { name: 'Size' }).click();
+    // Canvas menu and size flyout remain open after preset click
     await expect(page.getByLabel('Canvas width')).toHaveValue('1024');
     await expect(page.getByLabel('Canvas height')).toHaveValue('1024');
 
@@ -202,7 +194,10 @@ test.describe('editor toolbar flows', () => {
     await expect(page.locator('.layer-row')).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeVisible();
 
-    const imageChooser = await startToolbarFileChooser(page, 'Upload', 'Image...');
+    const [imageChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByRole('button', { name: 'Add image', exact: true }).click(),
+    ]);
     await imageChooser.setFiles({
       name: 'toolbar-image.svg',
       mimeType: 'image/svg+xml',
@@ -216,11 +211,18 @@ test.describe('editor toolbar flows', () => {
     await expect(page.locator('.layer-row')).toHaveCount(2);
     await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible();
 
-    const fontChooser = await startToolbarFileChooser(page, 'Upload', 'Font...');
-    await fontChooser.setFiles(path.join(process.cwd(), 'src/assets/fonts/CalSans-Regular.ttf'));
-
+    // Select the text item so the font picker is available
     await clickCanvas(page, { x: 240, y: 210 });
     await openPropertiesTab(page);
+    await page.getByTestId('font-family-picker-trigger').click();
+
+    const [fontChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByRole('button', { name: 'Import font…' }).click(),
+    ]);
+    await fontChooser.setFiles(path.join(process.cwd(), 'src/assets/fonts/CalSans-Regular.ttf'));
+
+    // Re-open the font picker to verify the uploaded font appears
     await page.getByTestId('font-family-picker-trigger').click();
     await expect(page.getByRole('option', { name: 'Cal Sans' }).first()).toBeVisible();
   });
