@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- hook + provider are co-located by design */
 import { createContext, useContext, type ReactNode } from 'react';
 
 const FontImportContext = createContext<(() => void) | null>(null);

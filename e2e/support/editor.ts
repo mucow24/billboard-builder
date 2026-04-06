@@ -831,9 +831,8 @@ export async function movePointerToCanvasPoint(page: Page, destination: CanvasPo
   await page.mouse.move(end.x, end.y, { steps });
   // Store position so releasePointer can dispatch mouseup at the correct
   // coordinates via JS (see releasePointer for why).
-  await page.evaluate(([x, y]) => {
-    (window as any).__lastPointerPos = { x, y };
-  }, [end.x, end.y]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only page global
+  await page.evaluate(([x, y]) => { (window as any).__lastPointerPos = { x, y }; }, [end.x, end.y]);
 }
 
 export async function clickCanvasHook(page: Page, testId: string) {
@@ -885,6 +884,7 @@ export async function releasePointer(page: Page) {
   // sends mouseReleased for a button Chrome never saw pressed, and Chrome
   // silently drops the DOM event.  Dispatching directly on window avoids
   // this and reliably triggers the app's capture-phase mouseup listener.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only page global
   const pos = await page.evaluate(() => (window as any).__lastPointerPos ?? { x: 0, y: 0 });
   await page.evaluate(({ x, y }) => {
     window.dispatchEvent(new MouseEvent('mouseup', {

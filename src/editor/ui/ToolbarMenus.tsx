@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- GENERATOR_ICONS shared with ToolPalette */
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
