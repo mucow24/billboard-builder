@@ -1,7 +1,7 @@
 import type { Point } from '../interactionGeometry';
 
-export const MIN_ZOOM = 0.2;
-export const MAX_ZOOM = 4;
+export const MIN_ZOOM = 0.05;
+export const MAX_ZOOM = 16;
 
 export function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
