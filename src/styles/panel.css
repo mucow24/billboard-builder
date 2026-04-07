@@ -155,26 +155,6 @@
   font-size: 0.9rem;
 }
 
-/* ── Layers panel body / footer ──────────────────────────────────────────── */
-
-.layers-panel-body {
-  display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  flex-direction: column;
-  margin: 0;
-}
-
-.layers-panel-footer {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 0 -5px 0 -5px;
-  padding: 0;
-}
-
 /* ── Empty panel ─────────────────────────────────────────────────────────── */
 
 .empty-panel {

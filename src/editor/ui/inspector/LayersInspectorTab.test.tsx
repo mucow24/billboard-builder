@@ -80,6 +80,12 @@ describe('LayersInspectorTab', () => {
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Rectangle' }));
     expect(onSelectNode).toHaveBeenCalledWith(item.id);
     expect(onOpenProperties).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('group', { name: 'Layer order controls' })).toHaveClass(
+      'inspector-rail-toolbar-group',
+    );
+    expect(screen.getByRole('button', { name: 'Move to top' })).toHaveClass(
+      'inspector-rail-icon-button',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Move to top' }));
     expect(onReorder).toHaveBeenCalledWith('front');

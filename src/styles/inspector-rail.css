@@ -1,0 +1,147 @@
+/* ── Inspector rail toolbar primitives ───────────────────────────────────── */
+
+.inspector-rail-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 -5px 10px;
+  padding: 0 10px 10px;
+  border-bottom: 1px solid rgba(66, 87, 124, 0.62);
+}
+
+.inspector-rail-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.inspector-rail-field {
+  position: relative;
+  min-width: 0;
+}
+
+.inspector-rail-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-size);
+  min-width: var(--control-size);
+  height: var(--control-size);
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.inspector-rail-icon-button:hover:not(:disabled) {
+  border-color: rgba(129, 140, 248, 0.45);
+  background: rgba(28, 40, 66, 0.98);
+}
+
+.inspector-rail-icon-button:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.85);
+  outline-offset: 2px;
+}
+
+.inspector-rail-icon-button:disabled {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: var(--surface-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.inspector-rail-icon-button svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Specificity note: inspector.css scopes .properties-panel input/select rules.
+ * Keeping the rail field wrapper in these selectors ensures the rail toolbar
+ * controls can define their own compact geometry without leaking outside it. */
+.properties-panel .inspector-rail-toolbar .inspector-rail-field .inspector-rail-text-input {
+  width: 100%;
+  height: var(--control-size);
+  min-height: 0;
+  padding: 0 22px 0 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.properties-panel .inspector-rail-toolbar .inspector-rail-field .inspector-rail-text-input::placeholder {
+  color: #64789b;
+}
+
+.properties-panel .inspector-rail-toolbar .inspector-rail-field .inspector-rail-text-input:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.properties-panel .inspector-rail-toolbar .inspector-rail-field .inspector-rail-text-input:focus {
+  border-color: rgba(129, 140, 248, 0.55);
+}
+
+.inspector-rail-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Matches the top toolbar caret so the select reads as part of the same system. */
+.inspector-rail-select-wrap::after {
+  content: '▼';
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.properties-panel .inspector-rail-toolbar .inspector-rail-select-wrap .inspector-rail-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: var(--control-size);
+  min-height: 0;
+  padding: 0 22px 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  background-color: var(--surface-base);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.properties-panel .inspector-rail-toolbar .inspector-rail-select-wrap .inspector-rail-select:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.properties-panel .inspector-rail-toolbar .inspector-rail-select-wrap .inspector-rail-select:focus {
+  border-color: rgba(129, 140, 248, 0.55);
+}

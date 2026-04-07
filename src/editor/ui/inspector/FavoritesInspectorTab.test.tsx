@@ -217,9 +217,18 @@ describe('FavoritesInspectorTab', () => {
 
     it('renders the toolbar with a search box and a sort dropdown when favorites exist', () => {
       renderTab();
-      expect(screen.getByRole('toolbar', { name: /Favorites filter and sort/ })).toBeInTheDocument();
-      expect(screen.getByRole('searchbox', { name: /Filter favorites by name/ })).toBeInTheDocument();
-      expect(screen.getByRole('combobox', { name: /Sort favorites by/ })).toBeInTheDocument();
+      expect(screen.getByRole('toolbar', { name: /Favorites filter and sort/ })).toHaveClass(
+        'inspector-rail-toolbar',
+      );
+      expect(screen.getByRole('searchbox', { name: /Filter favorites by name/ })).toHaveClass(
+        'inspector-rail-text-input',
+      );
+      expect(screen.getByRole('combobox', { name: /Sort favorites by/ })).toHaveClass(
+        'inspector-rail-select',
+      );
+      expect(screen.getByRole('button', { name: /Toggle sort direction/ })).toHaveClass(
+        'inspector-rail-icon-button',
+      );
     });
 
     it('filters rendered rows by name as the user types (case-insensitive)', async () => {

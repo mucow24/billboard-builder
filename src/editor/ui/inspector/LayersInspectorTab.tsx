@@ -15,6 +15,7 @@ import {
   getVisibleLayerRows,
   resolveDropDepth,
 } from './layersTabModel';
+import { InspectorRailIconButton } from './InspectorRailIconButton';
 import { useListReorder } from './useListReorder';
 import type { LayersInspectorTabProps } from './types';
 
@@ -150,55 +151,45 @@ export function LayersInspectorTab({
 
   return (
     <>
-      <div className="layers-panel-footer layers-panel-utilities">
-        <div className="footer-rule" />
-        <div className="order-row">
-          <div className="order-controls">
-            <div className="layer-order-toolbar" role="group" aria-label="Layer order controls">
-              <button
-                type="button"
-                className="toolbar-button"
-                aria-label="Move to top"
-                title="Move to top"
-                disabled={!canReorder}
-                onClick={() => onReorder('front')}
-              >
-                {renderReorderIcon('front')}
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                aria-label="Move up"
-                title="Move up"
-                disabled={!canReorder}
-                onClick={() => onReorder('forward')}
-              >
-                {renderReorderIcon('forward')}
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                aria-label="Move down"
-                title="Move down"
-                disabled={!canReorder}
-                onClick={() => onReorder('backward')}
-              >
-                {renderReorderIcon('backward')}
-              </button>
-              <button
-                type="button"
-                className="toolbar-button"
-                aria-label="Move to bottom"
-                title="Move to bottom"
-                disabled={!canReorder}
-                onClick={() => onReorder('back')}
-              >
-                {renderReorderIcon('back')}
-              </button>
-            </div>
-          </div>
+      <div className="inspector-rail-toolbar">
+        <div
+          className="inspector-rail-toolbar-group"
+          role="group"
+          aria-label="Layer order controls"
+        >
+          <InspectorRailIconButton
+            label="Move to top"
+            disabled={!canReorder}
+            title="Move to top"
+            onClick={() => onReorder('front')}
+          >
+            {renderReorderIcon('front')}
+          </InspectorRailIconButton>
+          <InspectorRailIconButton
+            label="Move up"
+            disabled={!canReorder}
+            title="Move up"
+            onClick={() => onReorder('forward')}
+          >
+            {renderReorderIcon('forward')}
+          </InspectorRailIconButton>
+          <InspectorRailIconButton
+            label="Move down"
+            disabled={!canReorder}
+            title="Move down"
+            onClick={() => onReorder('backward')}
+          >
+            {renderReorderIcon('backward')}
+          </InspectorRailIconButton>
+          <InspectorRailIconButton
+            label="Move to bottom"
+            disabled={!canReorder}
+            title="Move to bottom"
+            onClick={() => onReorder('back')}
+          >
+            {renderReorderIcon('back')}
+          </InspectorRailIconButton>
         </div>
-        <div className="footer-rule" />
       </div>
       <div
         className="layer-list layer-list-tabbed"
