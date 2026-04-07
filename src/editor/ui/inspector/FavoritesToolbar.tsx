@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 
 import type { FavoritesSortDirection, FavoritesSortField } from './favoritesSort';
+import { InspectorRailIconButton } from './InspectorRailIconButton';
 
 const CLEAR_ICON = (
   <svg viewBox="0 0 12 12">
@@ -71,15 +72,15 @@ export function FavoritesToolbar({
 
   return (
     <div
-      className="favorites-toolbar"
+      className="favorites-toolbar inspector-rail-toolbar"
       role="toolbar"
       aria-label="Favorites filter and sort"
     >
-      <div className="favorites-search">
+      <div className="favorites-search inspector-rail-field">
         <input
           ref={searchInputRef}
           type="search"
-          className="favorites-search-input"
+          className="favorites-search-input inspector-rail-text-input"
           aria-label="Filter favorites by name"
           placeholder="Search favorites"
           value={searchQuery}
@@ -99,9 +100,9 @@ export function FavoritesToolbar({
       </div>
 
       <div className="favorites-sort">
-        <div className="favorites-sort-field">
+        <div className="favorites-sort-field inspector-rail-select-wrap">
           <select
-            className="favorites-sort-select"
+            className="favorites-sort-select inspector-rail-select"
             aria-label="Sort favorites by"
             value={sortField}
             onChange={(e) => onSortFieldChange(e.target.value as FavoritesSortField)}
@@ -112,16 +113,15 @@ export function FavoritesToolbar({
             <option value="color">Color</option>
           </select>
         </div>
-        <button
-          type="button"
-          className="favorites-sort-direction toolbar-button"
-          aria-label={directionNextLabel}
+        <InspectorRailIconButton
+          className="favorites-sort-direction"
+          label={directionNextLabel}
           onClick={handleDirectionClick}
           disabled={directionDisabled}
-          aria-disabled={directionDisabled || undefined}
+          ariaDisabled={directionDisabled}
         >
           {sortDirection === 'asc' ? ARROW_UP_ICON : ARROW_DOWN_ICON}
-        </button>
+        </InspectorRailIconButton>
       </div>
     </div>
   );

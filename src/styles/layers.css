@@ -6,7 +6,6 @@
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
-  padding: 10px 5px 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -41,7 +40,6 @@
   align-items: stretch;
   width: 100%;
   min-width: 0;
-  min-height: 28px;
   padding: 0;
   background: transparent;
   --tree-line-color: rgb(52, 80, 122);
@@ -75,7 +73,6 @@
 }
 
 .layer-row-group {
-  min-height: 28px;
   background: rgba(15, 23, 38, 0.44);
 }
 
@@ -102,38 +99,8 @@
 /* ── Layer drag grip ─────────────────────────────────────────────────────── */
 
 .layer-grip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 12px;
-  width: 12px;
-  align-self: stretch;
-  margin: 0 5px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #64789b;
-  cursor: grab;
-  touch-action: none;
-}
-
-.layer-grip:hover {
-  color: #93a8c9;
-}
-
-.layer-grip:active {
-  cursor: grabbing;
-}
-
-
-.layer-grip-icon {
-  width: 6px;
-  height: 13px;
-  fill: currentColor;
-}
-
-.layer-row.dragging {
-  opacity: 0.4;
+  flex: 0 0 var(--inspector-list-grip-width);
+  margin: 0 var(--inspector-list-row-inset);
 }
 
 .list-drop-indicator {
@@ -221,10 +188,7 @@
   justify-content: center;
   flex: 0 0 auto;
   align-self: center;
-  width: 17px;
-  min-width: 17px;
-  height: 17px;
-  margin-left: 2px;
+  margin-left: calc(var(--inspector-list-content-gap) - var(--inspector-list-row-inset));
   border: 1px solid rgba(147, 168, 201, 0.26);
   border-radius: var(--radius-sm);
   background: rgba(12, 19, 32, 0.92);
@@ -297,12 +261,9 @@
 
 .layer-row-copy {
   display: flex;
-  min-width: 0;
   flex: 1 1 auto;
   align-self: center;
-  align-items: baseline;
-  gap: 7px;
-  margin-left: 7px;
+  margin-left: var(--inspector-list-content-gap);
 }
 
 .layer-row-copy.compact.richer {
@@ -310,20 +271,14 @@
 }
 
 .layer-row-copy strong {
-  color: var(--text-primary);
-  font-size: 12px;
   line-height: 1.2;
-  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
 }
 
 .layer-row-copy small {
   display: block;
-  color: #93a8c9;
-  font-size: 11px;
   line-height: 1.25;
-  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -345,65 +300,6 @@
   white-space: nowrap;
 }
 
-/* ── Shared row actions (layers + favorites) ───────────────────────────── */
-
-.list-actions {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-  gap: 1px;
-}
-
-.list-action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-base);
-  background: transparent;
-  cursor: pointer;
-  opacity: 0.25;
-  transition: opacity 0.12s, background 0.12s;
-}
-
-.list-action-btn svg {
-  width: 12px;
-  height: 12px;
-  stroke: #b8cceb;
-  stroke-width: 1.2;
-  fill: none;
-}
-
-.list-action-btn.active {
-  opacity: 0.85;
-}
-
-.list-action-btn.active svg {
-  stroke: #e0eaff;
-}
-
-.list-row:hover .list-action-btn {
-  opacity: 0.4;
-}
-
-.list-row:hover .list-action-btn.active {
-  opacity: 1;
-}
-
-.list-action-btn:hover,
-.list-action-btn.active:hover {
-  opacity: 1;
-  background: rgba(129, 140, 248, 0.55);
-}
-
-.list-action-btn:hover svg {
-  stroke: #e0eaff;
-}
-
 /* Inline rename input */
 .layer-rename-input {
   width: 100%;
@@ -422,40 +318,10 @@
   border-color: rgba(96, 165, 250, 0.7);
 }
 
-/* ── Layers footer toolbar ───────────────────────────────────────────────── */
-
-.footer-rule {
-  display: none;
-}
-
-.order-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 4px 4px;
-  border-bottom: 1px solid rgba(66, 87, 124, 0.62);
-  background: linear-gradient(180deg, rgba(11, 18, 31, 0.34), rgba(10, 16, 28, 0.18));
-  box-shadow: 0 1px 0 rgba(5, 9, 16, 0.7);
-}
-
-.order-controls {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.layer-order-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
 /*
- * Shared shell: order toolbar buttons, compact color picker trigger, delete button.
+ * Shared shell: compact color picker trigger and delete button.
  * Color-picker shape overrides live in pickers.css.
  */
-.toolbar-button,
 .color-picker-trigger-compact,
 .delete-button {
   display: inline-flex;
@@ -472,7 +338,6 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-.toolbar-button:hover:not(:disabled),
 .color-picker-trigger-compact:hover:not(:disabled) {
   border-color: rgba(129, 140, 248, 0.45);
   background: rgba(28, 40, 66, 0.98);
@@ -493,7 +358,6 @@
   background: rgba(72, 29, 39, 0.98);
 }
 
-.toolbar-button:disabled,
 .color-picker-trigger-compact:disabled,
 .delete-button:disabled {
   border-color: rgba(148, 163, 184, 0.16);
@@ -503,7 +367,6 @@
   box-shadow: none;
 }
 
-.toolbar-button svg,
 .color-picker-trigger-compact svg,
 .delete-button svg {
   width: 15px;
@@ -516,55 +379,10 @@
   vector-effect: non-scaling-stroke;
 }
 
-/* ── Favorites toolbar (search + sort) ───────────────────────────────────── */
-
-.favorites-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  /* Negative margin extends the divider to the container's true edges
-   * (parent .rail-tab-body-favorites has 5px horizontal padding).
-   * Horizontal padding 10px = 5px offset + 5px original control inset. */
-  margin: 0 -5px 10px;
-  padding: 0 10px 10px;
-  border-bottom: 1px solid rgba(66, 87, 124, 0.62);
-}
-
 .favorites-search {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/* Specificity note: .properties-panel scopes an input:not(range):not(checkbox)
- * rule in inspector.css (specificity 0,3,1). Using 4 classes here (0,4,0)
- * beats that outright since class count trumps element count. */
-.properties-panel .favorites-toolbar .favorites-search .favorites-search-input {
-  width: 100%;
-  height: 1.8rem;
-  min-height: 0;
-  padding: 0 22px 0 7px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-base);
-  background: var(--surface-base);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.properties-panel .favorites-toolbar .favorites-search .favorites-search-input::placeholder {
-  color: #64789b;
-}
-
-.properties-panel .favorites-toolbar .favorites-search .favorites-search-input:hover {
-  border-color: rgba(129, 140, 248, 0.45);
-}
-
-.properties-panel .favorites-toolbar .favorites-search .favorites-search-input:focus {
-  border-color: rgba(129, 140, 248, 0.55);
 }
 
 /* Hide native search clear UI — we render our own */
@@ -614,58 +432,6 @@
   flex: 0 0 auto;
 }
 
-/* Wraps ONLY the native <select> so the ::after Unicode caret is positioned
- * over the select (not the adjacent direction button). Matches
- * .top-toolbar-menu-caret exactly (same character, font, size, color)
- * so rendering is pixel-identical to the Canvas menu caret. */
-.favorites-sort-field {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.favorites-sort-field::after {
-  content: '▼';
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  line-height: 1;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.favorites-toolbar .favorites-sort-select {
-  /* appearance: none strips browser chrome so the ::after caret on the
-   * wrapper is the only visible triangle. */
-  appearance: none;
-  -webkit-appearance: none;
-  height: 1.8rem;
-  min-height: 0;
-  padding: 0 22px 0 8px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-base);
-  background-color: var(--surface-base);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-}
-
-.favorites-toolbar .favorites-sort-select:hover {
-  border-color: rgba(129, 140, 248, 0.45);
-}
-
-.favorites-toolbar .favorites-sort-select:focus {
-  border-color: rgba(129, 140, 248, 0.55);
-}
-
-/* .favorites-sort-direction reuses .toolbar-button shape (1.8rem square). */
-
 /* ── Favorites empty-search state ────────────────────────────────────────── */
 
 .favorites-empty-search {
@@ -678,17 +444,14 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 0 5px;
 }
 
 .favorite-row {
   display: grid;
   grid-template-columns: 12px 17px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
-  min-height: 28px;
-  padding: 0 0 0 5px;
-  border-radius: var(--radius-sm);
+  gap: var(--inspector-list-content-gap);
+  padding-left: var(--inspector-list-row-inset);
 }
 
 .favorite-row:hover {
@@ -697,31 +460,8 @@
   border-radius: var(--radius-sm);
 }
 
-.favorite-row.dragging {
-  opacity: 0.4;
-}
-
-/* Drag grip handle */
 .favorite-grip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 12px;
-  align-self: stretch;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #64789b;
-  cursor: grab;
-  touch-action: none;
-}
-
-.favorite-grip:hover {
-  color: #93a8c9;
-}
-
-.favorite-grip:active {
-  cursor: grabbing;
+  justify-self: center;
 }
 
 .favorite-grip-inert {
@@ -730,17 +470,9 @@
   cursor: default;
 }
 
-.favorite-grip-icon {
-  width: 6px;
-  height: 13px;
-  fill: currentColor;
-}
-
 /* Swatch */
 .favorite-swatch {
   position: relative;
-  width: 17px;
-  height: 17px;
   padding: 0;
   border: 1px solid rgba(147, 168, 201, 0.26);
   border-radius: var(--radius-sm);
@@ -765,9 +497,6 @@
 /* Row body (clickable area for insert) */
 .favorite-row-body {
   display: flex;
-  align-items: baseline;
-  gap: 7px;
-  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
@@ -778,18 +507,12 @@
 }
 
 .favorite-row-name {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .favorite-row-count {
-  font-size: 11px;
-  font-weight: 500;
-  color: #93a8c9;
   white-space: nowrap;
   flex-shrink: 0;
 }

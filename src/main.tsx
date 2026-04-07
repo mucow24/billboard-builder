@@ -13,6 +13,8 @@ import './styles/editor-layout.css';
 import './styles/canvas.css';
 import './styles/panel.css';
 import './styles/inspector.css';
+import './styles/inspector-rail.css';
+import './styles/inspector-list.css';
 import './styles/pickers.css';
 import './styles/layers.css';
 
