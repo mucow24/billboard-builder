@@ -504,6 +504,8 @@ test.describe('editor properties flows', () => {
     await openPropertiesTab(page);
     await expect(inspector.getByRole('heading', { name: 'Text' })).toBeVisible();
     await expectSliders(page, 'Text', ['Size']);
+    await expect(page.getByRole('slider', { name: 'Size', exact: true })).toHaveAttribute('step', '1');
+    await expect(page.getByRole('spinbutton', { name: 'Size value', exact: true })).toHaveAttribute('step', '1');
     await expectSliders(page, 'Advanced text', ['Line height', 'Character spacing']);
     await expectSliders(page, 'Geometry', ['Rotation']);
 

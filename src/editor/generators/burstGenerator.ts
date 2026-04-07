@@ -9,11 +9,11 @@ export const burstGeneratorSpec: GeneratorSpec<BurstGeneratorParams> = {
   fields: [
     { key: 'accentColor', label: 'Accent Color', type: 'color' },
     { key: 'bandColorB', label: 'Secondary Color', type: 'color' },
-    { key: 'burstRays', label: 'Ray Count', type: 'range', min: 2, max: 48, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'burstRays', label: 'Ray Count', type: 'range', min: 1, max: 48, step: 1, textMin: 1, textMax: 48 },
     { key: 'burstScale', label: 'Scale', type: 'range', min: 0.1, max: 2, step: 0.01, textMin: 0, textMax: Infinity },
     { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'offsetX', label: 'Offset X', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
-    { key: 'offsetY', label: 'Offset Y', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
+    { key: 'offsetX', label: 'Offset X', type: 'range', min: -512, max: 512, step: 1, textMin: -512, textMax: 512 },
+    { key: 'offsetY', label: 'Offset Y', type: 'range', min: -512, max: 512, step: 1, textMin: -512, textMax: 512 },
     { key: 'rotation', label: 'Rotation', type: 'range', min: -180, max: 180, step: 1, textMin: -Infinity, textMax: Infinity },
   ],
   createDefaultParams(): BurstGeneratorParams {

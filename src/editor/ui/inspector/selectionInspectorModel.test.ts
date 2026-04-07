@@ -328,6 +328,100 @@ describe('selectionInspectorModel', () => {
     expect(angleField?.textMax).toBe(Infinity);
   });
 
+  it('surfaces the requested generator slider bounds and text input step metadata', () => {
+    const environment = buildInspectorEnvironment([], []);
+
+    function findNumberField(
+      generatorType: Parameters<typeof createGeneratorItem>[0],
+      propertyKey: string,
+    ): NumberFieldDescriptor | undefined {
+      const generator = createGeneratorItem(generatorType, 1024, 1024);
+      const sections = buildSelectionInspectorSections([generator], environment);
+      return sections
+        .find((section) => section.key === 'generator')
+        ?.fields.find((field) => field.descriptor.propertyKey === propertyKey)
+        ?.descriptor as NumberFieldDescriptor | undefined;
+    }
+
+    const textSections = buildSelectionInspectorSections([createTextItem()], environment);
+    const textSizeField = textSections
+      .find((section) => section.key === 'text')
+      ?.fields.find((field) => field.descriptor.propertyKey === 'fontSize')
+      ?.descriptor as NumberFieldDescriptor | undefined;
+
+    expect(findNumberField('bands', 'gen_stripeSpacingJitter')).toMatchObject({
+      min: 0,
+      max: 5,
+    });
+    expect(findNumberField('bands', 'gen_stripeSkew')).toMatchObject({
+      min: 0,
+      max: 3,
+    });
+    expect(findNumberField('burst', 'gen_burstRays')).toMatchObject({
+      min: 1,
+      max: 48,
+      textMin: 1,
+      textMax: 48,
+    });
+    expect(findNumberField('burst', 'gen_offsetX')).toMatchObject({
+      min: -512,
+      max: 512,
+    });
+    expect(findNumberField('burst', 'gen_offsetY')).toMatchObject({
+      min: -512,
+      max: 512,
+    });
+    expect(findNumberField('zigzags', 'gen_count')).toMatchObject({
+      min: 1,
+      max: 48,
+      textMin: 1,
+      textMax: 48,
+    });
+    expect(findNumberField('zigzags', 'gen_thickness')).toMatchObject({
+      min: 1,
+      max: 64,
+      textMin: 1,
+      textMax: 64,
+    });
+    expect(findNumberField('flatGrid', 'gen_thickness')).toMatchObject({
+      min: 1,
+      max: 64,
+      textMin: 1,
+      textMax: 64,
+    });
+    expect(findNumberField('noise', 'gen_intensity')).toMatchObject({
+      min: 0,
+      max: 1,
+      textMin: 0,
+      textMax: 1,
+    });
+    expect(findNumberField('shapes', 'gen_count')).toMatchObject({
+      min: 1,
+      max: 256,
+      textMin: 1,
+      textMax: 256,
+    });
+    expect(findNumberField('shapes', 'gen_shapeMinSize')).toMatchObject({
+      min: 1,
+      max: 384,
+      textMin: 1,
+      textMax: 384,
+    });
+    expect(findNumberField('shapes', 'gen_shapeMaxSize')).toMatchObject({
+      min: 1,
+      max: 384,
+      textMin: 1,
+      textMax: 384,
+    });
+    expect(findNumberField('shapes', 'gen_rotation')).toMatchObject({
+      min: 0,
+      max: 1,
+      textMin: 0,
+      textMax: 1,
+    });
+    expect(textSizeField?.step).toBe(1);
+  });
+
   it('generator buildChange produces correct generatorParams patch', () => {
     const generator = createGeneratorItem('bands', 1024, 1024);
     const environment = buildInspectorEnvironment([], []);

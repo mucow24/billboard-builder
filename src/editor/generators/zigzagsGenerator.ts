@@ -9,9 +9,9 @@ export const zigzagsGeneratorSpec: GeneratorSpec<ZigzagsGeneratorParams> = {
   fields: [
     { key: 'accentColor', label: 'Accent Color', type: 'color' },
     { key: 'bandColorA', label: 'Secondary Color', type: 'color' },
-    { key: 'count', label: 'Count', type: 'range', min: 0, max: 24, step: 1, textMin: 0, textMax: Infinity },
+    { key: 'count', label: 'Count', type: 'range', min: 1, max: 48, step: 1, textMin: 1, textMax: 48 },
     { key: 'zigzagAmplitude', label: 'Amplitude', type: 'range', min: 0, max: 160, step: 1, textMin: 0, textMax: Infinity },
-    { key: 'thickness', label: 'Thickness', type: 'range', min: 1, max: 24, step: 1, textMin: 0, textMax: Infinity },
+    { key: 'thickness', label: 'Thickness', type: 'range', min: 1, max: 64, step: 1, textMin: 1, textMax: 64 },
     { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
     { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
   ],

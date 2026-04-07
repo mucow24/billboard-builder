@@ -9,7 +9,7 @@ export const flatGridGeneratorSpec: GeneratorSpec<FlatGridGeneratorParams> = {
     { key: 'accentColor', label: 'Grid Color', type: 'color' },
     { key: 'gridSpacingX', label: 'Spacing X', type: 'range', min: 8, max: 180, step: 1, textMin: 1, textMax: Infinity },
     { key: 'gridSpacingY', label: 'Spacing Y', type: 'range', min: 8, max: 180, step: 1, textMin: 1, textMax: Infinity },
-    { key: 'thickness', label: 'Thickness', type: 'range', min: 1, max: 8, step: 0.5, textMin: 0, textMax: Infinity },
+    { key: 'thickness', label: 'Thickness', type: 'range', min: 1, max: 64, step: 1, textMin: 1, textMax: 64 },
     { key: 'offsetX', label: 'Offset X', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
     { key: 'offsetY', label: 'Offset Y', type: 'range', min: -240, max: 240, step: 1, textMin: -Infinity, textMax: Infinity },
     { key: 'rotation', label: 'Rotation', type: 'range', min: -180, max: 180, step: 1, textMin: -Infinity, textMax: Infinity },
