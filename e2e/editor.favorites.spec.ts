@@ -174,6 +174,93 @@ test.describe('editor favorite library flows', () => {
     expect(namesAfterReload[1]).toBe(namesBefore[0]);
   });
 
+  test('TL-08 filter and sort toolbar filters, sorts, and gates manual drag', async ({ page }) => {
+    const rectA = createRectangleFixture({ id: 'rect-e', x: 80, y: 80, width: 80, height: 80 });
+    const rectB = createRectangleFixture({ id: 'rect-f', x: 240, y: 240, width: 80, height: 80 });
+    const rectC = createRectangleFixture({ id: 'rect-g', x: 420, y: 420, width: 80, height: 80 });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createGroupedProjectDocument([rectA, rectB, rectC]),
+      'toolbar-test.json',
+    );
+
+    // Save three rectangles as favorites. uniquifyFavoriteName produces:
+    //   "Rectangle favorite", "Rectangle favorite (2)", "Rectangle favorite (3)".
+    for (const { x, y } of [
+      { x: 120, y: 120 },
+      { x: 280, y: 280 },
+      { x: 460, y: 460 },
+    ]) {
+      await clickCanvas(page, { x: 600, y: 600 }); // deselect
+      await clickCanvas(page, { x, y });
+      await page.getByRole('button', { name: 'Save as favorite' }).click();
+      await expect(page.getByRole('status')).toHaveText('Added to favorites');
+    }
+
+    await openFavoritesTab(page);
+
+    const toolbar = page.getByRole('toolbar', { name: /Favorites filter and sort/ });
+    await expect(toolbar).toBeVisible();
+
+    const search = page.getByRole('searchbox', { name: /Filter favorites by name/ });
+    const sortSelect = page.getByRole('combobox', { name: /Sort favorites by/ });
+    const directionButton = page.getByRole('button', { name: /Toggle sort direction/ });
+    const insertButtons = page.getByRole('button', { name: /^Insert Rectangle favorite/ });
+    const grips = page.getByRole('button', { name: /^Reorder Rectangle favorite/ });
+
+    await expect(insertButtons).toHaveCount(3);
+    await expect(sortSelect).toHaveValue('manual');
+    await expect(directionButton).toBeDisabled();
+
+    // Filter: type "(3)" to isolate the third favorite
+    await search.fill('(3)');
+    await expect(insertButtons).toHaveCount(1);
+    await expect(insertButtons.first()).toHaveText(/\(3\)/);
+
+    // Grips go inert while filtering (search non-empty)
+    for (let i = 0; i < (await grips.count()); i += 1) {
+      await expect(grips.nth(i)).toHaveAttribute('aria-disabled', 'true');
+    }
+
+    // Clear button restores the full list and refocuses the search box
+    await page.getByRole('button', { name: /Clear search/ }).click();
+    await expect(insertButtons).toHaveCount(3);
+    await expect(search).toBeFocused();
+    await expect(search).toHaveValue('');
+
+    // Switch to Name sort → direction button enabled, grips become inert
+    await sortSelect.selectOption('name');
+    await expect(directionButton).toBeEnabled();
+    const namesAscending = await insertButtons.allInnerTexts();
+    expect(namesAscending).toEqual([...namesAscending].sort());
+    for (let i = 0; i < 3; i += 1) {
+      await expect(grips.nth(i)).toHaveAttribute('aria-disabled', 'true');
+    }
+
+    // Toggle direction → order reverses
+    await directionButton.click();
+    const namesDescending = await insertButtons.allInnerTexts();
+    expect(namesDescending).toEqual([...namesAscending].reverse());
+
+    // Switch back to Manual → direction button disabled, grips re-enabled
+    await sortSelect.selectOption('manual');
+    await expect(directionButton).toBeDisabled();
+    for (let i = 0; i < 3; i += 1) {
+      await expect(grips.nth(i)).not.toHaveAttribute('aria-disabled', 'true');
+    }
+
+    // Sort selection persists across reload; search resets
+    await sortSelect.selectOption('name');
+    await search.fill('favorite');
+    await page.reload();
+    await waitForEditor(page);
+    await openFavoritesTab(page);
+    await expect(page.getByRole('combobox', { name: /Sort favorites by/ })).toHaveValue('name');
+    await expect(page.getByRole('searchbox', { name: /Filter favorites by name/ })).toHaveValue('');
+  });
+
   test('TL-05 lazily restores a favorite-only uploaded font after reload', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(

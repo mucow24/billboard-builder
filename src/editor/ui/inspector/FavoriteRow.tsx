@@ -34,7 +34,7 @@ export interface FavoriteRowProps {
   favorite: StoredFavorite;
   isEditing: boolean;
   isDragging: boolean;
-  dragHandleProps: DragHandleProps;
+  dragHandleProps?: DragHandleProps;
   onStartEdit: () => void;
   onCommitRename: (name: string) => void;
   onCancelEdit: () => void;
@@ -104,14 +104,16 @@ export function FavoriteRow({
     }
   }
 
+  const gripInert = isEditing || !dragHandleProps;
+
   return (
     <div className={`list-row favorite-row${isDragging ? ' dragging' : ''}`}>
       <button
         type="button"
-        className={`favorite-grip${isEditing ? ' favorite-grip-inert' : ''}`}
+        className={`favorite-grip${gripInert ? ' favorite-grip-inert' : ''}`}
         aria-label={`Reorder ${favorite.name}`}
-        aria-disabled={isEditing || undefined}
-        {...(isEditing ? { tabIndex: -1 } : dragHandleProps)}
+        aria-disabled={gripInert || undefined}
+        {...(gripInert ? { tabIndex: -1 } : dragHandleProps)}
       >
         {GRIP_ICON}
       </button>
