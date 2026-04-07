@@ -55,7 +55,7 @@ export function FavoritesInspectorTab({
       ))}
       {dropTargetIndex !== null && dragIndex !== null && (
         <div
-          className="favorite-drop-indicator"
+          className="list-drop-indicator"
           data-drop-indicator
           style={{
             position: 'absolute',
@@ -73,7 +73,7 @@ export function FavoritesInspectorTab({
 function getDropIndicatorOffset(list: HTMLElement | null, dropIndex: number): number {
   if (!list) return 0;
   const children = Array.from(list.children).filter(
-    (el) => !el.classList.contains('favorite-drop-indicator'),
+    (el) => !el.classList.contains('list-drop-indicator'),
   ) as HTMLElement[];
   if (dropIndex >= children.length) {
     const last = children[children.length - 1];

@@ -136,7 +136,7 @@
   opacity: 0.4;
 }
 
-.layer-drop-indicator {
+.list-drop-indicator {
   height: 2px;
   background: rgba(96, 165, 250, 0.7);
   border-radius: 1px;
@@ -345,9 +345,9 @@
   white-space: nowrap;
 }
 
-/* ── Row actions (lock / visibility) ────────────────────────────────────── */
+/* ── Shared row actions (layers + favorites) ───────────────────────────── */
 
-.layer-row-actions {
+.list-actions {
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -355,7 +355,7 @@
   gap: 1px;
 }
 
-.layer-row-action-btn {
+.list-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -370,7 +370,7 @@
   transition: opacity 0.12s, background 0.12s;
 }
 
-.layer-row-action-btn svg {
+.list-action-btn svg {
   width: 12px;
   height: 12px;
   stroke: #b8cceb;
@@ -378,49 +378,30 @@
   fill: none;
 }
 
-.layer-row-action-btn.active {
+.list-action-btn.active {
   opacity: 0.85;
 }
 
-.layer-row-action-btn.active svg {
+.list-action-btn.active svg {
   stroke: #e0eaff;
 }
 
-.layer-row:hover .layer-row-action-btn {
+.list-row:hover .list-action-btn {
   opacity: 0.4;
 }
 
-.layer-row:hover .layer-row-action-btn.active {
+.list-row:hover .list-action-btn.active {
   opacity: 1;
 }
 
-.layer-row-action-btn:hover,
-.layer-row-action-btn.active:hover {
+.list-action-btn:hover,
+.list-action-btn.active:hover {
   opacity: 1;
   background: rgba(129, 140, 248, 0.55);
 }
 
-.layer-row-action-btn:hover svg {
+.list-action-btn:hover svg {
   stroke: #e0eaff;
-}
-
-/* Rename action button — light blue accent */
-.layer-row-action-btn-rename {
-  opacity: 0.35;
-  color: #7eb8f0;
-}
-
-.layer-row-action-btn-rename svg {
-  stroke: currentColor;
-}
-
-.layer-row:hover .layer-row-action-btn-rename {
-  opacity: 0.5;
-}
-
-.layer-row-action-btn-rename:hover {
-  opacity: 1 !important;
-  background: rgba(96, 165, 250, 0.35);
 }
 
 /* Inline rename input */
@@ -541,21 +522,23 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  padding: 0 5px;
 }
 
 .favorite-row {
   display: grid;
-  grid-template-columns: 12px 24px minmax(0, 1fr) auto;
+  grid-template-columns: 12px 17px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
-  padding: 5px 4px 5px 2px;
-  border-radius: 4px;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 0 0 5px;
+  border-radius: var(--radius-sm);
 }
 
 .favorite-row:hover {
-  background: rgba(148, 163, 184, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+  background: rgba(22, 35, 57, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(54, 80, 122, 0.24);
+  border-radius: var(--radius-sm);
 }
 
 .favorite-row.dragging {
@@ -568,7 +551,7 @@
   align-items: center;
   justify-content: center;
   width: 12px;
-  height: 24px;
+  align-self: stretch;
   padding: 0;
   border: 0;
   background: transparent;
@@ -593,26 +576,18 @@
 
 .favorite-grip-icon {
   width: 6px;
-  height: 10px;
+  height: 13px;
   fill: currentColor;
-}
-
-/* Drop indicator line between rows during drag */
-.favorite-drop-indicator {
-  height: 2px;
-  background: rgba(96, 165, 250, 0.7);
-  border-radius: 1px;
-  pointer-events: none;
 }
 
 /* Swatch */
 .favorite-swatch {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: 17px;
+  height: 17px;
   padding: 0;
-  border: 1px solid rgba(147, 168, 201, 0.2);
-  border-radius: var(--radius-base);
+  border: 1px solid rgba(147, 168, 201, 0.26);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -635,7 +610,7 @@
 .favorite-row-body {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -681,31 +656,6 @@
   border-color: rgba(96, 165, 250, 0.7);
 }
 
-/* Action buttons container */
-.favorite-row-actions {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-}
-
-/* Edit / delete buttons — inherit .toolbar-button / .delete-button base */
-.favorite-edit-btn,
-.favorite-delete-btn {
-  width: 1.5rem;
-  height: 1.5rem;
-}
-
-.favorite-edit-btn svg,
-.favorite-delete-btn svg {
-  width: 12px;
-  height: 12px;
-}
-
-.favorite-edit-btn.active {
-  background: rgba(96, 165, 250, 0.35);
-  border-color: rgba(96, 165, 250, 0.7);
-  color: #bfdbfe;
-}
 
 .pinned-utility-row {
   margin-top: auto;
