@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createGroupNode,
@@ -10,6 +10,7 @@ import {
 
 import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 import { FavoritesInspectorTab } from './FavoritesInspectorTab';
+import { FAVORITES_PREFERENCES_STORAGE_KEY } from './useFavoritesPreferences';
 
 function makeFavorite(overrides: Partial<StoredFavorite> & { id: string; name: string }): StoredFavorite {
   return {
@@ -20,6 +21,14 @@ function makeFavorite(overrides: Partial<StoredFavorite> & { id: string; name: s
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  window.localStorage.removeItem(FAVORITES_PREFERENCES_STORAGE_KEY);
+});
+
+afterEach(() => {
+  window.localStorage.removeItem(FAVORITES_PREFERENCES_STORAGE_KEY);
+});
 
 describe('FavoritesInspectorTab', () => {
   it('renders an empty state when no favorites have been saved', () => {
@@ -171,5 +180,186 @@ describe('FavoritesInspectorTab', () => {
     await user.click(grip);
 
     expect(onInsertFavorite).not.toHaveBeenCalled();
+  });
+
+  describe('search + sort toolbar', () => {
+    const threeFavorites: StoredFavorite[] = [
+      makeFavorite({ id: 'f1', name: 'Charlie', color: '#ee2222' }),
+      makeFavorite({ id: 'f2', name: 'Alpha', color: '#22ee22' }),
+      makeFavorite({ id: 'f3', name: 'Bravo', color: '#2222ee' }),
+    ];
+
+    function renderTab(favorites: StoredFavorite[] = threeFavorites, extra: Partial<React.ComponentProps<typeof FavoritesInspectorTab>> = {}) {
+      return render(
+        <FavoritesInspectorTab
+          onDeleteFavorite={vi.fn()}
+          onInsertFavorite={vi.fn()}
+          onRenameFavorite={vi.fn()}
+          onRecolorFavorite={vi.fn()}
+          onReorderFavorite={vi.fn()}
+          favorites={favorites}
+          {...extra}
+        />,
+      );
+    }
+
+    function getRenderedFavoriteNames(): string[] {
+      return screen
+        .getAllByRole('button', { name: /^Insert / })
+        .map((btn) => (btn.textContent ?? '').trim().replace(/\d+ items?$/, '').trim());
+    }
+
+    it('does not render the toolbar when the favorites list is empty', () => {
+      renderTab([]);
+      expect(screen.queryByRole('toolbar', { name: /Favorites filter and sort/ })).toBeNull();
+      expect(screen.queryByRole('searchbox')).toBeNull();
+    });
+
+    it('renders the toolbar with a search box and a sort dropdown when favorites exist', () => {
+      renderTab();
+      expect(screen.getByRole('toolbar', { name: /Favorites filter and sort/ })).toBeInTheDocument();
+      expect(screen.getByRole('searchbox', { name: /Filter favorites by name/ })).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /Sort favorites by/ })).toBeInTheDocument();
+    });
+
+    it('filters rendered rows by name as the user types (case-insensitive)', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      const search = screen.getByRole('searchbox', { name: /Filter favorites by name/ });
+      await user.type(search, 'AL');
+      expect(getRenderedFavoriteNames()).toEqual(['Alpha']);
+    });
+
+    it('shows a clear button after typing, and clears the query when clicked', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      expect(screen.queryByRole('button', { name: /Clear search/ })).toBeNull();
+      const search = screen.getByRole('searchbox', { name: /Filter favorites by name/ });
+      await user.type(search, 'zz');
+      const clear = screen.getByRole('button', { name: /Clear search/ });
+      expect(clear).toBeInTheDocument();
+      await user.click(clear);
+      expect(search).toHaveValue('');
+      expect(screen.queryByRole('button', { name: /Clear search/ })).toBeNull();
+    });
+
+    it('shows a "No matching favorites" message when the query has no matches', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      const search = screen.getByRole('searchbox', { name: /Filter favorites by name/ });
+      await user.type(search, 'zzznomatch');
+      expect(screen.getByText(/No matching favorites/i)).toBeInTheDocument();
+    });
+
+    it('defaults to Manual sort with the direction button disabled', () => {
+      renderTab();
+      const select = screen.getByRole('combobox', { name: /Sort favorites by/ }) as HTMLSelectElement;
+      expect(select.value).toBe('manual');
+      const direction = screen.getByRole('button', { name: /Toggle sort direction/ });
+      expect(direction).toBeDisabled();
+    });
+
+    it('sorts favorites alphabetically when Name is selected', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      const select = screen.getByRole('combobox', { name: /Sort favorites by/ });
+      await user.selectOptions(select, 'name');
+      expect(getRenderedFavoriteNames()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    });
+
+    it('reverses name sort when direction is toggled', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      const select = screen.getByRole('combobox', { name: /Sort favorites by/ });
+      await user.selectOptions(select, 'name');
+      const direction = screen.getByRole('button', { name: /Toggle sort direction/ });
+      await user.click(direction);
+      expect(getRenderedFavoriteNames()).toEqual(['Charlie', 'Bravo', 'Alpha']);
+    });
+
+    it('persists the sort field across unmount via localStorage', async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderTab();
+      await user.selectOptions(
+        screen.getByRole('combobox', { name: /Sort favorites by/ }),
+        'name',
+      );
+      unmount();
+
+      renderTab();
+      const select = screen.getByRole('combobox', { name: /Sort favorites by/ }) as HTMLSelectElement;
+      expect(select.value).toBe('name');
+      expect(getRenderedFavoriteNames()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+    });
+
+    it('disables the drag grip when a non-manual sort is active', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await user.selectOptions(
+        screen.getByRole('combobox', { name: /Sort favorites by/ }),
+        'name',
+      );
+      const grips = screen.getAllByRole('button', { name: /Reorder/ });
+      grips.forEach((grip) => {
+        expect(grip).toHaveAttribute('aria-disabled', 'true');
+      });
+    });
+
+    it('disables the drag grip when a search query is active in Manual mode', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await user.type(
+        screen.getByRole('searchbox', { name: /Filter favorites by name/ }),
+        'a',
+      );
+      const grips = screen.getAllByRole('button', { name: /Reorder/ });
+      grips.forEach((grip) => {
+        expect(grip).toHaveAttribute('aria-disabled', 'true');
+      });
+    });
+
+    it('re-enables the drag grip when switching back to Manual mode with an empty query', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      const select = screen.getByRole('combobox', { name: /Sort favorites by/ });
+      await user.selectOptions(select, 'name');
+      await user.selectOptions(select, 'manual');
+      const grips = screen.getAllByRole('button', { name: /Reorder/ });
+      grips.forEach((grip) => {
+        expect(grip).not.toHaveAttribute('aria-disabled');
+      });
+    });
+
+    it('does not fire onReorderFavorite via Alt+ArrowDown in a sorted mode', async () => {
+      const user = userEvent.setup();
+      const onReorderFavorite = vi.fn();
+      renderTab(threeFavorites, { onReorderFavorite });
+      await user.selectOptions(
+        screen.getByRole('combobox', { name: /Sort favorites by/ }),
+        'name',
+      );
+      const firstGrip = screen.getAllByRole('button', { name: /Reorder/ })[0];
+      firstGrip.focus();
+      await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');
+      expect(onReorderFavorite).not.toHaveBeenCalled();
+    });
+
+    it('clears an in-progress edit when the edited row is filtered out by the query', async () => {
+      const user = userEvent.setup();
+      renderTab();
+      await user.click(screen.getByRole('button', { name: /Rename Alpha/ }));
+      // Row body renders an input while editing
+      expect(screen.getByDisplayValue('Alpha')).toBeInTheDocument();
+      // Now filter so Alpha disappears
+      await user.type(
+        screen.getByRole('searchbox', { name: /Filter favorites by name/ }),
+        'Charlie',
+      );
+      expect(screen.queryByDisplayValue('Alpha')).toBeNull();
+      // Clearing the query brings Alpha back, but it should NOT be in edit mode
+      await user.click(screen.getByRole('button', { name: /Clear search/ }));
+      expect(screen.queryByDisplayValue('Alpha')).toBeNull();
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
   });
 });

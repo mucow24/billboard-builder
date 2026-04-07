@@ -516,6 +516,162 @@
   vector-effect: non-scaling-stroke;
 }
 
+/* ── Favorites toolbar (search + sort) ───────────────────────────────────── */
+
+.favorites-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Negative margin extends the divider to the container's true edges
+   * (parent .rail-tab-body-favorites has 5px horizontal padding).
+   * Horizontal padding 10px = 5px offset + 5px original control inset. */
+  margin: 0 -5px 10px;
+  padding: 0 10px 10px;
+  border-bottom: 1px solid rgba(66, 87, 124, 0.62);
+}
+
+.favorites-search {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Specificity note: .properties-panel scopes an input:not(range):not(checkbox)
+ * rule in inspector.css (specificity 0,3,1). Using 4 classes here (0,4,0)
+ * beats that outright since class count trumps element count. */
+.properties-panel .favorites-toolbar .favorites-search .favorites-search-input {
+  width: 100%;
+  height: 1.8rem;
+  min-height: 0;
+  padding: 0 22px 0 7px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.properties-panel .favorites-toolbar .favorites-search .favorites-search-input::placeholder {
+  color: #64789b;
+}
+
+.properties-panel .favorites-toolbar .favorites-search .favorites-search-input:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.properties-panel .favorites-toolbar .favorites-search .favorites-search-input:focus {
+  border-color: rgba(129, 140, 248, 0.55);
+}
+
+/* Hide native search clear UI — we render our own */
+.properties-panel .favorites-toolbar .favorites-search .favorites-search-input::-webkit-search-cancel-button,
+.properties-panel .favorites-toolbar .favorites-search .favorites-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.favorites-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #93a8c9;
+  transform: translateY(-50%);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.favorites-search-clear:hover {
+  color: var(--text-primary);
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.favorites-search-clear svg {
+  width: 10px;
+  height: 10px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.favorites-sort {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+/* Wraps ONLY the native <select> so the ::after Unicode caret is positioned
+ * over the select (not the adjacent direction button). Matches
+ * .top-toolbar-menu-caret exactly (same character, font, size, color)
+ * so rendering is pixel-identical to the Canvas menu caret. */
+.favorites-sort-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.favorites-sort-field::after {
+  content: '▼';
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  line-height: 1;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.favorites-toolbar .favorites-sort-select {
+  /* appearance: none strips browser chrome so the ::after caret on the
+   * wrapper is the only visible triangle. */
+  appearance: none;
+  -webkit-appearance: none;
+  height: 1.8rem;
+  min-height: 0;
+  padding: 0 22px 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  background-color: var(--surface-base);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.favorites-toolbar .favorites-sort-select:hover {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+
+.favorites-toolbar .favorites-sort-select:focus {
+  border-color: rgba(129, 140, 248, 0.55);
+}
+
+/* .favorites-sort-direction reuses .toolbar-button shape (1.8rem square). */
+
+/* ── Favorites empty-search state ────────────────────────────────────────── */
+
+.favorites-empty-search {
+  padding-top: 4px;
+}
+
 /* ── Favorites (thin-row layout) ─────────────────────────────────────────── */
 
 .favorite-library-list {
