@@ -18,10 +18,28 @@ import {
 } from '../editor/core/selectors';
 import { flattenLayerRows } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
+import type { InspectorTab } from '../editor/ui/inspector/types';
+
+export interface InspectorPanelState {
+  tab: InspectorTab;
+  collapsed: boolean;
+}
 
 export function useEditorController() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingCollapsedGroupIds, setPendingCollapsedGroupIds] = useState<string[]>([]);
+  const [inspectorPanel, setInspectorPanel] = useState<InspectorPanelState>({
+    tab: 'properties',
+    collapsed: false,
+  });
+
+  const toggleInspectorTab = useCallback((tab: InspectorTab) => {
+    setInspectorPanel((current) =>
+      current.tab === tab
+        ? { tab, collapsed: !current.collapsed }
+        : { tab, collapsed: false },
+    );
+  }, []);
 
   const {
     editor,
@@ -156,6 +174,7 @@ export function useEditorController() {
     selectParentNode,
     selectAllNodes,
     setActiveTool,
+    toggleInspectorTab,
     undo,
     ungroupSelectedNode,
   });
@@ -190,6 +209,7 @@ export function useEditorController() {
       setActiveTool,
       setCanvasSize,
       insertFavorite,
+      toggleInspectorTab,
       toggleSelectedNode,
       toggleSelectedNodes,
       undo,
@@ -204,6 +224,7 @@ export function useEditorController() {
       canUndo,
       document,
       errorMessage,
+      inspectorPanel,
       layerRows,
       pendingCollapsedGroupIds,
       missingFontFamilies,

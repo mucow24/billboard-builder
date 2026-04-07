@@ -88,6 +88,7 @@ function createShortcutHarness() {
   const selectAllNodes = vi.fn();
   const selectParentNode = vi.fn().mockReturnValue(false);
   const setActiveTool = vi.fn();
+  const toggleInspectorTab = vi.fn();
   const undo = vi.fn();
   const ungroupSelectedNode = vi.fn();
 
@@ -103,6 +104,7 @@ function createShortcutHarness() {
     selectAllNodes,
     selectParentNode,
     setActiveTool,
+    toggleInspectorTab,
     undo,
     ungroupSelectedNode,
   };
@@ -120,6 +122,7 @@ function createShortcutHarness() {
     selectAllNodes,
     selectParentNode,
     setActiveTool,
+    toggleInspectorTab,
     undo,
     ungroupSelectedNode,
   };
@@ -436,5 +439,48 @@ describe('useEditorShortcuts', () => {
     expect(harness.selectParentNode).toHaveBeenCalledOnce();
     expect(harness.applyTransaction).not.toHaveBeenCalled();
     expect(harness.setActiveTool).not.toHaveBeenCalled();
+  });
+
+  it('toggles the inspector tabs with the 1, 2, and 3 digit keys', () => {
+    const harness = createShortcutHarness();
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchKeyDown(document.body, { key: '1' });
+    dispatchKeyDown(document.body, { key: '2' });
+    dispatchKeyDown(document.body, { key: '3' });
+
+    expect(harness.toggleInspectorTab).toHaveBeenNthCalledWith(1, 'properties');
+    expect(harness.toggleInspectorTab).toHaveBeenNthCalledWith(2, 'layers');
+    expect(harness.toggleInspectorTab).toHaveBeenNthCalledWith(3, 'favorites');
+    expect(harness.setActiveTool).not.toHaveBeenCalled();
+  });
+
+  it('does not toggle inspector tabs when a modifier key is held', () => {
+    const harness = createShortcutHarness();
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchKeyDown(document.body, { key: '1', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: '2', metaKey: true });
+
+    expect(harness.toggleInspectorTab).not.toHaveBeenCalled();
+  });
+
+  it('does not toggle inspector tabs when typing in an editable target', () => {
+    const harness = createShortcutHarness();
+
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    dispatchKeyDown(input, { key: '1' });
+    dispatchKeyDown(input, { key: '2' });
+    dispatchKeyDown(input, { key: '3' });
+
+    expect(harness.toggleInspectorTab).not.toHaveBeenCalled();
+
+    input.remove();
   });
 });

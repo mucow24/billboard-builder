@@ -9,7 +9,6 @@ import { CanvasStage } from './editor/rendering/CanvasStage';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
-import type { InspectorTab } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
 import { FontImportProvider } from './editor/ui/FontImportContext';
 import type { GuideLine } from './editor/document/documentTypes';
@@ -29,8 +28,6 @@ export default function App() {
   const favoriteStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('properties');
-  const [panelCollapsed, setPanelCollapsed] = useState(false);
 
   const {
     actions: {
@@ -57,6 +54,7 @@ export default function App() {
       setActiveTool,
       setCanvasSize,
       insertFavorite,
+      toggleInspectorTab,
       toggleSelectedNode,
       undo,
       ungroupSelectedNode,
@@ -70,6 +68,7 @@ export default function App() {
       canUndo,
       document,
       errorMessage,
+      inspectorPanel: { tab: inspectorTab, collapsed: panelCollapsed },
       layerRows,
       missingFontFamilies,
       pendingCollapsedGroupIds,
@@ -109,15 +108,6 @@ export default function App() {
   const handleCanvasFocusToggle = useCallback(() => {
     setCanvasFocusActive((prev) => !prev);
   }, []);
-
-  function handleInspectorTabChange(tab: InspectorTab) {
-    if (tab === inspectorTab) {
-      setPanelCollapsed((c) => !c);
-    } else {
-      setInspectorTab(tab);
-      setPanelCollapsed(false);
-    }
-  }
 
   return (
     <div className="app-shell">
@@ -173,7 +163,7 @@ export default function App() {
             onUngroup={ungroupSelectedNode}
             activeInspectorTab={inspectorTab}
             panelCollapsed={panelCollapsed}
-            onInspectorTabChange={handleInspectorTabChange}
+            onInspectorTabChange={toggleInspectorTab}
             itemCount={layerRows.length}
             favoriteCount={favorites.length}
             inspectorPanel={
@@ -201,7 +191,7 @@ export default function App() {
                 }}
                 onDeleteNode={deleteNode}
                 onMoveNode={moveNode}
-                onOpenProperties={() => handleInspectorTabChange('properties')}
+                onOpenProperties={() => toggleInspectorTab('properties')}
                 onRenameGroup={(groupId, name) => {
                   dispatch({ type: 'update_group', groupId, changes: { name } });
                 }}

@@ -11,6 +11,7 @@ import { cloneCanvasNode } from '../editor/document/sceneGraph';
 import type { CanvasTool } from '../editor/document/documentTypes';
 import { useEditorStore, type EditorStoreState } from '../editor/state/store';
 import { selectSelectedNodes } from '../editor/core/selectors';
+import type { InspectorTab } from '../editor/ui/inspector/types';
 
 interface UseEditorShortcutsArgs {
   applyTransaction: EditorStoreState['applyTransaction'];
@@ -24,6 +25,7 @@ interface UseEditorShortcutsArgs {
   selectParentNode: EditorStoreState['selectParentNode'];
   selectAllNodes: EditorStoreState['selectAllNodes'];
   setActiveTool: EditorStoreState['setActiveTool'];
+  toggleInspectorTab: (tab: InspectorTab) => void;
   undo: EditorStoreState['undo'];
   ungroupSelectedNode: EditorStoreState['ungroupSelectedNode'];
 }
@@ -40,6 +42,7 @@ export function useEditorShortcuts({
   selectParentNode,
   selectAllNodes,
   setActiveTool,
+  toggleInspectorTab,
   undo,
   ungroupSelectedNode,
 }: UseEditorShortcutsArgs) {
@@ -144,6 +147,13 @@ export function useEditorShortcuts({
       if (hasModifier || isEditable) {
         return;
       }
+      if (pressedKey === '1' || pressedKey === '2' || pressedKey === '3') {
+        event.preventDefault();
+        const tab: InspectorTab =
+          pressedKey === '1' ? 'properties' : pressedKey === '2' ? 'layers' : 'favorites';
+        toggleInspectorTab(tab);
+        return;
+      }
       const tool = hotkeyMap.get(pressedKey);
       if (tool) {
         setActiveTool(tool);
@@ -230,6 +240,7 @@ export function useEditorShortcuts({
     selectParentNode,
     selectAllNodes,
     setActiveTool,
+    toggleInspectorTab,
     undo,
     ungroupSelectedNode,
   ]);
