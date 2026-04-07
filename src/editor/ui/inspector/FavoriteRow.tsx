@@ -6,13 +6,15 @@ import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 import type { DragHandleProps } from './useListReorder';
 
 const GRIP_ICON = (
-  <svg viewBox="0 0 6 10" className="favorite-grip-icon">
+  <svg viewBox="0 0 6 13" className="favorite-grip-icon">
     <circle cx="1.5" cy="1.5" r="1" />
     <circle cx="4.5" cy="1.5" r="1" />
     <circle cx="1.5" cy="5" r="1" />
     <circle cx="4.5" cy="5" r="1" />
     <circle cx="1.5" cy="8.5" r="1" />
     <circle cx="4.5" cy="8.5" r="1" />
+    <circle cx="1.5" cy="12" r="1" />
+    <circle cx="4.5" cy="12" r="1" />
   </svg>
 );
 
@@ -103,7 +105,7 @@ export function FavoriteRow({
   }
 
   return (
-    <div className={`favorite-row${isDragging ? ' dragging' : ''}`}>
+    <div className={`list-row favorite-row${isDragging ? ' dragging' : ''}`}>
       <button
         type="button"
         className={`favorite-grip${isEditing ? ' favorite-grip-inert' : ''}`}
@@ -170,10 +172,10 @@ export function FavoriteRow({
         )}
       </button>
 
-      <div className="favorite-row-actions">
+      <div className="list-actions">
         <button
           type="button"
-          className={`toolbar-button favorite-edit-btn${isEditing ? ' active' : ''}`}
+          className={`list-action-btn${isEditing ? ' active' : ''}`}
           aria-label={`Rename ${favorite.name}`}
           onClick={handlePencilClick}
         >
@@ -181,7 +183,7 @@ export function FavoriteRow({
         </button>
         <button
           type="button"
-          className="delete-button favorite-delete-btn"
+          className="list-action-btn"
           aria-label={`Delete favorite ${favorite.name}`}
           onClick={(e) => {
             e.stopPropagation();

@@ -226,7 +226,7 @@ export function LayersInspectorTab({
               const rowPreviewStyle = isCanvasItemNode(row.node)
                 ? getLayerPreviewStyle(row.node)
                 : undefined;
-              const rowClassNames = ['layer-row'];
+              const rowClassNames = ['list-row', 'layer-row'];
               if (rowVisualState === 'active') {
                 rowClassNames.push('active');
               } else if (rowVisualState === 'contains-selection') {
@@ -398,11 +398,11 @@ export function LayersInspectorTab({
                     )}
                   </span>
                   {/* Lock & Visibility */}
-                  <span className="layer-row-actions">
+                  <span className="list-actions">
                     {isGroup && (
                       <button
                         type="button"
-                        className="layer-row-action-btn layer-row-action-btn-rename"
+                        className="list-action-btn"
                         aria-label="Rename group"
                         title="Rename"
                         onClick={(e) => {
@@ -418,7 +418,7 @@ export function LayersInspectorTab({
                     )}
                     <button
                       type="button"
-                      className={`layer-row-action-btn${row.node.locked ? ' active' : ''}`}
+                      className={`list-action-btn${row.node.locked ? ' active' : ''}`}
                       aria-label={row.node.locked ? 'Unlock layer' : 'Lock layer'}
                       title="Lock"
                       onClick={(e) => {
@@ -440,7 +440,7 @@ export function LayersInspectorTab({
                     </button>
                     <button
                       type="button"
-                      className={`layer-row-action-btn${row.node.hidden ? ' active' : ''}`}
+                      className={`list-action-btn${row.node.hidden ? ' active' : ''}`}
                       aria-label={row.node.hidden ? 'Show layer' : 'Hide layer'}
                       title="Toggle visibility"
                       onClick={(e) => {
@@ -463,7 +463,7 @@ export function LayersInspectorTab({
                     </button>
                     <button
                       type="button"
-                      className="layer-row-action-btn"
+                      className="list-action-btn"
                       aria-label="Delete layer"
                       title="Delete"
                       onClick={(e) => {
@@ -482,7 +482,7 @@ export function LayersInspectorTab({
             })}
             {dropTargetIndex !== null && dragIndex !== null && (
               <div
-                className="layer-drop-indicator"
+                className="list-drop-indicator"
                 data-drop-indicator
                 style={{
                   position: 'absolute',
@@ -503,7 +503,7 @@ export function LayersInspectorTab({
 function getDropIndicatorOffset(list: HTMLElement | null, dropIndex: number): number {
   if (!list) return 0;
   const children = Array.from(list.children).filter(
-    (el) => !el.classList.contains('layer-drop-indicator'),
+    (el) => !el.classList.contains('list-drop-indicator'),
   ) as HTMLElement[];
   if (dropIndex >= children.length) {
     const last = children[children.length - 1];
