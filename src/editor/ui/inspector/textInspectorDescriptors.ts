@@ -80,7 +80,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionLabel: 'Text',
       sectionOrder: SECTION_ORDER.text,
       slider: true,
-      step: 5,
+      step: 1,
       textMax: Infinity,
 
       valueType: 'number',

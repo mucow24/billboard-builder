@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   addGenerator,
@@ -9,6 +9,19 @@ import {
 } from './support/editor';
 
 test.describe('generator layers', () => {
+  async function expectRangeFieldBounds(
+    page: Page,
+    label: string,
+    bounds: { min: string; max: string; step: string },
+  ) {
+    await expect(page.getByRole('slider', { name: label, exact: true })).toHaveAttribute('min', bounds.min);
+    await expect(page.getByRole('slider', { name: label, exact: true })).toHaveAttribute('max', bounds.max);
+    await expect(page.getByRole('slider', { name: label, exact: true })).toHaveAttribute('step', bounds.step);
+    await expect(page.getByRole('spinbutton', { name: `${label} value`, exact: true })).toHaveAttribute('min', bounds.min);
+    await expect(page.getByRole('spinbutton', { name: `${label} value`, exact: true })).toHaveAttribute('max', bounds.max);
+    await expect(page.getByRole('spinbutton', { name: `${label} value`, exact: true })).toHaveAttribute('step', bounds.step);
+  }
+
   test('adds a Diagonal Bands generator from the toolbar and shows its properties', async ({ page }) => {
     await openFreshEditor(page);
 
@@ -23,6 +36,53 @@ test.describe('generator layers', () => {
     await expect(page.getByText('Band Color A')).toBeVisible();
     await expect(page.getByText('Band Count')).toBeVisible();
     await expect(page.getByText('Band Angle')).toBeVisible();
+  });
+
+  test('shows the updated generator slider bounds in the live inspector', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await addGenerator(page, 'Diagonal Bands');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Diagonal Bands');
+    await openPropertiesTab(page);
+    await expectRangeFieldBounds(page, 'Spacing Jitter', { min: '0', max: '5', step: '0.01' });
+    await expectRangeFieldBounds(page, 'Skew Intensity', { min: '0', max: '3', step: '0.01' });
+
+    await addGenerator(page, 'Burst Rays');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Burst Rays');
+    await openPropertiesTab(page);
+    await expectRangeFieldBounds(page, 'Ray Count', { min: '1', max: '48', step: '1' });
+    await expectRangeFieldBounds(page, 'Offset X', { min: '-512', max: '512', step: '1' });
+    await expectRangeFieldBounds(page, 'Offset Y', { min: '-512', max: '512', step: '1' });
+
+    await addGenerator(page, 'Zigzags');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Zigzags');
+    await openPropertiesTab(page);
+    await expectRangeFieldBounds(page, 'Count', { min: '1', max: '48', step: '1' });
+    await expectRangeFieldBounds(page, 'Thickness', { min: '1', max: '64', step: '1' });
+
+    await addGenerator(page, 'Flat Grid');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Flat Grid');
+    await openPropertiesTab(page);
+    await expectRangeFieldBounds(page, 'Thickness', { min: '1', max: '64', step: '1' });
+
+    await addGenerator(page, 'Noise');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Noise');
+    await openPropertiesTab(page);
+    await expectRangeFieldBounds(page, 'Intensity', { min: '0', max: '1', step: '0.001' });
+
+    await addGenerator(page, 'Shapes');
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Shapes');
+    await openPropertiesTab(page);
+    await expectRangeFieldBounds(page, 'Count', { min: '1', max: '256', step: '1' });
+    await expectRangeFieldBounds(page, 'Min Size', { min: '1', max: '384', step: '1' });
+    await expectRangeFieldBounds(page, 'Max Size', { min: '1', max: '384', step: '1' });
+    await expectRangeFieldBounds(page, 'Rotation', { min: '0', max: '1', step: '0.01' });
   });
 
   test('text input accepts values beyond slider range but clamps to correctness bounds', async ({ page }) => {
