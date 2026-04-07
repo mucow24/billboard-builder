@@ -48,6 +48,43 @@ function expectSavedGroup(project: Record<string, unknown>, nodeId: string): Sav
 }
 
 test.describe('editor shortcuts', () => {
+  test('toggles inspector tabs with the 1, 2, and 3 digit keys', async ({ page }) => {
+    await openFreshEditor(page);
+    await page.evaluate(() => {
+      (document.activeElement as HTMLElement | null)?.blur?.();
+    });
+
+    const propertiesTab = page.getByRole('tab', { name: 'Properties' });
+    const layersTab = page.getByRole('tab', { name: /Layers/ });
+    const favoritesTab = page.getByRole('tab', { name: /Favorites/ });
+
+    // Default state: Properties is open.
+    await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+
+    await page.keyboard.press('2');
+    await expect(layersTab).toHaveAttribute('aria-selected', 'true');
+    await expect(propertiesTab).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByTestId('layers-tab-body')).toBeVisible();
+
+    await page.keyboard.press('3');
+    await expect(favoritesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('favorites-tab-body')).toBeVisible();
+
+    await page.keyboard.press('1');
+    await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('properties-tab-body')).toBeVisible();
+
+    // Pressing the active tab's key collapses the panel.
+    await page.keyboard.press('1');
+    await expect(propertiesTab).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByTestId('properties-tab-body')).toBeHidden();
+
+    // Pressing it again re-opens the panel on the same tab.
+    await page.keyboard.press('1');
+    await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('properties-tab-body')).toBeVisible();
+  });
+
   test('KB-01 switches tools through real browser keyboard input', async ({ page }) => {
     await openFreshEditor(page);
 
