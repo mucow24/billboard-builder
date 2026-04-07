@@ -1,0 +1,147 @@
+/* ── Inspector list row primitives ───────────────────────────────────────── */
+
+.properties-panel {
+  --inspector-list-row-height: 28px;
+  --inspector-list-row-inset: 5px;
+  --inspector-list-grip-width: 12px;
+  --inspector-list-grip-icon-width: 6px;
+  --inspector-list-grip-icon-height: 13px;
+  --inspector-list-preview-size: 17px;
+  --inspector-list-content-gap: 7px;
+  --inspector-list-actions-gap: 1px;
+  --inspector-list-action-size: 18px;
+}
+
+.layer-list {
+  padding: 0 var(--inspector-list-row-inset);
+}
+
+.favorite-library-list {
+  padding: 0 var(--inspector-list-row-inset);
+}
+
+.list-row {
+  min-height: var(--inspector-list-row-height);
+  border-radius: var(--radius-sm);
+}
+
+.list-row.dragging {
+  opacity: 0.4;
+}
+
+.layer-grip,
+.favorite-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--inspector-list-grip-width);
+  align-self: stretch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64789b;
+  cursor: grab;
+  touch-action: none;
+}
+
+.layer-grip:hover,
+.favorite-grip:hover {
+  color: #93a8c9;
+}
+
+.layer-grip:active,
+.favorite-grip:active {
+  cursor: grabbing;
+}
+
+.layer-grip-icon,
+.favorite-grip-icon {
+  width: var(--inspector-list-grip-icon-width);
+  height: var(--inspector-list-grip-icon-height);
+  fill: currentColor;
+}
+
+.layer-row-type,
+.favorite-swatch {
+  width: var(--inspector-list-preview-size);
+  min-width: var(--inspector-list-preview-size);
+  height: var(--inspector-list-preview-size);
+}
+
+.layer-row-copy,
+.favorite-row-body {
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--inspector-list-content-gap);
+}
+
+.layer-row-copy strong,
+.favorite-row-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.layer-row-copy small,
+.favorite-row-count {
+  color: #93a8c9;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.list-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  gap: var(--inspector-list-actions-gap);
+}
+
+.list-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--inspector-list-action-size);
+  height: var(--inspector-list-action-size);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-base);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.25;
+  transition: opacity 0.12s, background 0.12s;
+}
+
+.list-action-btn svg {
+  width: 12px;
+  height: 12px;
+  stroke: #b8cceb;
+  stroke-width: 1.2;
+  fill: none;
+}
+
+.list-action-btn.active {
+  opacity: 0.85;
+}
+
+.list-action-btn.active svg {
+  stroke: #e0eaff;
+}
+
+.list-row:hover .list-action-btn {
+  opacity: 0.4;
+}
+
+.list-row:hover .list-action-btn.active {
+  opacity: 1;
+}
+
+.list-action-btn:hover,
+.list-action-btn.active:hover {
+  opacity: 1;
+  background: rgba(129, 140, 248, 0.55);
+}
+
+.list-action-btn:hover svg {
+  stroke: #e0eaff;
+}
