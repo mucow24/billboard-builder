@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   clickCanvas,
@@ -13,6 +13,27 @@ import {
   createTextFixture,
   uploadProject,
 } from './support/editor';
+
+const ZOOM_ALIGNMENT_GRID = 64;
+
+function expectAlignedZoom(zoom: number, devicePixelRatio: number) {
+  const scaledZoom = zoom * ZOOM_ALIGNMENT_GRID * devicePixelRatio;
+  expect(Math.abs(scaledZoom - Math.round(scaledZoom))).toBeLessThan(1e-6);
+}
+
+async function expectVisibleAlignedZoom(page: Page) {
+  const [devicePixelRatio, stageDebug] = await Promise.all([
+    page.evaluate(() => window.devicePixelRatio),
+    readStageDebug(page),
+  ]);
+
+  await expect(page.getByTestId('viewport-zoom')).toContainText(
+    `Zoom: ${Math.round(stageDebug.viewport.zoom * 100)}%`,
+  );
+  expectAlignedZoom(stageDebug.viewport.zoom, devicePixelRatio);
+
+  return stageDebug;
+}
 
 test.describe('editor smoke flows', () => {
   test('boots and creates rectangle, text, and line items from the canvas', async ({ page }) => {
@@ -41,7 +62,7 @@ test.describe('editor smoke flows', () => {
   test('updates zoom from the HUD and pans with the spacebar-drag gesture', async ({ page }) => {
     await openFreshEditor(page);
 
-    const initialDebug = await readStageDebug(page);
+    const initialDebug = await expectVisibleAlignedZoom(page);
     const initialZoom = initialDebug.viewport.zoom;
     const initialPan = {
       x: initialDebug.viewport.panX,
@@ -49,7 +70,23 @@ test.describe('editor smoke flows', () => {
     };
 
     await page.getByRole('button', { name: 'Zoom in' }).click();
-    await expect(page.getByTestId('viewport-zoom')).not.toContainText(`Zoom: ${Math.round(initialZoom * 100)}%`);
+    await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBeGreaterThan(initialZoom);
+    const zoomedInDebug = await expectVisibleAlignedZoom(page);
+
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await expect
+      .poll(async () => (await readStageDebug(page)).viewport.zoom)
+      .toBeLessThan(zoomedInDebug.viewport.zoom);
+    await expectVisibleAlignedZoom(page);
+
+    await page.getByRole('button', { name: 'Set zoom to 100%' }).click();
+    await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 100%');
+    const oneHundredPercentDebug = await expectVisibleAlignedZoom(page);
+    expect(oneHundredPercentDebug.viewport.zoom).toBe(1);
+
+    await page.getByRole('button', { name: 'Fit canvas to viewport' }).click();
+    await expect(page.getByTestId('viewport-zoom')).not.toContainText('Zoom: 100%');
+    await expectVisibleAlignedZoom(page);
 
     await page.keyboard.down(' ');
     await dragCanvas(page, { x: 220, y: 220 }, { x: 320, y: 300 });

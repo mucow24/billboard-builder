@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  alignToDevicePixels,
+  alignViewportPanToDevicePixels,
   clampZoom,
+  floorZoomToSeamFriendlyStep,
+  snapZoomToSeamFriendlyStep,
   toCanvasPointer,
   toOverlayStyle,
   toViewportPoint,
@@ -13,6 +17,21 @@ describe('viewportMath', () => {
     expect(clampZoom(0.01)).toBe(0.05);
     expect(clampZoom(2)).toBe(2);
     expect(clampZoom(20)).toBe(16);
+  });
+
+  it('aligns viewport pan values to device pixels', () => {
+    expect(alignToDevicePixels(-708.1090534979423, 1)).toBe(-708);
+    expect(alignToDevicePixels(316.324, 2)).toBe(316.5);
+    expect(alignViewportPanToDevicePixels({ x: 316.324, y: -389.7633744855966 }, 2)).toEqual({
+      x: 316.5,
+      y: -390,
+    });
+  });
+
+  it('snaps zoom levels to seam-friendlier steps', () => {
+    expect(snapZoomToSeamFriendlyStep(0.8, 1)).toBe(0.796875);
+    expect(snapZoomToSeamFriendlyStep(0.33, 1)).toBe(0.328125);
+    expect(floorZoomToSeamFriendlyStep(0.6328125, 1)).toBe(0.625);
   });
 
   it('converts points between viewport and canvas spaces', () => {

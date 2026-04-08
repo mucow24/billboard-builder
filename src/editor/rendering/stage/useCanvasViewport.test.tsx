@@ -5,6 +5,11 @@ import { useCanvasViewport } from './useCanvasViewport';
 
 describe('useCanvasViewport', () => {
   beforeEach(() => {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: 1,
+    });
+
     class TestResizeObserver {
       private readonly callback: ResizeObserverCallback;
 
@@ -75,9 +80,9 @@ describe('useCanvasViewport', () => {
       result.current.fitCanvasToViewport();
     });
 
-    expect(result.current.zoom).toBeCloseTo(0.6328125, 6);
-    expect(result.current.pan.x).toBeCloseTo(316, 6);
-    expect(result.current.pan.y).toBeCloseTo(36, 6);
+    expect(result.current.zoom).toBeCloseTo(0.625, 6);
+    expect(result.current.pan.x).toBeCloseTo(320, 6);
+    expect(result.current.pan.y).toBeCloseTo(40, 6);
 
     act(() => {
       result.current.setZoomFromHud(1);
@@ -124,6 +129,32 @@ describe('useCanvasViewport', () => {
     expect(result.current.getStageCursor(false)).toBe('grab');
   });
 
+  it('aligns fitted and zoomed pan values to device pixels', () => {
+    Object.defineProperty(window, 'devicePixelRatio', {
+      configurable: true,
+      value: 2,
+    });
+
+    const { result } = renderHook(() =>
+      useCanvasViewport({
+        activeTool: 'select',
+        canvasHeight: 1000,
+        canvasWidth: 999,
+      }),
+    );
+
+    expect(result.current.zoom).toBeCloseTo(0.640625, 6);
+    expect(result.current.pan).toEqual({ x: 320, y: 39.5 });
+
+    act(() => {
+      result.current.zoomAround({ x: 400, y: 300 }, 1.333);
+    });
+
+    expect(result.current.zoom).toBeCloseTo(1.3359375, 6);
+    expect(result.current.pan.x * 2).toBeCloseTo(Math.round(result.current.pan.x * 2), 6);
+    expect(result.current.pan.y * 2).toBeCloseTo(Math.round(result.current.pan.y * 2), 6);
+  });
+
   it('starts and stops pan dragging through stage pointer handlers', () => {
     const { result } = renderHook(() =>
       useCanvasViewport({
@@ -138,7 +169,7 @@ describe('useCanvasViewport', () => {
       result.current.handleStagePointerMove({ x: 140, y: 160 });
     });
 
-    expect(result.current.pan).toEqual({ x: 356, y: 96 });
+    expect(result.current.pan).toEqual({ x: 360, y: 100 });
     let handledPointerUp = false;
     act(() => {
       handledPointerUp = result.current.handleStagePointerUp();
@@ -186,7 +217,7 @@ describe('useCanvasViewport', () => {
       );
     });
 
-    expect(result.current.pan).toEqual({ x: 316, y: 36 });
+    expect(result.current.pan).toEqual({ x: 320, y: 40 });
   });
 
   it('continues pan dragging through window events only after the pointer leaves the viewport', () => {
@@ -228,7 +259,7 @@ describe('useCanvasViewport', () => {
       );
     });
 
-    expect(result.current.pan).toEqual({ x: 1616, y: 796 });
+    expect(result.current.pan).toEqual({ x: 1620, y: 800 });
   });
 
   it('stops pan dragging on window mouseup even when the release stays inside the viewport', () => {

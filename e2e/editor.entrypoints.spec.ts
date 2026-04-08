@@ -23,6 +23,27 @@ import {
   uploadProject,
 } from './support/editor';
 
+const ZOOM_ALIGNMENT_GRID = 64;
+
+function expectAlignedZoom(zoom: number, devicePixelRatio: number) {
+  const scaledZoom = zoom * ZOOM_ALIGNMENT_GRID * devicePixelRatio;
+  expect(Math.abs(scaledZoom - Math.round(scaledZoom))).toBeLessThan(1e-6);
+}
+
+async function expectVisibleAlignedViewportZoom(page: Page) {
+  const [devicePixelRatio, stageDebug] = await Promise.all([
+    page.evaluate(() => window.devicePixelRatio),
+    readStageDebug(page),
+  ]);
+
+  await expect(page.getByTestId('viewport-zoom')).toContainText(
+    `Zoom: ${Math.round(stageDebug.viewport.zoom * 100)}%`,
+  );
+  expectAlignedZoom(stageDebug.viewport.zoom, devicePixelRatio);
+
+  return stageDebug;
+}
+
 async function expectNoActiveSelection(page: Page) {
   await expect(page.locator('.layer-row.active')).toHaveCount(0);
 }
@@ -460,14 +481,14 @@ test.describe('editor canvas entrypoints', () => {
     await openFreshEditor(page);
     await setCanvasTestHooksEnabled(page, false);
 
-    const initialDebug = await readStageDebug(page);
+    const initialDebug = await expectVisibleAlignedViewportZoom(page);
     const stageSurface = page.locator('.konvajs-content');
 
     await selectTool(page, 'Zoom');
     await expect(page.getByRole('button', { name: 'Zoom (Z)' })).toHaveAttribute('aria-pressed', 'true');
     await expect(stageSurface).toHaveCSS('cursor', 'zoom-in');
     await clickCanvas(page, { x: 300, y: 300 });
-    let stageDebug = await readStageDebug(page);
+    let stageDebug = await expectVisibleAlignedViewportZoom(page);
     expect(stageDebug.viewport.zoom).toBeGreaterThan(initialDebug.viewport.zoom);
     // Zoom tool auto-reverts to select after click
     await expect(stageSurface).toHaveCSS('cursor', 'default');
@@ -478,16 +499,19 @@ test.describe('editor canvas entrypoints', () => {
     await expect(stageSurface).toHaveCSS('cursor', 'zoom-out');
     await clickCanvas(page, { x: 300, y: 300 });
     await page.keyboard.up('Alt');
-    stageDebug = await readStageDebug(page);
+    stageDebug = await expectVisibleAlignedViewportZoom(page);
     expect(stageDebug.viewport.zoom).toBeLessThanOrEqual(initialDebug.viewport.zoom * 1.01);
     // Auto-reverts again
     await expect(stageSurface).toHaveCSS('cursor', 'default');
 
     await page.getByRole('button', { name: 'Set zoom to 100%' }).click();
     await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 100%');
+    stageDebug = await expectVisibleAlignedViewportZoom(page);
+    expect(stageDebug.viewport.zoom).toBe(1);
 
     await page.getByRole('button', { name: 'Fit canvas to viewport' }).click();
     await expect(page.getByTestId('viewport-zoom')).not.toContainText('Zoom: 100%');
+    stageDebug = await expectVisibleAlignedViewportZoom(page);
 
     await selectTool(page, 'Hand');
     const handCursor = await stageSurface.evaluate((node) => getComputedStyle(node).cursor);
@@ -510,6 +534,7 @@ test.describe('editor canvas entrypoints', () => {
     const preWheelZoom = stageDebug.viewport.zoom;
     await page.mouse.wheel(0, -240);
     await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBeGreaterThan(preWheelZoom);
+    stageDebug = await expectVisibleAlignedViewportZoom(page);
   });
 
   for (const pickupCase of leafPickupCases) {

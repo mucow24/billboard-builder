@@ -371,10 +371,10 @@ describe('CanvasStage viewport controls', () => {
     expect(contentLayer).not.toHaveAttribute('data-prop-clipheight');
     expect(canvasRect).not.toBeNull();
     expect(exportCue).toHaveClass('canvas-export-bounds-cue', 'active');
-    expect(topPanel).toHaveStyle({ left: '0px', top: '0px', width: '1280px', height: '36px' });
-    expect(rightPanel).toHaveStyle({ left: '964px', top: '36px', width: '316px', height: '648px' });
-    expect(bottomPanel).toHaveStyle({ left: '0px', top: '684px', width: '1280px', height: '36px' });
-    expect(leftPanel).toHaveStyle({ left: '0px', top: '36px', width: '316px', height: '648px' });
+    expect(topPanel).toHaveStyle({ left: '0px', top: '0px', width: '1280px', height: '40px' });
+    expect(rightPanel).toHaveStyle({ left: '960px', top: '40px', width: '320px', height: '640px' });
+    expect(bottomPanel).toHaveStyle({ left: '0px', top: '680px', width: '1280px', height: '40px' });
+    expect(leftPanel).toHaveStyle({ left: '0px', top: '40px', width: '320px', height: '640px' });
   });
 
 
@@ -506,19 +506,19 @@ describe('CanvasStage viewport controls', () => {
 
     expect(screen.getByRole('button', { name: 'Fit canvas to viewport' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Set zoom to 100%' })).toBeInTheDocument();
-    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 32%');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 31%');
 
     await user.click(screen.getByRole('button', { name: 'Set zoom to 100%' }));
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 100%');
 
     await user.click(screen.getByRole('button', { name: 'Zoom in' }));
-    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 110%');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 109%');
 
     await user.click(screen.getByRole('button', { name: 'Zoom out' }));
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 100%');
 
     await user.click(screen.getByRole('button', { name: 'Fit canvas to viewport' }));
-    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 32%');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 31%');
   });
 
   it('keeps the group frame visual-only while still forwarding group resize handles', () => {
