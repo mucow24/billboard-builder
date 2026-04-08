@@ -5,7 +5,16 @@ import type { CanvasTool } from '../../document/documentTypes';
 import type { Point } from '../interactionGeometry';
 import { useModifierKeys } from '../useModifierKeys';
 
-import { clampZoom, toCanvasPointer, toViewportPoint, toViewportRect } from './viewportMath';
+import {
+  alignViewportPanToDevicePixels,
+  clampZoom,
+  floorZoomToSeamFriendlyStep,
+  getDevicePixelRatio,
+  snapZoomToSeamFriendlyStep,
+  toCanvasPointer,
+  toViewportPoint,
+  toViewportRect,
+} from './viewportMath';
 
 const ZOOM_STEP = 1.2;
 const HUD_ZOOM_STEP = 0.1;
@@ -20,6 +29,8 @@ interface ViewportPoint {
   x: number;
   y: number;
 }
+
+type PanUpdate = Point | ((currentPan: Point) => Point);
 
 export function useCanvasViewport({
   activeTool,
@@ -46,24 +57,33 @@ export function useCanvasViewport({
     [viewportSize.height, viewportSize.width],
   );
 
+  const setAlignedPan = useCallback((nextPan: PanUpdate) => {
+    setPan((currentPan) => {
+      const resolvedPan = typeof nextPan === 'function' ? nextPan(currentPan) : nextPan;
+
+      return alignViewportPanToDevicePixels(resolvedPan, getDevicePixelRatio());
+    });
+  }, []);
+
   const fitCanvasToViewport = useCallback(() => {
     if (viewportSize.width <= 0 || viewportSize.height <= 0) {
       return;
     }
 
-    const nextZoom = clampZoom(
+    const requestedZoom = clampZoom(
       Math.min(
         viewportSize.width / Math.max(canvasWidth, 1),
         viewportSize.height / Math.max(canvasHeight, 1),
       ) * 0.9,
     );
+    const nextZoom = floorZoomToSeamFriendlyStep(requestedZoom, getDevicePixelRatio());
 
     setZoom(nextZoom);
-    setPan({
+    setAlignedPan({
       x: (viewportSize.width - canvasWidth * nextZoom) / 2,
       y: (viewportSize.height - canvasHeight * nextZoom) / 2,
     });
-  }, [canvasHeight, canvasWidth, viewportSize.height, viewportSize.width]);
+  }, [canvasHeight, canvasWidth, setAlignedPan, viewportSize.height, viewportSize.width]);
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -162,7 +182,7 @@ export function useCanvasViewport({
       }
       event.preventDefault();
       window.document.body.style.cursor = 'grabbing';
-      setPan({
+      setAlignedPan({
         x: current.startPan.x + (pointer.x - current.startPointer.x),
         y: current.startPan.y + (pointer.y - current.startPointer.y),
       });
@@ -180,7 +200,7 @@ export function useCanvasViewport({
       window.removeEventListener('mouseup', handleWindowMouseUp);
       window.document.body.style.cursor = '';
     };
-  }, [getViewportPointerFromClient, isClientPointInsideViewport, isPanDragging, stopPanDrag]);
+  }, [getViewportPointerFromClient, isClientPointInsideViewport, isPanDragging, setAlignedPan, stopPanDrag]);
 
   const viewport = useMemo(
     () => ({ zoom, panX: pan.x, panY: pan.y }),
@@ -189,12 +209,13 @@ export function useCanvasViewport({
 
   const zoomAround = useCallback((point: Point, nextZoom: number) => {
     const clampedZoom = clampZoom(nextZoom);
-    setPan((currentPan) => ({
-      x: point.x - ((point.x - currentPan.x) / zoomRef.current) * clampedZoom,
-      y: point.y - ((point.y - currentPan.y) / zoomRef.current) * clampedZoom,
+    const snappedZoom = snapZoomToSeamFriendlyStep(clampedZoom, getDevicePixelRatio());
+    setAlignedPan((currentPan) => ({
+      x: point.x - ((point.x - currentPan.x) / zoomRef.current) * snappedZoom,
+      y: point.y - ((point.y - currentPan.y) / zoomRef.current) * snappedZoom,
     }));
-    setZoom(clampedZoom);
-  }, []);
+    setZoom(snappedZoom);
+  }, [setAlignedPan]);
 
   const setZoomFromHud = useCallback(
     (nextZoom: number) => {
@@ -237,11 +258,11 @@ export function useCanvasViewport({
     if (!current || !pointer) {
       return;
     }
-    setPan({
+    setAlignedPan({
       x: current.startPan.x + (pointer.x - current.startPointer.x),
       y: current.startPan.y + (pointer.y - current.startPointer.y),
     });
-  }, []);
+  }, [setAlignedPan]);
 
   const handleStagePointerUp = useCallback(() => {
     if (!panDragRef.current) {

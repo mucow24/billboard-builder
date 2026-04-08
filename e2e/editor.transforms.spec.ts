@@ -456,9 +456,14 @@ test.describe('editor transforms', () => {
 
     expect(snappedItem).toBeDefined();
     expect(unsnappedItem).toBeDefined();
-    expect(Number(snappedItem?.x)).toBeCloseTo(480, 0);
-    expect(Number(unsnappedItem?.x)).toBeCloseTo(484, 0);
-    expect(Number(unsnappedItem?.x)).toBeGreaterThan(Number(snappedItem?.x));
+    const snappedX = Number(snappedItem?.x);
+    const unsnappedX = Number(unsnappedItem?.x);
+    expect(snappedX).toBeCloseTo(480, 0);
+    expect(unsnappedX).toBeGreaterThan(snappedX);
+    // The control-modified drag should preserve the small overshoot past the
+    // sibling edge instead of collapsing to the snapped 480px alignment.
+    expect(unsnappedX - snappedX).toBeGreaterThan(2);
+    expect(unsnappedX - snappedX).toBeLessThan(8);
     expect(Number(snappedItem?.y)).toBe(120);
     expect(Number(unsnappedItem?.y)).toBe(120);
   });
