@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { Wheel, type ColorResult } from '@uiw/react-color';
 
 import { computePickerPosition } from './colorPickerPosition';
+import { useHistoryInteraction } from '../state/useHistoryInteraction';
 import {
   commitHexColorInput,
   hexColorToHsla,
@@ -51,6 +52,7 @@ export function ColorPickerControl({
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [draftHex, setDraftHex] = useState(storedValue);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
+  const { start: startInteraction, end: endInteraction } = useHistoryInteraction();
 
   useEffect(() => {
     setDraftHex(storedValue);
@@ -214,7 +216,13 @@ export function ColorPickerControl({
                   }
                 }}
               >
-                <div className="color-picker-wheel">
+                <div
+                  className="color-picker-wheel"
+                  onPointerDown={startInteraction}
+                  onPointerUp={endInteraction}
+                  onPointerCancel={endInteraction}
+                  onLostPointerCapture={endInteraction}
+                >
                   <Wheel
                     color={hsva}
                     onChange={handleWheelChange}
@@ -256,6 +264,10 @@ export function ColorPickerControl({
                       step={1}
                       type="range"
                       value={Math.round(hsla.h)}
+                      onPointerDown={startInteraction}
+                      onPointerUp={endInteraction}
+                      onPointerCancel={endInteraction}
+                      onLostPointerCapture={endInteraction}
                       onChange={(event) =>
                         updateHsla('h', Number(event.target.value), {
                           min: 0,
@@ -277,6 +289,10 @@ export function ColorPickerControl({
                       step={1}
                       type="range"
                       value={Math.round(hsla.s)}
+                      onPointerDown={startInteraction}
+                      onPointerUp={endInteraction}
+                      onPointerCancel={endInteraction}
+                      onLostPointerCapture={endInteraction}
                       onChange={(event) =>
                         updateHsla('s', Number(event.target.value), {
                           min: 0,
@@ -298,6 +314,10 @@ export function ColorPickerControl({
                       step={1}
                       type="range"
                       value={Math.round(hsla.l)}
+                      onPointerDown={startInteraction}
+                      onPointerUp={endInteraction}
+                      onPointerCancel={endInteraction}
+                      onLostPointerCapture={endInteraction}
                       onChange={(event) =>
                         updateHsla('l', Number(event.target.value), {
                           min: 0,
@@ -319,6 +339,10 @@ export function ColorPickerControl({
                       step={1}
                       type="range"
                       value={Math.round(hsva.a * 100)}
+                      onPointerDown={startInteraction}
+                      onPointerUp={endInteraction}
+                      onPointerCancel={endInteraction}
+                      onLostPointerCapture={endInteraction}
                       onChange={(event) =>
                         updateHsla('a', Number(event.target.value) / 100, {
                           min: 0,

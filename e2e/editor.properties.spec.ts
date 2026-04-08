@@ -452,6 +452,65 @@ test.describe('editor properties flows', () => {
     ]);
   });
 
+  test('slider drags commit a single history entry so one Ctrl+Z reverts the drag', async ({
+    page,
+  }) => {
+    const rectangle = createRectangleFixture({
+      id: 'drag-rect',
+      name: 'Drag Rectangle',
+      x: 180,
+      y: 180,
+      width: 200,
+      height: 140,
+      cornerRadius: 0,
+      zIndex: 0,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([rectangle]),
+      'properties-drag-undo.json',
+    );
+    await clickCanvas(page, { x: 280, y: 250 });
+    await openPropertiesTab(page);
+
+    await page.getByRole('button', { name: 'Geometry' }).click();
+    const slider = page.getByRole('slider', { name: 'Corner radius' });
+    await expect(slider).toBeVisible();
+    await expect(slider).toHaveValue('0');
+
+    // Simulate a pointer-driven slider drag: pointerdown, multiple intermediate
+    // change events, pointerup. Without the history-interaction wiring, each
+    // intermediate change would write its own undo entry, so a single Ctrl+Z
+    // would only revert the final step rather than the entire drag.
+    await slider.dispatchEvent('pointerdown');
+    await slider.evaluate((el: HTMLInputElement) => {
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      for (const value of ['5', '10', '15', '20', '25']) {
+        valueSetter?.call(el, value);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    await slider.dispatchEvent('pointerup');
+
+    // After the drag, the radius should reflect the final dragged value.
+    await expect(slider).toHaveValue('25');
+
+    // One Ctrl+Z should restore the pre-drag value (0), not an intermediate one.
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(slider).toHaveValue('0');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({ id: 'drag-rect', cornerRadius: 0 }),
+    ]);
+  });
+
   test('numeric properties render slider+input combos', async ({ page }) => {
     const rectangle = createRectangleFixture({
       id: 'slider-rect',

@@ -1,9 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ColorPickerControl } from './ColorPickerControl';
 import { computePickerPosition } from './colorPickerPosition';
+import { useEditorStore } from '../state/store';
+import { createDefaultEditorState } from '../core/editorState';
 
 vi.mock('@uiw/react-color', async () => {
   const actual =
@@ -171,6 +173,53 @@ describe('ColorPickerControl', () => {
 
     await user.click(screen.getByRole('button', { name: 'Outside' }));
     expect(screen.queryByLabelText('Fill hex')).not.toBeInTheDocument();
+  });
+
+  describe('history interaction bracketing', () => {
+    beforeEach(() => {
+      useEditorStore.setState({ editor: createDefaultEditorState() });
+    });
+
+    it('brackets HSL slider drags with begin/commit interaction', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <ColorPickerControl label="Fill" value="#ff000080" onChange={vi.fn()} />,
+      );
+
+      await user.click(screen.getByRole('button', { name: /fill/i }));
+      const hueSlider = screen.getByLabelText('Fill hue');
+
+      expect(useEditorStore.getState().editor.interactionSnapshot).toBeNull();
+      fireEvent.pointerDown(hueSlider);
+      expect(useEditorStore.getState().editor.interactionSnapshot).not.toBeNull();
+
+      fireEvent.change(hueSlider, { target: { value: '120' } });
+      fireEvent.pointerUp(hueSlider);
+      expect(useEditorStore.getState().editor.interactionSnapshot).toBeNull();
+    });
+
+    it('brackets wheel drags via the wheel wrapper', async () => {
+      const user = userEvent.setup();
+
+      render(
+        <ColorPickerControl label="Fill" value="#33669980" onChange={vi.fn()} />,
+      );
+
+      await user.click(screen.getByRole('button', { name: /fill/i }));
+      // The wheel wrapper is a sibling div around the mocked Wheel button; the
+      // Wheel's container div carries the `color-picker-wheel` class.
+      const wheelWrapper = screen
+        .getByRole('button', { name: 'Mock wheel' })
+        .closest('.color-picker-wheel') as HTMLElement;
+      expect(wheelWrapper).not.toBeNull();
+
+      fireEvent.pointerDown(wheelWrapper);
+      expect(useEditorStore.getState().editor.interactionSnapshot).not.toBeNull();
+
+      fireEvent.pointerUp(wheelWrapper);
+      expect(useEditorStore.getState().editor.interactionSnapshot).toBeNull();
+    });
   });
 });
 
