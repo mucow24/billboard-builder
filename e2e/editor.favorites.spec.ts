@@ -205,14 +205,12 @@ test.describe('editor favorite library flows', () => {
     await expect(toolbar).toBeVisible();
 
     const search = page.getByRole('searchbox', { name: /Filter favorites by name/ });
-    const sortSelect = page.getByRole('combobox', { name: /Sort favorites by/ });
-    const directionButton = page.getByRole('button', { name: /Toggle sort direction/ });
+    const sortTrigger = page.getByRole('button', { name: 'Manual sort' });
     const insertButtons = page.getByRole('button', { name: /^Insert Rectangle favorite/ });
     const grips = page.getByRole('button', { name: /^Reorder Rectangle favorite/ });
 
     await expect(insertButtons).toHaveCount(3);
-    await expect(sortSelect).toHaveValue('manual');
-    await expect(directionButton).toBeDisabled();
+    await expect(sortTrigger).toBeVisible();
 
     // Filter: type "(3)" to isolate the third favorite
     await search.fill('(3)');
@@ -230,34 +228,46 @@ test.describe('editor favorite library flows', () => {
     await expect(search).toBeFocused();
     await expect(search).toHaveValue('');
 
-    // Switch to Name sort → direction button enabled, grips become inert
-    await sortSelect.selectOption('name');
-    await expect(directionButton).toBeEnabled();
+    // Switch to Name sort → trigger label updates, grips become inert
+    await sortTrigger.click();
+    await page.getByRole('group', { name: 'Sort favorites' }).getByRole('button', { name: 'Name' }).click();
+    await expect(page.getByRole('button', { name: 'Name (Asc)' })).toBeVisible();
     const namesAscending = await insertButtons.allInnerTexts();
     expect(namesAscending).toEqual([...namesAscending].sort());
     for (let i = 0; i < 3; i += 1) {
       await expect(grips.nth(i)).toHaveAttribute('aria-disabled', 'true');
     }
 
-    // Toggle direction → order reverses
-    await directionButton.click();
+    // Change direction → order reverses
+    await page.getByRole('button', { name: 'Name (Asc)' }).click();
+    await page
+      .getByRole('group', { name: 'Sort favorites' })
+      .getByRole('button', { name: 'Descending' })
+      .click();
+    await expect(page.getByRole('button', { name: 'Name (Desc)' })).toBeVisible();
     const namesDescending = await insertButtons.allInnerTexts();
     expect(namesDescending).toEqual([...namesAscending].reverse());
 
-    // Switch back to Manual → direction button disabled, grips re-enabled
-    await sortSelect.selectOption('manual');
-    await expect(directionButton).toBeDisabled();
+    // Switch back to Manual → trigger label resets, grips re-enabled
+    await page.getByRole('button', { name: 'Name (Desc)' }).click();
+    await page
+      .getByRole('group', { name: 'Sort favorites' })
+      .getByRole('button', { name: 'Manual sort' })
+      .click();
+    await expect(page.getByRole('button', { name: 'Manual sort' })).toBeVisible();
     for (let i = 0; i < 3; i += 1) {
       await expect(grips.nth(i)).not.toHaveAttribute('aria-disabled', 'true');
     }
 
     // Sort selection persists across reload; search resets
-    await sortSelect.selectOption('name');
+    await page.getByRole('button', { name: 'Manual sort' }).click();
+    await page.getByRole('group', { name: 'Sort favorites' }).getByRole('button', { name: 'Name' }).click();
+    await expect(page.getByRole('button', { name: 'Name (Desc)' })).toBeVisible();
     await search.fill('favorite');
     await page.reload();
     await waitForEditor(page);
     await openFavoritesTab(page);
-    await expect(page.getByRole('combobox', { name: /Sort favorites by/ })).toHaveValue('name');
+    await expect(page.getByRole('button', { name: 'Name (Desc)' })).toBeVisible();
     await expect(page.getByRole('searchbox', { name: /Filter favorites by name/ })).toHaveValue('');
   });
 

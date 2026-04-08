@@ -215,7 +215,7 @@ describe('FavoritesInspectorTab', () => {
       expect(screen.queryByRole('searchbox')).toBeNull();
     });
 
-    it('renders the toolbar with a search box and a sort dropdown when favorites exist', () => {
+    it('renders the toolbar with a search box and a sort trigger when favorites exist', () => {
       renderTab();
       expect(screen.getByRole('toolbar', { name: /Favorites filter and sort/ })).toHaveClass(
         'inspector-rail-toolbar',
@@ -223,11 +223,8 @@ describe('FavoritesInspectorTab', () => {
       expect(screen.getByRole('searchbox', { name: /Filter favorites by name/ })).toHaveClass(
         'inspector-rail-text-input',
       );
-      expect(screen.getByRole('combobox', { name: /Sort favorites by/ })).toHaveClass(
-        'inspector-rail-select',
-      );
-      expect(screen.getByRole('button', { name: /Toggle sort direction/ })).toHaveClass(
-        'inspector-rail-icon-button',
+      expect(screen.getByRole('button', { name: 'Manual sort' })).toHaveClass(
+        'inspector-rail-menu-trigger',
       );
     });
 
@@ -260,54 +257,50 @@ describe('FavoritesInspectorTab', () => {
       expect(screen.getByText(/No matching favorites/i)).toBeInTheDocument();
     });
 
-    it('defaults to Manual sort with the direction button disabled', () => {
+    it('defaults to Manual sort', () => {
       renderTab();
-      const select = screen.getByRole('combobox', { name: /Sort favorites by/ }) as HTMLSelectElement;
-      expect(select.value).toBe('manual');
-      const direction = screen.getByRole('button', { name: /Toggle sort direction/ });
-      expect(direction).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Manual sort' })).toBeInTheDocument();
     });
 
     it('sorts favorites alphabetically when Name is selected', async () => {
       const user = userEvent.setup();
       renderTab();
-      const select = screen.getByRole('combobox', { name: /Sort favorites by/ });
-      await user.selectOptions(select, 'name');
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
+      await user.click(screen.getByRole('button', { name: 'Name' }));
+      expect(screen.getByRole('button', { name: 'Name (Asc)' })).toBeInTheDocument();
       expect(getRenderedFavoriteNames()).toEqual(['Alpha', 'Bravo', 'Charlie']);
     });
 
     it('reverses name sort when direction is toggled', async () => {
       const user = userEvent.setup();
       renderTab();
-      const select = screen.getByRole('combobox', { name: /Sort favorites by/ });
-      await user.selectOptions(select, 'name');
-      const direction = screen.getByRole('button', { name: /Toggle sort direction/ });
-      await user.click(direction);
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
+      await user.click(screen.getByRole('button', { name: 'Name' }));
+      await user.click(screen.getByRole('button', { name: 'Name (Asc)' }));
+      await user.click(screen.getByRole('button', { name: 'Descending' }));
+      expect(screen.getByRole('button', { name: 'Name (Desc)' })).toBeInTheDocument();
       expect(getRenderedFavoriteNames()).toEqual(['Charlie', 'Bravo', 'Alpha']);
     });
 
-    it('persists the sort field across unmount via localStorage', async () => {
+    it('persists the sort field and direction across unmount via localStorage', async () => {
       const user = userEvent.setup();
       const { unmount } = renderTab();
-      await user.selectOptions(
-        screen.getByRole('combobox', { name: /Sort favorites by/ }),
-        'name',
-      );
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
+      await user.click(screen.getByRole('button', { name: 'Name' }));
+      await user.click(screen.getByRole('button', { name: 'Name (Asc)' }));
+      await user.click(screen.getByRole('button', { name: 'Descending' }));
       unmount();
 
       renderTab();
-      const select = screen.getByRole('combobox', { name: /Sort favorites by/ }) as HTMLSelectElement;
-      expect(select.value).toBe('name');
-      expect(getRenderedFavoriteNames()).toEqual(['Alpha', 'Bravo', 'Charlie']);
+      expect(screen.getByRole('button', { name: 'Name (Desc)' })).toBeInTheDocument();
+      expect(getRenderedFavoriteNames()).toEqual(['Charlie', 'Bravo', 'Alpha']);
     });
 
     it('disables the drag grip when a non-manual sort is active', async () => {
       const user = userEvent.setup();
       renderTab();
-      await user.selectOptions(
-        screen.getByRole('combobox', { name: /Sort favorites by/ }),
-        'name',
-      );
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
+      await user.click(screen.getByRole('button', { name: 'Name' }));
       const grips = screen.getAllByRole('button', { name: /Reorder/ });
       grips.forEach((grip) => {
         expect(grip).toHaveAttribute('aria-disabled', 'true');
@@ -330,9 +323,10 @@ describe('FavoritesInspectorTab', () => {
     it('re-enables the drag grip when switching back to Manual mode with an empty query', async () => {
       const user = userEvent.setup();
       renderTab();
-      const select = screen.getByRole('combobox', { name: /Sort favorites by/ });
-      await user.selectOptions(select, 'name');
-      await user.selectOptions(select, 'manual');
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
+      await user.click(screen.getByRole('button', { name: 'Name' }));
+      await user.click(screen.getByRole('button', { name: 'Name (Asc)' }));
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
       const grips = screen.getAllByRole('button', { name: /Reorder/ });
       grips.forEach((grip) => {
         expect(grip).not.toHaveAttribute('aria-disabled');
@@ -343,10 +337,8 @@ describe('FavoritesInspectorTab', () => {
       const user = userEvent.setup();
       const onReorderFavorite = vi.fn();
       renderTab(threeFavorites, { onReorderFavorite });
-      await user.selectOptions(
-        screen.getByRole('combobox', { name: /Sort favorites by/ }),
-        'name',
-      );
+      await user.click(screen.getByRole('button', { name: 'Manual sort' }));
+      await user.click(screen.getByRole('button', { name: 'Name' }));
       const firstGrip = screen.getAllByRole('button', { name: /Reorder/ })[0];
       firstGrip.focus();
       await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');

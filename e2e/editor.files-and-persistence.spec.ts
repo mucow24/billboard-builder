@@ -15,6 +15,7 @@ import {
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
+  primePersistenceBeforeLoad,
   readDownloadedJson,
   readDownloadedPngSize,
   readStageDebug,
@@ -237,7 +238,7 @@ test.describe('editor file and persistence flows', () => {
     await expect(page.locator('.layer-row')).toHaveCount(1);
 
     await clearPersistence(page);
-    await seedPersistence(page, '{not-valid-json');
+    await primePersistenceBeforeLoad(page, '{not-valid-json');
     await page.reload();
     await waitForEditor(page);
     await openLayersTab(page);
