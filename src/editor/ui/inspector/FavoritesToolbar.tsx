@@ -1,32 +1,13 @@
 import { useRef } from 'react';
 
 import type { FavoritesSortDirection, FavoritesSortField } from './favoritesSort';
-import { InspectorRailIconButton } from './InspectorRailIconButton';
+import { FavoritesSortMenu } from './FavoritesSortMenu';
 
 const CLEAR_ICON = (
   <svg viewBox="0 0 12 12">
     <path d="M3 3l6 6M9 3l-6 6" />
   </svg>
 );
-
-const ARROW_UP_ICON = (
-  <svg viewBox="0 0 12 12">
-    <path d="M6 10V2M2.5 5.5L6 2l3.5 3.5" />
-  </svg>
-);
-
-const ARROW_DOWN_ICON = (
-  <svg viewBox="0 0 12 12">
-    <path d="M6 2v8M2.5 6.5L6 10l3.5-3.5" />
-  </svg>
-);
-
-const SORT_FIELD_LABELS: Record<FavoritesSortField, string> = {
-  manual: 'Manual',
-  name: 'Name',
-  parts: 'Parts',
-  color: 'Color',
-};
 
 export interface FavoritesToolbarProps {
   searchQuery: string;
@@ -47,12 +28,6 @@ export function FavoritesToolbar({
 }: FavoritesToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const directionDisabled = sortField === 'manual';
-  const directionNextLabel =
-    sortDirection === 'asc'
-      ? `Toggle sort direction (currently ascending by ${SORT_FIELD_LABELS[sortField].toLowerCase()})`
-      : `Toggle sort direction (currently descending by ${SORT_FIELD_LABELS[sortField].toLowerCase()})`;
-
   function handleClear() {
     onSearchQueryChange('');
     searchInputRef.current?.focus();
@@ -63,11 +38,6 @@ export function FavoritesToolbar({
       e.preventDefault();
       handleClear();
     }
-  }
-
-  function handleDirectionClick() {
-    if (directionDisabled) return;
-    onSortDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc');
   }
 
   return (
@@ -99,30 +69,12 @@ export function FavoritesToolbar({
         )}
       </div>
 
-      <div className="favorites-sort">
-        <div className="favorites-sort-field inspector-rail-select-wrap">
-          <select
-            className="favorites-sort-select inspector-rail-select"
-            aria-label="Sort favorites by"
-            value={sortField}
-            onChange={(e) => onSortFieldChange(e.target.value as FavoritesSortField)}
-          >
-            <option value="manual">Manual</option>
-            <option value="name">Name</option>
-            <option value="parts">Parts</option>
-            <option value="color">Color</option>
-          </select>
-        </div>
-        <InspectorRailIconButton
-          className="favorites-sort-direction"
-          label={directionNextLabel}
-          onClick={handleDirectionClick}
-          disabled={directionDisabled}
-          ariaDisabled={directionDisabled}
-        >
-          {sortDirection === 'asc' ? ARROW_UP_ICON : ARROW_DOWN_ICON}
-        </InspectorRailIconButton>
-      </div>
+      <FavoritesSortMenu
+        sortField={sortField}
+        sortDirection={sortDirection}
+        onSortFieldChange={onSortFieldChange}
+        onSortDirectionChange={onSortDirectionChange}
+      />
     </div>
   );
 }

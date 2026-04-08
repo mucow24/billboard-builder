@@ -425,13 +425,6 @@
   vector-effect: non-scaling-stroke;
 }
 
-.favorites-sort {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-}
-
 /* ── Favorites empty-search state ────────────────────────────────────────── */
 
 .favorites-empty-search {
