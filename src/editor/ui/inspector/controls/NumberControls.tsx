@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
+import { useHistoryInteraction } from '../../../state/useHistoryInteraction';
 import { formatDisplayedNumber } from '../inspectorModel';
 import { FieldShell } from './FieldShell';
 
@@ -155,6 +156,8 @@ export function NumberInput({
   const { draft: textDraft, setDraft: setTextDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft, handleChange: handleTextChange } =
     useDraftNumber(value, digits, textMin ?? min, textMax ?? max, onChange);
 
+  const { start: startSliderInteraction, end: endSliderInteraction } = useHistoryInteraction();
+
   function commitValue(nextValue: number) {
     onChange(clampNumberInputValue(nextValue, min, max));
   }
@@ -173,6 +176,10 @@ export function NumberInput({
               step={step}
               type="range"
               value={sliderValue}
+              onPointerDown={startSliderInteraction}
+              onPointerUp={endSliderInteraction}
+              onPointerCancel={endSliderInteraction}
+              onLostPointerCapture={endSliderInteraction}
               onChange={(event) => {
                 const sliderValue = clampNumberInputValue(
                   Number(event.target.value),

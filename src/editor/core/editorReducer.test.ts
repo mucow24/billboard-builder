@@ -189,6 +189,132 @@ describe('editor reducer', () => {
     expect(nextItem.y).toBe(20);
   });
 
+  describe('interaction sessions', () => {
+    function seedWithRectangle(width = 100) {
+      const item = createRectangleItem({ id: 'rect-1', width });
+      const seeded = reduceEditorState(createDefaultEditorState(), {
+        ...toEditorAction({ type: 'add_node', item }),
+      });
+      return { seeded, item };
+    }
+
+    it('batches multiple update_node actions into a single history entry on commit', () => {
+      const { seeded, item } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const afterFirst = reduceEditorState(begun, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 110 } }),
+      });
+      const afterSecond = reduceEditorState(afterFirst, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 120 } }),
+      });
+      const afterThird = reduceEditorState(afterSecond, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 150 } }),
+      });
+      const committed = reduceEditorState(afterThird, {
+        family: 'interaction',
+        type: 'commit',
+      });
+
+      // Exactly one new history entry versus the seeded state.
+      expect(committed.history.past).toHaveLength(seeded.history.past.length + 1);
+      // The entry is the pre-begin document.
+      expect(committed.history.past.at(-1)).toBe(seeded.document);
+      // Document reflects the final value.
+      const leaf = committed.document.nodes.flatMap(collectLeafItems)[0];
+      expect(leaf.width).toBe(150);
+      // Interaction slot cleared.
+      expect(committed.interactionSnapshot).toBeNull();
+    });
+
+    it('exposes intermediate document state during an interaction (live preview)', () => {
+      const { seeded, item } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const afterFirst = reduceEditorState(begun, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 130 } }),
+      });
+
+      // Intermediate document reflects the dragged value...
+      const leaf = afterFirst.document.nodes.flatMap(collectLeafItems)[0];
+      expect(leaf.width).toBe(130);
+      // ...but history was NOT pushed yet.
+      expect(afterFirst.history.past).toEqual(seeded.history.past);
+      // Snapshot holds the pre-begin document.
+      expect(afterFirst.interactionSnapshot).toBe(seeded.document);
+    });
+
+    it('cancel restores document to the pre-begin snapshot and leaves history untouched', () => {
+      const { seeded, item } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const dragged = reduceEditorState(begun, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 200 } }),
+      });
+      const cancelled = reduceEditorState(dragged, { family: 'interaction', type: 'cancel' });
+
+      expect(cancelled.document).toBe(seeded.document);
+      expect(cancelled.history).toEqual(seeded.history);
+      expect(cancelled.interactionSnapshot).toBeNull();
+    });
+
+    it('commit with no mutating actions does not push a history entry', () => {
+      const { seeded } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const committed = reduceEditorState(begun, { family: 'interaction', type: 'commit' });
+
+      expect(committed.history.past).toEqual(seeded.history.past);
+      expect(committed.interactionSnapshot).toBeNull();
+    });
+
+    it('undo and redo are no-ops while an interaction is active', () => {
+      const { seeded, item } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const dragged = reduceEditorState(begun, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 150 } }),
+      });
+
+      const undoAttempt = reduceEditorState(dragged, { family: 'history', type: 'undo' });
+      expect(undoAttempt).toBe(dragged);
+
+      const redoAttempt = reduceEditorState(dragged, { family: 'history', type: 'redo' });
+      expect(redoAttempt).toBe(dragged);
+    });
+
+    it('second begin while one is active is a no-op', () => {
+      const { seeded, item } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const dragged = reduceEditorState(begun, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 150 } }),
+      });
+      const begunAgain = reduceEditorState(dragged, { family: 'interaction', type: 'begin' });
+
+      // Snapshot is still the pre-begin document, NOT the intermediate (width=150) state.
+      expect(begunAgain.interactionSnapshot).toBe(seeded.document);
+    });
+
+    it('load_document dispatched mid-interaction clears interactionSnapshot', () => {
+      const { seeded, item } = seedWithRectangle(100);
+
+      const begun = reduceEditorState(seeded, { family: 'interaction', type: 'begin' });
+      const dragged = reduceEditorState(begun, {
+        ...toEditorAction({ type: 'update_node', itemId: item.id, changes: { width: 150 } }),
+      });
+
+      const loaded = reduceEditorState(dragged, {
+        ...toEditorAction({
+          type: 'load_document',
+          document: { ...createDefaultProjectDocument(), nodes: [createTextItem({ id: 'loaded' })] },
+        }),
+      });
+
+      expect(loaded.interactionSnapshot).toBeNull();
+    });
+  });
+
   it('collapses singleton groups after deleting a grouped child through the reducer command path', () => {
     const first = createRectangleItem({ id: 'first' });
     const second = createTextItem({ id: 'second' });

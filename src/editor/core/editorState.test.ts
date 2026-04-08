@@ -39,6 +39,7 @@ describe('editor state', () => {
         past: [],
         future: [],
       },
+      interactionSnapshot: null,
     });
   });
 

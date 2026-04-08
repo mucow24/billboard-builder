@@ -41,6 +41,7 @@ import {
   type DocumentAction,
   type DocumentCommand,
   type EditorAction,
+  type InteractionAction,
   type SelectionAction,
   type SessionAction,
   type TransactionAction,
@@ -268,15 +269,20 @@ function reduceDocumentAction(
       document: commandResult.nextDocument,
       session: { ...createDefaultSessionState(), availableFonts: state.session.availableFonts },
       history: createDefaultHistoryState(),
+      interactionSnapshot: null,
     };
   }
+
+  const suppressForInteraction = state.interactionSnapshot !== null;
 
   return {
     ...state,
     document: commandResult.nextDocument,
     session: nextSession,
     history:
-      options.suppressHistory || !isHistoryWorthyDocumentCommand(action.command)
+      options.suppressHistory ||
+      suppressForInteraction ||
+      !isHistoryWorthyDocumentCommand(action.command)
         ? state.history
         : {
             past: [...state.history.past, state.document],
@@ -346,7 +352,12 @@ function reduceTransactionAction(state: EditorState, action: TransactionAction):
     return {
       ...nextState,
       history: createDefaultHistoryState(),
+      interactionSnapshot: null,
     };
+  }
+
+  if (state.interactionSnapshot !== null) {
+    return nextState;
   }
 
   if (!containsHistoryWorthyDocumentAction(action.actions)) {
@@ -362,6 +373,54 @@ function reduceTransactionAction(state: EditorState, action: TransactionAction):
   };
 }
 
+function reduceInteractionAction(state: EditorState, action: InteractionAction): EditorState {
+  switch (action.type) {
+    case 'begin': {
+      // Double-begin guard: if already mid-interaction, keep the original snapshot.
+      if (state.interactionSnapshot !== null) {
+        return state;
+      }
+      return { ...state, interactionSnapshot: state.document };
+    }
+    case 'commit': {
+      const snapshot = state.interactionSnapshot;
+      if (snapshot === null) {
+        return state;
+      }
+      // No net change — drop the snapshot without touching history.
+      if (snapshot === state.document) {
+        return { ...state, interactionSnapshot: null };
+      }
+      return {
+        ...state,
+        interactionSnapshot: null,
+        history: {
+          past: [...state.history.past, snapshot],
+          future: [],
+        },
+      };
+    }
+    case 'cancel': {
+      const snapshot = state.interactionSnapshot;
+      if (snapshot === null) {
+        return state;
+      }
+      return {
+        ...state,
+        document: snapshot,
+        session: {
+          ...state.session,
+          selectedNodeIds: normalizeSelectionForDocument(
+            state.session.selectedNodeIds,
+            snapshot
+          ),
+        },
+        interactionSnapshot: null,
+      };
+    }
+  }
+}
+
 export function reduceEditorState(state: EditorState, action: EditorAction): EditorState {
   switch (action.family) {
     case 'document':
@@ -372,7 +431,14 @@ export function reduceEditorState(state: EditorState, action: EditorAction): Edi
       return reduceSessionAction(state, action);
     case 'transaction':
       return reduceTransactionAction(state, action);
+    case 'interaction':
+      return reduceInteractionAction(state, action);
     case 'history':
+      // Undo/redo while mid-interaction would corrupt the snapshot's meaning —
+      // silently ignore so the drag can complete normally.
+      if (state.interactionSnapshot !== null && (action.type === 'undo' || action.type === 'redo')) {
+        return state;
+      }
       switch (action.type) {
         case 'undo': {
           const previousDocument = state.history.past.at(-1);

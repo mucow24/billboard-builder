@@ -21,6 +21,11 @@ export type HistoryAction =
   | { family: 'history'; type: 'redo' }
   | { family: 'history'; type: 'reset_editor' };
 
+export type InteractionAction =
+  | { family: 'interaction'; type: 'begin' }
+  | { family: 'interaction'; type: 'commit' }
+  | { family: 'interaction'; type: 'cancel' };
+
 export type TransactionHistoryMode = 'single' | 'reset' | 'none';
 
 export type TransactionAction = {
@@ -34,6 +39,7 @@ export type EditorAction =
   | SelectionAction
   | SessionAction
   | HistoryAction
+  | InteractionAction
   | TransactionAction;
 
 export function isSelectionCommand(command: EditorCommand): command is SelectionCommand {

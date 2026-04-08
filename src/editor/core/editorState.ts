@@ -18,6 +18,7 @@ export interface EditorState {
   document: ProjectDocument;
   session: SessionState;
   history: HistoryState;
+  interactionSnapshot: ProjectDocument | null;
 }
 
 export function createDefaultSessionState(): SessionState {
@@ -44,5 +45,6 @@ export function createDefaultEditorState(
     document,
     session: createDefaultSessionState(),
     history: createDefaultHistoryState(),
+    interactionSnapshot: null,
   };
 }

@@ -72,6 +72,9 @@ export interface EditorStoreState {
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+  beginInteraction: () => void;
+  commitInteraction: () => void;
+  cancelInteraction: () => void;
   registerAvailableFont: (font: UploadedFont) => void;
   setMissingFontFamilies: (families: string[]) => void;
   loadDocument: (document: ProjectDocument) => void;
@@ -290,6 +293,9 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     redo: () => set((state) => applyStoreAction(state, { family: 'history', type: 'redo' })),
     canUndo: () => selectCanUndo(get().editor.history),
     canRedo: () => selectCanRedo(get().editor.history),
+    beginInteraction: () => set((state) => applyStoreAction(state, { family: 'interaction', type: 'begin' })),
+    commitInteraction: () => set((state) => applyStoreAction(state, { family: 'interaction', type: 'commit' })),
+    cancelInteraction: () => set((state) => applyStoreAction(state, { family: 'interaction', type: 'cancel' })),
     registerAvailableFont: (font) => set((state) => applyStoreAction(state, { family: 'session', type: 'register_available_font', font })),
     setMissingFontFamilies: (families) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_missing_font_families', families })),
     loadDocument: (document) => get().dispatch({ type: 'load_document', document }),
