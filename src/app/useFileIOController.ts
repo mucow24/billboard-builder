@@ -1,6 +1,6 @@
-import type Konva from 'konva';
+import type { CanvasRendererHandle } from '../editor/rendering/renderer/canvasRendererTypes';
 
-import { downloadStageAsPng } from '../editor/io/exportPng';
+import { downloadCanvasAsPng } from '../editor/io/exportPng';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
 import { createImageItem } from '../editor/document/documentDefaults';
@@ -79,11 +79,11 @@ export function useFileIOController({
     resetDocument();
   }
 
-  function handleExport(stage: Konva.Stage | null) {
-    if (!stage) {
+  function handleExport(handle: CanvasRendererHandle | null) {
+    if (!handle) {
       return;
     }
-    downloadStageAsPng(stage, 1);
+    void downloadCanvasAsPng(handle, document.canvas.width, document.canvas.height, 1);
   }
 
   function handleSave() {

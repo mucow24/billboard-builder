@@ -195,7 +195,7 @@ function CanvasStage(props: Partial<React.ComponentProps<typeof ActualCanvasStag
       showCanvasTestHooks
       guides={[]}
       onGuidesChange={vi.fn()}
-      stageRef={createRef<Konva.Stage>()}
+      stageRef={createRef()}
       {...rest}
     />
   );
@@ -283,7 +283,7 @@ describe('CanvasStage viewport controls', () => {
         showCanvasTestHooks={false}
         guides={[]}
         onGuidesChange={vi.fn()}
-        stageRef={createRef<Konva.Stage>()}
+        stageRef={createRef()}
       />,
     );
 

@@ -17,6 +17,7 @@ import { useImageElement } from '../useImageElement';
 import { NOOP } from '../noop';
 import { getRenderBox } from '../transformGeometry';
 import { createItemPointerDownHandler } from './itemPointerHandlers';
+import { asKonvaMouseDown } from '../renderer/normalizeKonvaEvent';
 
 import {
   HANDLE_FILL,
@@ -158,14 +159,14 @@ export const ShapeItemView = memo(function ShapeItemView({
           opacity={item.opacity}
           visible={!item.hidden}
           listening={interactionEnabled && !item.locked}
-          onMouseDown={createItemPointerDownHandler({
+          onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
             isInteractive: () => interactionEnabled && !item.locked,
             panModifierHeld: spacebarHeld,
             startPanDrag,
             toCanvasPointer,
             onAction: (pointer, shiftKey, nativeEvent) =>
               onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
-          })}
+          }))}
           onTap={() => {
             if (interactionEnabled) {
               onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
@@ -284,14 +285,14 @@ export const ShapeItemView = memo(function ShapeItemView({
               x={renderBox.x}
               y={renderBox.y}
               rotation={item.rotation}
-              onMouseDown={createItemPointerDownHandler({
+              onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
                 isInteractive: () => !item.locked,
                 panModifierHeld: spacebarHeld,
                 startPanDrag,
                 toCanvasPointer,
                 onAction: (pointer, shiftKey, nativeEvent) =>
                   onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
-              })}
+              }))}
               onDblClick={() => {
                 if (!interactionEnabled || item.locked) {
                   return;
@@ -339,13 +340,13 @@ export const ShapeItemView = memo(function ShapeItemView({
                       fill={HANDLE_FILL}
                       stroke={HANDLE_STROKE}
                       strokeWidth={overlayMetrics.handleStrokeWidth}
-                      onMouseDown={createItemPointerDownHandler({
+                      onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
                         isInteractive: () => !item.locked,
                         panModifierHeld: spacebarHeld,
                         startPanDrag,
                         toCanvasPointer,
                         onAction: (pointer) => onBeginResize(item, handle, pointer, 'overlay'),
-                      })}
+                      }))}
                     />
                   );
                 })}
@@ -356,13 +357,13 @@ export const ShapeItemView = memo(function ShapeItemView({
                   fill={HANDLE_FILL}
                   stroke={HANDLE_STROKE}
                   strokeWidth={overlayMetrics.handleStrokeWidth}
-                  onMouseDown={createItemPointerDownHandler({
+                  onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
                     isInteractive: () => !item.locked,
                     panModifierHeld: spacebarHeld,
                     startPanDrag,
                     toCanvasPointer,
                     onAction: (pointer) => onBeginRotate(item, pointer, 'overlay'),
-                  })}
+                  }))}
                 />
               </>
             ) : null}

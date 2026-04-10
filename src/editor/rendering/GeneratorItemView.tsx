@@ -5,6 +5,7 @@ import type Konva from 'konva';
 import type { CanvasItem, CanvasTool, GeneratorCanvasItem } from '../document/documentTypes';
 import type { Point } from './interactionGeometry';
 import { createItemPointerDownHandler } from './stage/itemPointerHandlers';
+import { asKonvaMouseDown } from './renderer/normalizeKonvaEvent';
 import { useBlurEffect } from './useBlurEffect';
 
 import { useGeneratorCanvas } from '../generators/useGeneratorCanvas';
@@ -53,14 +54,14 @@ export const GeneratorItemView = memo(function GeneratorItemView({
       opacity={item.opacity}
       visible={!item.hidden}
       listening={interactionEnabled}
-      onMouseDown={createItemPointerDownHandler({
+      onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
         isInteractive: () => interactionEnabled,
         panModifierHeld: spacebarHeld,
         startPanDrag,
         toCanvasPointer,
         onAction: (pointer, shiftKey, nativeEvent) =>
           onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
-      })}
+      }))}
       onTap={() => {
         if (interactionEnabled) {
           onItemPointerDown(item, selectableNodeId, { x: 0, y: 0 }, false);

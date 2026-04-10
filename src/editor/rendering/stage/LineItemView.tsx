@@ -15,6 +15,7 @@ import {
 import { NOOP } from '../noop';
 import { getCanvasOverlayMetrics } from './overlayGeometry';
 import { createItemPointerDownHandler } from './itemPointerHandlers';
+import { asKonvaMouseDown } from '../renderer/normalizeKonvaEvent';
 
 interface LineItemViewProps {
   activeTool: CanvasTool;
@@ -96,14 +97,14 @@ export const LineItemView = memo(function LineItemView({
           visible={!item.hidden}
           hitStrokeWidth={Math.max(item.strokeWidth + 12, 20)}
           listening={interactionEnabled && !item.locked}
-          onMouseDown={createItemPointerDownHandler({
+          onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
             isInteractive: () => interactionEnabled && !item.locked,
             panModifierHeld: spacebarHeld,
             startPanDrag,
             toCanvasPointer,
             onAction: (pointer, shiftKey, nativeEvent) =>
               onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
-          })}
+          }))}
           onTap={() => {
             if (interactionEnabled) {
               onItemPointerDown(item, selectableNodeId, { x: item.x, y: item.y }, false);
@@ -127,14 +128,14 @@ export const LineItemView = memo(function LineItemView({
               item.strokeWidth + overlayMetrics.lineSelectionStrokeWidth,
               overlayMetrics.lineSelectionHitStrokeWidth,
             )}
-            onMouseDown={createItemPointerDownHandler({
+            onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
               isInteractive: () => !item.locked,
               panModifierHeld: spacebarHeld,
               startPanDrag,
               toCanvasPointer,
               onAction: (pointer, shiftKey, nativeEvent) =>
                 onItemPointerDown(item, selectableNodeId, pointer, shiftKey, nativeEvent),
-            })}
+            }))}
             onDblClick={() => {
               if (!interactionEnabled || item.locked) {
                 return;
@@ -154,13 +155,13 @@ export const LineItemView = memo(function LineItemView({
                     fill={HANDLE_FILL}
                     stroke={HANDLE_STROKE}
                     strokeWidth={overlayMetrics.handleStrokeWidth}
-                    onMouseDown={createItemPointerDownHandler({
+                    onMouseDown={asKonvaMouseDown(createItemPointerDownHandler({
                       isInteractive: () => !item.locked,
                       panModifierHeld: spacebarHeld,
                       startPanDrag,
                       toCanvasPointer,
                       onAction: (pointer) => onBeginLineHandle(item, handle, pointer, 'overlay'),
-                    })}
+                    }))}
                   />
                 );
               })

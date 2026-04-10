@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDownloadProject,
-  mockDownloadStageAsPng,
+  mockDownloadCanvasAsPng,
   mockImportImageFile,
   mockLoadBundledFonts,
   mockPersistenceClear,
@@ -22,7 +22,7 @@ const {
   mockUploadedFontPersistenceSave,
 } = vi.hoisted(() => ({
   mockDownloadProject: vi.fn(),
-  mockDownloadStageAsPng: vi.fn(),
+  mockDownloadCanvasAsPng: vi.fn(),
   mockImportImageFile: vi.fn(),
   mockLoadBundledFonts: vi.fn(),
   mockPersistenceClear: vi.fn(),
@@ -131,7 +131,7 @@ vi.mock('./editor/rendering/ImageItemNode', () => ({
 }));
 
 vi.mock('./editor/io/exportPng', () => ({
-  downloadStageAsPng: (...args: unknown[]) => mockDownloadStageAsPng(...args),
+  downloadCanvasAsPng: (...args: unknown[]) => mockDownloadCanvasAsPng(...args),
 }));
 
 vi.mock('./editor/io/images', () => ({
@@ -326,7 +326,7 @@ describe('App integration', () => {
     fireEvent.click(exportButton);
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();
-    expect(mockDownloadStageAsPng).toHaveBeenCalledWith(expect.anything(), 1);
+    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1);
 
     clickToolbarPopoverItem('Canvas', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {

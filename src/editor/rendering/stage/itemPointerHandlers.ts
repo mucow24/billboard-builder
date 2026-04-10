@@ -1,9 +1,8 @@
-import type Konva from 'konva';
-
+import type { CanvasPointerEvent } from '../renderer/canvasRendererTypes';
 import type { Point } from '../interactionGeometry';
 
 /**
- * Creates an onMouseDown handler for canvas items that handles:
+ * Creates an onPointerDown handler for canvas items that handles:
  * - Early return when the item is not interactive
  * - Pan-gesture detection (middle-mouse-button or spacebar-held)
  * - Bubble cancellation
@@ -22,23 +21,24 @@ export function createItemPointerDownHandler({
   toCanvasPointer: (pointer: Point) => Point;
   onAction: (pointer: Point, shiftKey: boolean, nativeEvent: MouseEvent) => void;
 }) {
-  return (event: Konva.KonvaEventObject<MouseEvent>) => {
+  return (event: CanvasPointerEvent) => {
     if (!isInteractive()) {
       return;
     }
-    const pointer = event.target.getStage()?.getPointerPosition();
+    const pointer = event.viewportPointer;
     if (!pointer) {
       return;
     }
-    if (event.evt.button === 1 || panModifierHeld) {
+    const nativeEvent = event.nativeEvent as MouseEvent;
+    if (nativeEvent.button === 1 || panModifierHeld) {
       if (!startPanDrag) {
         return;
       }
-      event.cancelBubble = true;
+      event.stopPropagation();
       startPanDrag(pointer);
       return;
     }
-    event.cancelBubble = true;
-    onAction(toCanvasPointer(pointer), event.evt.shiftKey, event.evt);
+    event.stopPropagation();
+    onAction(toCanvasPointer(pointer), nativeEvent.shiftKey, nativeEvent);
   };
 }

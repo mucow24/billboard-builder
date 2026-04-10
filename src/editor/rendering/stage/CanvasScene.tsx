@@ -1,6 +1,5 @@
 import { Group, Layer, Rect, Stage } from 'react-konva';
 import type Konva from 'konva';
-import type { KonvaEventObject } from 'konva/lib/Node';
 
 import type {
   CanvasItem,
@@ -13,6 +12,8 @@ import type {
 import type { Point, ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
+import type { CanvasPointerEvent } from '../renderer/canvasRendererTypes';
+import { normalizeKonvaEvent } from '../renderer/normalizeKonvaEvent';
 
 import { CanvasGuidesLayer } from './CanvasGuidesLayer';
 import { CanvasItemLayer } from './CanvasItemLayer';
@@ -68,12 +69,12 @@ interface CanvasSceneProps {
     shiftKey: boolean,
     nativeEvent?: MouseEvent,
   ) => void;
-  onStageMouseDown: (event: KonvaEventObject<MouseEvent>) => void;
+  onStageMouseDown: (event: CanvasPointerEvent) => void;
   onStageMouseLeave: () => void;
-  onStageMouseMove: (event: KonvaEventObject<MouseEvent>) => void;
-  onStageMouseUp: (event: KonvaEventObject<MouseEvent>) => void;
-  onStageWheel: (event: KonvaEventObject<WheelEvent>) => void;
-  registerShapeRef: (itemId: string, node: Konva.Node | null) => void;
+  onStageMouseMove: (event: CanvasPointerEvent) => void;
+  onStageMouseUp: (event: CanvasPointerEvent) => void;
+  onStageWheel: (event: CanvasPointerEvent) => void;
+  registerShapeRef: (itemId: string, node: unknown) => void;
   renderedItems: RenderableCanvasItem[];
   renderedSelectedItems: RenderableCanvasItem[];
   selectedItemId?: string;
@@ -157,10 +158,10 @@ export function CanvasScene({
       height={size.height}
       className="editor-stage editor-stage-fullscreen"
       style={{ cursor: stageCursor }}
-      onWheel={onStageWheel}
-      onMouseDown={onStageMouseDown}
-      onMouseMove={onStageMouseMove}
-      onMouseUp={onStageMouseUp}
+      onWheel={(e) => onStageWheel(normalizeKonvaEvent(e))}
+      onMouseDown={(e) => onStageMouseDown(normalizeKonvaEvent(e))}
+      onMouseMove={(e) => onStageMouseMove(normalizeKonvaEvent(e))}
+      onMouseUp={(e) => onStageMouseUp(normalizeKonvaEvent(e))}
       onMouseLeave={onStageMouseLeave}
     >
       <Layer>
