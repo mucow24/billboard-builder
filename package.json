@@ -20,8 +20,10 @@
     "e2e:all": "node scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@pixi/react": "^8.0.5",
     "@uiw/react-color": "^2.9.6",
     "konva": "^9.3.20",
+    "pixi.js": "^8.17.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-konva": "^19.0.7",

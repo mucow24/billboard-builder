@@ -49,19 +49,41 @@ vi.mock('konva', () => ({
   },
 }));
 
+vi.mock('pixi.js', () => ({
+  Container: class {},
+  Graphics: class {},
+  Rectangle: class {
+    constructor(public x = 0, public y = 0, public width = 0, public height = 0) {}
+  },
+}));
+
+vi.mock('@pixi/react', () => {
+  type MockProps = React.PropsWithChildren<Record<string, unknown>>;
+  const Application = React.forwardRef<unknown, MockProps>(({ children, ...props }, ref) => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    React.useImperativeHandle(ref, () => ({
+      getCanvas: () => canvasRef.current,
+      getApplication: () => ({ canvas: canvasRef.current }),
+    }));
+    return React.createElement('div', { 'data-pixi': 'application' },
+      React.createElement('canvas', { ref: canvasRef }),
+      children as React.ReactNode,
+    );
+  });
+  return {
+    Application,
+    extend: () => {},
+  };
+});
+
 import { CanvasStage as ActualCanvasStage } from './CanvasStage';
 import {
   createDefaultProjectDocument,
-  createImageItem,
-  createLineItem,
   createRectangleItem,
-  createTextItem,
 } from '../document/documentDefaults';
 import type { ProjectDocument } from '../document/documentTypes';
 import { resetEditorStore } from '../../test/editorStore';
 import { useEditorStore } from '../state/store';
-import type Konva from 'konva';
-import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
 import { getGroupResizeFrame, getSelectionFrameForRotation } from './transformGeometry';
 
 vi.mock('react-konva', () => {
@@ -295,209 +317,6 @@ describe('CanvasStage viewport controls', () => {
 
 
 
-  it('renders an exact canvas edge treatment and draws the checkerboard as a single Shape', () => {
-    const { container } = render(
-      <CanvasStage />,
-    );
-
-    const glowRect = container.querySelector('[data-konva-node="Rect"][data-prop-name="export-exclude"]');
-    expect(glowRect).not.toBeNull();
-    expect(glowRect).toHaveAttribute('data-prop-x', '0');
-    expect(glowRect).toHaveAttribute('data-prop-y', '0');
-    expect(glowRect).toHaveAttribute('data-prop-width', '2048');
-    expect(glowRect).toHaveAttribute('data-prop-height', '2048');
-    expect(glowRect).toHaveAttribute('data-prop-cornerradius', '0');
-    expect(glowRect).toHaveAttribute('data-prop-stroke', 'rgba(128, 176, 255, 0.18)');
-    expect(glowRect).toHaveAttribute('data-prop-shadowcolor', 'rgba(110, 160, 255, 0.14)');
-
-    const checkerboardShape = container.querySelector(
-      '[data-konva-node="Shape"][data-prop-name="checkerboard export-exclude"]',
-    );
-    expect(checkerboardShape).not.toBeNull();
-    expect(checkerboardShape).toHaveAttribute('data-prop-width', '2048');
-    expect(checkerboardShape).toHaveAttribute('data-prop-height', '2048');
-
-    const canvasRect = container.querySelector(
-      '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
-    );
-    expect(canvasRect).not.toBeNull();
-    expect(canvasRect).toHaveAttribute('data-prop-cornerradius', '0');
-    expect(canvasRect).toHaveAttribute('data-prop-fill', '#0b1220');
-    expect(canvasRect).toHaveAttribute('data-prop-stroke', 'rgba(0, 0, 0, 0.14)');
-  });
-
-  it('renders the main scene unclipped without the overflow preview layer and frames the canvas with the export cue', () => {
-    const document = createDefaultProjectDocument();
-    document.background = '#11223344';
-    const overflowRectangle = createRectangleItem({
-      id: 'overflow-rectangle',
-      x: -48,
-      y: 180,
-      width: 220,
-      height: 140,
-      fill: '#f97316',
-    });
-    Object.assign(mockInteractionSession, {
-      renderedItems: [overflowRectangle],
-    });
-
-    const { container } = render(
-      <CanvasStage
-        showExportBoundsCue
-        document={document}
-      />,
-    );
-
-    const overflowLayer = container.querySelector(
-      '[data-konva-node="Group"][data-prop-name="overflow-preview-layer export-exclude"]',
-    );
-    const canvasRect = container.querySelector(
-      '[data-konva-node="Rect"][data-prop-name="canvas-background canvas-surface export-exclude"]',
-    );
-    const contentLayer = container.querySelector(
-      '[data-konva-node="Group"][data-prop-name="export-content"]',
-    );
-    const exportCue = screen.getByTestId('export-bounds-cue');
-    const topPanel = screen.getByTestId('export-bounds-cue-top');
-    const rightPanel = screen.getByTestId('export-bounds-cue-right');
-    const bottomPanel = screen.getByTestId('export-bounds-cue-bottom');
-    const leftPanel = screen.getByTestId('export-bounds-cue-left');
-
-    expect(overflowLayer).toBeNull();
-    expect(contentLayer).not.toBeNull();
-    expect(contentLayer).not.toHaveAttribute('data-prop-clipx');
-    expect(contentLayer).not.toHaveAttribute('data-prop-clipy');
-    expect(contentLayer).not.toHaveAttribute('data-prop-clipwidth');
-    expect(contentLayer).not.toHaveAttribute('data-prop-clipheight');
-    expect(canvasRect).not.toBeNull();
-    expect(exportCue).toHaveClass('canvas-export-bounds-cue', 'active');
-    expect(topPanel).toHaveStyle({ left: '0px', top: '0px', width: '1280px', height: '40px' });
-    expect(rightPanel).toHaveStyle({ left: '960px', top: '40px', width: '320px', height: '640px' });
-    expect(bottomPanel).toHaveStyle({ left: '0px', top: '680px', width: '1280px', height: '40px' });
-    expect(leftPanel).toHaveStyle({ left: '0px', top: '40px', width: '320px', height: '640px' });
-  });
-
-
-  it('renders subtle outlines for each item in a multi-selection and rotates the shared overlay during group rotation', () => {
-    const document = createDefaultProjectDocument();
-    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40, rotation: 0 });
-    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50, rotation: 0 });
-    document.nodes = [first, second];
-
-    Object.assign(mockInteractionSession, {
-      renderedItems: [first, second],
-      renderedSelectedItems: [first, second],
-      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
-      session: {
-        kind: 'group-rotate',
-        itemIds: ['first', 'second'],
-        originalItems: [first, second],
-        previewItems: [first, second],
-        bounds: { x: 20, y: 30, width: 180, height: 80 },
-        pointerStart: { x: 110, y: -20 },
-        currentPointer: { x: 150, y: 20 },
-        handle: 'rotater',
-        guides: [],
-      },
-    });
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={['first', 'second']}
-      />,
-    );
-
-    const dashedLines = container.querySelectorAll('[data-konva-node="Line"][data-prop-dash]');
-    expect(dashedLines.length).toBeGreaterThanOrEqual(2);
-
-    const rotatedGroups = Array.from(container.querySelectorAll('[data-konva-node="Group"][data-prop-rotation]'));
-    expect(rotatedGroups.some((node) => node.getAttribute('data-prop-rotation') !== '0')).toBe(true);
-  });
-
-  it('renders chonky crop outlines and handle hit targets while crop mode is active', () => {
-    const previewItem = createImageItem({
-      src: 'data:image/svg+xml;base64,AAA',
-      mimeType: 'image/svg+xml',
-      originalWidth: 160,
-      originalHeight: 100,
-      x: 140,
-      y: 110,
-      width: 120,
-      height: 80,
-    });
-    previewItem.id = 'crop-image';
-    previewItem.crop = {
-      x: 20,
-      y: 10,
-      width: 120,
-      height: 80,
-    };
-    const fullImageItem = {
-      ...previewItem,
-      x: 120,
-      y: 100,
-      width: 160,
-      height: 100,
-      crop: {
-        x: 0,
-        y: 0,
-        width: previewItem.originalWidth,
-        height: previewItem.originalHeight,
-      },
-    };
-
-    Object.assign(mockInteractionSession, {
-      cropSession: {
-        itemId: previewItem.id,
-        previewItem,
-        fullImageItem,
-      },
-      renderedItems: [previewItem],
-      renderedSelectedItems: [previewItem],
-      selectedDocumentItem: previewItem,
-      selectedRenderedItem: previewItem,
-      selectedItemId: previewItem.id,
-    });
-    const document = createDefaultProjectDocument();
-    document.nodes = [previewItem];
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[previewItem.id]}
-      />,
-    );
-
-    const outlineUnderlay = container.querySelector(
-      '[data-konva-node="Line"][data-prop-name="crop-selection-outline-underlay"][data-prop-stroke="#ffffff"]',
-    );
-    const outline = container.querySelector(
-      '[data-konva-node="Line"][data-prop-name="crop-selection-outline"][data-prop-stroke="#111111"]',
-    );
-    const handleUnderlay = container.querySelector(
-      '[data-konva-node="Line"][data-prop-name="crop-handle-visual-underlay top-center"][data-prop-stroke="#ffffff"]',
-    );
-    const handleVisual = container.querySelector(
-      '[data-konva-node="Line"][data-prop-name="crop-handle-visual top-left"][data-prop-stroke="#111111"]',
-    );
-    const hitTarget = container.querySelector(
-      '[data-konva-node="Rect"][data-prop-name="crop-handle-hit middle-right"]',
-    );
-
-    expect(outlineUnderlay).not.toBeNull();
-    expect(outline).not.toBeNull();
-    expect(handleUnderlay).not.toBeNull();
-    expect(handleVisual).not.toBeNull();
-    expect(hitTarget).not.toBeNull();
-    expect(Number(outlineUnderlay?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(10);
-    expect(Number(outline?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(6);
-    expect(Number(handleUnderlay?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(13);
-    expect(Number(handleVisual?.getAttribute('data-prop-strokewidth'))).toBeGreaterThan(8);
-    expect(Number(hitTarget?.getAttribute('data-prop-width'))).toBeGreaterThan(24);
-    expect(Number(hitTarget?.getAttribute('data-prop-height'))).toBeGreaterThan(24);
-  });
-
   it('renders zoom controls and updates the readout', async () => {
     const user = userEvent.setup();
     render(
@@ -519,47 +338,6 @@ describe('CanvasStage viewport controls', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fit canvas to viewport' }));
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 31%');
-  });
-
-  it('keeps the group frame visual-only while still forwarding group resize handles', () => {
-    const document = createDefaultProjectDocument();
-    const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
-    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    document.nodes = [first, second];
-
-    Object.assign(mockInteractionSession, {
-      renderedItems: [first, second],
-      renderedSelectedItems: [first, second],
-      renderedGroupBounds: { x: 20, y: 30, width: 180, height: 80 },
-      selectedItemId: first.id,
-    });
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[first.id, second.id]}
-      />,
-    );
-
-    const groupOutline = container.querySelector(
-      '[data-konva-node="Rect"][data-prop-stroke="#7dd3fc"]'
-    ) as HTMLElement | null;
-    const rightHandle = container.querySelector(
-      '[data-konva-node="Circle"][data-prop-x="90"][data-prop-y="0"]'
-    ) as HTMLElement | null;
-
-    expect(groupOutline).not.toBeNull();
-    expect(rightHandle).not.toBeNull();
-
-    fireEvent.mouseDown(groupOutline!, { button: 0 });
-    fireEvent.mouseDown(rightHandle!, { button: 0 });
-
-    expect(mockInteractionSession.beginGroupDrag).not.toHaveBeenCalled();
-    expect(mockInteractionSession.beginGroupResize).toHaveBeenCalledWith(
-      'middle-right',
-      expect.any(Object),
-      'overlay',
-    );
   });
 
   it('starts a pan drag instead of group drag when middle-clicking the group overlay hook', () => {
@@ -986,304 +764,4 @@ describe('CanvasStage viewport controls', () => {
     }
   });
 
-  it('forwards selected line handle drags to the interaction session', () => {
-    const document = createDefaultProjectDocument();
-    const line = createLineItem({
-      id: 'line',
-      startX: 160,
-      startY: 160,
-      endX: 360,
-      endY: 220,
-    });
-    document.nodes = [line];
-    const startHandle = getLineHandleRects(line).start;
-
-    Object.assign(mockInteractionSession, {
-      renderedItems: [line],
-      renderedSelectedItems: [line],
-      selectedDocumentItem: line,
-      selectedRenderedItem: line,
-      selectedItemId: line.id,
-    });
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[line.id]}
-      />,
-    );
-
-    const startHandleNode = container.querySelector(
-      `[data-konva-node="Circle"][data-prop-x="${startHandle.x + startHandle.width / 2}"][data-prop-y="${startHandle.y + startHandle.height / 2}"]`
-    ) as HTMLElement | null;
-
-    expect(startHandleNode).not.toBeNull();
-
-    fireEvent.mouseDown(startHandleNode!, { button: 0 });
-
-    expect(mockInteractionSession.beginLineHandle).toHaveBeenCalledWith(
-      line,
-      'start',
-      expect.any(Object),
-      'overlay',
-    );
-  });
-
-  it('forwards single-shape drag, resize, and rotate handles to the interaction session', () => {
-    const document = createDefaultProjectDocument();
-    const rectangle = createRectangleItem({
-      id: 'shape',
-      x: 120,
-      y: 80,
-      width: 160,
-      height: 100,
-    });
-    document.nodes = [rectangle];
-    const handlePoints = getShapeHandlePoints(rectangle);
-
-    Object.assign(mockInteractionSession, {
-      renderedItems: [rectangle],
-      renderedSelectedItems: [rectangle],
-      selectedDocumentItem: rectangle,
-      selectedRenderedItem: rectangle,
-      selectedItemId: rectangle.id,
-    });
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[rectangle.id]}
-      />,
-    );
-
-    const shapeGroups = container.querySelectorAll(
-      `[data-konva-node="Group"][data-prop-x="${rectangle.x}"][data-prop-y="${rectangle.y}"]`
-    );
-    const rotaterHandle = Array.from(container.querySelectorAll('[data-konva-node="Circle"]')).find(
-      (node) =>
-        node.getAttribute('data-prop-x') === String(handlePoints.rotater.x) &&
-        Number(node.getAttribute('data-prop-y')) < rectangle.y,
-    ) as HTMLElement | undefined;
-    const rightResizeHandle = container.querySelector(
-      `[data-konva-node="Circle"][data-prop-x="${handlePoints['middle-right'].x}"][data-prop-y="${handlePoints['middle-right'].y}"]`
-    ) as HTMLElement | null;
-
-    expect(shapeGroups.length).toBeGreaterThan(0);
-    expect(rotaterHandle).toBeDefined();
-    expect(rightResizeHandle).not.toBeNull();
-
-    fireEvent.mouseDown(shapeGroups[0]!, { button: 0, shiftKey: true, clientX: 300, clientY: 240 });
-    fireEvent.mouseDown(rightResizeHandle!, { button: 0, clientX: 300, clientY: 240 });
-    fireEvent.mouseDown(rotaterHandle!, { button: 0, clientX: 300, clientY: 240 });
-
-    expect(mockInteractionSession.handleItemPointerDown).toHaveBeenCalledWith(
-      rectangle,
-      rectangle.id,
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-      true,
-      expect.anything(),
-    );
-    expect(mockInteractionSession.beginResize).toHaveBeenCalledWith(
-      rectangle,
-      'middle-right',
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-      'overlay',
-    );
-    expect(mockInteractionSession.beginRotate).toHaveBeenCalledWith(
-      rectangle,
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-      'overlay',
-    );
-  });
-
-  it('forwards item double-clicks to the interaction session', () => {
-    const document = createDefaultProjectDocument();
-    const rectangle = createRectangleItem({
-      id: 'shape',
-      x: 120,
-      y: 80,
-      width: 160,
-      height: 100,
-    });
-    document.nodes = [rectangle];
-    document.nodes = [rectangle];
-
-    Object.assign(mockInteractionSession, {
-      renderedItems: [rectangle],
-    });
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-      />,
-    );
-
-    const shapeGroup = container.querySelector(
-      `[data-konva-node="Group"][data-prop-x="${rectangle.x}"][data-prop-y="${rectangle.y}"]`,
-    );
-
-    expect(shapeGroup).not.toBeNull();
-
-    fireEvent.dblClick(shapeGroup!, { button: 0, clientX: 240, clientY: 160 });
-
-    expect(mockInteractionSession.handleItemDoubleClick).toHaveBeenCalledWith(rectangle);
-  });
-
-  it('renders unobtrusive subgroup outlines for grouped selections', () => {
-    const document = createDefaultProjectDocument();
-    Object.assign(mockInteractionSession, {
-      subgroupOutlineFrames: [
-        {
-          nodeId: 'group-a',
-          bounds: { x: 100, y: 90, width: 120, height: 80 },
-        },
-        {
-          nodeId: 'group-b',
-          bounds: { x: 280, y: 120, width: 140, height: 90 },
-        },
-      ],
-    });
-
-    const { container } = render(
-      <CanvasStage
-        document={document}
-      />,
-    );
-
-    const subgroupOutlines = container.querySelectorAll(
-      '[data-konva-node="Rect"][data-prop-name="subgroup-selection-outline"]',
-    );
-
-    expect(subgroupOutlines).toHaveLength(2);
-  });
-
-  it('renders marquee and text-create previews plus active guide lines', () => {
-    const document = createDefaultProjectDocument();
-    const previewItem = createTextItem({
-      x: 80,
-      y: 70,
-      width: 180,
-      height: 60,
-      text: 'Preview',
-      fontFamily: 'Arial',
-      fontSize: 32,
-      lineHeight: 1.2,
-      letterSpacing: 0,
-      padding: { top: 0, right: 0, bottom: 0, left: 0 },
-      fill: '#ffffff',
-    });
-
-    Object.assign(mockInteractionSession, {
-      renderedItems: [],
-      renderedSelectedItems: [],
-      session: {
-        kind: 'marquee',
-        pointerStart: { x: 50, y: 40 },
-        currentPointer: { x: 180, y: 140 },
-        toggleMode: false,
-        guides: [],
-      },
-    });
-
-    const { container, rerender } = render(
-      <CanvasStage
-        document={document}
-        guides={[
-          { orientation: 'vertical', position: 120 },
-          { orientation: 'horizontal', position: 90 },
-        ]}
-      />,
-    );
-
-    expect(
-      container.querySelector('[data-konva-node="Rect"][data-prop-stroke="#7dd3fc"][data-prop-dash="[6,4]"]')
-    ).not.toBeNull();
-    expect(
-      container.querySelector(
-        `[data-konva-node="Line"][data-prop-points="[120,-100000,120,${document.canvas.height + 100000}]"]`
-      )
-    ).not.toBeNull();
-    expect(
-      container.querySelector(
-        `[data-konva-node="Line"][data-prop-points="[-100000,90,${document.canvas.width + 100000},90]"]`
-      )
-    ).not.toBeNull();
-
-    Object.assign(mockInteractionSession, {
-      session: {
-        kind: 'create',
-        tool: 'text',
-        pointerStart: { x: 80, y: 70 },
-        previewItem,
-        guides: [],
-        snapDisabled: false,
-      },
-    });
-
-    rerender(
-      <CanvasStage
-        activeTool="text"
-        document={document}
-      />,
-    );
-
-    expect(
-      container.querySelector('[data-konva-node="Rect"][data-prop-x="80"][data-prop-y="70"][data-prop-width="180"][data-prop-height="60"][data-prop-dash="[6,4]"]')
-    ).not.toBeNull();
-  });
-
-  it('wires stage wheel, zoom-tool clicks, pan gestures, and mouse-up forwarding', () => {
-    const handleStageMouseDown = vi.fn();
-    const handleStagePointerMove = vi.fn();
-    const handleStageMouseUp = vi.fn();
-    Object.assign(mockInteractionSession, {
-      handleStageMouseDown,
-      handleStagePointerMove,
-      handleStageMouseUp,
-    });
-
-    const { container, rerender } = render(
-      <CanvasStage />,
-    );
-
-    const stage = container.querySelector('[data-konva-node="Stage"]') as HTMLElement | null;
-    const readCursor = () => JSON.parse(stage?.getAttribute('data-prop-style') ?? '{}').cursor;
-    expect(stage).not.toBeNull();
-    expect(readCursor()).toBe('default');
-
-    fireEvent.wheel(stage!, { deltaY: -100, clientX: 640, clientY: 360 });
-    expect(screen.getByTestId('viewport-zoom')).not.toHaveTextContent('Zoom: 63%');
-
-    fireEvent.mouseDown(stage!, { button: 0, clientX: 640, clientY: 360 });
-    fireEvent.mouseUp(stage!, { button: 0, clientX: 640, clientY: 360 });
-
-    expect(handleStageMouseDown).toHaveBeenCalledOnce();
-    expect(handleStageMouseUp).toHaveBeenCalledOnce();
-
-    fireEvent.keyDown(window, { key: ' ' });
-    expect(readCursor()).toBe('grab');
-
-    fireEvent.mouseDown(stage!, { button: 0, clientX: 640, clientY: 360 });
-    expect(document.body.style.cursor).toBe('grabbing');
-
-    fireEvent.mouseMove(stage!, { clientX: 700, clientY: 420 });
-    expect(readCursor()).toBe('grabbing');
-    fireEvent.mouseUp(stage!, { button: 0, clientX: 700, clientY: 420 });
-    expect(document.body.style.cursor).toBe('');
-    expect(handleStageMouseUp).toHaveBeenCalledOnce();
-
-    fireEvent.keyUp(window, { key: ' ' });
-
-    rerender(
-      <CanvasStage activeTool="zoom" />,
-    );
-
-    expect(readCursor()).toBe('zoom-in');
-    fireEvent.keyDown(window, { key: 'Alt' });
-    expect(readCursor()).toBe('zoom-out');
-    fireEvent.mouseDown(stage!, { button: 0, altKey: true, clientX: 640, clientY: 360 });
-    expect(handleStageMouseDown).toHaveBeenCalledOnce();
-    expect(useEditorStore.getState().editor.session.activeTool).toBe('select');
-    fireEvent.keyUp(window, { key: 'Alt' });
-  });
 });

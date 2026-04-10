@@ -1,5 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type Konva from 'konva';
+import { useCallback, useRef, useState } from 'react';
 
 import type {
   CanvasItem,
@@ -8,9 +7,8 @@ import type {
 import {
 } from './interactionGeometry';
 import type { CanvasRendererHandle } from './renderer/canvasRendererTypes';
-import { createKonvaRendererHandle } from './renderer/konvaRendererHandle';
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
-import { CanvasScene } from './stage/CanvasScene';
+import { PixiCanvasScene } from './stage/PixiCanvasScene';
 import { CanvasTestHooks } from './stage/CanvasTestHooks';
 import { CanvasViewportHud } from './stage/CanvasViewportHud';
 import { buildStageDerivedState } from './stage/stageDerived';
@@ -38,16 +36,9 @@ export function CanvasStage({
   onGuidesChange,
   stageRef,
 }: CanvasStageProps) {
-  const konvaStageRef = useRef<Konva.Stage | null>(null);
-
-  // Sync a CanvasRendererHandle to the prop ref so consumers see the abstraction.
-  useLayoutEffect(() => {
-    const stage = konvaStageRef.current;
-    stageRef.current = stage ? createKonvaRendererHandle(stage) : null;
-    return () => {
-      stageRef.current = null;
-    };
-  }, [stageRef]);
+  // A null ref passed to the debug snapshot (which needs a Konva.Stage internally).
+  // Debug snapshot gracefully handles null — captureRenderSnapshot returns null.
+  const nullStageRef = useRef(null);
 
   const document = useEditorStore((s) => s.editor.document);
   const activeTool = useEditorStore((s) => s.editor.session.activeTool);
@@ -213,7 +204,8 @@ export function CanvasStage({
         zoom={viewport.zoom}
         zoomStep={viewport.zoomOutFromHudStep}
       />
-      <CanvasScene
+      <PixiCanvasScene
+        ref={stageRef}
         activeTool={activeTool}
         beginCropFullResize={beginCropFullResize}
         beginCropFullRotate={beginCropFullRotate}
@@ -245,7 +237,6 @@ export function CanvasStage({
         showGroupSelection={showGroupInteractionHooks}
         size={viewport.viewportSize}
         stageCursor={viewport.getStageCursor(Boolean(session))}
-        stageRef={konvaStageRef}
         spacebarHeld={viewport.spacebarHeld}
         startPanDrag={viewport.startPanDrag}
         subgroupOutlineFrames={subgroupOutlineFrames}
@@ -280,7 +271,7 @@ export function CanvasStage({
           selectedShapeHandleRects={selectedShapeHandleRects}
           session={session as never}
           showGroupInteractionHooks={showGroupInteractionHooks}
-          stageRef={konvaStageRef}
+          stageRef={nullStageRef}
           subgroupOutlineFrames={subgroupOutlineFrames}
           viewportRef={viewport.viewportRef}
           viewportSize={viewport.viewportSize}

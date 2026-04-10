@@ -24,7 +24,7 @@ import { ImageCropOverlay } from './ImageCropOverlay';
 import { SELECTION_STROKE } from './renderConstants';
 import { SingleSelectionOverlay } from './SingleSelectionOverlay';
 
-interface CanvasSceneProps {
+export interface CanvasSceneProps {
   activeTool: CanvasTool;
   beginCropFullResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   beginCropFullRotate: (pointer: Point, source?: PointerGestureSource) => void;

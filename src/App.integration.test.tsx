@@ -51,6 +51,33 @@ vi.mock('konva', () => ({
   },
 }));
 
+vi.mock('pixi.js', () => ({
+  Container: class {},
+  Graphics: class {},
+  Rectangle: class {
+    constructor(public x = 0, public y = 0, public width = 0, public height = 0) {}
+  },
+}));
+
+vi.mock('@pixi/react', () => {
+  type MockProps = PropsWithChildren<Record<string, unknown>>;
+  const Application = React.forwardRef<unknown, MockProps>(({ children, ...props }, ref) => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    React.useImperativeHandle(ref, () => ({
+      getCanvas: () => canvasRef.current,
+      getApplication: () => ({ canvas: canvasRef.current }),
+    }));
+    return React.createElement('div', { 'data-pixi': 'application' },
+      React.createElement('canvas', { ref: canvasRef }),
+      children as React.ReactNode,
+    );
+  });
+  return {
+    Application,
+    extend: () => {},
+  };
+});
+
 vi.mock('react-konva', () => {
   type MockKonvaProps = PropsWithChildren<Record<string, unknown>>;
 
