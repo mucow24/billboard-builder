@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Application, extend, type ApplicationRef } from '@pixi/react';
 import { Container, Graphics, Rectangle, Sprite, Text, TextureSource } from 'pixi.js';
 import type { Container as PixiContainer, FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
@@ -270,19 +270,18 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
     );
 
     // --- Marquee preview (during drag-select) --------------------------------
-    const marqueeRect = (() => {
-      if (session?.kind !== 'marquee' || !session.pointerStart || !session.currentPointer) {
-        return null;
-      }
-      const s = session.pointerStart;
-      const c = session.currentPointer;
+    const isMarquee = session?.kind === 'marquee';
+    const mStart = isMarquee ? session.pointerStart : null;
+    const mCurrent = isMarquee ? session.currentPointer : null;
+    const marqueeRect = useMemo(() => {
+      if (!mStart || !mCurrent) return null;
       return {
-        x: Math.min(s.x, c.x),
-        y: Math.min(s.y, c.y),
-        w: Math.max(1, Math.abs(c.x - s.x)),
-        h: Math.max(1, Math.abs(c.y - s.y)),
+        x: Math.min(mStart.x, mCurrent.x),
+        y: Math.min(mStart.y, mCurrent.y),
+        w: Math.max(1, Math.abs(mCurrent.x - mStart.x)),
+        h: Math.max(1, Math.abs(mCurrent.y - mStart.y)),
       };
-    })();
+    }, [mStart, mCurrent]);
 
     const drawMarquee = useCallback(
       (g: Graphics) => {
@@ -318,7 +317,10 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       [guides, canvasWidth, canvasHeight, guideStrokeWidth],
     );
 
-    const hitArea = new Rectangle(0, 0, size.width, size.height);
+    const hitArea = useMemo(
+      () => new Rectangle(0, 0, size.width, size.height),
+      [size.width, size.height],
+    );
 
     return (
       <Application

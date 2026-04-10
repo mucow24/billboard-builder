@@ -193,56 +193,47 @@ function buildTextStyleProps(item: TextCanvasItem) {
 // Individual item drawers
 // ---------------------------------------------------------------------------
 
-function drawRectangle(g: Graphics, item: RectangleCanvasItem) {
-  g.clear();
-  const { width, height, cornerRadius, stroke, strokeWidth } = item;
-  if (cornerRadius > 0) {
-    g.roundRect(0, 0, width, height, cornerRadius);
-  } else {
-    g.rect(0, 0, width, height);
-  }
-
+function applyFillAndStroke(
+  g: Graphics,
+  item: GradientCapable & { stroke: string; strokeWidth: number },
+  width: number,
+  height: number,
+) {
   const grad = buildPixiGradient(item, width, height);
   g.fill(grad ?? item.fill);
-
-  if (strokeWidth > 0 && stroke && stroke !== 'transparent') {
-    g.stroke({ color: stroke, width: strokeWidth });
+  if (item.strokeWidth > 0 && item.stroke && item.stroke !== 'transparent') {
+    g.stroke({ color: item.stroke, width: item.strokeWidth });
   }
+}
+
+function drawRectangle(g: Graphics, item: RectangleCanvasItem) {
+  g.clear();
+  if (item.cornerRadius > 0) {
+    g.roundRect(0, 0, item.width, item.height, item.cornerRadius);
+  } else {
+    g.rect(0, 0, item.width, item.height);
+  }
+  applyFillAndStroke(g, item, item.width, item.height);
 }
 
 function drawEllipse(g: Graphics, item: EllipseCanvasItem) {
   g.clear();
-  const { width, height, stroke, strokeWidth } = item;
-  const rx = width / 2;
-  const ry = height / 2;
+  const rx = item.width / 2;
+  const ry = item.height / 2;
   g.ellipse(rx, ry, rx, ry);
-
-  const grad = buildPixiGradient(item, width, height);
-  g.fill(grad ?? item.fill);
-
-  if (strokeWidth > 0 && stroke && stroke !== 'transparent') {
-    g.stroke({ color: stroke, width: strokeWidth });
-  }
+  applyFillAndStroke(g, item, item.width, item.height);
 }
 
 function drawNgon(g: Graphics, item: NgonCanvasItem) {
   g.clear();
-  const { width, height, sides, stroke, strokeWidth } = item;
-  const pts = computeNgonPoints(width, height, sides);
+  const pts = computeNgonPoints(item.width, item.height, item.sides);
   if (pts.length === 0) return;
-
   g.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) {
     g.lineTo(pts[i].x, pts[i].y);
   }
   g.closePath();
-
-  const grad = buildPixiGradient(item, width, height);
-  g.fill(grad ?? item.fill);
-
-  if (strokeWidth > 0 && stroke && stroke !== 'transparent') {
-    g.stroke({ color: stroke, width: strokeWidth });
-  }
+  applyFillAndStroke(g, item, item.width, item.height);
 }
 
 function drawLine(g: Graphics, item: LineCanvasItem) {
@@ -580,14 +571,30 @@ function PixiItemView({
       }
     }
     return filters.length > 0 ? filters : undefined;
-  }, [item, zoom]);
+  }, [item.blurRadius, item.shadow, item.kind, zoom]);
 
   const renderBox = useMemo(() => getRenderBox(item), [item]);
 
+  const shapeHitArea = useMemo(
+    () => new Rectangle(0, 0, renderBox.width, renderBox.height),
+    [renderBox.width, renderBox.height],
+  );
+
+  const genHitArea = useMemo(
+    () => new Rectangle(0, 0, canvasWidth, canvasHeight),
+    [canvasWidth, canvasHeight],
+  );
+
+  // Memoize line hit polygon unconditionally to satisfy hook ordering rules.
+  // Uses `item` as dep since line-specific fields (startX/Y, endX/Y, strokeWidth)
+  // are not accessible on the union type without narrowing.
+  const lineHitArea = useMemo(() => {
+    if (item.kind !== 'line') return null;
+    return buildLineHitPolygon(item.startX, item.startY, item.endX, item.endY, item.strokeWidth);
+  }, [item]);
+
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
-  // Build a narrow polygon along the line for hit testing (not the full bounding box).
   if (item.kind === 'line') {
-    const hitArea = buildLineHitPolygon(item.startX, item.startY, item.endX, item.endY, item.strokeWidth);
     return (
       <pixiGraphics
         label={item.id}
@@ -595,64 +602,14 @@ function PixiItemView({
         alpha={item.opacity}
         filters={itemFilters}
         eventMode={eventMode}
-        hitArea={hitArea}
+        hitArea={lineHitArea!}
         onMouseDown={handleMouseDown}
       />
     );
   }
 
-  const shapeHitArea = new Rectangle(0, 0, renderBox.width, renderBox.height);
-
-  // Text items render via <pixiText> instead of <pixiGraphics>.
-  if (item.kind === 'text') {
-    const { style: textStyle, textX, textY } = buildTextStyleProps(item);
-    return (
-      <pixiContainer
-        label={item.id}
-        x={renderBox.x}
-        y={renderBox.y}
-        rotation={(item.rotation * Math.PI) / 180}
-        alpha={item.opacity}
-        filters={itemFilters}
-        pivot={{ x: 0, y: 0 }}
-        eventMode={eventMode}
-        hitArea={shapeHitArea}
-        onMouseDown={handleMouseDown}
-      >
-        <pixiText
-          text={item.text}
-          style={textStyle}
-          x={textX}
-          y={textY}
-          eventMode="none"
-        />
-      </pixiContainer>
-    );
-  }
-
-  // Image items render via <pixiSprite> with a clip mask.
-  if (item.kind === 'image') {
-    return (
-      <pixiContainer
-        label={item.id}
-        x={renderBox.x}
-        y={renderBox.y}
-        rotation={(item.rotation * Math.PI) / 180}
-        alpha={item.opacity}
-        filters={itemFilters}
-        pivot={{ x: 0, y: 0 }}
-        eventMode={eventMode}
-        hitArea={shapeHitArea}
-        onMouseDown={handleMouseDown}
-      >
-        <PixiImageContent item={item as ImageCanvasItem} />
-      </pixiContainer>
-    );
-  }
-
-  // Generators render a full-canvas pattern at origin.
+  // Generators render a full-canvas pattern at origin (different layout from other items).
   if (item.kind === 'generator') {
-    const genHitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
     return (
       <pixiContainer
         label={item.id}
@@ -673,6 +630,19 @@ function PixiItemView({
     );
   }
 
+  // All other items share the same container layout (position, rotation, hitArea).
+  let children: React.ReactNode;
+  if (item.kind === 'text') {
+    const { style: textStyle, textX, textY } = buildTextStyleProps(item);
+    children = (
+      <pixiText text={item.text} style={textStyle} x={textX} y={textY} eventMode="none" />
+    );
+  } else if (item.kind === 'image') {
+    children = <PixiImageContent item={item as ImageCanvasItem} />;
+  } else {
+    children = <pixiGraphics draw={draw} eventMode="none" />;
+  }
+
   return (
     <pixiContainer
       label={item.id}
@@ -686,7 +656,7 @@ function PixiItemView({
       hitArea={shapeHitArea}
       onMouseDown={handleMouseDown}
     >
-      <pixiGraphics draw={draw} eventMode="none" />
+      {children}
     </pixiContainer>
   );
 }

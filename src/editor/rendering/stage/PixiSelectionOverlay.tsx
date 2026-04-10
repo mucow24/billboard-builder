@@ -29,6 +29,17 @@ const BASE_HANDLE_STROKE_WIDTH = 2;
 const BASE_SELECTION_STROKE_WIDTH = 2;
 const BASE_ROTATE_HANDLE_OFFSET = 50;
 
+function getZoomScaledDimensions(zoom: number) {
+  const nz = zoom > 0 ? zoom : 1;
+  return {
+    nz,
+    selectionStroke: BASE_SELECTION_STROKE_WIDTH / nz,
+    handleRadius: BASE_HANDLE_RADIUS / nz,
+    handleStroke: BASE_HANDLE_STROKE_WIDTH / nz,
+    rotateOffset: BASE_ROTATE_HANDLE_OFFSET / nz,
+  };
+}
+
 // ── Handle cursor map ────────────────────────────────────────────────────────
 const HANDLE_CURSORS: Record<string, string> = {
   'top-left': 'nwse-resize',
@@ -43,6 +54,51 @@ const HANDLE_CURSORS: Record<string, string> = {
   start: 'move',
   end: 'move',
 };
+
+// ── Generic interactive handle ───────────────────────────────────────────────
+
+function InteractiveHandle({
+  name,
+  x,
+  y,
+  radius,
+  strokeWidth,
+  onMouseDown,
+}: {
+  name: string;
+  x: number;
+  y: number;
+  radius: number;
+  strokeWidth: number;
+  onMouseDown: (e: FederatedPointerEvent) => void;
+}) {
+  const draw = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      g.circle(0, 0, radius);
+      g.fill({ color: HANDLE_FILL, alpha: HANDLE_FILL_ALPHA });
+      g.stroke({ color: HANDLE_STROKE, width: strokeWidth });
+    },
+    [radius, strokeWidth],
+  );
+
+  const hitArea = useMemo(
+    () => new Rectangle(-radius * 1.5, -radius * 1.5, radius * 3, radius * 3),
+    [radius],
+  );
+
+  return (
+    <pixiGraphics
+      x={x}
+      y={y}
+      draw={draw}
+      eventMode="static"
+      hitArea={hitArea}
+      cursor={HANDLE_CURSORS[name] ?? 'pointer'}
+      onMouseDown={onMouseDown}
+    />
+  );
+}
 
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface PixiSelectionOverlayProps {
@@ -147,8 +203,7 @@ function ItemOutlineOnly({
   item: RenderableCanvasItem;
   zoom: number;
 }) {
-  const nz = zoom > 0 ? zoom : 1;
-  const selectionStroke = BASE_SELECTION_STROKE_WIDTH / nz;
+  const { selectionStroke } = getZoomScaledDimensions(zoom);
   const renderBox = useMemo(() => getRenderBox(item), [item]);
 
   const drawOutline = useCallback(
@@ -197,11 +252,7 @@ function GroupSelectionOverlay({
   beginGroupRotate: PixiSelectionOverlayProps['beginGroupRotate'];
   toCanvasPointer: (pointer: Point) => Point;
 }) {
-  const nz = zoom > 0 ? zoom : 1;
-  const selectionStroke = BASE_SELECTION_STROKE_WIDTH / nz;
-  const handleRadius = BASE_HANDLE_RADIUS / nz;
-  const handleStroke = BASE_HANDLE_STROKE_WIDTH / nz;
-  const rotateOffset = BASE_ROTATE_HANDLE_OFFSET / nz;
+  const { selectionStroke, handleRadius, handleStroke, rotateOffset } = getZoomScaledDimensions(zoom);
 
   const { bounds, rotation } = frame;
   const cx = bounds.x + bounds.width / 2;
@@ -266,6 +317,24 @@ function GroupSelectionOverlay({
     [handlePoints],
   );
 
+  const groupHandleMouseDownMap = useMemo(
+    () => Object.fromEntries(
+      [...RESIZE_HANDLE_NAMES, 'rotater' as const].map((name) => [
+        name,
+        (e: FederatedPointerEvent) => {
+          e.stopPropagation();
+          const canvasPointer = toCanvasPointer({ x: e.global.x, y: e.global.y });
+          if (name === 'rotater') {
+            beginGroupRotate(canvasPointer);
+          } else {
+            beginGroupResize(name, canvasPointer);
+          }
+        },
+      ]),
+    ) as Record<ResizeHandle | 'rotater', (e: FederatedPointerEvent) => void>,
+    [beginGroupResize, beginGroupRotate, toCanvasPointer],
+  );
+
   return (
     <pixiContainer label="group-selection-overlay">
       {/* Group bounding rect */}
@@ -282,78 +351,17 @@ function GroupSelectionOverlay({
 
       {/* Handles */}
       {handleEntries.map(([name, point]) => (
-        <GroupHandleCircle
+        <InteractiveHandle
           key={name}
           name={name}
-          point={point}
+          x={point.x}
+          y={point.y}
           radius={handleRadius}
           strokeWidth={handleStroke}
-          beginGroupResize={beginGroupResize}
-          beginGroupRotate={beginGroupRotate}
-          toCanvasPointer={toCanvasPointer}
+          onMouseDown={groupHandleMouseDownMap[name]}
         />
       ))}
     </pixiContainer>
-  );
-}
-
-function GroupHandleCircle({
-  name,
-  point,
-  radius,
-  strokeWidth,
-  beginGroupResize,
-  beginGroupRotate,
-  toCanvasPointer,
-}: {
-  name: ResizeHandle | 'rotater';
-  point: Point;
-  radius: number;
-  strokeWidth: number;
-  beginGroupResize: PixiSelectionOverlayProps['beginGroupResize'];
-  beginGroupRotate: PixiSelectionOverlayProps['beginGroupRotate'];
-  toCanvasPointer: (pointer: Point) => Point;
-}) {
-  const draw = useCallback(
-    (g: Graphics) => {
-      g.clear();
-      g.circle(0, 0, radius);
-      g.fill({ color: HANDLE_FILL, alpha: HANDLE_FILL_ALPHA });
-      g.stroke({ color: HANDLE_STROKE, width: strokeWidth });
-    },
-    [radius, strokeWidth],
-  );
-
-  const hitArea = useMemo(
-    () => new Rectangle(-radius * 1.5, -radius * 1.5, radius * 3, radius * 3),
-    [radius],
-  );
-
-  const handleMouseDown = useCallback(
-    (e: FederatedPointerEvent) => {
-      e.stopPropagation();
-      const viewportPointer = { x: e.global.x, y: e.global.y };
-      const canvasPointer = toCanvasPointer(viewportPointer);
-
-      if (name === 'rotater') {
-        beginGroupRotate(canvasPointer);
-      } else {
-        beginGroupResize(name, canvasPointer);
-      }
-    },
-    [name, beginGroupResize, beginGroupRotate, toCanvasPointer],
-  );
-
-  return (
-    <pixiGraphics
-      x={point.x}
-      y={point.y}
-      draw={draw}
-      eventMode="static"
-      hitArea={hitArea}
-      cursor={HANDLE_CURSORS[name] ?? 'pointer'}
-      onMouseDown={handleMouseDown}
-    />
   );
 }
 
@@ -372,11 +380,7 @@ function ShapeSelectionOverlay({
   beginRotate: PixiSelectionOverlayProps['beginRotate'];
   toCanvasPointer: (pointer: Point) => Point;
 }) {
-  const nz = zoom > 0 ? zoom : 1;
-  const selectionStroke = BASE_SELECTION_STROKE_WIDTH / nz;
-  const handleRadius = BASE_HANDLE_RADIUS / nz;
-  const handleStroke = BASE_HANDLE_STROKE_WIDTH / nz;
-  const rotateOffset = BASE_ROTATE_HANDLE_OFFSET / nz;
+  const { selectionStroke, handleRadius, handleStroke, rotateOffset } = getZoomScaledDimensions(zoom);
 
   const renderBox = useMemo(() => getRenderBox(item), [item]);
 
@@ -439,6 +443,31 @@ function ShapeSelectionOverlay({
     [handlePoints],
   );
 
+  const shapeHandleMouseDownMap = useMemo(
+    () => Object.fromEntries(
+      [...RESIZE_HANDLE_NAMES, 'rotater' as const].map((name) => [
+        name,
+        (e: FederatedPointerEvent) => {
+          e.stopPropagation();
+          const canvasPointer = toCanvasPointer({ x: e.global.x, y: e.global.y });
+          if (name === 'rotater') {
+            beginRotate(
+              item as Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+              canvasPointer,
+            );
+          } else {
+            beginResize(
+              item as Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+              name,
+              canvasPointer,
+            );
+          }
+        },
+      ]),
+    ) as Record<ResizeHandle | 'rotater', (e: FederatedPointerEvent) => void>,
+    [item, beginResize, beginRotate, toCanvasPointer],
+  );
+
   return (
     <pixiContainer label="selection-overlay">
       {/* Outline: drawn in item-local space inside a rotated container */}
@@ -455,90 +484,17 @@ function ShapeSelectionOverlay({
 
       {/* Handles (stage space) */}
       {handleEntries.map(([name, point]) => (
-        <HandleCircle
+        <InteractiveHandle
           key={name}
           name={name}
-          point={point}
-          item={item}
+          x={point.x}
+          y={point.y}
           radius={handleRadius}
           strokeWidth={handleStroke}
-          beginResize={beginResize}
-          beginRotate={beginRotate}
-          toCanvasPointer={toCanvasPointer}
+          onMouseDown={shapeHandleMouseDownMap[name]}
         />
       ))}
     </pixiContainer>
-  );
-}
-
-// ── Individual handle circle (interactive) ───────────────────────────────────
-
-function HandleCircle({
-  name,
-  point,
-  item,
-  radius,
-  strokeWidth,
-  beginResize,
-  beginRotate,
-  toCanvasPointer,
-}: {
-  name: ResizeHandle | 'rotater';
-  point: Point;
-  item: RenderableCanvasItem;
-  radius: number;
-  strokeWidth: number;
-  beginResize: PixiSelectionOverlayProps['beginResize'];
-  beginRotate: PixiSelectionOverlayProps['beginRotate'];
-  toCanvasPointer: (pointer: Point) => Point;
-}) {
-  const draw = useCallback(
-    (g: Graphics) => {
-      g.clear();
-      g.circle(0, 0, radius);
-      g.fill({ color: HANDLE_FILL, alpha: HANDLE_FILL_ALPHA });
-      g.stroke({ color: HANDLE_STROKE, width: strokeWidth });
-    },
-    [radius, strokeWidth],
-  );
-
-  const hitArea = useMemo(
-    () => new Rectangle(-radius * 1.5, -radius * 1.5, radius * 3, radius * 3),
-    [radius],
-  );
-
-  const handleMouseDown = useCallback(
-    (e: FederatedPointerEvent) => {
-      e.stopPropagation();
-      const viewportPointer = { x: e.global.x, y: e.global.y };
-      const canvasPointer = toCanvasPointer(viewportPointer);
-
-      if (name === 'rotater') {
-        beginRotate(
-          item as Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
-          canvasPointer,
-        );
-      } else {
-        beginResize(
-          item as Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
-          name,
-          canvasPointer,
-        );
-      }
-    },
-    [name, item, beginResize, beginRotate, toCanvasPointer],
-  );
-
-  return (
-    <pixiGraphics
-      x={point.x}
-      y={point.y}
-      draw={draw}
-      eventMode="static"
-      hitArea={hitArea}
-      cursor={HANDLE_CURSORS[name] ?? 'pointer'}
-      onMouseDown={handleMouseDown}
-    />
   );
 }
 
@@ -555,92 +511,50 @@ function LineSelectionHandles({
   beginLineHandle: PixiSelectionOverlayProps['beginLineHandle'];
   toCanvasPointer: (pointer: Point) => Point;
 }) {
-  const nz = zoom > 0 ? zoom : 1;
-  const handleRadius = BASE_HANDLE_RADIUS / nz;
-  const handleStroke = BASE_HANDLE_STROKE_WIDTH / nz;
+  const { handleRadius, handleStroke } = getZoomScaledDimensions(zoom);
+
+  const handleStartMouseDown = useCallback(
+    (e: FederatedPointerEvent) => {
+      e.stopPropagation();
+      beginLineHandle(
+        item as Extract<CanvasItem, { kind: 'line' }>,
+        'start',
+        toCanvasPointer({ x: e.global.x, y: e.global.y }),
+      );
+    },
+    [item, beginLineHandle, toCanvasPointer],
+  );
+
+  const handleEndMouseDown = useCallback(
+    (e: FederatedPointerEvent) => {
+      e.stopPropagation();
+      beginLineHandle(
+        item as Extract<CanvasItem, { kind: 'line' }>,
+        'end',
+        toCanvasPointer({ x: e.global.x, y: e.global.y }),
+      );
+    },
+    [item, beginLineHandle, toCanvasPointer],
+  );
 
   return (
     <pixiContainer label="line-selection-overlay">
-      <LineEndpointHandle
-        endpoint="start"
+      <InteractiveHandle
+        name="start"
         x={item.startX}
         y={item.startY}
         radius={handleRadius}
         strokeWidth={handleStroke}
-        item={item}
-        beginLineHandle={beginLineHandle}
-        toCanvasPointer={toCanvasPointer}
+        onMouseDown={handleStartMouseDown}
       />
-      <LineEndpointHandle
-        endpoint="end"
+      <InteractiveHandle
+        name="end"
         x={item.endX}
         y={item.endY}
         radius={handleRadius}
         strokeWidth={handleStroke}
-        item={item}
-        beginLineHandle={beginLineHandle}
-        toCanvasPointer={toCanvasPointer}
+        onMouseDown={handleEndMouseDown}
       />
     </pixiContainer>
-  );
-}
-
-function LineEndpointHandle({
-  endpoint,
-  x,
-  y,
-  radius,
-  strokeWidth,
-  item,
-  beginLineHandle,
-  toCanvasPointer,
-}: {
-  endpoint: 'start' | 'end';
-  x: number;
-  y: number;
-  radius: number;
-  strokeWidth: number;
-  item: RenderableCanvasItem & { kind: 'line' };
-  beginLineHandle: PixiSelectionOverlayProps['beginLineHandle'];
-  toCanvasPointer: (pointer: Point) => Point;
-}) {
-  const draw = useCallback(
-    (g: Graphics) => {
-      g.clear();
-      g.circle(0, 0, radius);
-      g.fill({ color: HANDLE_FILL, alpha: HANDLE_FILL_ALPHA });
-      g.stroke({ color: HANDLE_STROKE, width: strokeWidth });
-    },
-    [radius, strokeWidth],
-  );
-
-  const hitArea = useMemo(
-    () => new Rectangle(-radius * 1.5, -radius * 1.5, radius * 3, radius * 3),
-    [radius],
-  );
-
-  const handleMouseDown = useCallback(
-    (e: FederatedPointerEvent) => {
-      e.stopPropagation();
-      const viewportPointer = { x: e.global.x, y: e.global.y };
-      beginLineHandle(
-        item as Extract<CanvasItem, { kind: 'line' }>,
-        endpoint,
-        toCanvasPointer(viewportPointer),
-      );
-    },
-    [endpoint, item, beginLineHandle, toCanvasPointer],
-  );
-
-  return (
-    <pixiGraphics
-      x={x}
-      y={y}
-      draw={draw}
-      eventMode="static"
-      hitArea={hitArea}
-      cursor={HANDLE_CURSORS[endpoint] ?? 'pointer'}
-      onMouseDown={handleMouseDown}
-    />
   );
 }

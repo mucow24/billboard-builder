@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Graphics, Rectangle } from 'pixi.js';
 import type { FederatedPointerEvent } from 'pixi.js';
 
@@ -96,6 +96,8 @@ export function PixiImageCropOverlay({
   const fullHandlePoints = getShapeOverlayHandlePoints(fullImageItem, zoom);
   const cropHandlePoints = getShapeOverlayHandlePoints(previewItem, zoom);
   const fullRenderBox = getRenderBox(fullImageItem);
+  const fullRotationRad = (fullImageItem.rotation * Math.PI) / 180;
+  const previewRotationRad = (previewItem.rotation * Math.PI) / 180;
 
   // ── Double-click detection for commit ──────────────────────────────────
   const lastClickRef = useRef(0);
@@ -131,17 +133,15 @@ export function PixiImageCropOverlay({
     [beginCropPan, commitCropSession, toCanvasPointer],
   );
 
-  // ── Full image outline (blue dashed) ──────────────────────────────────
+  // ── Full image outline (blue closed polyline) ─────────────────────────
   const drawFullOutline = useCallback(
     (g: Graphics) => {
       g.clear();
-      if (fullOutlinePoints.length < 4) return;
-      g.moveTo(fullOutlinePoints[0], fullOutlinePoints[1]);
-      for (let i = 2; i < fullOutlinePoints.length; i += 2) {
-        g.lineTo(fullOutlinePoints[i], fullOutlinePoints[i + 1]);
-      }
-      g.lineTo(fullOutlinePoints[0], fullOutlinePoints[1]);
-      g.stroke({ color: FULL_IMAGE_STROKE, width: m.selectionStrokeWidth });
+      // Close the outline by appending the first point
+      const closed = fullOutlinePoints.length >= 4
+        ? [...fullOutlinePoints, fullOutlinePoints[0], fullOutlinePoints[1]]
+        : fullOutlinePoints;
+      drawPolyline(g, closed, FULL_IMAGE_STROKE, m.selectionStrokeWidth);
     },
     [fullOutlinePoints, m.selectionStrokeWidth],
   );
@@ -168,12 +168,17 @@ export function PixiImageCropOverlay({
   // ── Hit areas for full image handles (invisible, interactive) ─────────
   const fullHandleHitSize = m.cropHandleHitSize;
 
-  const makeFullHandleMouseDown = useCallback(
-    (handle: ResizeHandle) => (e: FederatedPointerEvent) => {
-      if ((e.nativeEvent as MouseEvent).button !== 0) return;
-      e.stopPropagation();
-      beginCropFullResize(handle, toCanvasPointer({ x: e.global.x, y: e.global.y }), 'overlay');
-    },
+  const fullHandleMouseDownMap = useMemo(
+    () => Object.fromEntries(
+      RESIZE_HANDLE_NAMES.map((handle) => [
+        handle,
+        (e: FederatedPointerEvent) => {
+          if ((e.nativeEvent as MouseEvent).button !== 0) return;
+          e.stopPropagation();
+          beginCropFullResize(handle, toCanvasPointer({ x: e.global.x, y: e.global.y }), 'overlay');
+        },
+      ]),
+    ) as Record<ResizeHandle, (e: FederatedPointerEvent) => void>,
     [beginCropFullResize, toCanvasPointer],
   );
 
@@ -215,12 +220,17 @@ export function PixiImageCropOverlay({
   );
 
   // ── Hit areas for crop handles (invisible, interactive) ───────────────
-  const makeCropHandleMouseDown = useCallback(
-    (handle: ResizeHandle) => (e: FederatedPointerEvent) => {
-      if ((e.nativeEvent as MouseEvent).button !== 0) return;
-      e.stopPropagation();
-      beginCropResize(handle, toCanvasPointer({ x: e.global.x, y: e.global.y }), 'overlay');
-    },
+  const cropHandleMouseDownMap = useMemo(
+    () => Object.fromEntries(
+      RESIZE_HANDLE_NAMES.map((handle) => [
+        handle,
+        (e: FederatedPointerEvent) => {
+          if ((e.nativeEvent as MouseEvent).button !== 0) return;
+          e.stopPropagation();
+          beginCropResize(handle, toCanvasPointer({ x: e.global.x, y: e.global.y }), 'overlay');
+        },
+      ]),
+    ) as Record<ResizeHandle, (e: FederatedPointerEvent) => void>,
     [beginCropResize, toCanvasPointer],
   );
 
@@ -230,7 +240,7 @@ export function PixiImageCropOverlay({
       <pixiContainer
         x={fullRenderBox.x}
         y={fullRenderBox.y}
-        rotation={(fullImageItem.rotation * Math.PI) / 180}
+        rotation={fullRotationRad}
         alpha={Math.min(1, fullImageItem.opacity * 0.35)}
         eventMode="none"
       >
@@ -241,7 +251,7 @@ export function PixiImageCropOverlay({
       <pixiContainer
         x={previewRenderBox.x}
         y={previewRenderBox.y}
-        rotation={(previewItem.rotation * Math.PI) / 180}
+        rotation={previewRotationRad}
         alpha={previewItem.opacity}
         eventMode="none"
       >
@@ -252,7 +262,7 @@ export function PixiImageCropOverlay({
       <pixiContainer
         x={fullRenderBox.x}
         y={fullRenderBox.y}
-        rotation={(fullImageItem.rotation * Math.PI) / 180}
+        rotation={fullRotationRad}
         eventMode="static"
         hitArea={new Rectangle(0, 0, fullRenderBox.width, fullRenderBox.height)}
         onMouseDown={handlePanMouseDown}
@@ -281,7 +291,7 @@ export function PixiImageCropOverlay({
               fullHandleHitSize,
               fullHandleHitSize,
             )}
-            onMouseDown={makeFullHandleMouseDown(handle)}
+            onMouseDown={fullHandleMouseDownMap[handle]}
           />
         );
       })}
@@ -304,7 +314,7 @@ export function PixiImageCropOverlay({
       <pixiContainer
         x={previewRenderBox.x}
         y={previewRenderBox.y}
-        rotation={(previewItem.rotation * Math.PI) / 180}
+        rotation={previewRotationRad}
         eventMode="none"
       >
         <pixiGraphics draw={drawCropOutline} eventMode="none" />
@@ -325,7 +335,7 @@ export function PixiImageCropOverlay({
               m.cropHandleHitSize,
               m.cropHandleHitSize,
             )}
-            onMouseDown={makeCropHandleMouseDown(handle)}
+            onMouseDown={cropHandleMouseDownMap[handle]}
           />
         );
       })}
