@@ -182,6 +182,27 @@ export function PixiImageCropOverlay({
     [beginCropFullResize, toCanvasPointer],
   );
 
+  const fullHandleHitArea = useMemo(
+    () => new Rectangle(
+      -fullHandleHitSize / 2, -fullHandleHitSize / 2,
+      fullHandleHitSize, fullHandleHitSize,
+    ),
+    [fullHandleHitSize],
+  );
+
+  const cropHandleHitArea = useMemo(
+    () => new Rectangle(
+      -m.cropHandleHitSize / 2, -m.cropHandleHitSize / 2,
+      m.cropHandleHitSize, m.cropHandleHitSize,
+    ),
+    [m.cropHandleHitSize],
+  );
+
+  const panHitArea = useMemo(
+    () => new Rectangle(0, 0, fullRenderBox.width, fullRenderBox.height),
+    [fullRenderBox.width, fullRenderBox.height],
+  );
+
   const handleRotateMouseDown = useCallback(
     (e: FederatedPointerEvent) => {
       if ((e.nativeEvent as MouseEvent).button !== 0) return;
@@ -264,7 +285,7 @@ export function PixiImageCropOverlay({
         y={fullRenderBox.y}
         rotation={fullRotationRad}
         eventMode="static"
-        hitArea={new Rectangle(0, 0, fullRenderBox.width, fullRenderBox.height)}
+        hitArea={panHitArea}
         onMouseDown={handlePanMouseDown}
       >
         <pixiGraphics draw={drawPanArea} eventMode="none" />
@@ -285,12 +306,7 @@ export function PixiImageCropOverlay({
             x={pt.x}
             y={pt.y}
             eventMode="static"
-            hitArea={new Rectangle(
-              -fullHandleHitSize / 2,
-              -fullHandleHitSize / 2,
-              fullHandleHitSize,
-              fullHandleHitSize,
-            )}
+            hitArea={fullHandleHitArea}
             onMouseDown={fullHandleMouseDownMap[handle]}
           />
         );
@@ -301,12 +317,7 @@ export function PixiImageCropOverlay({
         x={fullHandlePoints.rotater.x}
         y={fullHandlePoints.rotater.y}
         eventMode="static"
-        hitArea={new Rectangle(
-          -fullHandleHitSize / 2,
-          -fullHandleHitSize / 2,
-          fullHandleHitSize,
-          fullHandleHitSize,
-        )}
+        hitArea={fullHandleHitArea}
         onMouseDown={handleRotateMouseDown}
       />
 
@@ -329,12 +340,7 @@ export function PixiImageCropOverlay({
             x={pt.x}
             y={pt.y}
             eventMode="static"
-            hitArea={new Rectangle(
-              -m.cropHandleHitSize / 2,
-              -m.cropHandleHitSize / 2,
-              m.cropHandleHitSize,
-              m.cropHandleHitSize,
-            )}
+            hitArea={cropHandleHitArea}
             onMouseDown={cropHandleMouseDownMap[handle]}
           />
         );

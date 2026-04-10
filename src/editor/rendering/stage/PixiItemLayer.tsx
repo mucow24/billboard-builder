@@ -302,7 +302,11 @@ export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
 
-  const renderBox = useMemo(() => getRenderBox(item), [item]);
+  const renderBox = useMemo(
+    () => getRenderBox(item),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the specific fields getRenderBox reads
+    [item.x, item.y, item.width, item.height, item.scaleX, item.scaleY],
+  );
 
   const presentation = useMemo(
     () => getImageNodePresentation(item.sourceTransform, item.mirrorHorizontal),
@@ -506,7 +510,9 @@ function PixiItemView({
           break;
       }
     },
-    [item],
+    [item], // Intentionally keyed on whole item — shape drawers read many variant-specific fields.
+    // Redrawing Graphics is cheap (a single clear+path+fill); the perf-critical memos are
+    // itemFilters (expensive filter construction) and hitArea (triggers PixiJS prop diffs).
   );
 
   // PixiJS federated events don't include dblclick, so detect manually.
@@ -573,7 +579,11 @@ function PixiItemView({
     return filters.length > 0 ? filters : undefined;
   }, [item.blurRadius, item.shadow, item.kind, zoom]);
 
-  const renderBox = useMemo(() => getRenderBox(item), [item]);
+  const renderBox = useMemo(
+    () => getRenderBox(item),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the specific fields getRenderBox reads
+    [item.kind, item.x, item.y, item.width, item.height, item.scaleX, item.scaleY],
+  );
 
   const shapeHitArea = useMemo(
     () => new Rectangle(0, 0, renderBox.width, renderBox.height),
@@ -586,12 +596,14 @@ function PixiItemView({
   );
 
   // Memoize line hit polygon unconditionally to satisfy hook ordering rules.
-  // Uses `item` as dep since line-specific fields (startX/Y, endX/Y, strokeWidth)
-  // are not accessible on the union type without narrowing.
+  // For lines, renderBox is derived from the same startX/Y, endX/Y fields used here,
+  // so renderBox changes iff the line endpoints change. strokeWidth is on LineCanvasItem
+  // only, but we can safely read it when kind === 'line'.
   const lineHitArea = useMemo(() => {
     if (item.kind !== 'line') return null;
     return buildLineHitPolygon(item.startX, item.startY, item.endX, item.endY, item.strokeWidth);
-  }, [item]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.kind, renderBox.x, renderBox.y, renderBox.width, renderBox.height]);
 
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
   if (item.kind === 'line') {
