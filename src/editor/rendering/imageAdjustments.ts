@@ -1,10 +1,6 @@
-import Konva from 'konva';
-
 import { parseHexColor } from '../color/hexColor';
 import type { ImageAdjustments } from '../document/documentTypes';
 import { normalizeImageAdjustments } from '../document/imageAdjustments';
-
-type KonvaFilter = (typeof Konva.Filters)[keyof typeof Konva.Filters];
 
 export interface RenderableImageAdjustments {
   brightness: number;
@@ -13,7 +9,6 @@ export interface RenderableImageAdjustments {
   tintGreen: number;
   tintBlue: number;
   tintAlpha: number;
-  filters: KonvaFilter[];
   isActive: boolean;
 }
 
@@ -34,17 +29,7 @@ export function getRenderableImageAdjustments(
   const brightness = (normalized.brightness - 100) / 100;
   const contrast = (normalized.contrast - 50) * 2;
   const tintAlpha = normalized.tintStrength / 100;
-  const filters: KonvaFilter[] = [];
-
-  if (brightness !== 0) {
-    filters.push(Konva.Filters.Brighten);
-  }
-  if (contrast !== 0) {
-    filters.push(Konva.Filters.Contrast);
-  }
-  if (tintAlpha > 0) {
-    filters.push(Konva.Filters.RGBA);
-  }
+  const isActive = brightness !== 0 || contrast !== 0 || tintAlpha > 0;
 
   return {
     brightness,
@@ -53,7 +38,6 @@ export function getRenderableImageAdjustments(
     tintGreen: tint.green,
     tintBlue: tint.blue,
     tintAlpha,
-    filters,
-    isActive: filters.length > 0,
+    isActive,
   };
 }

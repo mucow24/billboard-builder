@@ -582,6 +582,8 @@ function PixiItemView({
     return filters.length > 0 ? filters : undefined;
   }, [item, zoom]);
 
+  const renderBox = useMemo(() => getRenderBox(item), [item]);
+
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
   // Build a narrow polygon along the line for hit testing (not the full bounding box).
   if (item.kind === 'line') {
@@ -599,7 +601,6 @@ function PixiItemView({
     );
   }
 
-  const renderBox = useMemo(() => getRenderBox(item), [item]);
   const shapeHitArea = new Rectangle(0, 0, renderBox.width, renderBox.height);
 
   // Text items render via <pixiText> instead of <pixiGraphics>.

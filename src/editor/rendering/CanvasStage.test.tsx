@@ -39,16 +39,6 @@ const { mockInteractionSession } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('konva', () => ({
-  default: {
-    Filters: {
-      Brighten: Symbol('Brighten'),
-      Contrast: Symbol('Contrast'),
-      RGBA: Symbol('RGBA'),
-    },
-  },
-}));
-
 vi.mock('pixi-filters', () => ({
   DropShadowFilter: class { constructor() {} },
 }));
@@ -71,7 +61,7 @@ vi.mock('pixi.js', () => ({
 
 vi.mock('@pixi/react', () => {
   type MockProps = React.PropsWithChildren<Record<string, unknown>>;
-  const Application = React.forwardRef<unknown, MockProps>(({ children, ...props }, ref) => {
+  const Application = React.forwardRef<unknown, MockProps>(({ children }, ref) => {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     React.useImperativeHandle(ref, () => ({
       getCanvas: () => canvasRef.current,
@@ -95,106 +85,7 @@ import {
 } from '../document/documentDefaults';
 import type { ProjectDocument } from '../document/documentTypes';
 import { resetEditorStore } from '../../test/editorStore';
-import { useEditorStore } from '../state/store';
 import { getGroupResizeFrame, getSelectionFrameForRotation } from './transformGeometry';
-
-vi.mock('react-konva', () => {
-  type MockKonvaProps = React.PropsWithChildren<Record<string, unknown>>;
-  const noop = () => {};
-  function buildKonvaEvent(
-    event: MouseEvent | WheelEvent,
-    nodeRef: HTMLDivElement | null,
-  ) {
-    const stage = {
-      getPointerPosition: () => ({
-        x: event.clientX || 640,
-        y: event.clientY || 360,
-      }),
-    };
-
-    return {
-      cancelBubble: false,
-      evt: event,
-      target: Object.assign(nodeRef ?? event.target ?? {}, {
-        getStage: () => stage,
-      }),
-    };
-  }
-
-  const make = (name: string) =>
-    React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) => {
-      let nodeRef: HTMLDivElement | null = null;
-      const entries = Object.entries(props).flatMap<[string, unknown]>(([key, value]) => {
-          if (value === undefined) {
-            return [];
-          }
-          if (typeof value === 'function') {
-            if (/^on(MouseDown|MouseUp|MouseMove|MouseLeave|Wheel|DblClick)$/.test(key)) {
-              const domEventName = key === 'onDblClick' ? 'onDoubleClick' : key;
-              return [[
-                domEventName,
-                (event: MouseEvent | WheelEvent) => {
-                  value(buildKonvaEvent(event, nodeRef));
-                },
-              ]];
-            }
-            return /^(onClick|onWheel)/.test(key) ? [[key, value]] : [];
-          }
-          return [[`data-prop-${key.toLowerCase()}`, typeof value === 'object' ? JSON.stringify(value) : String(value)]];
-        });
-      const domProps = Object.fromEntries(entries);
-      const setRef = (node: HTMLDivElement | null) => {
-        nodeRef = node;
-        if (node) {
-          Object.assign(node, {
-            alpha: noop,
-            blue: noop,
-            blurRadius: noop,
-            brightness: noop,
-            cache: noop,
-            clearCache: noop,
-            contrast: noop,
-            filters: noop,
-            getStage: () => ({
-              getPointerPosition: () => ({ x: 640, y: 360 }),
-            }),
-            getLayer: () => ({
-              batchDraw: noop,
-            }),
-            green: noop,
-            hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
-            name: () => String(props.name ?? ''),
-            red: noop,
-            scaleX: noop,
-            scaleY: noop,
-          });
-        }
-        if (typeof ref === 'function') {
-          ref(node);
-        } else if (ref) {
-          ref.current = node;
-        }
-      };
-      return React.createElement(
-        'div',
-        { ref: setRef, 'data-konva-node': name, ...domProps },
-        children as React.ReactNode,
-      );
-    });
-
-  return {
-    Stage: make('Stage'),
-    Layer: make('Layer'),
-    Group: make('Group'),
-    Rect: make('Rect'),
-    Shape: make('Shape'),
-    Line: make('Line'),
-    Text: make('Text'),
-    Circle: make('Circle'),
-    Ellipse: make('Ellipse'),
-    Image: make('Image'),
-  };
-});
 
 vi.mock('./useCanvasInteractionSession', () => ({
   useCanvasInteractionSession: () => mockInteractionSession,

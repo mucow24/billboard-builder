@@ -7,7 +7,7 @@ import type {
   SnapRect,
 } from '../document/documentTypes';
 import { buildVisibleImageCropFromSourceTransform } from './imagePresentation';
-import { getResizeSnappedRect } from './snapping';
+import { buildCandidateCache, getResizeSnappedRect } from './snapping';
 import {
   localToStage,
   stageToLocal,
@@ -116,19 +116,20 @@ export function resizeImageCrop(params: {
     { x: baseItem.x, y: baseItem.y },
     baseItem.rotation,
   );
+
   let left = 0;
   let top = 0;
   let right = baseItem.width;
   let bottom = baseItem.height;
 
   if (handle.includes('left')) {
-    left = clamp(localPointer.x, 0, right - 1);
+    left = clamp(localPointer.x, -Number.MAX_SAFE_INTEGER, right - 1);
   }
   if (handle.includes('right')) {
     right = clamp(localPointer.x, left + 1, Number.MAX_SAFE_INTEGER);
   }
   if (handle.includes('top')) {
-    top = clamp(localPointer.y, 0, bottom - 1);
+    top = clamp(localPointer.y, -Number.MAX_SAFE_INTEGER, bottom - 1);
   }
   if (handle.includes('bottom')) {
     bottom = clamp(localPointer.y, top + 1, Number.MAX_SAFE_INTEGER);
@@ -144,6 +145,17 @@ export function resizeImageCrop(params: {
 
   let guides: GuideLine[] = [];
   if (snapEnabled && Math.abs(baseItem.rotation) < 0.001) {
+    const st = baseItem.sourceTransform;
+    const cache = buildCandidateCache(siblingItems, stageRect);
+    // Add the source image edges so the crop box snaps to the full image bounds.
+    const imgLeft = baseItem.x + st.x;
+    const imgTop = baseItem.y + st.y;
+    cache.lines.push(
+      { orientation: 'vertical', position: imgLeft },
+      { orientation: 'vertical', position: imgLeft + st.width },
+      { orientation: 'horizontal', position: imgTop },
+      { orientation: 'horizontal', position: imgTop + st.height },
+    );
     const snapped = getResizeSnappedRect(
       {
         x: baseItem.x + left,
@@ -155,6 +167,7 @@ export function resizeImageCrop(params: {
       stageRect,
       handle,
       threshold,
+      cache,
     );
     left = snapped.rect.x - baseItem.x;
     top = snapped.rect.y - baseItem.y;
@@ -212,22 +225,8 @@ export function panImageUnderCrop(params: {
   };
   const nextSourceTransform: ImageSourceTransform = {
     ...baseItem.sourceTransform,
-    x:
-      Math.abs(baseItem.sourceTransform.rotation) < 0.001
-        ? clamp(
-            baseItem.sourceTransform.x + deltaLocal.x,
-            baseItem.width - baseItem.sourceTransform.width,
-            0,
-          )
-        : baseItem.sourceTransform.x + deltaLocal.x,
-    y:
-      Math.abs(baseItem.sourceTransform.rotation) < 0.001
-        ? clamp(
-            baseItem.sourceTransform.y + deltaLocal.y,
-            baseItem.height - baseItem.sourceTransform.height,
-            0,
-          )
-        : baseItem.sourceTransform.y + deltaLocal.y,
+    x: baseItem.sourceTransform.x + deltaLocal.x,
+    y: baseItem.sourceTransform.y + deltaLocal.y,
   };
   const previewItem = buildImagePreviewItem(baseItem, nextSourceTransform);
 

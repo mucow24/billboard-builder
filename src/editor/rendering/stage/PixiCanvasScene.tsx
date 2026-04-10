@@ -1,12 +1,22 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Application, extend, type ApplicationRef } from '@pixi/react';
 import { Container, Graphics, Rectangle, Sprite, Text, TextureSource } from 'pixi.js';
-import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
+import type { Container as PixiContainer, FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 
-import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
+import type {
+  CanvasItem,
+  CanvasTool,
+  GeneratorCanvasItem,
+  GuideLine,
+  LineCanvasItem,
+  ProjectDocument,
+} from '../../document/documentTypes';
+import type { Point, ResizeHandle } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
+import type { RenderableCanvasItem } from '../renderAdapter';
+import type { CanvasPointerEvent, CanvasRendererHandle } from '../renderer/canvasRendererTypes';
 import { normalizePixiEvent } from '../renderer/normalizePixiEvent';
 import { createPixiRendererHandle } from '../renderer/pixiRendererHandle';
-import type { CanvasSceneProps } from './CanvasScene';
 
 import { PixiImageCropOverlay } from './PixiImageCropOverlay';
 import { PixiItemLayer } from './PixiItemLayer';
@@ -22,7 +32,81 @@ extend({ Container, Graphics, Sprite, Text });
 // power-of-two size so minification filtering stays smooth.
 TextureSource.defaultOptions.autoGenerateMipmaps = true;
 
-type PixiCanvasSceneProps = Omit<CanvasSceneProps, 'stageRef'>;
+interface PixiCanvasSceneProps {
+  activeTool: CanvasTool;
+  beginCropFullResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginCropFullRotate: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropPan: (pointer: Point, source?: PointerGestureSource) => void;
+  beginCropResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
+  beginLineHandle: (
+    item: Extract<CanvasItem, { kind: 'line' }>,
+    handle: 'start' | 'end',
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginResize: (
+    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+    handle: ResizeHandle,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginRotate: (
+    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  commitCropSession: () => boolean;
+  cropSession: {
+    itemId: string;
+    previewItem: Extract<CanvasItem, { kind: 'image' }>;
+    fullImageItem: Extract<CanvasItem, { kind: 'image' }>;
+  } | null;
+  document: ProjectDocument;
+  groupOverlayFrame: {
+    bounds: { x: number; y: number; width: number; height: number };
+    rotation: number;
+  } | null;
+  guides: GuideLine[];
+  handleItemDoubleClick: (item: CanvasItem) => void;
+  handleItemPointerDown: (
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
+  ) => void;
+  onStageMouseDown: (event: CanvasPointerEvent) => void;
+  onStageMouseLeave: () => void;
+  onStageMouseMove: (event: CanvasPointerEvent) => void;
+  onStageMouseUp: (event: CanvasPointerEvent) => void;
+  onStageWheel: (event: CanvasPointerEvent) => void;
+  renderedItems: RenderableCanvasItem[];
+  renderedSelectedItems: RenderableCanvasItem[];
+  selectedRenderedItem: RenderableCanvasItem | null;
+  session: {
+    kind: string;
+    tool?: string;
+    pointerStart?: { x: number; y: number };
+    currentPointer?: { x: number; y: number };
+    previewItem?: {
+      kind: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+  } | null;
+  showGroupSelection: boolean;
+  size: { width: number; height: number };
+  spacebarHeld: boolean;
+  stageCursor: string;
+  startPanDrag: (pointer: Point) => void;
+  toCanvasPointer: (pointer: Point) => Point;
+  viewportPan: { x: number; y: number };
+  zoom: number;
+}
 
 export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneProps>(
   function PixiCanvasScene(
@@ -65,9 +149,10 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
     ref,
   ) {
     const appRef = useRef<ApplicationRef>(null);
+    const exportContainerRef = useRef<PixiContainer>(null);
     const [rendererReady, setRendererReady] = useState(false);
 
-    useImperativeHandle(ref, () => createPixiRendererHandle(appRef), []);
+    useImperativeHandle(ref, () => createPixiRendererHandle(appRef, exportContainerRef), []);
 
     // Keep the renderer sized to the viewport.  @pixi/react's app.init() is
     // async, so the renderer may not exist when this effect first fires.  The
@@ -265,20 +350,22 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             <pixiGraphics draw={drawCanvasBorder} eventMode="none" />
             <pixiGraphics label="canvas-background" draw={drawCanvasBackground} eventMode="none" />
             <pixiGraphics draw={drawCheckerboard} eventMode="none" />
-            <pixiGraphics label="canvas-surface" draw={drawBackground} eventMode="none" />
-            {/* Document items */}
-            <PixiItemLayer
-              activeTool={activeTool}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-              items={sceneItems}
-              onItemPointerDown={handleItemPointerDown}
-              onItemDoubleClick={handleItemDoubleClick}
-              spacebarHeld={spacebarHeld}
-              startPanDrag={startPanDrag}
-              toCanvasPointer={toCanvasPointer}
-              zoom={zoom}
-            />
+            {/* Export container — background + items only (no overlays/guides). */}
+            <pixiContainer ref={exportContainerRef} label="export-content">
+              <pixiGraphics label="canvas-surface" draw={drawBackground} eventMode="none" />
+              <PixiItemLayer
+                activeTool={activeTool}
+                canvasWidth={canvasWidth}
+                canvasHeight={canvasHeight}
+                items={sceneItems}
+                onItemPointerDown={handleItemPointerDown}
+                onItemDoubleClick={handleItemDoubleClick}
+                spacebarHeld={spacebarHeld}
+                startPanDrag={startPanDrag}
+                toCanvasPointer={toCanvasPointer}
+                zoom={zoom}
+              />
+            </pixiContainer>
             {/* Marquee preview */}
             {marqueeRect ? (
               <pixiGraphics label="marquee-preview" draw={drawMarquee} eventMode="none" />

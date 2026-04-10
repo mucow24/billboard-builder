@@ -1,4 +1,5 @@
 import type { ApplicationRef } from '@pixi/react';
+import { Container, Rectangle } from 'pixi.js';
 
 import type { CanvasRendererHandle } from './canvasRendererTypes';
 
@@ -7,9 +8,13 @@ import type { CanvasRendererHandle } from './canvasRendererTypes';
  *
  * The appRef is read lazily — the Application may still be initializing when
  * this handle is first created, but it will be ready before any user interaction.
+ *
+ * exportContainerRef points to the Container that wraps only the exportable
+ * content (background + items, no overlays/guides).
  */
 export function createPixiRendererHandle(
   appRef: React.RefObject<ApplicationRef | null>,
+  exportContainerRef: React.RefObject<Container | null>,
 ): CanvasRendererHandle {
   return {
     getContainerElement() {
@@ -28,11 +33,15 @@ export function createPixiRendererHandle(
 
     async exportToDataURL({ contentWidth, contentHeight, pixelRatio, mimeType = 'image/png' }) {
       const app = appRef.current?.getApplication();
-      if (!app) return '';
+      const exportContainer = exportContainerRef.current;
+      if (!app?.renderer || !exportContainer) return '';
 
-      // Phase 5: implement full export (snapshot/restore, hide overlays, etc.)
-      // For now return a basic canvas export.
-      const canvas = app.canvas as HTMLCanvasElement;
+      const canvas = app.renderer.extract.canvas({
+        target: exportContainer,
+        frame: new Rectangle(0, 0, contentWidth, contentHeight),
+        resolution: pixelRatio,
+      }) as HTMLCanvasElement;
+
       return canvas.toDataURL(mimeType);
     },
   };

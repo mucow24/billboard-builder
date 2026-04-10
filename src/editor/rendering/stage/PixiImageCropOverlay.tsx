@@ -254,6 +254,7 @@ export function PixiImageCropOverlay({
         y={fullRenderBox.y}
         rotation={(fullImageItem.rotation * Math.PI) / 180}
         eventMode="static"
+        hitArea={new Rectangle(0, 0, fullRenderBox.width, fullRenderBox.height)}
         onMouseDown={handlePanMouseDown}
       >
         <pixiGraphics draw={drawPanArea} eventMode="none" />

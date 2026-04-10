@@ -22,12 +22,10 @@
   "dependencies": {
     "@pixi/react": "^8.0.5",
     "@uiw/react-color": "^2.9.6",
-    "konva": "^9.3.20",
     "pixi-filters": "^6.1.5",
     "pixi.js": "^8.17.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-konva": "^19.0.7",
     "zod": "^4.1.5",
     "zustand": "^5.0.8"
   },

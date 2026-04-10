@@ -40,17 +40,6 @@ const {
   mockUploadedFontPersistenceSave: vi.fn(),
 }));
 
-vi.mock('konva', () => ({
-  default: {
-    Filters: {
-      Brighten: Symbol('Brighten'),
-      Contrast: Symbol('Contrast'),
-      RGBA: Symbol('RGBA'),
-      Blur: Symbol('Blur'),
-    },
-  },
-}));
-
 vi.mock('pixi-filters', () => ({
   DropShadowFilter: class { constructor() {} },
 }));
@@ -73,7 +62,7 @@ vi.mock('pixi.js', () => ({
 
 vi.mock('@pixi/react', () => {
   type MockProps = PropsWithChildren<Record<string, unknown>>;
-  const Application = React.forwardRef<unknown, MockProps>(({ children, ...props }, ref) => {
+  const Application = React.forwardRef<unknown, MockProps>(({ children }, ref) => {
     const canvasRef = React.useRef<HTMLCanvasElement>(null);
     React.useImperativeHandle(ref, () => ({
       getCanvas: () => canvasRef.current,
@@ -90,83 +79,8 @@ vi.mock('@pixi/react', () => {
   };
 });
 
-vi.mock('react-konva', () => {
-  type MockKonvaProps = PropsWithChildren<Record<string, unknown>>;
-
-  const make = (name: string) =>
-    React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) => {
-      let nodeRef: HTMLDivElement | null = null;
-      const domEntries = Object.entries(props).flatMap<[string, string]>(([key, value]) => {
-        if (value === undefined || typeof value === 'function') {
-          return [];
-        }
-        return [[`data-prop-${key.toLowerCase()}`, typeof value === 'object' ? JSON.stringify(value) : String(value)]];
-      });
-      const domProps = Object.fromEntries(domEntries);
-
-      const noop = () => {};
-      const setRef = (node: HTMLDivElement | null) => {
-        nodeRef = node;
-        if (node) {
-          Object.assign(node, {
-            alpha: noop,
-            blue: noop,
-            blurRadius: noop,
-            brightness: noop,
-            cache: noop,
-            clearCache: noop,
-            contrast: noop,
-            filters: noop,
-            getLayer: () => ({ batchDraw: noop }),
-            getStage: () => ({
-              getPointerPosition: () => ({ x: 640, y: 360 }),
-            }),
-            getClientRect: () => ({ x: 0, y: 0, width: 100, height: 100 }),
-            green: noop,
-            hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
-            name: () => String(props.name ?? ''),
-            red: noop,
-            x: () => Number(props.x ?? 0),
-            y: () => Number(props.y ?? 0),
-            rotation: () => Number(props.rotation ?? 0),
-            scaleX: () => Number(props.scaleX ?? 1),
-            scaleY: () => Number(props.scaleY ?? 1),
-          });
-        }
-        if (typeof ref === 'function') {
-          ref(nodeRef);
-        } else if (ref) {
-          ref.current = nodeRef;
-        }
-      };
-
-      return React.createElement(
-        'div',
-        { ref: setRef, 'data-konva-node': name, ...domProps },
-        children as React.ReactNode
-      );
-    });
-
-  return {
-    Stage: make('Stage'),
-    Layer: make('Layer'),
-    Group: make('Group'),
-    Rect: make('Rect'),
-    Shape: make('Shape'),
-    Line: make('Line'),
-    Text: make('Text'),
-    Circle: make('Circle'),
-    Ellipse: make('Ellipse'),
-    Image: make('Image'),
-  };
-});
-
 vi.mock('./editor/rendering/useImageElement', () => ({
   useImageElement: () => null,
-}));
-
-vi.mock('./editor/rendering/ImageItemNode', () => ({
-  ImageItemNode: () => null,
 }));
 
 vi.mock('./editor/io/exportPng', () => ({
