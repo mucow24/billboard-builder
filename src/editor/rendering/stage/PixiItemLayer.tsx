@@ -307,7 +307,7 @@ function buildImageAdjustmentFilters(
 // Image content component (uses hooks for async image loading + masking)
 // ---------------------------------------------------------------------------
 
-function PixiImageContent({ item }: { item: ImageCanvasItem }) {
+export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
 

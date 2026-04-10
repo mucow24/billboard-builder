@@ -8,6 +8,7 @@ import { normalizePixiEvent } from '../renderer/normalizePixiEvent';
 import { createPixiRendererHandle } from '../renderer/pixiRendererHandle';
 import type { CanvasSceneProps } from './CanvasScene';
 
+import { PixiImageCropOverlay } from './PixiImageCropOverlay';
 import { PixiItemLayer } from './PixiItemLayer';
 import { PixiSelectionOverlay } from './PixiSelectionOverlay';
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
@@ -21,11 +22,17 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
   function PixiCanvasScene(
     {
       activeTool,
+      beginCropFullResize,
+      beginCropFullRotate,
+      beginCropPan,
+      beginCropResize,
       beginGroupResize,
       beginGroupRotate,
       beginLineHandle,
       beginResize,
       beginRotate,
+      commitCropSession,
+      cropSession,
       document: doc,
       groupOverlayFrame,
       guides,
@@ -76,6 +83,11 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       () => onStageMouseLeave(),
       [onStageMouseLeave],
     );
+
+    // --- Filter cropped item out of normal rendering -----------------------
+    const sceneItems = cropSession
+      ? renderedItems.filter((item) => item.id !== cropSession.itemId)
+      : renderedItems;
 
     // --- Drawing callbacks ------------------------------------------------
     const canvasWidth = doc.canvas.width;
@@ -221,7 +233,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
               activeTool={activeTool}
               canvasWidth={canvasWidth}
               canvasHeight={canvasHeight}
-              items={renderedItems}
+              items={sceneItems}
               onItemPointerDown={handleItemPointerDown}
               onItemDoubleClick={handleItemDoubleClick}
               spacebarHeld={spacebarHeld}
@@ -236,20 +248,34 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             {guides && guides.length > 0 ? (
               <pixiGraphics label="guide-lines" draw={drawGuides} eventMode="none" />
             ) : null}
-            {/* Selection overlays render above everything else */}
-            <PixiSelectionOverlay
-              selectedRenderedItem={selectedRenderedItem}
-              renderedSelectedItems={renderedSelectedItems}
-              showGroupSelection={showGroupSelection}
-              groupOverlayFrame={groupOverlayFrame}
-              zoom={zoom}
-              beginResize={beginResize}
-              beginRotate={beginRotate}
-              beginGroupResize={beginGroupResize}
-              beginGroupRotate={beginGroupRotate}
-              beginLineHandle={beginLineHandle}
-              toCanvasPointer={toCanvasPointer}
-            />
+            {/* Crop overlay (replaces selection overlay when active) */}
+            {cropSession ? (
+              <PixiImageCropOverlay
+                beginCropFullResize={beginCropFullResize}
+                beginCropFullRotate={beginCropFullRotate}
+                beginCropPan={beginCropPan}
+                beginCropResize={beginCropResize}
+                commitCropSession={commitCropSession}
+                fullImageItem={cropSession.fullImageItem}
+                previewItem={cropSession.previewItem}
+                toCanvasPointer={toCanvasPointer}
+                zoom={zoom}
+              />
+            ) : (
+              <PixiSelectionOverlay
+                selectedRenderedItem={selectedRenderedItem}
+                renderedSelectedItems={renderedSelectedItems}
+                showGroupSelection={showGroupSelection}
+                groupOverlayFrame={groupOverlayFrame}
+                zoom={zoom}
+                beginResize={beginResize}
+                beginRotate={beginRotate}
+                beginGroupResize={beginGroupResize}
+                beginGroupRotate={beginGroupRotate}
+                beginLineHandle={beginLineHandle}
+                toCanvasPointer={toCanvasPointer}
+              />
+            )}
           </pixiContainer>
         </pixiContainer>
       </Application>
