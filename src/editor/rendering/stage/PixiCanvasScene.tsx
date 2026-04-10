@@ -8,6 +8,7 @@ import { normalizePixiEvent } from '../renderer/normalizePixiEvent';
 import { createPixiRendererHandle } from '../renderer/pixiRendererHandle';
 import type { CanvasSceneProps } from './CanvasScene';
 
+import { PixiItemLayer } from './PixiItemLayer';
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 
 // Register PixiJS components for @pixi/react's JSX.
@@ -24,6 +25,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       onStageMouseMove,
       onStageMouseUp,
       onStageWheel,
+      renderedItems,
       size,
       stageCursor,
       viewportPan,
@@ -147,6 +149,8 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             <pixiGraphics label="canvas-background" draw={drawCanvasBackground} eventMode="none" />
             <pixiGraphics draw={drawCheckerboard} eventMode="none" />
             <pixiGraphics label="canvas-surface" draw={drawBackground} eventMode="none" />
+            {/* Document items */}
+            <PixiItemLayer items={renderedItems} />
           </pixiContainer>
         </pixiContainer>
       </Application>
