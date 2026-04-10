@@ -68,6 +68,7 @@ vi.mock('pixi.js', () => ({
   Sprite: class {},
   Text: class {},
   Texture: { from: () => ({}), EMPTY: {} },
+  TextureSource: { defaultOptions: {} },
 }));
 
 vi.mock('@pixi/react', () => {

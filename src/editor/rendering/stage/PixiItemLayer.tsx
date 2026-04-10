@@ -425,6 +425,7 @@ interface PixiItemLayerProps {
   spacebarHeld: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  zoom: number;
 }
 
 export function PixiItemLayer({
@@ -437,6 +438,7 @@ export function PixiItemLayer({
   spacebarHeld,
   startPanDrag,
   toCanvasPointer,
+  zoom,
 }: PixiItemLayerProps) {
   const interactive = activeTool === 'select';
 
@@ -456,6 +458,7 @@ export function PixiItemLayer({
             spacebarHeld={spacebarHeld}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
+            zoom={zoom}
           />
         );
       })}
@@ -473,6 +476,7 @@ interface PixiItemViewProps {
   spacebarHeld: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  zoom: number;
 }
 
 function PixiItemView({
@@ -485,6 +489,7 @@ function PixiItemView({
   spacebarHeld,
   startPanDrag,
   toCanvasPointer,
+  zoom,
 }: PixiItemViewProps) {
   const draw = useCallback(
     (g: Graphics) => {
@@ -554,10 +559,12 @@ function PixiItemView({
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;
 
   // Build combined filters: blur + shadow (text handles its own shadow via dropShadow style).
+  // DropShadowFilter is a post-processing effect that operates in screen space,
+  // so offset and blur must be scaled by the current zoom to match item-space values.
   const itemFilters = useMemo(() => {
     const filters: Filter[] = [];
     if (item.blurRadius > 0) {
-      filters.push(new BlurFilter({ strength: item.blurRadius }));
+      filters.push(new BlurFilter({ strength: item.blurRadius * zoom }));
     }
     if (item.kind !== 'text') {
       const s = item.shadow;
@@ -566,14 +573,14 @@ function PixiItemView({
         filters.push(new DropShadowFilter({
           color: s.color,
           alpha: s.opacity,
-          blur: s.blur / 2,
-          offset: { x: s.offsetX, y: s.offsetY },
+          blur: (s.blur / 2) * zoom,
+          offset: { x: s.offsetX * zoom, y: s.offsetY * zoom },
           quality: 8,
         }));
       }
     }
     return filters.length > 0 ? filters : undefined;
-  }, [item]);
+  }, [item, zoom]);
 
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
   // Build a narrow polygon along the line for hit testing (not the full bounding box).

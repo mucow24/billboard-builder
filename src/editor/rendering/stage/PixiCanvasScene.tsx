@@ -1,6 +1,6 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Application, extend, type ApplicationRef } from '@pixi/react';
-import { Container, Graphics, Rectangle, Sprite, Text } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Text, TextureSource } from 'pixi.js';
 import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 
 import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
@@ -15,6 +15,12 @@ import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 
 // Register PixiJS components for @pixi/react's JSX.
 extend({ Container, Graphics, Sprite, Text });
+
+// Enable mipmaps for all textures (text, images, generators).
+// Without mipmaps, zooming out causes heavy minification artifacts because the
+// GPU skips most texels.  Mipmaps provide pre-averaged versions at every
+// power-of-two size so minification filtering stays smooth.
+TextureSource.defaultOptions.autoGenerateMipmaps = true;
 
 type PixiCanvasSceneProps = Omit<CanvasSceneProps, 'stageRef'>;
 
@@ -59,24 +65,53 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
     ref,
   ) {
     const appRef = useRef<ApplicationRef>(null);
+    const [rendererReady, setRendererReady] = useState(false);
 
     useImperativeHandle(ref, () => createPixiRendererHandle(appRef), []);
 
+    // Keep the renderer sized to the viewport.  @pixi/react's app.init() is
+    // async, so the renderer may not exist when this effect first fires.  The
+    // rendererReady flag (set by onInit) re-triggers the effect once init
+    // completes so the resize is never missed.
+    useEffect(() => {
+      const app = appRef.current?.getApplication();
+      if (app?.renderer) {
+        app.renderer.resize(size.width, size.height);
+      }
+    }, [size.width, size.height, rendererReady]);
+
     // --- Federated event wrappers -------------------------------------------
+    // @pixi/react sets event handlers as `container.onwheel = fn` properties.
+    // PixiJS calls these properties during ALL propagation phases (capture,
+    // at-target, bubble).  When the cursor is over a child display object the
+    // handler fires twice — once in capture and once in bubble.  Skip the
+    // capture phase so every handler fires exactly once.
     const handleMouseDown = useCallback(
-      (e: FederatedPointerEvent) => onStageMouseDown(normalizePixiEvent(e)),
+      (e: FederatedPointerEvent) => {
+        if (e.eventPhase === e.CAPTURING_PHASE) return;
+        onStageMouseDown(normalizePixiEvent(e));
+      },
       [onStageMouseDown],
     );
     const handleMouseMove = useCallback(
-      (e: FederatedPointerEvent) => onStageMouseMove(normalizePixiEvent(e)),
+      (e: FederatedPointerEvent) => {
+        if (e.eventPhase === e.CAPTURING_PHASE) return;
+        onStageMouseMove(normalizePixiEvent(e));
+      },
       [onStageMouseMove],
     );
     const handleMouseUp = useCallback(
-      (e: FederatedPointerEvent) => onStageMouseUp(normalizePixiEvent(e)),
+      (e: FederatedPointerEvent) => {
+        if (e.eventPhase === e.CAPTURING_PHASE) return;
+        onStageMouseUp(normalizePixiEvent(e));
+      },
       [onStageMouseUp],
     );
     const handleWheel = useCallback(
-      (e: FederatedWheelEvent) => onStageWheel(normalizePixiEvent(e)),
+      (e: FederatedWheelEvent) => {
+        if (e.eventPhase === e.CAPTURING_PHASE) return;
+        onStageWheel(normalizePixiEvent(e));
+      },
       [onStageWheel],
     );
     const handleMouseLeave = useCallback(
@@ -205,8 +240,11 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
         ref={appRef}
         width={size.width}
         height={size.height}
+        resolution={window.devicePixelRatio || 1}
+        autoDensity
         antialias
         backgroundAlpha={0}
+        onInit={() => setRendererReady(true)}
         className="editor-stage editor-stage-fullscreen"
       >
         {/* Root event container — covers the full viewport for stage-level events. */}
@@ -239,6 +277,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
               spacebarHeld={spacebarHeld}
               startPanDrag={startPanDrag}
               toCanvasPointer={toCanvasPointer}
+              zoom={zoom}
             />
             {/* Marquee preview */}
             {marqueeRect ? (
