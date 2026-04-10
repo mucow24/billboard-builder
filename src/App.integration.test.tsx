@@ -51,12 +51,23 @@ vi.mock('konva', () => ({
   },
 }));
 
+vi.mock('pixi-filters', () => ({
+  DropShadowFilter: class { constructor() {} },
+}));
+
 vi.mock('pixi.js', () => ({
+  BlurFilter: class { constructor() {} },
+  ColorMatrixFilter: class { matrix = new Float32Array(20); constructor() { this.matrix[0] = 1; this.matrix[6] = 1; this.matrix[12] = 1; this.matrix[18] = 1; } },
   Container: class {},
+  FillGradient: class { constructor() {} },
   Graphics: class {},
+  Polygon: class { constructor() {} },
   Rectangle: class {
     constructor(public x = 0, public y = 0, public width = 0, public height = 0) {}
   },
+  Sprite: class {},
+  Text: class {},
+  Texture: { from: () => ({}), EMPTY: {} },
 }));
 
 vi.mock('@pixi/react', () => {

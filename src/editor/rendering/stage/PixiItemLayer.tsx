@@ -1,18 +1,28 @@
-import { useCallback, useRef } from 'react';
-import { FillGradient, Graphics, Polygon, Rectangle } from 'pixi.js';
-import type { FederatedPointerEvent } from 'pixi.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BlurFilter, ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
+import type { FederatedPointerEvent, Filter } from 'pixi.js';
+import { DropShadowFilter } from 'pixi-filters';
 
 import type {
   CanvasItem,
   CanvasTool,
   EllipseCanvasItem,
+  GeneratorCanvasItem,
+  ImageCanvasItem,
   LineCanvasItem,
   NgonCanvasItem,
   RectangleCanvasItem,
   TextCanvasItem,
 } from '../../document/documentTypes';
+import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
+import { getRenderableImageAdjustments } from '../imageAdjustments';
+import { getImageNodePresentation } from '../imagePresentation';
 import type { Point } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
+import { measureWordWrappedTextHeight } from '../textMeasurement';
+import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
+import { getRenderBox } from '../transformGeometry';
+import { useImageElement } from '../useImageElement';
 
 // ---------------------------------------------------------------------------
 // Ngon geometry — ported from ShapeItemView
@@ -120,6 +130,66 @@ function buildPixiGradient(
 }
 
 // ---------------------------------------------------------------------------
+// Text style builder
+// ---------------------------------------------------------------------------
+
+function buildTextStyleProps(item: TextCanvasItem) {
+  const effectiveStyle = getRenderableCombinedFontStyle(item);
+  const fontWeight = effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const);
+  const fontStyle = effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const);
+
+  const renderBox = getRenderBox(item);
+  const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
+
+  const fill = item.gradientEnabled
+    ? buildPixiGradient(item, renderBox.width, renderBox.height) ?? item.fill
+    : item.fill;
+
+  // Convert app shadow model (offsetX/Y) → PixiJS dropShadow (angle+distance).
+  const s = item.shadow;
+  const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
+  const dropShadow = hasShadow
+    ? {
+        alpha: s.opacity,
+        angle: Math.atan2(s.offsetY, s.offsetX),
+        blur: s.blur,
+        color: s.color,
+        distance: Math.sqrt(s.offsetX * s.offsetX + s.offsetY * s.offsetY),
+      }
+    : undefined;
+
+  // Vertical alignment offset.
+  const contentHeight = renderBox.height - item.padding.top - item.padding.bottom;
+  const measuredHeight =
+    measureWordWrappedTextHeight(item, renderBox.width) - item.padding.top - item.padding.bottom;
+  let textY = item.padding.top;
+  if (item.verticalAlign === 'middle') {
+    textY += Math.max(0, (contentHeight - measuredHeight) / 2);
+  } else if (item.verticalAlign === 'bottom') {
+    textY += Math.max(0, contentHeight - measuredHeight);
+  }
+
+  return {
+    style: {
+      fontFamily: item.fontFamily,
+      fontSize: item.fontSize,
+      fontWeight,
+      fontStyle,
+      fill,
+      letterSpacing: item.letterSpacing,
+      lineHeight: item.fontSize * item.lineHeight,
+      wordWrap: true,
+      wordWrapWidth: contentWidth,
+      align: item.align as 'left' | 'center' | 'right',
+      whiteSpace: 'pre-line' as const,
+      ...(dropShadow ? { dropShadow } : {}),
+    },
+    textX: item.padding.left,
+    textY,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Individual item drawers
 // ---------------------------------------------------------------------------
 
@@ -186,17 +256,153 @@ function drawLine(g: Graphics, item: LineCanvasItem) {
 }
 
 // ---------------------------------------------------------------------------
-// Text rendering stub
+// Image adjustment filters (brightness, contrast, tint)
 // ---------------------------------------------------------------------------
 
-function drawTextPlaceholder(g: Graphics, item: TextCanvasItem) {
-  g.clear();
-  const { width, height, fill } = item;
-  // Phase 2a: render a filled rect placeholder for text items.
-  // Phase 3 will replace this with PixiJS Text objects.
-  g.rect(0, 0, width, height);
-  g.fill({ color: fill, alpha: 0.15 });
-  g.stroke({ color: fill, alpha: 0.4, width: 1 });
+function buildImageAdjustmentFilters(
+  adjustments: ImageCanvasItem['adjustments'],
+): Filter[] | undefined {
+  const adj = getRenderableImageAdjustments(adjustments);
+  if (!adj.isActive) return undefined;
+
+  const filters: Filter[] = [];
+
+  if (adj.brightness !== 0 || adj.contrast !== 0) {
+    const cm = new ColorMatrixFilter();
+    // Konva contrast: factor = ((contrast + 100) / 100)^2, applied around 0.5 midpoint.
+    const factor = adj.contrast !== 0 ? ((adj.contrast + 100) / 100) ** 2 : 1;
+    // Combined brightness (additive) + contrast (scale around 0.5):
+    //   v' = v * factor + brightness * factor + 0.5 * (1 - factor)
+    const offset = adj.brightness * factor + 0.5 * (1 - factor);
+    cm.matrix[0] = factor;
+    cm.matrix[6] = factor;
+    cm.matrix[12] = factor;
+    cm.matrix[4] = offset;
+    cm.matrix[9] = offset;
+    cm.matrix[14] = offset;
+    filters.push(cm);
+  }
+
+  if (adj.tintAlpha > 0) {
+    // Blend toward tint color: v' = v * (1 - alpha) + tintChannel * alpha
+    const r = adj.tintRed / 255;
+    const g = adj.tintGreen / 255;
+    const b = adj.tintBlue / 255;
+    const a = adj.tintAlpha;
+    const cm = new ColorMatrixFilter();
+    cm.matrix[0] = 1 - a;
+    cm.matrix[4] = r * a;
+    cm.matrix[6] = 1 - a;
+    cm.matrix[9] = g * a;
+    cm.matrix[12] = 1 - a;
+    cm.matrix[14] = b * a;
+    cm.matrix[18] = 1;
+    filters.push(cm);
+  }
+
+  return filters.length > 0 ? filters : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Image content component (uses hooks for async image loading + masking)
+// ---------------------------------------------------------------------------
+
+function PixiImageContent({ item }: { item: ImageCanvasItem }) {
+  const imageElement = useImageElement(item.src);
+  const [maskNode, setMaskNode] = useState<Graphics | null>(null);
+
+  const renderBox = useMemo(() => getRenderBox(item), [item]);
+
+  const presentation = useMemo(
+    () => getImageNodePresentation(item.sourceTransform, item.mirrorHorizontal),
+    [item.sourceTransform, item.mirrorHorizontal],
+  );
+
+  const texture = useMemo(
+    () => (imageElement ? Texture.from(imageElement) : Texture.EMPTY),
+    [imageElement],
+  );
+
+  const adjustmentFilters = useMemo(
+    () => buildImageAdjustmentFilters(item.adjustments),
+    [item.adjustments],
+  );
+
+  const drawClipMask = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      g.rect(0, 0, renderBox.width, renderBox.height);
+      g.fill(0xffffff);
+    },
+    [renderBox.width, renderBox.height],
+  );
+
+  if (!imageElement) {
+    // Placeholder while loading.
+    const drawPlaceholder = (g: Graphics) => {
+      g.clear();
+      g.rect(0, 0, renderBox.width, renderBox.height);
+      g.fill({ color: 0x334455, alpha: 0.3 });
+      g.stroke({ color: 0x5588aa, alpha: 0.5, width: 1 });
+    };
+    return <pixiGraphics draw={drawPlaceholder} eventMode="none" />;
+  }
+
+  return (
+    <>
+      <pixiGraphics ref={setMaskNode} draw={drawClipMask} eventMode="none" />
+      <pixiSprite
+        texture={texture}
+        x={presentation.x}
+        y={presentation.y}
+        width={presentation.width * presentation.scaleX}
+        height={presentation.height}
+        rotation={(presentation.rotation * Math.PI) / 180}
+        filters={adjustmentFilters}
+        mask={maskNode}
+        eventMode="none"
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Generator content component (renders full-canvas pattern via Canvas2D texture)
+// ---------------------------------------------------------------------------
+
+function PixiGeneratorContent({
+  item,
+  canvasWidth,
+  canvasHeight,
+}: {
+  item: GeneratorCanvasItem;
+  canvasWidth: number;
+  canvasHeight: number;
+}) {
+  const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight);
+
+  const texture = useMemo(
+    () => (generatorCanvas ? Texture.from(generatorCanvas) : Texture.EMPTY),
+    [generatorCanvas],
+  );
+
+  // The canvas element is reused — tell PixiJS to re-upload pixels when params change.
+  useEffect(() => {
+    if (texture !== Texture.EMPTY) {
+      texture.source.update();
+    }
+  }, [texture, item.generatorParams, item.seed, canvasWidth, canvasHeight]);
+
+  if (!generatorCanvas) return null;
+
+  return (
+    <pixiSprite
+      texture={texture}
+      width={canvasWidth}
+      height={canvasHeight}
+      eventMode="none"
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +411,8 @@ function drawTextPlaceholder(g: Graphics, item: TextCanvasItem) {
 
 interface PixiItemLayerProps {
   activeTool: CanvasTool;
+  canvasWidth: number;
+  canvasHeight: number;
   items: RenderableCanvasItem[];
   onItemPointerDown: (
     item: CanvasItem,
@@ -221,6 +429,8 @@ interface PixiItemLayerProps {
 
 export function PixiItemLayer({
   activeTool,
+  canvasWidth,
+  canvasHeight,
   items,
   onItemPointerDown,
   onItemDoubleClick,
@@ -237,6 +447,8 @@ export function PixiItemLayer({
         return (
           <PixiItemView
             key={item.id}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
             interactive={interactive}
             item={item}
             onItemPointerDown={onItemPointerDown}
@@ -252,6 +464,8 @@ export function PixiItemLayer({
 }
 
 interface PixiItemViewProps {
+  canvasWidth: number;
+  canvasHeight: number;
   interactive: boolean;
   item: RenderableCanvasItem;
   onItemPointerDown: PixiItemLayerProps['onItemPointerDown'];
@@ -262,6 +476,8 @@ interface PixiItemViewProps {
 }
 
 function PixiItemView({
+  canvasWidth,
+  canvasHeight,
   interactive,
   item,
   onItemPointerDown,
@@ -286,19 +502,11 @@ function PixiItemView({
           drawLine(g, item);
           break;
         case 'text':
-          drawTextPlaceholder(g, item);
-          break;
         case 'image':
-          g.clear();
-          g.rect(0, 0, item.width, item.height);
-          g.fill({ color: 0x334455, alpha: 0.3 });
-          g.stroke({ color: 0x5588aa, alpha: 0.5, width: 1 });
+          // Handled by dedicated components below, not via Graphics draw.
           break;
         case 'generator':
-          g.clear();
-          g.rect(0, 0, item.width, item.height);
-          g.fill({ color: 0x553344, alpha: 0.3 });
-          g.stroke({ color: 0xaa5588, alpha: 0.5, width: 1 });
+          // Handled by dedicated component below, not via Graphics draw.
           break;
       }
     },
@@ -345,6 +553,28 @@ function PixiItemView({
 
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;
 
+  // Build combined filters: blur + shadow (text handles its own shadow via dropShadow style).
+  const itemFilters = useMemo(() => {
+    const filters: Filter[] = [];
+    if (item.blurRadius > 0) {
+      filters.push(new BlurFilter({ strength: item.blurRadius }));
+    }
+    if (item.kind !== 'text') {
+      const s = item.shadow;
+      const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
+      if (hasShadow) {
+        filters.push(new DropShadowFilter({
+          color: s.color,
+          alpha: s.opacity,
+          blur: s.blur / 2,
+          offset: { x: s.offsetX, y: s.offsetY },
+          quality: 8,
+        }));
+      }
+    }
+    return filters.length > 0 ? filters : undefined;
+  }, [item]);
+
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
   // Build a narrow polygon along the line for hit testing (not the full bounding box).
   if (item.kind === 'line') {
@@ -354,6 +584,7 @@ function PixiItemView({
         label={item.id}
         draw={draw}
         alpha={item.opacity}
+        filters={itemFilters}
         eventMode={eventMode}
         hitArea={hitArea}
         onMouseDown={handleMouseDown}
@@ -361,15 +592,87 @@ function PixiItemView({
     );
   }
 
-  const shapeHitArea = new Rectangle(0, 0, item.width, item.height);
+  const renderBox = useMemo(() => getRenderBox(item), [item]);
+  const shapeHitArea = new Rectangle(0, 0, renderBox.width, renderBox.height);
+
+  // Text items render via <pixiText> instead of <pixiGraphics>.
+  if (item.kind === 'text') {
+    const { style: textStyle, textX, textY } = buildTextStyleProps(item);
+    return (
+      <pixiContainer
+        label={item.id}
+        x={renderBox.x}
+        y={renderBox.y}
+        rotation={(item.rotation * Math.PI) / 180}
+        alpha={item.opacity}
+        filters={itemFilters}
+        pivot={{ x: 0, y: 0 }}
+        eventMode={eventMode}
+        hitArea={shapeHitArea}
+        onMouseDown={handleMouseDown}
+      >
+        <pixiText
+          text={item.text}
+          style={textStyle}
+          x={textX}
+          y={textY}
+          eventMode="none"
+        />
+      </pixiContainer>
+    );
+  }
+
+  // Image items render via <pixiSprite> with a clip mask.
+  if (item.kind === 'image') {
+    return (
+      <pixiContainer
+        label={item.id}
+        x={renderBox.x}
+        y={renderBox.y}
+        rotation={(item.rotation * Math.PI) / 180}
+        alpha={item.opacity}
+        filters={itemFilters}
+        pivot={{ x: 0, y: 0 }}
+        eventMode={eventMode}
+        hitArea={shapeHitArea}
+        onMouseDown={handleMouseDown}
+      >
+        <PixiImageContent item={item as ImageCanvasItem} />
+      </pixiContainer>
+    );
+  }
+
+  // Generators render a full-canvas pattern at origin.
+  if (item.kind === 'generator') {
+    const genHitArea = new Rectangle(0, 0, canvasWidth, canvasHeight);
+    return (
+      <pixiContainer
+        label={item.id}
+        x={0}
+        y={0}
+        alpha={item.opacity}
+        filters={itemFilters}
+        eventMode={eventMode}
+        hitArea={genHitArea}
+        onMouseDown={handleMouseDown}
+      >
+        <PixiGeneratorContent
+          item={item as GeneratorCanvasItem}
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
+        />
+      </pixiContainer>
+    );
+  }
 
   return (
     <pixiContainer
       label={item.id}
-      x={item.x}
-      y={item.y}
+      x={renderBox.x}
+      y={renderBox.y}
       rotation={(item.rotation * Math.PI) / 180}
       alpha={item.opacity}
+      filters={itemFilters}
       pivot={{ x: 0, y: 0 }}
       eventMode={eventMode}
       hitArea={shapeHitArea}

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import { Application, extend, type ApplicationRef } from '@pixi/react';
-import { Container, Graphics, Rectangle } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Text } from 'pixi.js';
 import type { FederatedPointerEvent, FederatedWheelEvent } from 'pixi.js';
 
 import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
@@ -13,7 +13,7 @@ import { PixiSelectionOverlay } from './PixiSelectionOverlay';
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 
 // Register PixiJS components for @pixi/react's JSX.
-extend({ Container, Graphics });
+extend({ Container, Graphics, Sprite, Text });
 
 type PixiCanvasSceneProps = Omit<CanvasSceneProps, 'stageRef'>;
 
@@ -219,6 +219,8 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             {/* Document items */}
             <PixiItemLayer
               activeTool={activeTool}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
               items={renderedItems}
               onItemPointerDown={handleItemPointerDown}
               onItemDoubleClick={handleItemDoubleClick}
