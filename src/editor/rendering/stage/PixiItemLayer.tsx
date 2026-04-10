@@ -1,17 +1,48 @@
-import { useCallback } from 'react';
-import { FillGradient, Graphics } from 'pixi.js';
+import { useCallback, useRef } from 'react';
+import { FillGradient, Graphics, Polygon, Rectangle } from 'pixi.js';
+import type { FederatedPointerEvent } from 'pixi.js';
 
 import type {
+  CanvasItem,
+  CanvasTool,
   EllipseCanvasItem,
   LineCanvasItem,
   NgonCanvasItem,
   RectangleCanvasItem,
   TextCanvasItem,
 } from '../../document/documentTypes';
+import type { Point } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
 
 // ---------------------------------------------------------------------------
 // Ngon geometry — ported from ShapeItemView
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Line hit-area helper — builds a narrow polygon along the line
+// ---------------------------------------------------------------------------
+
+function buildLineHitPolygon(
+  x1: number, y1: number, x2: number, y2: number, strokeWidth: number,
+): Polygon {
+  const pad = Math.max(strokeWidth / 2 + 8, 12);
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  // Perpendicular unit vector
+  const px = (-dy / len) * pad;
+  const py = (dx / len) * pad;
+  // Four corners of a thick line
+  return new Polygon([
+    x1 + px, y1 + py,
+    x2 + px, y2 + py,
+    x2 - px, y2 - py,
+    x1 - px, y1 - py,
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Ngon geometry helper
 // ---------------------------------------------------------------------------
 
 function computeNgonPoints(
@@ -173,21 +204,72 @@ function drawTextPlaceholder(g: Graphics, item: TextCanvasItem) {
 // ---------------------------------------------------------------------------
 
 interface PixiItemLayerProps {
+  activeTool: CanvasTool;
   items: RenderableCanvasItem[];
+  onItemPointerDown: (
+    item: CanvasItem,
+    selectionNodeId: string,
+    pointer: Point,
+    shiftKey: boolean,
+    nativeEvent?: MouseEvent,
+  ) => void;
+  onItemDoubleClick: (item: CanvasItem) => void;
+  spacebarHeld: boolean;
+  startPanDrag: (pointer: Point) => void;
+  toCanvasPointer: (pointer: Point) => Point;
 }
 
-export function PixiItemLayer({ items }: PixiItemLayerProps) {
+export function PixiItemLayer({
+  activeTool,
+  items,
+  onItemPointerDown,
+  onItemDoubleClick,
+  spacebarHeld,
+  startPanDrag,
+  toCanvasPointer,
+}: PixiItemLayerProps) {
+  const interactive = activeTool === 'select';
+
   return (
     <>
       {items.map((item) => {
         if (item.hidden) return null;
-        return <PixiItemView key={item.id} item={item} />;
+        return (
+          <PixiItemView
+            key={item.id}
+            interactive={interactive}
+            item={item}
+            onItemPointerDown={onItemPointerDown}
+            onItemDoubleClick={onItemDoubleClick}
+            spacebarHeld={spacebarHeld}
+            startPanDrag={startPanDrag}
+            toCanvasPointer={toCanvasPointer}
+          />
+        );
       })}
     </>
   );
 }
 
-function PixiItemView({ item }: { item: RenderableCanvasItem }) {
+interface PixiItemViewProps {
+  interactive: boolean;
+  item: RenderableCanvasItem;
+  onItemPointerDown: PixiItemLayerProps['onItemPointerDown'];
+  onItemDoubleClick: PixiItemLayerProps['onItemDoubleClick'];
+  spacebarHeld: boolean;
+  startPanDrag: (pointer: Point) => void;
+  toCanvasPointer: (pointer: Point) => Point;
+}
+
+function PixiItemView({
+  interactive,
+  item,
+  onItemPointerDown,
+  onItemDoubleClick,
+  spacebarHeld,
+  startPanDrag,
+  toCanvasPointer,
+}: PixiItemViewProps) {
   const draw = useCallback(
     (g: Graphics) => {
       switch (item.kind) {
@@ -207,15 +289,12 @@ function PixiItemView({ item }: { item: RenderableCanvasItem }) {
           drawTextPlaceholder(g, item);
           break;
         case 'image':
-          // Phase 3: PixiJS Sprite from loaded texture.
-          // For now, render a placeholder.
           g.clear();
           g.rect(0, 0, item.width, item.height);
           g.fill({ color: 0x334455, alpha: 0.3 });
           g.stroke({ color: 0x5588aa, alpha: 0.5, width: 1 });
           break;
         case 'generator':
-          // Phase 3: PixiJS Sprite from generator canvas.
           g.clear();
           g.rect(0, 0, item.width, item.height);
           g.fill({ color: 0x553344, alpha: 0.3 });
@@ -226,17 +305,63 @@ function PixiItemView({ item }: { item: RenderableCanvasItem }) {
     [item],
   );
 
+  // PixiJS federated events don't include dblclick, so detect manually.
+  const lastClickRef = useRef(0);
+
+  const handleMouseDown = useCallback(
+    (e: FederatedPointerEvent) => {
+      if (!interactive || item.locked) return;
+      const viewportPointer = { x: e.global.x, y: e.global.y };
+      const nativeEvent = e.nativeEvent as MouseEvent;
+
+      // Pan gesture: middle-click or spacebar held
+      if (nativeEvent.button === 1 || spacebarHeld) {
+        e.stopPropagation();
+        startPanDrag(viewportPointer);
+        return;
+      }
+
+      // Double-click detection
+      const now = Date.now();
+      if (now - lastClickRef.current < 400) {
+        lastClickRef.current = 0;
+        e.stopPropagation();
+        onItemDoubleClick(item);
+        return;
+      }
+      lastClickRef.current = now;
+
+      e.stopPropagation();
+      onItemPointerDown(
+        item,
+        item.selectableNodeId,
+        toCanvasPointer(viewportPointer),
+        nativeEvent.shiftKey,
+        nativeEvent,
+      );
+    },
+    [interactive, item, onItemDoubleClick, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
+  );
+
+  const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;
+
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
+  // Build a narrow polygon along the line for hit testing (not the full bounding box).
   if (item.kind === 'line') {
+    const hitArea = buildLineHitPolygon(item.startX, item.startY, item.endX, item.endY, item.strokeWidth);
     return (
       <pixiGraphics
         label={item.id}
         draw={draw}
         alpha={item.opacity}
-        eventMode="none"
+        eventMode={eventMode}
+        hitArea={hitArea}
+        onMouseDown={handleMouseDown}
       />
     );
   }
+
+  const shapeHitArea = new Rectangle(0, 0, item.width, item.height);
 
   return (
     <pixiContainer
@@ -246,6 +371,9 @@ function PixiItemView({ item }: { item: RenderableCanvasItem }) {
       rotation={(item.rotation * Math.PI) / 180}
       alpha={item.opacity}
       pivot={{ x: 0, y: 0 }}
+      eventMode={eventMode}
+      hitArea={shapeHitArea}
+      onMouseDown={handleMouseDown}
     >
       <pixiGraphics draw={draw} eventMode="none" />
     </pixiContainer>

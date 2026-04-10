@@ -9,6 +9,7 @@ import { createPixiRendererHandle } from '../renderer/pixiRendererHandle';
 import type { CanvasSceneProps } from './CanvasScene';
 
 import { PixiItemLayer } from './PixiItemLayer';
+import { PixiSelectionOverlay } from './PixiSelectionOverlay';
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 
 // Register PixiJS components for @pixi/react's JSX.
@@ -19,15 +20,32 @@ type PixiCanvasSceneProps = Omit<CanvasSceneProps, 'stageRef'>;
 export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneProps>(
   function PixiCanvasScene(
     {
+      activeTool,
+      beginGroupResize,
+      beginGroupRotate,
+      beginLineHandle,
+      beginResize,
+      beginRotate,
       document: doc,
+      groupOverlayFrame,
+      guides,
+      handleItemDoubleClick,
+      handleItemPointerDown,
       onStageMouseDown,
       onStageMouseLeave,
       onStageMouseMove,
       onStageMouseUp,
       onStageWheel,
       renderedItems,
+      renderedSelectedItems,
+      selectedRenderedItem,
+      session,
+      showGroupSelection,
       size,
+      spacebarHeld,
       stageCursor,
+      startPanDrag,
+      toCanvasPointer,
       viewportPan,
       zoom,
     },
@@ -119,6 +137,55 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       [canvasWidth, canvasHeight, background],
     );
 
+    // --- Marquee preview (during drag-select) --------------------------------
+    const marqueeRect = (() => {
+      if (session?.kind !== 'marquee' || !session.pointerStart || !session.currentPointer) {
+        return null;
+      }
+      const s = session.pointerStart;
+      const c = session.currentPointer;
+      return {
+        x: Math.min(s.x, c.x),
+        y: Math.min(s.y, c.y),
+        w: Math.max(1, Math.abs(c.x - s.x)),
+        h: Math.max(1, Math.abs(c.y - s.y)),
+      };
+    })();
+
+    const drawMarquee = useCallback(
+      (g: Graphics) => {
+        g.clear();
+        if (!marqueeRect) return;
+        g.rect(marqueeRect.x, marqueeRect.y, marqueeRect.w, marqueeRect.h);
+        g.fill({ color: 0x38bdf8, alpha: 0.08 });
+        g.stroke({ color: 0x7dd3fc, width: 1.5 });
+      },
+      [marqueeRect],
+    );
+
+    // --- Guide lines ---------------------------------------------------------
+    const nz = zoom > 0 ? zoom : 1;
+    const guideStrokeWidth = 1 / nz;
+    const GUIDE_EXTENT = 100_000;
+
+    const drawGuides = useCallback(
+      (g: Graphics) => {
+        g.clear();
+        if (!guides || guides.length === 0) return;
+        for (const guide of guides) {
+          if (guide.orientation === 'vertical') {
+            g.moveTo(guide.position, -GUIDE_EXTENT);
+            g.lineTo(guide.position, canvasHeight + GUIDE_EXTENT);
+          } else {
+            g.moveTo(-GUIDE_EXTENT, guide.position);
+            g.lineTo(canvasWidth + GUIDE_EXTENT, guide.position);
+          }
+        }
+        g.stroke({ color: 0x7dd3fc, width: guideStrokeWidth });
+      },
+      [guides, canvasWidth, canvasHeight, guideStrokeWidth],
+    );
+
     const hitArea = new Rectangle(0, 0, size.width, size.height);
 
     return (
@@ -150,7 +217,37 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             <pixiGraphics draw={drawCheckerboard} eventMode="none" />
             <pixiGraphics label="canvas-surface" draw={drawBackground} eventMode="none" />
             {/* Document items */}
-            <PixiItemLayer items={renderedItems} />
+            <PixiItemLayer
+              activeTool={activeTool}
+              items={renderedItems}
+              onItemPointerDown={handleItemPointerDown}
+              onItemDoubleClick={handleItemDoubleClick}
+              spacebarHeld={spacebarHeld}
+              startPanDrag={startPanDrag}
+              toCanvasPointer={toCanvasPointer}
+            />
+            {/* Marquee preview */}
+            {marqueeRect ? (
+              <pixiGraphics label="marquee-preview" draw={drawMarquee} eventMode="none" />
+            ) : null}
+            {/* Guide lines (below selection handles) */}
+            {guides && guides.length > 0 ? (
+              <pixiGraphics label="guide-lines" draw={drawGuides} eventMode="none" />
+            ) : null}
+            {/* Selection overlays render above everything else */}
+            <PixiSelectionOverlay
+              selectedRenderedItem={selectedRenderedItem}
+              renderedSelectedItems={renderedSelectedItems}
+              showGroupSelection={showGroupSelection}
+              groupOverlayFrame={groupOverlayFrame}
+              zoom={zoom}
+              beginResize={beginResize}
+              beginRotate={beginRotate}
+              beginGroupResize={beginGroupResize}
+              beginGroupRotate={beginGroupRotate}
+              beginLineHandle={beginLineHandle}
+              toCanvasPointer={toCanvasPointer}
+            />
           </pixiContainer>
         </pixiContainer>
       </Application>
