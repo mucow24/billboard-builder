@@ -48,7 +48,7 @@ export default defineConfig({
           ? {
               headless: false,
               launchOptions: {
-                args: ['--use-gl=egl', '--use-angle=gl', '--ignore-gpu-blocklist'],
+                args: ['--use-gl=desktop', '--ignore-gpu-blocklist'],
               },
             }
           : {}),
