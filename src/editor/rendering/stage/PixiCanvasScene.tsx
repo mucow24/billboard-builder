@@ -179,6 +179,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
 
       app.ticker.stop();
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rootBoundary is public but not in the TS typings
       const boundary = (app.renderer.events as any).rootBoundary;
       const origHitTest = boundary.hitTest.bind(boundary);
       boundary.hitTest = (x: number, y: number) => {
