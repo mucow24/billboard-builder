@@ -19,6 +19,7 @@ import {
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
+  waitForDoubleClickCadence,
 } from './support/editor';
 
 function rotatePoint(
@@ -83,6 +84,7 @@ test.describe('editor transforms', () => {
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
 
     // Drag the item body
+    await waitForDoubleClickCadence(page);
     await dragCanvas(page, { x: 240, y: 200 }, { x: 360, y: 300 });
 
     // Verify selection survived the drag
@@ -389,12 +391,14 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-enabled.json');
     await clickCanvas(page, clickPoint);
+    await waitForDoubleClickCadence(page);
     await dragCanvas(page, clickPoint, dragTarget);
     const snappedProject = await saveAndReadProject(page);
 
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-disabled.json');
     await clickCanvas(page, clickPoint);
+    await waitForDoubleClickCadence(page);
     await dragCanvasWithModifier(page, 'Control', clickPoint, dragTarget);
     const unsnappedProject = await saveAndReadProject(page);
 
