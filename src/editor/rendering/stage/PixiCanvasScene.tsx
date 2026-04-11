@@ -168,24 +168,13 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
     // @pixi/react uses a ConcurrentRoot reconciler whose scene-tree commits
     // lag 1-2 React render cycles behind the DOM.  The default 60 fps ticker
     // eventually renders, but on slow renderers (CI SwiftShader, 50-200 ms per
-    // frame) a Playwright click can arrive before transforms are current.
-    //
-    // Fix: stop the idle ticker and render on-demand — once per React commit
-    // (useEffect) for visual updates, and once before every hit-test (patch)
-    // so worldTransform values are always fresh for pointer interactions.
+    // frame) 60 fps saturates the CPU.  Throttle to 2 fps so transforms stay
+    // fresh (every ~500ms) without overwhelming slow GPUs.
     useEffect(() => {
       const app = appRef.current?.getApplication();
       if (!app?.renderer) return;
 
-      app.ticker.stop();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rootBoundary is public but not in the TS typings
-      const boundary = (app.renderer.events as any).rootBoundary;
-      const origHitTest = boundary.hitTest.bind(boundary);
-      boundary.hitTest = (x: number, y: number) => {
-        app.render();
-        return origHitTest(x, y);
-      };
+      app.ticker.maxFPS = 2;
     }, [rendererReady]);
 
     // Visual render after every React commit.
