@@ -54,46 +54,7 @@ jobs:
 
       - run: npx playwright install --with-deps ${{ matrix.project }}
 
-      - name: Install Mesa and xvfb for software OpenGL (llvmpipe)
-        run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dri xvfb
-
-      - name: Check GPU renderer
-        env:
-          LIBGL_ALWAYS_SOFTWARE: '1'
-          GALLIUM_DRIVER: llvmpipe
-        run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-          node -e "
-            const { chromium } = require('playwright');
-            (async () => {
-              const browser = await chromium.launch({
-                headless: false,
-                args: ['--use-gl=desktop', '--ignore-gpu-blocklist']
-              });
-              const page = await browser.newPage();
-              const gl = await page.evaluate(() => {
-                const c = document.createElement('canvas');
-                const gl = c.getContext('webgl2') || c.getContext('webgl');
-                if (!gl) return { error: 'no webgl' };
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                return {
-                  renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
-                  vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
-                  version: gl.getParameter(gl.VERSION),
-                };
-              });
-              console.log('GL_RENDERER:', gl.renderer);
-              console.log('GL_VENDOR:', gl.vendor);
-              console.log('GL_VERSION:', gl.version);
-              await browser.close();
-            })();
-          "
-
-      - name: Run e2e tests
-        env:
-          LIBGL_ALWAYS_SOFTWARE: '1'
-          GALLIUM_DRIVER: llvmpipe
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" npm run e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
+      - run: npm run e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
 
       - if: failure()
         uses: actions/upload-artifact@v4

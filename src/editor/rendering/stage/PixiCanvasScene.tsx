@@ -165,11 +165,11 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       }
     }, [size.width, size.height, rendererReady]);
 
-    // Cap the render loop to 15 fps.  CI runners use Mesa llvmpipe (software
-    // OpenGL) where each frame costs ~30-50 ms; 60 fps saturates the CPU and
-    // starves Playwright's event loop, causing drag timeouts.  15 fps keeps
-    // transforms at most 66 ms stale — well within tolerance for hit-testing
-    // and interaction sessions.
+    // Cap the render loop to 15 fps.  CI uses SwiftShader (software WebGL)
+    // where each frame costs 50-200 ms; 60 fps saturates the CPU and starves
+    // Playwright's event loop, causing drag timeouts.  15 fps keeps transforms
+    // at most 66 ms stale — well within tolerance for hit-testing and
+    // interaction sessions.
     useEffect(() => {
       const app = appRef.current?.getApplication();
       if (app?.renderer) app.ticker.maxFPS = 15;

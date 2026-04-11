@@ -14,7 +14,7 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
-  timeout: 60_000,
+  timeout: process.env.CI ? 180_000 : 60_000,
   expect: {
     timeout: 10_000,
     toHaveScreenshot: {
@@ -44,14 +44,6 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        ...(process.env.CI
-          ? {
-              headless: false,
-              launchOptions: {
-                args: ['--use-gl=desktop', '--ignore-gpu-blocklist'],
-              },
-            }
-          : {}),
       },
     },
   ],
