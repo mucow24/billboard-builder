@@ -69,13 +69,20 @@ jobs:
                 args: ['--use-gl=egl', '--ignore-gpu-blocklist']
               });
               const page = await browser.newPage();
-              await page.goto('chrome://gpu');
-              const text = await page.textContent('body');
-              for (const line of text.split('\n')) {
-                if (/GL_RENDERER|GL_VENDOR|GL_VERSION|SwiftShader|llvmpipe|gpu.*status/i.test(line)) {
-                  console.log(line.trim());
-                }
-              }
+              const gl = await page.evaluate(() => {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl2') || c.getContext('webgl');
+                if (!gl) return { error: 'no webgl' };
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                return {
+                  renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+                  vendor: dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR),
+                  version: gl.getParameter(gl.VERSION),
+                };
+              });
+              console.log('GL_RENDERER:', gl.renderer);
+              console.log('GL_VENDOR:', gl.vendor);
+              console.log('GL_VERSION:', gl.version);
               await browser.close();
             })();
           "
