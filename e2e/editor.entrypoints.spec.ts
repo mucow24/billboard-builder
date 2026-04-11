@@ -482,7 +482,7 @@ test.describe('editor canvas entrypoints', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     const initialDebug = await expectVisibleAlignedViewportZoom(page);
-    const stageSurface = page.locator('.konvajs-content');
+    const stageSurface = page.locator('.editor-stage');
 
     await selectTool(page, 'Zoom');
     await expect(page.getByRole('button', { name: 'Zoom (Z)' })).toHaveAttribute('aria-pressed', 'true');

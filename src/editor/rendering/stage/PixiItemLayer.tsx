@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BlurFilter, ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
 import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
@@ -23,6 +23,9 @@ import { measureWordWrappedTextHeight } from '../textMeasurement';
 import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
 import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
+
+// Stable reference so `pivot` prop doesn't trigger reconciliation every render.
+const ZERO_PIVOT = { x: 0, y: 0 } as const;
 
 // ---------------------------------------------------------------------------
 // Ngon geometry — ported from ShapeItemView
@@ -474,7 +477,7 @@ interface PixiItemViewProps {
   zoom: number;
 }
 
-function PixiItemView({
+const PixiItemView = memo(function PixiItemView({
   canvasWidth,
   canvasHeight,
   interactive,
@@ -663,7 +666,7 @@ function PixiItemView({
       rotation={(item.rotation * Math.PI) / 180}
       alpha={item.opacity}
       filters={itemFilters}
-      pivot={{ x: 0, y: 0 }}
+      pivot={ZERO_PIVOT}
       eventMode={eventMode}
       hitArea={shapeHitArea}
       onMouseDown={handleMouseDown}
@@ -671,4 +674,4 @@ function PixiItemView({
       {children}
     </pixiContainer>
   );
-}
+});
