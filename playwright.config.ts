@@ -44,6 +44,13 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        ...(process.env.CI
+          ? {
+              launchOptions: {
+                args: ['--use-gl=egl', '--ignore-gpu-blocklist'],
+              },
+            }
+          : {}),
       },
     },
   ],

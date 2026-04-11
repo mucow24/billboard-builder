@@ -101,7 +101,7 @@ interface PixiCanvasSceneProps {
   showGroupSelection: boolean;
   size: { width: number; height: number };
   spacebarHeld: boolean;
-  stageCursor: string;
+
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   viewportPan: { x: number; y: number };
@@ -140,7 +140,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       showGroupSelection,
       size,
       spacebarHeld,
-      stageCursor,
+
       startPanDrag,
       toCanvasPointer,
       viewportPan,
@@ -164,24 +164,6 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
         app.renderer.resize(size.width, size.height);
       }
     }, [size.width, size.height, rendererReady]);
-
-    // @pixi/react uses a ConcurrentRoot reconciler whose scene-tree commits
-    // lag 1-2 React render cycles behind the DOM.  The default 60 fps ticker
-    // eventually renders, but on slow renderers (CI SwiftShader, 50-200 ms per
-    // frame) 60 fps saturates the CPU.  Throttle to 2 fps so transforms stay
-    // fresh (every ~500ms) without overwhelming slow GPUs.
-    useEffect(() => {
-      const app = appRef.current?.getApplication();
-      if (!app?.renderer) return;
-
-      app.ticker.maxFPS = 2;
-    }, [rendererReady]);
-
-    // Visual render after every React commit.
-    useEffect(() => {
-      const app = appRef.current?.getApplication();
-      if (app?.renderer) app.render();
-    });
 
     // --- Federated event wrappers -------------------------------------------
     // @pixi/react sets event handlers as `container.onwheel = fn` properties.

@@ -229,7 +229,7 @@ export function CanvasStage({
         session={session as never}
         showGroupSelection={showGroupInteractionHooks}
         size={viewport.viewportSize}
-        stageCursor={viewport.getStageCursor(Boolean(session))}
+
         spacebarHeld={viewport.spacebarHeld}
         startPanDrag={viewport.startPanDrag}
         toCanvasPointer={viewport.toCanvasPointer}
