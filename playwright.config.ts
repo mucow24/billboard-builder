@@ -46,6 +46,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         ...(process.env.CI
           ? {
+              headless: false,
               launchOptions: {
                 args: ['--use-gl=egl', '--ignore-gpu-blocklist'],
               },

@@ -54,18 +54,20 @@ jobs:
 
       - run: npx playwright install --with-deps ${{ matrix.project }}
 
-      - name: Install Mesa for software OpenGL (llvmpipe)
-        run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dri
+      - name: Install Mesa and xvfb for software OpenGL (llvmpipe)
+        run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dri xvfb
 
       - name: Check GPU renderer
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           GALLIUM_DRIVER: llvmpipe
         run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
           node -e "
             const { chromium } = require('playwright');
             (async () => {
               const browser = await chromium.launch({
+                headless: false,
                 args: ['--use-gl=egl', '--ignore-gpu-blocklist']
               });
               const page = await browser.newPage();
@@ -91,7 +93,7 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           GALLIUM_DRIVER: llvmpipe
-        run: npm run e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" npm run e2e -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/4
 
       - if: failure()
         uses: actions/upload-artifact@v4
