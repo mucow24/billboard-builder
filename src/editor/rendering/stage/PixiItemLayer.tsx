@@ -519,7 +519,12 @@ const PixiItemView = memo(function PixiItemView({
   );
 
   // PixiJS federated events don't include dblclick, so detect manually.
+  // On a fast second mouseDown we defer the double-click action until
+  // pointerup confirms the pointer didn't move.  This prevents a quick
+  // click-then-drag from false-triggering double-click.
   const lastClickRef = useRef(0);
+  const onItemDoubleClickRef = useRef(onItemDoubleClick);
+  onItemDoubleClickRef.current = onItemDoubleClick;
 
   const handleMouseDown = useCallback(
     (e: FederatedPointerEvent) => {
@@ -534,15 +539,31 @@ const PixiItemView = memo(function PixiItemView({
         return;
       }
 
-      // Double-click detection
+      // Double-click candidate: always proceed with the normal mouseDown
+      // (start drag), but also listen for a quick pointerup without movement
+      // to confirm it was a real double-click.
       const now = Date.now();
       if (now - lastClickRef.current < 400) {
         lastClickRef.current = 0;
-        e.stopPropagation();
-        onItemDoubleClick(item);
-        return;
+        const downX = nativeEvent.clientX;
+        const downY = nativeEvent.clientY;
+        let cancelled = false;
+        const onMove = (moveEvt: PointerEvent) => {
+          const dx = moveEvt.clientX - downX;
+          const dy = moveEvt.clientY - downY;
+          if (dx * dx + dy * dy > 25) {
+            cancelled = true;
+            document.removeEventListener('pointermove', onMove);
+          }
+        };
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', () => {
+          document.removeEventListener('pointermove', onMove);
+          if (!cancelled) onItemDoubleClickRef.current(item);
+        }, { once: true });
+      } else {
+        lastClickRef.current = now;
       }
-      lastClickRef.current = now;
 
       e.stopPropagation();
       onItemPointerDown(
@@ -553,7 +574,7 @@ const PixiItemView = memo(function PixiItemView({
         nativeEvent,
       );
     },
-    [interactive, item, onItemDoubleClick, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
+    [interactive, item, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
   );
 
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;

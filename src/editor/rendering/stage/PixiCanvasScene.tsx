@@ -165,6 +165,34 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       }
     }, [size.width, size.height, rendererReady]);
 
+    // @pixi/react uses a ConcurrentRoot reconciler whose scene-tree commits
+    // lag 1-2 React render cycles behind the DOM.  The default 60 fps ticker
+    // eventually renders, but on slow renderers (CI SwiftShader, 50-200 ms per
+    // frame) a Playwright click can arrive before transforms are current.
+    //
+    // Fix: stop the idle ticker and render on-demand — once per React commit
+    // (useEffect) for visual updates, and once before every hit-test (patch)
+    // so worldTransform values are always fresh for pointer interactions.
+    useEffect(() => {
+      const app = appRef.current?.getApplication();
+      if (!app?.renderer) return;
+
+      app.ticker.stop();
+
+      const boundary = (app.renderer.events as any).rootBoundary;
+      const origHitTest = boundary.hitTest.bind(boundary);
+      boundary.hitTest = (x: number, y: number) => {
+        app.render();
+        return origHitTest(x, y);
+      };
+    }, [rendererReady]);
+
+    // Visual render after every React commit.
+    useEffect(() => {
+      const app = appRef.current?.getApplication();
+      if (app?.renderer) app.render();
+    });
+
     // --- Federated event wrappers -------------------------------------------
     // @pixi/react sets event handlers as `container.onwheel = fn` properties.
     // PixiJS calls these properties during ALL propagation phases (capture,
