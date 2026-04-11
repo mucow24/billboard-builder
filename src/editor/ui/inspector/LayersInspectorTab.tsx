@@ -542,7 +542,7 @@ function CanvasLayerRow({
   }
 
   return (
-    <div className="canvas-layer-row layer-row">
+    <div className="canvas-layer-row">
       {/* Preview swatch = color picker trigger */}
       <ColorPickerControl
         label="Canvas background"

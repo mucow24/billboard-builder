@@ -564,8 +564,15 @@
 .canvas-layer-row {
   --canvas-row-icon-size: 17px;
   --canvas-row-picker-size: 1.8rem;
-  cursor: default;
+  position: relative;
+  display: flex;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+  user-select: none;
 }
 
 .properties-panel .canvas-layer-row .color-picker-trigger-compact {
