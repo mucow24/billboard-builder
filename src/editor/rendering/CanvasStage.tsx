@@ -174,6 +174,7 @@ export function CanvasStage({
       className="canvas-stage-screen"
       ref={viewport.viewportRef}
       data-testid="canvas-stage-root"
+      style={{ cursor: viewport.getStageCursor(Boolean(session)) }}
     >
       <div
         className={showExportBoundsCue ? 'canvas-export-bounds-cue active' : 'canvas-export-bounds-cue'}
