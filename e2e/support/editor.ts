@@ -982,12 +982,6 @@ export async function addGenerator(page: Page, generatorName: string) {
   await page.getByRole('button', { name: generatorName, exact: true }).click();
 }
 
-export async function chooseCanvasPreset(page: Page, presetName: string) {
-  await openToolbarPopover(page, 'Canvas');
-  await page.getByRole('button', { name: 'Size', exact: true }).hover();
-  await page.getByRole('button', { name: presetName, exact: true }).click();
-}
-
 export async function startToolbarFileChooser(page: Page, triggerName: string, itemName: string): Promise<FileChooser> {
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
@@ -1022,7 +1016,7 @@ function countVisibleLeafNodes(nodes: unknown[]): number {
 }
 
 export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
-  const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+  const chooser = await startToolbarFileChooser(page, 'File', 'Load...');
   await chooser.setFiles({
     name: fileName,
     mimeType: 'application/json',
@@ -1171,7 +1165,7 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+      await clickToolbarPopoverItem(page, 'File', 'Save');
     }),
   );
 }

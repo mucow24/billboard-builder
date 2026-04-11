@@ -473,7 +473,7 @@ test.describe('editor shortcuts', () => {
     expect((savedProject.nodes as SavedNode[])).toHaveLength(2);
     expect((savedProject.nodes as SavedNode[]).every((node) => node.kind === 'rectangle')).toBe(true);
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     const pastedImage = await pasteImageClipboardFile(page);
     expect(pastedImage.defaultPrevented).toBe(true);
     await openLayersTab(page);
@@ -491,7 +491,7 @@ test.describe('editor shortcuts', () => {
     const ignoredPaste = await pasteClipboardPayloadOnActiveElement(page, copied.payload);
     expect(ignoredPaste.defaultPrevented).toBe(false);
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(0);
   });

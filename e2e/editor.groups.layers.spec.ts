@@ -160,7 +160,7 @@ test.describe('editor group layers and inspector flows', () => {
       }),
     ]);
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     await uploadProject(page, savedProject, 'layers-group-roundtrip.json');
     await openLayersTab(page);
     await clickLayerRow(page, 'Layer Group');
@@ -239,7 +239,7 @@ test.describe('editor group layers and inspector flows', () => {
   test('updates the canvas background from the Canvas menu and persists the new value', async ({ page }) => {
     await openFreshEditor(page);
 
-    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+    await page.getByRole('button', { name: 'File', exact: true }).click();
     await page.getByRole('button', { name: 'Canvas background' }).click();
     await page.getByLabel('Canvas background hex').fill('#11223344');
     await page.getByLabel('Canvas background hex').press('Enter');
