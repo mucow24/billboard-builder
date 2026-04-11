@@ -552,7 +552,7 @@ function CanvasLayerRow({
       />
       {/* Label */}
       <span className="layer-row-copy compact richer">
-        <strong className="layer-row-label">Canvas</strong>
+        <strong className="canvas-layer-label">Canvas</strong>
       </span>
       {/* Size dropdown */}
       <span className="list-actions">

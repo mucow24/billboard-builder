@@ -599,6 +599,13 @@
   margin-left: var(--inspector-list-content-gap);
 }
 
+.canvas-layer-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
 .canvas-layer-row .list-actions {
   display: flex;
   align-items: center;
