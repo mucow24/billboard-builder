@@ -71,7 +71,7 @@ export const GENERATOR_ICONS: Record<string, ReactNode> = {
   ),
 };
 
-interface CanvasMenuProps {
+interface FileMenuProps {
   menuId: string;
   onLoad: () => void;
   onSave: () => void;
@@ -79,13 +79,13 @@ interface CanvasMenuProps {
   createMenuActionHandler: (action: () => void) => () => void;
 }
 
-export function CanvasMenu({
+export function FileMenu({
   menuId,
   onLoad,
   onSave,
   onNewProject,
   createMenuActionHandler,
-}: CanvasMenuProps) {
+}: FileMenuProps) {
   return (
     <div id={menuId} className="top-toolbar-popover-panel" role="group" aria-label="File actions">
       <ToolbarMenuAction label="New" onSelect={createMenuActionHandler(onNewProject)}>

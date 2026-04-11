@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton, ToolbarIcon } from './ToolbarPrimitives';
 import { joinClassNames, modKey } from './toolbarUtils';
-import { CanvasMenu } from './ToolbarMenus';
+import { FileMenu } from './ToolbarMenus';
 
 interface ToolbarProps {
   canDelete: boolean;
@@ -65,11 +65,11 @@ export function Toolbar({
   inspectorPanel,
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
-  const canvasTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [openMenu, setOpenMenu] = useState<'canvas' | null>(null);
+  const fileTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [openMenu, setOpenMenu] = useState<'file' | null>(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
   const [isExportFocused, setIsExportFocused] = useState(false);
-  const canvasMenuId = useId();
+  const fileMenuId = useId();
 
   useEffect(() => {
     onExportIntentChange?.(isExportHovered || isExportFocused);
@@ -102,7 +102,7 @@ export function Toolbar({
       if (event.key === 'Escape') {
         event.preventDefault();
         setOpenMenu(null);
-        window.requestAnimationFrame(() => canvasTriggerRef.current?.focus());
+        window.requestAnimationFrame(() => fileTriggerRef.current?.focus());
         return;
       }
 
@@ -116,7 +116,7 @@ export function Toolbar({
   }, [openMenu]);
 
   function toggleMenu() {
-    setOpenMenu((current) => (current === 'canvas' ? null : 'canvas'));
+    setOpenMenu((current) => (current === 'file' ? null : 'file'));
   }
 
   function closeMenu() {
@@ -150,22 +150,22 @@ export function Toolbar({
           <span>Export PNG</span>
         </button>
 
-        <div className={openMenu === 'canvas' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
+        <div className={openMenu === 'file' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
           <button
-            ref={canvasTriggerRef}
+            ref={fileTriggerRef}
             type="button"
             className="top-toolbar-button top-toolbar-control top-toolbar-menu-trigger"
-            aria-controls={canvasMenuId}
-            aria-expanded={openMenu === 'canvas'}
+            aria-controls={fileMenuId}
+            aria-expanded={openMenu === 'file'}
             aria-haspopup="true"
             onClick={toggleMenu}
           >
             <span>File</span>
             <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
           </button>
-          {openMenu === 'canvas' ? (
-            <CanvasMenu
-              menuId={canvasMenuId}
+          {openMenu === 'file' ? (
+            <FileMenu
+              menuId={fileMenuId}
               onLoad={onLoad}
               onSave={onSave}
               onNewProject={onNewProject}

@@ -562,11 +562,13 @@
 /* ── Canvas layer row (bottom of list) ──────────────────────────────────── */
 
 .canvas-layer-row {
+  --canvas-row-icon-size: 17px;
+  --canvas-row-picker-size: 1.8rem;
   cursor: default;
   align-items: center;
 }
 
-.canvas-layer-row .color-picker-trigger-compact.color-picker-trigger-compact {
+.properties-panel .canvas-layer-row .color-picker-trigger-compact {
   min-height: 0;
   height: auto;
   padding: 3px;
@@ -576,14 +578,13 @@
   flex: 0 0 auto;
   width: auto;
   align-self: center;
-  /* Align right edge with normal layer preview icons:
-     grip-margin + grip + grip-margin + icon-margin + icon(17px) − picker(1.8rem) */
+  /* Align picker right edge with normal layer preview icon right edge. */
   margin-left: calc(
-    var(--inspector-list-row-inset) * 2
+    var(--inspector-list-row-inset)
     + var(--inspector-list-grip-width)
     + var(--inspector-list-content-gap)
-    - var(--inspector-list-row-inset)
-    + 17px - 1.8rem
+    + var(--canvas-row-icon-size)
+    - var(--canvas-row-picker-size)
   );
 }
 
