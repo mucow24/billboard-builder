@@ -1,14 +1,11 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-import type { CanvasSize } from '../document/documentTypes';
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton, ToolbarIcon } from './ToolbarPrimitives';
 import { joinClassNames, modKey } from './toolbarUtils';
 import { CanvasMenu } from './ToolbarMenus';
 
 interface ToolbarProps {
-  background: string;
-  canvas: CanvasSize;
   canDelete: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -19,8 +16,6 @@ interface ToolbarProps {
   onCanvasFocusToggle: () => void;
   favoriteStatusFading?: boolean;
   favoriteStatusMessage?: string | null;
-  onBackgroundChange: (background: string) => void;
-  onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
   onExportIntentChange?: (active: boolean) => void;
@@ -41,8 +36,6 @@ interface ToolbarProps {
 }
 
 export function Toolbar({
-  background,
-  canvas,
   canDelete,
   canUndo,
   canRedo,
@@ -53,8 +46,6 @@ export function Toolbar({
   onCanvasFocusToggle,
   favoriteStatusFading = false,
   favoriteStatusMessage = null,
-  onBackgroundChange,
-  onCanvasSizeChange,
   onDelete,
   onExport,
   onExportIntentChange,
@@ -169,16 +160,12 @@ export function Toolbar({
             aria-haspopup="true"
             onClick={toggleMenu}
           >
-            <span>Canvas</span>
+            <span>File</span>
             <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
           </button>
           {openMenu === 'canvas' ? (
             <CanvasMenu
-              background={background}
-              canvas={canvas}
               menuId={canvasMenuId}
-              onBackgroundChange={onBackgroundChange}
-              onCanvasSizeChange={onCanvasSizeChange}
               onLoad={onLoad}
               onSave={onSave}
               onNewProject={onNewProject}
