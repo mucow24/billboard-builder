@@ -68,7 +68,7 @@ jobs:
             (async () => {
               const browser = await chromium.launch({
                 headless: false,
-                args: ['--use-gl=egl', '--ignore-gpu-blocklist']
+                args: ['--use-gl=egl', '--use-angle=gl', '--ignore-gpu-blocklist']
               });
               const page = await browser.newPage();
               const gl = await page.evaluate(() => {
