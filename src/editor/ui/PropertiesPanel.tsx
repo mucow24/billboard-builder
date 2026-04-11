@@ -11,9 +11,13 @@ export type { InspectorTab } from './inspector/types';
 export function PropertiesPanel({
   activeTab,
   availableFonts,
+  background,
+  canvas,
   fonts,
   layerRows,
   missingFontFamilies,
+  onBackgroundChange,
+  onCanvasSizeChange,
   onDeleteFavorite = () => {},
   onRenameFavorite = () => {},
   onRecolorFavorite = () => {},
@@ -140,9 +144,13 @@ export function PropertiesPanel({
             data-testid="layers-tab-body"
           >
             <LayersInspectorTab
+              background={background}
+              canvas={canvas}
               canReorder={selectedNodeIds.length > 0}
               collapsedGroupIds={collapsedGroupIds}
               rows={layerRows}
+              onBackgroundChange={onBackgroundChange}
+              onCanvasSizeChange={onCanvasSizeChange}
               onDeleteNode={onDeleteNode}
               onMoveNode={onMoveNode}
               onOpenProperties={onOpenProperties}

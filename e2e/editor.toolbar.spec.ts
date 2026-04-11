@@ -4,7 +4,6 @@ import { expect, test } from '@playwright/test';
 
 import {
   canvasPointToPage,
-  chooseCanvasPreset,
   clickCanvas,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
@@ -25,7 +24,7 @@ test.describe('editor toolbar flows', () => {
     await openFreshEditor(page);
 
     await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'File', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Undo/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Redo/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Delete/ })).toBeVisible();
@@ -33,36 +32,13 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+    await page.getByRole('button', { name: 'File', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Load...', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'New', exact: true })).toBeVisible();
 
     await page.mouse.click(24, 220);
     await expect(page.getByRole('button', { name: 'Load...' })).toHaveCount(0);
-
-    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
-    await page.getByRole('button', { name: 'Size', exact: true }).hover();
-    await expect(page.getByLabel('Canvas width')).toBeVisible();
-    await expect(page.getByLabel('Canvas height')).toBeVisible();
-  });
-
-  test('updates visible canvas dimensions from presets and clears preset selection after manual edits', async ({ page }) => {
-    await openFreshEditor(page);
-
-    await chooseCanvasPreset(page, '1024 x 1024');
-    // Canvas menu and size flyout remain open after preset click
-    await expect(page.getByLabel('Canvas width')).toHaveValue('1024');
-    await expect(page.getByLabel('Canvas height')).toHaveValue('1024');
-
-    await expect(page.getByRole('button', { name: '1024 x 1024', exact: true })).toHaveAttribute('aria-pressed', 'true');
-
-    await page.getByLabel('Canvas width').fill('640');
-    await page.getByLabel('Canvas height').fill('480');
-
-    await expect(page.getByRole('button', { name: '1024 x 1024', exact: true })).toHaveAttribute('aria-pressed', 'false');
-    await expect(page.getByLabel('Canvas width')).toHaveValue('640');
-    await expect(page.getByLabel('Canvas height')).toHaveValue('480');
   });
 
   test('shows the export-bounds cue on hover and focus without covering the canvas interior', async ({ page }) => {
@@ -84,7 +60,7 @@ test.describe('editor toolbar flows', () => {
     );
 
     const exportButton = page.getByRole('button', { name: 'Export PNG' });
-    const canvasButton = page.getByRole('button', { name: 'Canvas', exact: true });
+    const canvasButton = page.getByRole('button', { name: 'File', exact: true });
     const exportCue = page.getByTestId('export-bounds-cue');
     const cuePanels = [
       page.getByTestId('export-bounds-cue-top'),
@@ -168,7 +144,7 @@ test.describe('editor toolbar flows', () => {
   test('starts load, image upload, and font upload from real toolbar menu items and filechooser events', async ({ page }) => {
     await openFreshEditor(page);
 
-    const loadChooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+    const loadChooser = await startToolbarFileChooser(page, 'File', 'Load...');
     await loadChooser.setFiles({
       name: 'toolbar-load.json',
       mimeType: 'application/json',
@@ -253,7 +229,7 @@ test.describe('editor toolbar flows', () => {
     await clickCanvas(page, { x: 260, y: 240 });
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeEnabled();
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
   });
 

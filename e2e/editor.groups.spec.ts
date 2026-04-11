@@ -155,7 +155,7 @@ test.describe('editor groups', () => {
       }),
     ]);
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     await uploadProject(page, groupedDocument, 'grouped.json');
 
     await openLayersTab(page);
