@@ -170,9 +170,13 @@ export default function App() {
               <PropertiesPanel
                 activeTab={inspectorTab}
                 availableFonts={availableFonts}
+                background={document.background}
+                canvas={document.canvas}
                 fonts={document.fonts}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
+                onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
+                onCanvasSizeChange={setCanvasSize}
                 onDeleteFavorite={deleteFavorite}
                 onRenameFavorite={renameFavorite}
                 onRecolorFavorite={recolorFavorite}

@@ -1,5 +1,6 @@
 import type {
   CanvasItem,
+  CanvasSize,
   DocumentFontReference,
   GroupNode,
   ReorderMode,
@@ -16,6 +17,8 @@ export type InspectorTab = 'properties' | 'layers' | 'favorites';
 export interface PropertiesPanelProps {
   activeTab: InspectorTab;
   availableFonts: UploadedFont[];
+  background: string;
+  canvas: CanvasSize;
   fonts: DocumentFontReference[];
   layerRows: LayerRow[];
   missingFontFamilies: string[];
@@ -28,6 +31,8 @@ export interface PropertiesPanelProps {
   selectedItem?: CanvasItem;
   selectedItems?: CanvasItem[];
   selectedNodeIds: string[];
+  onBackgroundChange: (background: string) => void;
+  onCanvasSizeChange: (canvas: CanvasSize) => void;
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;
   onInsertFavorite?: (favoriteId: string) => void;
@@ -46,9 +51,13 @@ export interface PropertiesPanelProps {
 }
 
 export interface LayersInspectorTabProps {
+  background: string;
+  canvas: CanvasSize;
   canReorder: boolean;
   collapsedGroupIds: ReadonlySet<string>;
   rows: LayerRow[];
+  onBackgroundChange: (background: string) => void;
+  onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDeleteNode: (nodeId: string) => void;
   onMoveNode?: (nodeId: string, targetParentId: string | null, targetIndex: number) => void;
   onOpenProperties: () => void;
