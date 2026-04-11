@@ -57,6 +57,29 @@ jobs:
       - name: Install Mesa for software OpenGL (llvmpipe)
         run: sudo apt-get update && sudo apt-get install -y libegl1-mesa-dev libgl1-mesa-dri
 
+      - name: Check GPU renderer
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GALLIUM_DRIVER: llvmpipe
+        run: |
+          node -e "
+            const { chromium } = require('playwright');
+            (async () => {
+              const browser = await chromium.launch({
+                args: ['--use-gl=egl', '--ignore-gpu-blocklist']
+              });
+              const page = await browser.newPage();
+              await page.goto('chrome://gpu');
+              const text = await page.textContent('body');
+              for (const line of text.split('\n')) {
+                if (/GL_RENDERER|GL_VENDOR|GL_VERSION|SwiftShader|llvmpipe|gpu.*status/i.test(line)) {
+                  console.log(line.trim());
+                }
+              }
+              await browser.close();
+            })();
+          "
+
       - name: Run e2e tests
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
