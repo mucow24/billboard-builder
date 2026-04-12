@@ -19,7 +19,7 @@
     "e2e:screenshots:update": "node scripts/run-e2e.mjs --grep visual --update-snapshots",
     "e2e:all": "node scripts/run-e2e.mjs",
     "preflight": "node scripts/preflight.mjs",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks && (git config --worktree core.hooksPath .githooks 2>/dev/null || true)"
   },
   "dependencies": {
     "@pixi/react": "^8.0.5",
