@@ -376,13 +376,13 @@ test.describe('editor transforms', () => {
 
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-enabled.json');
-    await clickCanvas(page, clickPoint);
+    await setCanvasTestHooksEnabled(page, false);
     await dragCanvas(page, clickPoint, dragTarget);
     const snappedProject = await saveAndReadProject(page);
 
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-disabled.json');
-    await clickCanvas(page, clickPoint);
+    await setCanvasTestHooksEnabled(page, false);
     await dragCanvasWithModifier(page, 'Control', clickPoint, dragTarget);
     const unsnappedProject = await saveAndReadProject(page);
 
