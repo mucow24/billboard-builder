@@ -1,6 +1,8 @@
-import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 
 import { isCanvasItemNode } from '../../document/sceneGraph';
+import { CANVAS_PRESETS } from '../../document/documentDefaults';
+import { ColorPickerControl } from '../ColorPickerControl';
 
 import {
   getLayerPreviewStyle,
@@ -33,9 +35,13 @@ const GRIP_ICON = (
 );
 
 export function LayersInspectorTab({
+  background,
+  canvas,
   canReorder,
   collapsedGroupIds,
   rows,
+  onBackgroundChange,
+  onCanvasSizeChange,
   onDeleteNode,
   onMoveNode,
   onOpenProperties,
@@ -485,9 +491,137 @@ export function LayersInspectorTab({
               />
             )}
           </div>
+          <CanvasLayerRow
+            background={background}
+            canvas={canvas}
+            onBackgroundChange={onBackgroundChange}
+            onCanvasSizeChange={onCanvasSizeChange}
+          />
         </div>
       </div>
     </>
+  );
+}
+
+function CanvasLayerRow({
+  background,
+  canvas,
+  onBackgroundChange,
+  onCanvasSizeChange,
+}: Pick<LayersInspectorTabProps, 'background' | 'canvas' | 'onBackgroundChange' | 'onCanvasSizeChange'>) {
+  const [sizeOpen, setSizeOpen] = useState(false);
+  const sizeBtnRef = useRef<HTMLButtonElement>(null);
+  const sizePanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sizeOpen) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (!(event.target instanceof Node)) return;
+      if (sizeBtnRef.current?.contains(event.target)) return;
+      if (sizePanelRef.current?.contains(event.target)) return;
+      setSizeOpen(false);
+    }
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [sizeOpen]);
+
+  const selectedPresetId = canvas.presetId ?? 'custom';
+
+  function handlePresetSelect(presetId: string) {
+    const preset = CANVAS_PRESETS.find((entry) => entry.id === presetId);
+    if (!preset) return;
+    onCanvasSizeChange({ width: preset.width, height: preset.height, presetId: preset.id });
+  }
+
+  function handleCustomWidthChange(event: ChangeEvent<HTMLInputElement>) {
+    onCanvasSizeChange({ width: Number(event.target.value), height: canvas.height, presetId: undefined });
+  }
+
+  function handleCustomHeightChange(event: ChangeEvent<HTMLInputElement>) {
+    onCanvasSizeChange({ width: canvas.width, height: Number(event.target.value), presetId: undefined });
+  }
+
+  return (
+    <div className="canvas-layer-row">
+      {/* Preview swatch = color picker trigger */}
+      <ColorPickerControl
+        label="Canvas background"
+        value={background}
+        onChange={onBackgroundChange}
+        variant="compact"
+      />
+      {/* Label */}
+      <span className="layer-row-copy compact richer">
+        <strong className="canvas-layer-label">Canvas</strong>
+      </span>
+      {/* Size dropdown */}
+      <span className="list-actions">
+        <span className="canvas-size-popover-anchor">
+          <button
+            ref={sizeBtnRef}
+            type="button"
+            className="canvas-size-trigger"
+            aria-label="Canvas size"
+            title="Canvas size"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSizeOpen((v) => !v);
+            }}
+          >
+            <span>{canvas.width} x {canvas.height}</span>
+            <svg className="canvas-size-caret" viewBox="0 0 8 5" aria-hidden="true">
+              <path d="M1 1l3 3 3-3" />
+            </svg>
+          </button>
+          {sizeOpen && (
+            <div
+              ref={sizePanelRef}
+              className="canvas-size-popover"
+              role="group"
+              aria-label="Canvas size"
+            >
+              {CANVAS_PRESETS.map((preset) => {
+                const maxDim = Math.max(preset.width, preset.height);
+                const w = (preset.width / maxDim) * 12;
+                const h = (preset.height / maxDim) * 12;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    className={`canvas-size-preset${selectedPresetId === preset.id ? ' active' : ''}`}
+                    onClick={() => handlePresetSelect(preset.id)}
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <rect x={10 - w / 2} y={10 - h / 2} width={w} height={h} rx="1" />
+                    </svg>
+                    <span>{preset.label}</span>
+                  </button>
+                );
+              })}
+              <div className="canvas-size-divider" />
+              <div className="canvas-size-custom">
+                <span>Custom:</span>
+                <input
+                  aria-label="Canvas width"
+                  type="number"
+                  min={1}
+                  value={canvas.width}
+                  onChange={handleCustomWidthChange}
+                />
+                <span aria-hidden="true">x</span>
+                <input
+                  aria-label="Canvas height"
+                  type="number"
+                  min={1}
+                  value={canvas.height}
+                  onChange={handleCustomHeightChange}
+                />
+              </div>
+            </div>
+          )}
+        </span>
+      </span>
+    </div>
   );
 }
 

@@ -558,3 +558,168 @@
   font-weight: 500;
   text-align: center;
 }
+
+/* ── Canvas layer row (bottom of list) ──────────────────────────────────── */
+
+.canvas-layer-row {
+  --canvas-row-icon-size: 17px;
+  --canvas-row-picker-size: 1.8rem;
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+  user-select: none;
+}
+
+.properties-panel .canvas-layer-row .color-picker-trigger-compact {
+  min-height: 0;
+  height: auto;
+  padding: 3px;
+}
+
+.canvas-layer-row .color-picker-control {
+  flex: 0 0 auto;
+  width: auto;
+  align-self: center;
+  /* Align picker right edge with normal layer preview icon right edge. */
+  margin-left: calc(
+    var(--inspector-list-row-inset)
+    + var(--inspector-list-grip-width)
+    + var(--inspector-list-content-gap)
+    + var(--canvas-row-icon-size)
+    - var(--canvas-row-picker-size)
+  );
+}
+
+.canvas-layer-row .layer-row-copy {
+  margin-left: var(--inspector-list-content-gap);
+}
+
+.canvas-layer-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.canvas-layer-row .list-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Size trigger button */
+.canvas-size-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #64789b;
+  font-size: 11px;
+  line-height: 1.2;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.canvas-size-trigger:hover {
+  background: rgba(22, 35, 57, 0.72);
+  color: var(--text-primary);
+}
+
+.canvas-size-caret {
+  width: 8px;
+  height: 5px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+/* ── Canvas size popover ────────────────────────────────────────────────── */
+
+.canvas-size-popover-anchor {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.canvas-size-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  min-width: 180px;
+  background: var(--surface-popover, rgba(18, 27, 46, 0.98));
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: var(--radius-base);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.canvas-size-preset {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.canvas-size-preset:hover {
+  background: rgba(22, 35, 57, 0.72);
+}
+
+.canvas-size-preset.active {
+  background: rgba(37, 54, 83, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(86, 118, 171, 0.56);
+}
+
+.canvas-size-preset svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  fill: none;
+}
+
+.canvas-size-divider {
+  height: 1px;
+  margin: 2px 0;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.canvas-size-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #93a8c9);
+}
+
+.canvas-size-custom input {
+  width: 60px;
+  padding: 2px 4px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}

@@ -6,35 +6,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { Toolbar } from './Toolbar';
 import type { InspectorTab } from './inspector/types';
 
-vi.mock('@uiw/react-color', async () => {
-  const actual =
-    await vi.importActual<typeof import('@uiw/react-color')>(
-      '@uiw/react-color',
-    );
-  return {
-    ...actual,
-    Wheel: ({
-      onChange,
-      ...props
-    }: {
-      onChange?: (color: { hexa: string }) => void;
-    }) => (
-      <button
-        type="button"
-        {...props}
-        onClick={() => onChange?.({ hexa: '#12345678' })}
-      >
-        Mock wheel
-      </button>
-    ),
-  };
-});
-
 function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) {
   const props: ComponentProps<typeof Toolbar> = {
     activeInspectorTab: 'properties' satisfies InspectorTab,
-    background: '#ffffff00',
-    canvas: { width: 2048, height: 1024, presetId: 'landscape' },
     canDelete: false,
     canGroup: false,
     canRedo: false,
@@ -45,8 +19,6 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     favoriteCount: 0,
     itemCount: 0,
     onCanvasFocusToggle: vi.fn(),
-    onBackgroundChange: vi.fn(),
-    onCanvasSizeChange: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
     onGroup: vi.fn(),
@@ -73,7 +45,7 @@ describe('Toolbar', () => {
     renderToolbar();
 
     expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: /^Undo/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Redo/ })).toBeDisabled();
@@ -91,16 +63,16 @@ describe('Toolbar', () => {
 
     renderToolbar({ onLoad, onNewProject, onSave });
 
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('button', { name: 'Load...' }));
     expect(onLoad).toHaveBeenCalledOnce();
 
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSave).toHaveBeenCalledOnce();
 
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    await user.click(screen.getByRole('button', { name: 'File' }));
+    await user.click(screen.getByRole('button', { name: 'New' }));
     expect(onNewProject).toHaveBeenCalledOnce();
   });
 
@@ -123,47 +95,6 @@ describe('Toolbar', () => {
 
     fireEvent.blur(exportButton);
     expect(onExportIntentChange).toHaveBeenLastCalledWith(false);
-  });
-
-  it('updates preset and custom canvas dimensions through the canvas menu size submenu', async () => {
-    const user = userEvent.setup();
-    const onCanvasSizeChange = vi.fn();
-
-    renderToolbar({
-      canDelete: true,
-      canRedo: true,
-      canSaveFavorite: true,
-      canUndo: true,
-      onCanvasSizeChange,
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    await user.hover(await screen.findByRole('button', { name: 'Size' }));
-    await user.click(await screen.findByRole('button', { name: '1024 x 1024' }));
-
-    // Canvas menu and size flyout are still open after preset click
-    fireEvent.change(screen.getByLabelText('Canvas width'), {
-      target: { value: '640' },
-    });
-    fireEvent.change(screen.getByLabelText('Canvas height'), {
-      target: { value: '480' },
-    });
-
-    expect(onCanvasSizeChange).toHaveBeenCalledWith({
-      width: 1024,
-      height: 1024,
-      presetId: 'square-sm',
-    });
-    expect(onCanvasSizeChange).toHaveBeenCalledWith({
-      width: 640,
-      height: 1024,
-      presetId: undefined,
-    });
-    expect(onCanvasSizeChange).toHaveBeenCalledWith({
-      width: 2048,
-      height: 480,
-      presetId: undefined,
-    });
   });
 
   it('shows keyboard shortcuts in action button tooltips', () => {
@@ -197,7 +128,7 @@ describe('Toolbar', () => {
     const user = userEvent.setup();
     renderToolbar();
 
-    const canvasTrigger = screen.getByRole('button', { name: 'Canvas' });
+    const canvasTrigger = screen.getByRole('button', { name: 'File' });
 
     await user.click(canvasTrigger);
     expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
@@ -219,21 +150,4 @@ describe('Toolbar', () => {
     expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
   });
 
-  it('shows a background color picker in the canvas menu and fires onBackgroundChange', async () => {
-    const user = userEvent.setup();
-    const onBackgroundChange = vi.fn();
-
-    renderToolbar({ onBackgroundChange });
-
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    expect(screen.getByText('Color')).toBeVisible();
-
-    await user.click(screen.getByRole('button', { name: 'Canvas background' }));
-    expect(screen.getByLabelText('Canvas background hex')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
-
-    await user.clear(screen.getByLabelText('Canvas background hex'));
-    await user.type(screen.getByLabelText('Canvas background hex'), '#11223344{Enter}');
-    expect(onBackgroundChange).toHaveBeenCalledWith('#11223344');
-  });
 });

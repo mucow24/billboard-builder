@@ -59,9 +59,9 @@ test.describe('editor CSS visual regression — chrome', () => {
     await expect(page.locator('.top-toolbar')).toHaveScreenshot('chrome-toolbar.png');
   });
 
-  test('chrome-toolbar-menu: toolbar with Canvas menu open', async ({ page }) => {
+  test('chrome-toolbar-menu: toolbar with File menu open', async ({ page }) => {
     await openFreshEditor(page);
-    await openToolbarPopover(page, 'Canvas');
+    await openToolbarPopover(page, 'File');
     await expect(page.locator('.top-toolbar')).toHaveScreenshot('chrome-toolbar-menu.png');
   });
 

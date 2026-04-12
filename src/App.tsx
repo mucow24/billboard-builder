@@ -129,8 +129,6 @@ export default function App() {
           style={{ ['--overlay-topbar-height' as string]: `${topbarHeight}px` }}
         >
           <Toolbar
-            background={document.background}
-            canvas={document.canvas}
             canDelete={selectedNodeIds.length > 0}
             canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
             canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
@@ -141,8 +139,6 @@ export default function App() {
             favoriteStatusMessage={favoriteStatus.message}
             canvasFocusActive={canvasFocusActive}
             onCanvasFocusToggle={handleCanvasFocusToggle}
-            onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
-            onCanvasSizeChange={setCanvasSize}
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
             onExportIntentChange={handleExportIntentChange}
@@ -171,9 +167,13 @@ export default function App() {
               <PropertiesPanel
                 activeTab={inspectorTab}
                 availableFonts={availableFonts}
+                background={document.background}
+                canvas={document.canvas}
                 fonts={document.fonts}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}
+                onBackgroundChange={(background) => dispatch({ type: 'set_background', background })}
+                onCanvasSizeChange={setCanvasSize}
                 onDeleteFavorite={deleteFavorite}
                 onRenameFavorite={renameFavorite}
                 onRecolorFavorite={recolorFavorite}

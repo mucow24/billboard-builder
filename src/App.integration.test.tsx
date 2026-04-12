@@ -179,7 +179,7 @@ describe('App integration', () => {
 
   it('renders the real app shell and applies properties changes through the store/controller path', async () => {
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     const selectedRectangle = createRectangleItem({
       id: 'selected-rectangle',
@@ -212,7 +212,7 @@ describe('App integration', () => {
 
   it('mutates the real document through keyboard shortcuts and controller actions', async () => {
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     const selectedRectangle = createRectangleItem({
       id: 'shortcut-rectangle',
@@ -272,16 +272,16 @@ describe('App integration', () => {
     });
 
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     const exportButton = screen.getByRole('button', { name: 'Export PNG' });
-    clickToolbarPopoverItem('Canvas', 'Save');
+    clickToolbarPopoverItem('File', 'Save');
     fireEvent.click(exportButton);
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();
     expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1);
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['{}'], 'project.json', { type: 'application/json' })],
@@ -341,7 +341,7 @@ describe('App integration', () => {
     });
 
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
@@ -362,7 +362,7 @@ describe('App integration', () => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['bad'], 'broken.json', { type: 'application/json' })],
@@ -371,7 +371,7 @@ describe('App integration', () => {
     await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to open project: Broken project');
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['ok'], 'fixed.json', { type: 'application/json' })],
@@ -402,7 +402,7 @@ describe('App integration', () => {
 
   it('persists document changes only after bootstrap is ready and the debounce elapses', async () => {
     render(<App />);
-    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument();
 
     await act(async () => {
       await Promise.resolve();

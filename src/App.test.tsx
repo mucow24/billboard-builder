@@ -163,7 +163,7 @@ describe('App shell', () => {
     await renderApp();
 
     expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument();
   });
 
   it('switches into rectangle creation mode from the tool palette', async () => {
@@ -669,29 +669,11 @@ describe('App shell', () => {
     expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0].y).toBe(65);
   });
 
-  it('updates canvas size controls from the size menu', async () => {
-    const user = userEvent.setup();
-    await renderApp();
-
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    await user.hover(await screen.findByRole('button', { name: 'Size' }));
-
-    fireEvent.change(screen.getByLabelText('Canvas width'), {
-      target: { value: '900' },
-    });
-    fireEvent.change(screen.getByLabelText('Canvas height'), {
-      target: { value: '500' },
-    });
-
-    expect(useEditorStore.getState().editor.document.canvas.width).toBe(900);
-    expect(useEditorStore.getState().editor.document.canvas.height).toBe(500);
-  });
-
   it('shows a visible error when opening an invalid project file', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'File' }));
     await user.click(screen.getByRole('button', { name: 'Load...' }));
 
     const openInput = screen.getByTestId('project-open-input');

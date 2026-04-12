@@ -12,8 +12,12 @@ import { flattenLayerRows } from '../document/sceneGraph';
 
 const baseProps = {
   availableFonts: [] as [],
+  background: '#ffffff',
+  canvas: { width: 2048, height: 2048, presetId: 'square-lg' as const },
   fonts: [] as [],
   missingFontFamilies: [] as string[],
+  onBackgroundChange: vi.fn(),
+  onCanvasSizeChange: vi.fn(),
   onGroupOpacityChange: vi.fn(),
   onDeleteNode: vi.fn(),
   onItemChange: vi.fn(),

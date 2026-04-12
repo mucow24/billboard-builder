@@ -39,7 +39,7 @@ test.describe('editor smoke flows', () => {
   test('boots and creates rectangle, text, and line items from the canvas', async ({ page }) => {
     await openFreshEditor(page);
 
-    await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'File', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();
 
