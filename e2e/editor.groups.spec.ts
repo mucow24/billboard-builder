@@ -214,6 +214,7 @@ test.describe('editor groups', () => {
     await clickCanvas(page, { x: 260, y: 230 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
+    await waitForDoubleClickCadence(page);
 
     await dragCanvas(page, { x: 260, y: 230 }, { x: 380, y: 310 });
     await openLayersTab(page);
@@ -590,6 +591,7 @@ test.describe('editor groups', () => {
     await clickCanvas(page, { x: 360, y: 260 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
+    await waitForDoubleClickCadence(page);
     await dragCanvas(page, { x: 360, y: 260 }, { x: 480, y: 340 });
 
     stageDebug = await readStageDebug(page);

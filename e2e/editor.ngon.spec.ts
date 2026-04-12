@@ -34,56 +34,39 @@ test.describe('ngon tool flows', () => {
     await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
   });
 
-  test('shows Sides slider in properties panel for ngon', async ({ page }) => {
+  test('ngon properties: sides slider, value persistence, and gradient', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(
       page,
-      createProjectDocument([createNgonFixture()]),
+      createProjectDocument([createNgonFixture({ id: 'ngon-props-test' })]),
       'ngon-properties.json',
     );
 
     await clickCanvas(page, { x: 300, y: 300 });
     await openPropertiesTab(page);
 
-    await page.getByRole('button', { name: 'Geometry' }).click();
-    await expect(page.getByRole('slider', { name: 'Sides' })).toBeVisible();
-    await expect(page.getByRole('spinbutton', { name: 'Sides' })).toBeVisible();
-  });
+    await test.step('shows Sides slider in properties panel', async () => {
+      await page.getByRole('button', { name: 'Geometry' }).click();
+      await expect(page.getByRole('slider', { name: 'Sides' })).toBeVisible();
+      await expect(page.getByRole('spinbutton', { name: 'Sides' })).toBeVisible();
+    });
 
-  test('updates Sides value and persists through save', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(
-      page,
-      createProjectDocument([createNgonFixture({ id: 'ngon-sides-test' })]),
-      'ngon-sides.json',
-    );
+    await test.step('updates Sides value and persists through save', async () => {
+      await page.getByRole('spinbutton', { name: 'Sides' }).fill('5');
 
-    await clickCanvas(page, { x: 300, y: 300 });
-    await openPropertiesTab(page);
-    await page.getByRole('button', { name: 'Geometry' }).click();
-    await page.getByRole('spinbutton', { name: 'Sides' }).fill('5');
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ id: 'ngon-props-test', sides: 5 }),
+      ]);
+    });
 
-    const saved = await saveAndReadProject(page);
-    expect(saved.nodes).toEqual([
-      expect.objectContaining({ id: 'ngon-sides-test', sides: 5 }),
-    ]);
-  });
+    await test.step('enables gradient and persists through save', async () => {
+      await page.getByRole('button', { name: 'Toggle gradient' }).click();
 
-  test('enables gradient on ngon and persists through save', async ({ page }) => {
-    await openFreshEditor(page);
-    await uploadProject(
-      page,
-      createProjectDocument([createNgonFixture({ id: 'ngon-gradient-test' })]),
-      'ngon-gradient.json',
-    );
-
-    await clickCanvas(page, { x: 300, y: 300 });
-    await openPropertiesTab(page);
-    await page.getByRole('button', { name: 'Toggle gradient' }).click();
-
-    const saved = await saveAndReadProject(page);
-    expect(saved.nodes).toEqual([
-      expect.objectContaining({ id: 'ngon-gradient-test', gradientEnabled: true }),
-    ]);
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ id: 'ngon-props-test', sides: 5, gradientEnabled: true }),
+      ]);
+    });
   });
 });
