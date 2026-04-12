@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type Konva from 'konva';
 
+import type { CanvasPointerEvent, CanvasRendererHandle } from './renderer/canvasRendererTypes';
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
 import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
 import { getSelectionFrameForRotation } from './transformGeometry';
@@ -62,7 +62,6 @@ function mapPointBetweenFrames(
 }
 
 function makeStageRef() {
-  let pointer: { x: number; y: number } | null = null;
   let bounds = {
     left: 0,
     top: 0,
@@ -74,27 +73,25 @@ function makeStageRef() {
     y: 0,
     toJSON: () => ({}),
   } satisfies DOMRect;
-  const stage = {
-    setPointersPositions(event: MouseEvent) {
-      pointer = {
-        x: event.clientX,
-        y: event.clientY,
-      };
-    },
-    container() {
+  const handle: CanvasRendererHandle = {
+    getContainerElement() {
       return {
         getBoundingClientRect: () => bounds,
-      };
+      } as unknown as HTMLElement;
     },
-    getPointerPosition() {
-      return pointer;
+    getPointerPosition(event?: MouseEvent) {
+      if (!event) return null;
+      return { x: event.clientX, y: event.clientY };
     },
-  } as unknown as Konva.Stage;
+    async exportToDataURL() {
+      return '';
+    },
+  };
 
   return {
     ref: {
-      current: stage,
-    } as React.RefObject<Konva.Stage | null>,
+      current: handle,
+    } as React.RefObject<CanvasRendererHandle | null>,
     setBounds(nextBounds: Partial<DOMRect>) {
       bounds = {
         ...bounds,
@@ -108,8 +105,12 @@ function makeStageEvent(
   pointer: { x: number; y: number } | null,
   name = 'canvas-background',
   evtOverrides: Partial<MouseEvent> = {},
-) {
-  const evt = {
+): CanvasPointerEvent {
+  const isCanvasSurface =
+    name === 'canvas-background' ||
+    name === 'canvas-surface' ||
+    name === 'canvas-backdrop';
+  const nativeEvent = {
     button: 0,
     buttons: 1,
     clientX: pointer?.x ?? 0,
@@ -123,14 +124,11 @@ function makeStageEvent(
     ...evtOverrides,
   } as MouseEvent;
   return {
-    target: {
-      name: () => name,
-      getStage: () => ({
-        getPointerPosition: () => pointer,
-      }),
-    },
-    evt,
-  } as unknown as Konva.KonvaEventObject<MouseEvent>;
+    viewportPointer: pointer,
+    nativeEvent,
+    stopPropagation() {},
+    isCanvasSurface,
+  };
 }
 
 function createDocument(nodes: CanvasNode[] = []) {
@@ -846,8 +844,8 @@ describe('useCanvasInteractionSession', () => {
     act(() => {
       result.current.handleStageMouseDown({
         ...makeStageEvent({ x: 90, y: 90 }),
-        evt: { shiftKey: true },
-      } as unknown as Konva.KonvaEventObject<MouseEvent>);
+        nativeEvent: { ...makeStageEvent({ x: 90, y: 90 }).nativeEvent, shiftKey: true } as MouseEvent,
+      });
     });
     act(() => {
       window.dispatchEvent(

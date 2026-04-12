@@ -46,7 +46,6 @@ describe('useCanvasDebugSnapshot', () => {
         selectedShapeHandleRects: { rotater: { left: 140, top: 70, width: 16, height: 16 } },
         session: { kind: 'group-resize', handle: 'middle-right' },
         showGroupInteractionHooks: true,
-        stageRef: { current: null },
         subgroupOutlineFrames: [{ nodeId: 'group-1', bounds: { x: 8, y: 18, width: 84, height: 54 } }],
         viewportRef: { current: null },
         viewportSize: { width: 1280, height: 720 },
@@ -130,48 +129,6 @@ describe('useCanvasDebugSnapshot', () => {
     const root = document.createElement('div');
     root.append(overlay, handle, rotater, shapeHandle);
 
-    const stageNode = {
-      findOne: (selector: string) => {
-        if (selector === '#render-item-shape') {
-          return {
-            getAttr: (name: string) => (name === 'renderWidth' ? 80 : 50),
-            x: () => 10,
-            y: () => 20,
-            rotation: () => 0,
-          };
-        }
-        if (selector === '#render-item-line') {
-          return {
-            points: () => [20, 30, 120, 80],
-          };
-        }
-        return null;
-      },
-      find: (selector: string) => {
-        if (selector === '.subgroup-selection-outline') {
-          return [
-            {
-              getAttr: (name: string) => {
-                switch (name) {
-                  case 'x':
-                    return 14;
-                  case 'y':
-                    return 22;
-                  case 'width':
-                    return 108;
-                  case 'height':
-                    return 76;
-                  default:
-                    return null;
-                }
-              },
-            },
-          ];
-        }
-        return [];
-      },
-    };
-
     renderHook(() =>
       useCanvasDebugSnapshot({
         groupHandleViewportPoints: null,
@@ -195,7 +152,6 @@ describe('useCanvasDebugSnapshot', () => {
         selectedShapeHandleRects: { rotater: { left: 140, top: 70, width: 16, height: 16 } },
         session: { kind: 'group-drag' },
         showGroupInteractionHooks: true,
-        stageRef: { current: stageNode as never },
         subgroupOutlineFrames: [{ nodeId: 'group-1', bounds: { x: 14, y: 22, width: 108, height: 76 } }],
         viewportRef: { current: root },
         viewportSize: { width: 1280, height: 720 },

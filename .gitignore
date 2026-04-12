@@ -1,4 +1,6 @@
-.claude
+.claude/settings.local.json
+.claude/launch.json
+.claude/worktrees/
 node_modules
 dist
 coverage

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
-import type Konva from 'konva';
 
+import type { CanvasPointerEvent, CanvasRendererHandle } from './renderer/canvasRendererTypes';
+import { getRenderBox } from './transformGeometry';
 import {
   isCreateTool,
   type Point,
@@ -62,7 +63,7 @@ interface UseCanvasInteractionSessionParams {
   onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
   onSetActiveTool: (tool: CanvasTool) => void;
-  stageRef: React.RefObject<Konva.Stage | null>;
+  stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
 interface PendingItemGesture {
@@ -130,7 +131,7 @@ export function useCanvasInteractionSession({
   onSetActiveTool,
   stageRef,
 }: UseCanvasInteractionSessionParams) {
-  const shapeRefs = useRef(new Map<string, Konva.Node>());
+  const shapeRefs = useRef(new Map<string, unknown>());
   const sessionRef = useRef<InteractionSession | null>(null);
   const sessionRafRef = useRef<number | null>(null);
   const guidesRef = useRef<GuideLine[]>([]);
@@ -288,7 +289,7 @@ export function useCanvasInteractionSession({
   }, []);
 
   const getCanvasPointerFromClient = useCallback((clientX: number, clientY: number) => {
-    const containerBounds = stageRef.current?.container?.().getBoundingClientRect?.();
+    const containerBounds = stageRef.current?.getContainerElement()?.getBoundingClientRect();
     if (!containerBounds) {
       return null;
     }
@@ -299,7 +300,7 @@ export function useCanvasInteractionSession({
   }, [stageRef, viewport.panX, viewport.panY, viewport.zoom]);
 
   const isClientPointInsideStage = useCallback((clientX: number, clientY: number) => {
-    const containerBounds = stageRef.current?.container?.().getBoundingClientRect?.();
+    const containerBounds = stageRef.current?.getContainerElement()?.getBoundingClientRect();
     if (!containerBounds) {
       return false;
     }
@@ -340,8 +341,7 @@ export function useCanvasInteractionSession({
     if (!stageRef.current) {
       return null;
     }
-    stageRef.current.setPointersPositions(event);
-    const pointer = stageRef.current.getPointerPosition();
+    const pointer = stageRef.current.getPointerPosition(event);
     if (!pointer) {
       return getCanvasPointerFromClient(event.clientX, event.clientY);
     }
@@ -351,15 +351,15 @@ export function useCanvasInteractionSession({
     };
   }, [getCanvasPointerFromClient, stageRef, viewport.panX, viewport.panY, viewport.zoom]);
 
-  const getCanvasPointerFromStageEvent = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
-    const rawPointer = event.target.getStage()?.getPointerPosition() ?? null;
-    if (rawPointer) {
+  const getCanvasPointerFromStageEvent = useCallback((event: CanvasPointerEvent) => {
+    if (event.viewportPointer) {
       return {
-        x: (rawPointer.x - viewport.panX) / viewport.zoom,
-        y: (rawPointer.y - viewport.panY) / viewport.zoom,
+        x: (event.viewportPointer.x - viewport.panX) / viewport.zoom,
+        y: (event.viewportPointer.y - viewport.panY) / viewport.zoom,
       };
     }
-    return getCanvasPointerFromClient(event.evt.clientX, event.evt.clientY);
+    const nativeEvent = event.nativeEvent as MouseEvent;
+    return getCanvasPointerFromClient(nativeEvent.clientX, nativeEvent.clientY);
   }, [getCanvasPointerFromClient, viewport.panX, viewport.panY, viewport.zoom]);
 
   const createGroupDragSessionForNode = useCallback((
@@ -809,7 +809,7 @@ export function useCanvasInteractionSession({
     );
   }, [orderedItems, updateSession]);
 
-  const registerShapeRef = useCallback((itemId: string, node: Konva.Node | null) => {
+  const registerShapeRef = useCallback((itemId: string, node: unknown) => {
     if (!node) {
       shapeRefs.current.delete(itemId);
       return;
@@ -818,7 +818,12 @@ export function useCanvasInteractionSession({
   }, []);
 
   const selectedNode = selectedItemId ? shapeRefs.current.get(selectedItemId) ?? null : null;
-  const nodeClientRect = selectedNode && stageRef.current ? selectedNode.getClientRect({ relativeTo: stageRef.current }) : null;
+  const selectedRenderedItemForRect = selectedItemId
+    ? renderedItems.find((item) => item.id === selectedItemId) ?? null
+    : null;
+  const nodeClientRect = selectedRenderedItemForRect
+    ? getRenderBox(selectedRenderedItemForRect)
+    : null;
 
   const handleItemPointerDown = useCallback((
     item: CanvasItem,
@@ -935,24 +940,16 @@ export function useCanvasInteractionSession({
     }
   }, [cropSessionRef, document.nodes, onSelectNode, selectedNodeIds, startImageCropSession]);
 
-  const handleStageMouseDown = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
-    const target = event.target;
-    const stage = event.target.getStage();
-    const isCanvasSurface =
-      target === stage ||
-      target.hasName?.('canvas-surface') ||
-      target.hasName?.('canvas-background') ||
-      target.hasName?.('canvas-backdrop') ||
-      target.name() === 'canvas-surface' ||
-      target.name() === 'canvas-background' ||
-      target.name() === 'canvas-backdrop';
+  const handleStageMouseDown = useCallback((event: CanvasPointerEvent) => {
+    const isCanvasSurface = event.isCanvasSurface ?? false;
+    const nativeEvent = event.nativeEvent as MouseEvent;
     const pointer = getCanvasPointerFromStageEvent(event);
     if (cropSessionRef.current) {
       if (
         pointer &&
         isCanvasSurface &&
         activeTool === 'select' &&
-        event.evt?.button !== 1
+        nativeEvent.button !== 1
       ) {
         commitCropSession();
         onSelectNode(undefined);
@@ -966,12 +963,12 @@ export function useCanvasInteractionSession({
     if (
       handledItemEvent &&
       (
-        handledItemEvent.nativeEvent === event.evt ||
+        handledItemEvent.nativeEvent === nativeEvent ||
         (
-          handledItemEvent.timeStamp === event.evt.timeStamp &&
-          handledItemEvent.clientX === event.evt.clientX &&
-          handledItemEvent.clientY === event.evt.clientY &&
-          handledItemEvent.button === event.evt.button
+          handledItemEvent.timeStamp === nativeEvent.timeStamp &&
+          handledItemEvent.clientX === nativeEvent.clientX &&
+          handledItemEvent.clientY === nativeEvent.clientY &&
+          handledItemEvent.button === nativeEvent.button
         )
       )
     ) {
@@ -983,7 +980,7 @@ export function useCanvasInteractionSession({
       pointer &&
       isCanvasSurface &&
       activeTool === 'select' &&
-      event.evt?.button !== 1 &&
+      nativeEvent.button !== 1 &&
       selectedNodeIds.length === 1
     ) {
       const selectedNodeId = selectedNodeIds[0];
@@ -1000,15 +997,15 @@ export function useCanvasInteractionSession({
           const lastDescendantClick = lastStageDescendantClickRef.current;
           const pointerDelta = lastDescendantClick
             ? Math.hypot(
-                event.evt.clientX - lastDescendantClick.clientX,
-                event.evt.clientY - lastDescendantClick.clientY,
+                nativeEvent.clientX - lastDescendantClick.clientX,
+                nativeEvent.clientY - lastDescendantClick.clientY,
               )
             : Number.POSITIVE_INFINITY;
           const isStageSurfaceDoubleClick = isGroupDrillDoubleClick(
             lastDescendantClick,
             selectedNodeId,
             drilledItem.id,
-            event.evt.button,
+            nativeEvent.button,
             recordedAtMs,
             pointerDelta,
           );
@@ -1021,9 +1018,9 @@ export function useCanvasInteractionSession({
               groupId: selectedNodeId,
               itemId: drilledItem.id,
               recordedAtMs,
-              clientX: event.evt.clientX,
-              clientY: event.evt.clientY,
-              button: event.evt.button,
+              clientX: nativeEvent.clientX,
+              clientY: nativeEvent.clientY,
+              button: nativeEvent.button,
             };
           }
           return;
@@ -1033,8 +1030,8 @@ export function useCanvasInteractionSession({
     if (!pointer || !isCanvasSurface) return;
     clearPendingItemGesture();
     const modifiers = resolveModifierKeys({
-      ctrlKey: Boolean(event.evt?.ctrlKey),
-      shiftKey: Boolean(event.evt?.shiftKey),
+      ctrlKey: Boolean(nativeEvent.ctrlKey),
+      shiftKey: Boolean(nativeEvent.shiftKey),
     });
     if (isCreateTool(activeTool)) {
       setLastDrilldownSource(null);
@@ -1069,7 +1066,7 @@ export function useCanvasInteractionSession({
     updateSession,
   ]);
 
-  const handleStageMouseUp = useCallback((event: Konva.KonvaEventObject<MouseEvent>) => {
+  const handleStageMouseUp = useCallback((event: CanvasPointerEvent) => {
     const pointer = getCanvasPointerFromStageEvent(event);
     if (pendingItemGestureRef.current && commitPendingItemGesture(pointer)) {
       return;
@@ -1084,11 +1081,12 @@ export function useCanvasInteractionSession({
   }, [clearPendingMarquee, commitActiveSession, commitPendingItemGesture, getCanvasPointerFromStageEvent, updateGuides]);
 
   const handleStagePointerMove = useCallback(
-    (event: Konva.KonvaEventObject<MouseEvent>) => {
+    (event: CanvasPointerEvent) => {
+      const nativeEvent = event.nativeEvent as MouseEvent;
       const pointer = getCanvasPointerFromStageEvent(event);
       advanceSessionAtPointer(pointer, resolveModifierKeys({
-        ctrlKey: event.evt.ctrlKey,
-        shiftKey: event.evt.shiftKey,
+        ctrlKey: nativeEvent.ctrlKey,
+        shiftKey: nativeEvent.shiftKey,
       }));
     },
     [advanceSessionAtPointer, getCanvasPointerFromStageEvent, resolveModifierKeys],

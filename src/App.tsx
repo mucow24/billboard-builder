@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import type Konva from 'konva';
+
+import type { CanvasRendererHandle } from './editor/rendering/renderer/canvasRendererTypes';
 
 import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
 import { useEditorController } from './app/useEditorController';
@@ -16,7 +17,7 @@ import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './edito
 
 export default function App() {
   const runtimeFlags = readEditorRuntimeFlags();
-  const stageRef = useRef<Konva.Stage | null>(null);
+  const stageRef = useRef<CanvasRendererHandle | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const fontInputRef = useRef<HTMLInputElement | null>(null);
   const openInputRef = useRef<HTMLInputElement | null>(null);

@@ -214,6 +214,7 @@ test.describe('editor groups', () => {
     await clickCanvas(page, { x: 260, y: 230 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Simple Group');
+    await waitForDoubleClickCadence(page);
 
     await dragCanvas(page, { x: 260, y: 230 }, { x: 380, y: 310 });
     await openLayersTab(page);
@@ -590,6 +591,7 @@ test.describe('editor groups', () => {
     await clickCanvas(page, { x: 360, y: 260 });
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Rectangle');
+    await waitForDoubleClickCadence(page);
     await dragCanvas(page, { x: 360, y: 260 }, { x: 480, y: 340 });
 
     stageDebug = await readStageDebug(page);
@@ -844,11 +846,11 @@ test.describe('editor groups', () => {
             id: 'line-child',
             name: 'Line Child',
             x: 180,
-            y: 220,
+            y: 240,
             startX: 180,
-            startY: 220,
+            startY: 240,
             endX: 440,
-            endY: 280,
+            endY: 300,
             width: 260,
             height: 60,
             zIndex: 1,
@@ -872,7 +874,7 @@ test.describe('editor groups', () => {
     // This double-click lands inside the line bounding box but away from the visible
     // stroke, so the stage-surface fallback path is the one that must resolve the drill-in.
     await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 320, y: 228 });
+    await doubleClickCanvas(page, { x: 320, y: 260 });
     await assertNoDocumentTextSelection(page);
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Line');
@@ -883,8 +885,10 @@ test.describe('editor groups', () => {
     expect(stageDebug.hasLineHandles).toBe(true);
     expect(stageDebug.subgroupOutlineFrames ?? []).toHaveLength(1);
 
-    await dragCanvas(page, { x: 180, y: 220 }, { x: 260, y: 260 });
-    await dragCanvas(page, { x: 350, y: 260 }, { x: 470, y: 340 });
+    // Drag line start handle (now at 180,240 — clear of the rectangle's bottom edge at y=220)
+    await dragCanvas(page, { x: 180, y: 240 }, { x: 260, y: 280 });
+    // Drag line body (midpoint after start moved)
+    await dragCanvas(page, { x: 350, y: 290 }, { x: 470, y: 360 });
 
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasGroupOverlay).toBe(false);
@@ -909,10 +913,12 @@ test.describe('editor groups', () => {
         endY: expect.any(Number),
       }),
     );
-    expect(Number(expectSavedNode(savedProject, 'line-child').startX)).toBeGreaterThan(240);
-    expect(Number(expectSavedNode(savedProject, 'line-child').startY)).toBeGreaterThan(250);
-    expect(Number(expectSavedNode(savedProject, 'line-child').x)).toBeGreaterThan(280);
-    expect(Number(expectSavedNode(savedProject, 'line-child').y)).toBeGreaterThan(300);
+    // After start-handle drag (delta 80,40) then body drag (delta ~120,70):
+    // startX ≈ 180+80+120=380, startY ≈ 240+40+70=350
+    expect(Number(expectSavedNode(savedProject, 'line-child').startX)).toBeGreaterThan(340);
+    expect(Number(expectSavedNode(savedProject, 'line-child').startY)).toBeGreaterThan(310);
+    expect(Number(expectSavedNode(savedProject, 'line-child').endX)).toBeGreaterThan(520);
+    expect(Number(expectSavedNode(savedProject, 'line-child').endY)).toBeGreaterThan(340);
   });
 
   test('NI-11 NI-12 true grouped-node child manipulation survives undo, redo, and escape with the correct hierarchy state', async ({

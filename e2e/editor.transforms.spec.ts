@@ -13,6 +13,7 @@ import {
   dragCanvasHookToPoint,
   middleDragCanvas,
   openFreshEditor,
+  waitForDoubleClickCadence,
   openLayersTab,
   openPropertiesTab,
   readStageDebug,
@@ -64,9 +65,9 @@ function mapPointBetweenFrames(
 }
 
 test.describe('editor transforms', () => {
-  test('ST-01 drags a rectangle through a real canvas interaction', async ({ page }) => {
+  test('ST-01 ST-02 drags and resizes a rectangle through real canvas interactions', async ({ page }) => {
     const rectangle = createRectangleFixture({
-      id: 'drag-rect',
+      id: 'drag-resize-rect',
       x: 140,
       y: 140,
       width: 200,
@@ -74,74 +75,59 @@ test.describe('editor transforms', () => {
     });
 
     await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([rectangle]), 'drag-rect.json');
+    await uploadProject(page, createProjectDocument([rectangle]), 'drag-resize-rect.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    // Select by clicking the item body
-    await clickCanvas(page, { x: 240, y: 200 });
-    await openPropertiesTab(page);
-    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+    await test.step('ST-01: drag', async () => {
+      await clickCanvas(page, { x: 240, y: 200 });
+      await openPropertiesTab(page);
+      await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+      await waitForDoubleClickCadence(page);
 
-    // Drag the item body
-    await dragCanvas(page, { x: 240, y: 200 }, { x: 360, y: 300 });
+      await dragCanvas(page, { x: 240, y: 200 }, { x: 360, y: 300 });
 
-    // Verify selection survived the drag
-    await openPropertiesTab(page);
-    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+      await openPropertiesTab(page);
+      await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
 
-    // Verify saved geometry changed
-    const savedProject = await saveAndReadProject(page);
-    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
-      (item) => item.id === 'drag-rect'
-    );
-    expect(savedItem).toBeDefined();
-    expect(Number(savedItem?.x)).toBeGreaterThan(200);
-    expect(Number(savedItem?.y)).toBeGreaterThan(200);
-    expect(Number(savedItem?.width)).toBe(200);
-    expect(Number(savedItem?.height)).toBe(120);
-  });
-
-  test('ST-02 resizes a rectangle through a real canvas interaction', async ({ page }) => {
-    const rectangle = createRectangleFixture({
-      id: 'resize-rect',
-      x: 140,
-      y: 140,
-      width: 200,
-      height: 120,
+      const savedProject = await saveAndReadProject(page);
+      const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+        (item) => item.id === 'drag-resize-rect'
+      );
+      expect(savedItem).toBeDefined();
+      expect(Number(savedItem?.x)).toBeGreaterThan(200);
+      expect(Number(savedItem?.y)).toBeGreaterThan(200);
+      expect(Number(savedItem?.width)).toBe(200);
+      expect(Number(savedItem?.height)).toBe(120);
     });
 
-    await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([rectangle]), 'resize-rect.json');
+    await test.step('ST-02: resize', async () => {
+      // Re-enable hooks to locate the handle, then use real mouse drag
+      await setCanvasTestHooksEnabled(page, true);
+      const handleBox = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
+      if (!handleBox) {
+        throw new Error('Expected shape handle to be visible for resize.');
+      }
+      await setCanvasTestHooksEnabled(page, false);
+      const handleCenter = {
+        x: handleBox.x + handleBox.width / 2,
+        y: handleBox.y + handleBox.height / 2,
+      };
+      await page.mouse.move(handleCenter.x, handleCenter.y);
+      await page.mouse.down();
+      await page.mouse.move(handleCenter.x + 120, handleCenter.y, { steps: 18 });
+      await page.mouse.up();
 
-    // Select by clicking the item body
-    await clickCanvas(page, { x: 240, y: 200 });
-    await expect(page.getByTestId('canvas-shape-handle-middle-right')).toBeAttached();
+      await openPropertiesTab(page);
+      await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
 
-    // Use debug state to locate the middle-right handle position, then drag it
-    // with a real mouse interaction at that canvas coordinate
-    const debug = await readStageDebug(page);
-    const rect = debug.selectedItemViewportRect;
-    if (!rect) {
-      throw new Error('Expected a selected item viewport rect after selection.');
-    }
-    // middle-right handle is at the right edge, vertically centered
-    const handleX = 140 + 200; // item right edge in canvas space
-    const handleY = 140 + 60;  // item vertical center in canvas space
-
-    await dragCanvas(page, { x: handleX, y: handleY }, { x: handleX + 120, y: handleY });
-
-    // Verify selection still active
-    await openPropertiesTab(page);
-    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
-
-    // Verify saved geometry changed — width should have increased
-    const savedProject = await saveAndReadProject(page);
-    const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
-      (item) => item.id === 'resize-rect'
-    );
-    expect(savedItem).toBeDefined();
-    expect(Number(savedItem?.width)).toBeGreaterThan(280);
-    expect(Number(savedItem?.rotation)).toBe(0);
+      const savedProject = await saveAndReadProject(page);
+      const savedItem = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+        (item) => item.id === 'drag-resize-rect'
+      );
+      expect(savedItem).toBeDefined();
+      expect(Number(savedItem?.width)).toBeGreaterThan(280);
+      expect(Number(savedItem?.rotation)).toBe(0);
+    });
   });
 
   test('ST-04 ST-05 ST-06 drags, resizes, and rotates a text item through real canvas interactions', async ({
@@ -166,6 +152,7 @@ test.describe('editor transforms', () => {
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
 
+    await waitForDoubleClickCadence(page);
     await dragCanvas(page, { x: 250, y: 180 }, { x: 370, y: 260 });
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
@@ -247,6 +234,7 @@ test.describe('editor transforms', () => {
     await clickCanvas(page, { x: 260, y: 540 });
     const stageDebug = await readStageDebug(page);
     expect(stageDebug.hasLineHandles).toBe(true);
+    await waitForDoubleClickCadence(page);
 
     await dragCanvas(page, { x: 260, y: 540 }, { x: 360, y: 620 });
 
@@ -388,13 +376,13 @@ test.describe('editor transforms', () => {
 
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-enabled.json');
-    await clickCanvas(page, clickPoint);
+    await setCanvasTestHooksEnabled(page, false);
     await dragCanvas(page, clickPoint, dragTarget);
     const snappedProject = await saveAndReadProject(page);
 
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-disabled.json');
-    await clickCanvas(page, clickPoint);
+    await setCanvasTestHooksEnabled(page, false);
     await dragCanvasWithModifier(page, 'Control', clickPoint, dragTarget);
     const unsnappedProject = await saveAndReadProject(page);
 

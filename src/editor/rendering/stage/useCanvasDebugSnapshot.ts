@@ -1,5 +1,4 @@
 import { useEffect, useMemo } from 'react';
-import type Konva from 'konva';
 
 import type { CanvasItem } from '../../document/documentTypes';
 import {
@@ -114,7 +113,6 @@ interface UseCanvasDebugSnapshotParams {
   selectedShapeHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   session: { kind: string; handle?: string } | null;
   showGroupInteractionHooks: boolean;
-  stageRef: React.RefObject<Konva.Stage | null>;
   subgroupOutlineFrames: Array<{
     nodeId: string;
     bounds: { x: number; y: number; width: number; height: number };
@@ -150,7 +148,6 @@ export function useCanvasDebugSnapshot({
   selectedShapeHandleRects,
   session,
   showGroupInteractionHooks,
-  stageRef,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
@@ -313,48 +310,40 @@ export function useCanvasDebugSnapshot({
 
   useEffect(() => {
     function captureRenderSnapshot() {
-      const stage = stageRef.current;
       const root = viewportRef.current;
-      if (!stage || !root) {
+      if (!root) {
         return null;
       }
 
       const selectedItems = renderedItems
         .filter((item) => selectedNodeIds.includes(item.id))
         .map((item) => {
-          const node = stage.findOne(`#render-item-${item.id}`);
-          if (!node) {
-            return null;
-          }
-
           if (item.kind === 'line') {
-            const points = (node as Konva.Line).points();
             return {
               id: item.id,
               kind: item.kind,
               outlinePoints: [
-                { x: points[0], y: points[1] },
-                { x: points[2], y: points[3] },
+                { x: item.startX, y: item.startY },
+                { x: item.endX, y: item.endY },
               ],
               geometry: {
-                x: Math.min(points[0], points[2]),
-                y: Math.min(points[1], points[3]),
-                width: Math.max(1, Math.abs(points[2] - points[0])),
-                height: Math.max(1, Math.abs(points[3] - points[1])),
+                x: Math.min(item.startX, item.endX),
+                y: Math.min(item.startY, item.endY),
+                width: Math.max(1, Math.abs(item.endX - item.startX)),
+                height: Math.max(1, Math.abs(item.endY - item.startY)),
                 rotation: 0,
               },
             };
           }
 
-          const renderWidth = Number(node.getAttr('renderWidth') ?? 0);
-          const renderHeight = Number(node.getAttr('renderHeight') ?? 0);
-          const origin = { x: node.x(), y: node.y() };
-          const rotation = node.rotation();
+          const box = getRenderBox(item);
+          const origin = { x: box.x, y: box.y };
+          const rotation = item.rotation;
           const outlinePoints = [
             localToStage({ x: 0, y: 0 }, origin, rotation),
-            localToStage({ x: renderWidth, y: 0 }, origin, rotation),
-            localToStage({ x: renderWidth, y: renderHeight }, origin, rotation),
-            localToStage({ x: 0, y: renderHeight }, origin, rotation),
+            localToStage({ x: box.width, y: 0 }, origin, rotation),
+            localToStage({ x: box.width, y: box.height }, origin, rotation),
+            localToStage({ x: 0, y: box.height }, origin, rotation),
           ];
           return {
             id: item.id,
@@ -363,13 +352,12 @@ export function useCanvasDebugSnapshot({
             geometry: {
               x: origin.x,
               y: origin.y,
-              width: renderWidth,
-              height: renderHeight,
+              width: box.width,
+              height: box.height,
               rotation,
             },
           };
-        })
-        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+        });
 
       const overlay = readViewportHookRect(
         root.querySelector<HTMLElement>('[data-testid="canvas-group-overlay"]'),
@@ -377,15 +365,6 @@ export function useCanvasDebugSnapshot({
       const cropPanOverlay = readViewportHookRect(
         root.querySelector<HTMLElement>('[data-testid="canvas-crop-pan-overlay"]'),
       );
-      const subgroupOutlines = stage
-        .find('.subgroup-selection-outline')
-        .map((node) => {
-          const x = Number(node.getAttr('x') ?? 0);
-          const y = Number(node.getAttr('y') ?? 0);
-          const width = Number(node.getAttr('width') ?? 0);
-          const height = Number(node.getAttr('height') ?? 0);
-          return { x, y, width, height };
-        });
       const handles = Object.fromEntries(
         RESIZE_HANDLE_NAMES.flatMap((handle) => {
           const point = readViewportHookPoint(
@@ -439,7 +418,7 @@ export function useCanvasDebugSnapshot({
         groupOverlay: canvasOverlay,
         groupHandles: handles,
         groupRotater: rotater,
-        subgroupOutlines,
+        subgroupOutlines: subgroupOutlineFrames.map((f) => f.bounds),
         hasGroupOverlay: Boolean(canvasOverlay),
         hasShapeHandles,
         hasLineHandles,
@@ -461,7 +440,7 @@ export function useCanvasDebugSnapshot({
         delete window.__BB_TEST__;
       }
     };
-  }, [cropSession, pan.x, pan.y, renderedItems, selectedNodeIds, session, stageRef, viewportRef, zoom]);
+  }, [cropSession, pan.x, pan.y, renderedItems, selectedNodeIds, session, subgroupOutlineFrames, viewportRef, zoom]);
 
   return debugInfo;
 }
