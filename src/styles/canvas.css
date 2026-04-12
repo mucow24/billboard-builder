@@ -113,7 +113,6 @@
   display: block;
   border-radius: 0;
   overflow: hidden;
-  cursor: inherit !important;
 }
 
 .canvas-debug {

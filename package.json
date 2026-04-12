@@ -17,7 +17,9 @@
     "e2e:headed": "node scripts/run-e2e.mjs --headed --grep-invert visual",
     "e2e:screenshots": "node scripts/run-e2e.mjs --grep visual",
     "e2e:screenshots:update": "node scripts/run-e2e.mjs --grep visual --update-snapshots",
-    "e2e:all": "node scripts/run-e2e.mjs"
+    "e2e:all": "node scripts/run-e2e.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "prepare": "git config core.hooksPath .githooks"
   },
   "dependencies": {
     "@pixi/react": "^8.0.5",

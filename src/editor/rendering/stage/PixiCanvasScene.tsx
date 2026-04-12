@@ -101,7 +101,7 @@ interface PixiCanvasSceneProps {
   showGroupSelection: boolean;
   size: { width: number; height: number };
   spacebarHeld: boolean;
-
+  stageCursor: string;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   viewportPan: { x: number; y: number };
@@ -140,7 +140,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       showGroupSelection,
       size,
       spacebarHeld,
-
+      stageCursor,
       startPanDrag,
       toCanvasPointer,
       viewportPan,
@@ -164,16 +164,6 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
         app.renderer.resize(size.width, size.height);
       }
     }, [size.width, size.height, rendererReady]);
-
-    // Cap the render loop to 15 fps.  CI uses SwiftShader (software WebGL)
-    // where each frame costs 50-200 ms; 60 fps saturates the CPU and starves
-    // Playwright's event loop, causing drag timeouts.  15 fps keeps transforms
-    // at most 66 ms stale — well within tolerance for hit-testing and
-    // interaction sessions.
-    useEffect(() => {
-      const app = appRef.current?.getApplication();
-      if (app?.renderer) app.ticker.maxFPS = 15;
-    }, [rendererReady]);
 
     // --- Federated event wrappers -------------------------------------------
     // @pixi/react sets event handlers as `container.onwheel = fn` properties.
@@ -349,7 +339,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
           label="event-root"
           eventMode="static"
           hitArea={hitArea}
-          cursor="inherit"
+          cursor={stageCursor}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}

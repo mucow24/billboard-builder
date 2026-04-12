@@ -21,7 +21,6 @@ import {
   selectTool,
   setCanvasTestHooksEnabled,
   uploadProject,
-  waitForDoubleClickCadence,
 } from './support/editor';
 
 const ZOOM_ALIGNMENT_GRID = 64;
@@ -359,7 +358,6 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.hasShapeHandles).toBe(true);
     expect(stageDebug.hasGroupOverlay).toBe(false);
 
-    await waitForDoubleClickCadence(page);
     await beginCanvasDrag(page, { x: 220, y: 220 });
     await movePointerToCanvasPoint(page, { x: 340, y: 300 });
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
