@@ -101,7 +101,6 @@ interface PixiCanvasSceneProps {
   showGroupSelection: boolean;
   size: { width: number; height: number };
   spacebarHeld: boolean;
-  stageCursor: string;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   viewportPan: { x: number; y: number };
@@ -140,7 +139,6 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       showGroupSelection,
       size,
       spacebarHeld,
-      stageCursor,
       startPanDrag,
       toCanvasPointer,
       viewportPan,
@@ -339,7 +337,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
           label="event-root"
           eventMode="static"
           hitArea={hitArea}
-          cursor={stageCursor}
+          cursor="inherit"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}

@@ -13,6 +13,7 @@ import {
   dragCanvasHookToPoint,
   middleDragCanvas,
   openFreshEditor,
+  waitForDoubleClickCadence,
   openLayersTab,
   openPropertiesTab,
   readStageDebug,
@@ -166,6 +167,7 @@ test.describe('editor transforms', () => {
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
 
+    await waitForDoubleClickCadence(page);
     await dragCanvas(page, { x: 250, y: 180 }, { x: 370, y: 260 });
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();

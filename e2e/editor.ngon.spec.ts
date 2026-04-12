@@ -21,7 +21,7 @@ test.describe('ngon tool flows', () => {
     await dragCanvas(page, { x: 200, y: 200 }, { x: 400, y: 400 });
 
     await openLayersTab(page);
-    await expect(page.getByRole('button', { name: 'Polygon', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
   });
 
   test('activates polygon tool via G hotkey', async ({ page }) => {
@@ -31,7 +31,7 @@ test.describe('ngon tool flows', () => {
     await dragCanvas(page, { x: 150, y: 150 }, { x: 350, y: 350 });
 
     await openLayersTab(page);
-    await expect(page.getByRole('button', { name: 'Polygon', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
   });
 
   test('shows Sides slider in properties panel for ngon', async ({ page }) => {
