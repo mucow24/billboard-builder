@@ -1,0 +1,13 @@
+#!/bin/sh
+# Preflight gate — blocks push unless lint, typecheck, tests, and e2e all pass.
+# Bypass with: git push --no-verify
+
+node scripts/preflight.mjs
+GATE=$?
+
+# Preserve Git LFS pre-push behavior.
+command -v git-lfs >/dev/null 2>&1 && git lfs pre-push "$@"
+LFS=$?
+
+[ $GATE -ne 0 ] && exit $GATE
+exit $LFS

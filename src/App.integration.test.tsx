@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockDownloadProject,
-  mockDownloadStageAsPng,
+  mockDownloadCanvasAsPng,
   mockImportImageFile,
   mockLoadBundledFonts,
   mockPersistenceClear,
@@ -22,7 +22,7 @@ const {
   mockUploadedFontPersistenceSave,
 } = vi.hoisted(() => ({
   mockDownloadProject: vi.fn(),
-  mockDownloadStageAsPng: vi.fn(),
+  mockDownloadCanvasAsPng: vi.fn(),
   mockImportImageFile: vi.fn(),
   mockLoadBundledFonts: vi.fn(),
   mockPersistenceClear: vi.fn(),
@@ -40,85 +40,42 @@ const {
   mockUploadedFontPersistenceSave: vi.fn(),
 }));
 
-vi.mock('konva', () => ({
-  default: {
-    Filters: {
-      Brighten: Symbol('Brighten'),
-      Contrast: Symbol('Contrast'),
-      RGBA: Symbol('RGBA'),
-      Blur: Symbol('Blur'),
-    },
-  },
+vi.mock('pixi-filters', () => ({
+  DropShadowFilter: class { constructor() {} },
 }));
 
-vi.mock('react-konva', () => {
-  type MockKonvaProps = PropsWithChildren<Record<string, unknown>>;
+vi.mock('pixi.js', () => ({
+  BlurFilter: class { constructor() {} },
+  ColorMatrixFilter: class { matrix = new Float32Array(20); constructor() { this.matrix[0] = 1; this.matrix[6] = 1; this.matrix[12] = 1; this.matrix[18] = 1; } },
+  Container: class {},
+  FillGradient: class { constructor() {} },
+  Graphics: class {},
+  Polygon: class { constructor() {} },
+  Rectangle: class {
+    constructor(public x = 0, public y = 0, public width = 0, public height = 0) {}
+  },
+  Sprite: class {},
+  Text: class {},
+  Texture: { from: () => ({}), EMPTY: {} },
+  TextureSource: { defaultOptions: {} },
+}));
 
-  const make = (name: string) =>
-    React.forwardRef<HTMLDivElement, MockKonvaProps>(({ children, ...props }, ref) => {
-      let nodeRef: HTMLDivElement | null = null;
-      const domEntries = Object.entries(props).flatMap<[string, string]>(([key, value]) => {
-        if (value === undefined || typeof value === 'function') {
-          return [];
-        }
-        return [[`data-prop-${key.toLowerCase()}`, typeof value === 'object' ? JSON.stringify(value) : String(value)]];
-      });
-      const domProps = Object.fromEntries(domEntries);
-
-      const noop = () => {};
-      const setRef = (node: HTMLDivElement | null) => {
-        nodeRef = node;
-        if (node) {
-          Object.assign(node, {
-            alpha: noop,
-            blue: noop,
-            blurRadius: noop,
-            brightness: noop,
-            cache: noop,
-            clearCache: noop,
-            contrast: noop,
-            filters: noop,
-            getLayer: () => ({ batchDraw: noop }),
-            getStage: () => ({
-              getPointerPosition: () => ({ x: 640, y: 360 }),
-            }),
-            getClientRect: () => ({ x: 0, y: 0, width: 100, height: 100 }),
-            green: noop,
-            hasName: (value: string) => String(props.name ?? '').split(' ').includes(value),
-            name: () => String(props.name ?? ''),
-            red: noop,
-            x: () => Number(props.x ?? 0),
-            y: () => Number(props.y ?? 0),
-            rotation: () => Number(props.rotation ?? 0),
-            scaleX: () => Number(props.scaleX ?? 1),
-            scaleY: () => Number(props.scaleY ?? 1),
-          });
-        }
-        if (typeof ref === 'function') {
-          ref(nodeRef);
-        } else if (ref) {
-          ref.current = nodeRef;
-        }
-      };
-
-      return React.createElement(
-        'div',
-        { ref: setRef, 'data-konva-node': name, ...domProps },
-        children as React.ReactNode
-      );
-    });
-
+vi.mock('@pixi/react', () => {
+  type MockProps = PropsWithChildren<Record<string, unknown>>;
+  const Application = React.forwardRef<unknown, MockProps>(({ children }, ref) => {
+    const canvasRef = React.useRef<HTMLCanvasElement>(null);
+    React.useImperativeHandle(ref, () => ({
+      getCanvas: () => canvasRef.current,
+      getApplication: () => ({ canvas: canvasRef.current }),
+    }));
+    return React.createElement('div', { 'data-pixi': 'application' },
+      React.createElement('canvas', { ref: canvasRef }),
+      children as React.ReactNode,
+    );
+  });
   return {
-    Stage: make('Stage'),
-    Layer: make('Layer'),
-    Group: make('Group'),
-    Rect: make('Rect'),
-    Shape: make('Shape'),
-    Line: make('Line'),
-    Text: make('Text'),
-    Circle: make('Circle'),
-    Ellipse: make('Ellipse'),
-    Image: make('Image'),
+    Application,
+    extend: () => {},
   };
 });
 
@@ -126,12 +83,8 @@ vi.mock('./editor/rendering/useImageElement', () => ({
   useImageElement: () => null,
 }));
 
-vi.mock('./editor/rendering/ImageItemNode', () => ({
-  ImageItemNode: () => null,
-}));
-
 vi.mock('./editor/io/exportPng', () => ({
-  downloadStageAsPng: (...args: unknown[]) => mockDownloadStageAsPng(...args),
+  downloadCanvasAsPng: (...args: unknown[]) => mockDownloadCanvasAsPng(...args),
 }));
 
 vi.mock('./editor/io/images', () => ({
@@ -226,7 +179,7 @@ describe('App integration', () => {
 
   it('renders the real app shell and applies properties changes through the store/controller path', async () => {
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     const selectedRectangle = createRectangleItem({
       id: 'selected-rectangle',
@@ -259,7 +212,7 @@ describe('App integration', () => {
 
   it('mutates the real document through keyboard shortcuts and controller actions', async () => {
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     const selectedRectangle = createRectangleItem({
       id: 'shortcut-rectangle',
@@ -319,16 +272,16 @@ describe('App integration', () => {
     });
 
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     const exportButton = screen.getByRole('button', { name: 'Export PNG' });
-    clickToolbarPopoverItem('Canvas', 'Save');
+    clickToolbarPopoverItem('File', 'Save');
     fireEvent.click(exportButton);
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();
-    expect(mockDownloadStageAsPng).toHaveBeenCalledWith(expect.anything(), 1);
+    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1);
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['{}'], 'project.json', { type: 'application/json' })],
@@ -388,7 +341,7 @@ describe('App integration', () => {
     });
 
     render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await screen.findByRole('button', { name: 'File' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
@@ -409,7 +362,7 @@ describe('App integration', () => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['bad'], 'broken.json', { type: 'application/json' })],
@@ -418,7 +371,7 @@ describe('App integration', () => {
     await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to open project: Broken project');
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['ok'], 'fixed.json', { type: 'application/json' })],
@@ -449,7 +402,7 @@ describe('App integration', () => {
 
   it('persists document changes only after bootstrap is ready and the debounce elapses', async () => {
     render(<App />);
-    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument();
 
     await act(async () => {
       await Promise.resolve();

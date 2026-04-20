@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import type Konva from 'konva';
 
 import type {
   CanvasItem,
@@ -7,8 +6,9 @@ import type {
 } from '../document/documentTypes';
 import {
 } from './interactionGeometry';
+import type { CanvasRendererHandle } from './renderer/canvasRendererTypes';
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
-import { CanvasScene } from './stage/CanvasScene';
+import { PixiCanvasScene } from './stage/PixiCanvasScene';
 import { CanvasTestHooks } from './stage/CanvasTestHooks';
 import { CanvasViewportHud } from './stage/CanvasViewportHud';
 import { buildStageDerivedState } from './stage/stageDerived';
@@ -25,7 +25,7 @@ export interface CanvasStageProps {
   showExportBoundsCue?: boolean;
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
-  stageRef: React.RefObject<Konva.Stage | null>;
+  stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
 export function CanvasStage({
@@ -87,7 +87,6 @@ export function CanvasStage({
     handleStagePointerMove,
     handleStageMouseUp,
     nodeClientRect,
-    registerShapeRef,
     renderedGroupBounds,
     renderedSelectionFrame,
     renderedItems,
@@ -96,7 +95,6 @@ export function CanvasStage({
     lastDrilldownSource,
     selectedNode,
     selectedRenderedItem,
-    selectedItemId,
     session,
     subgroupOutlineFrames = [],
   } = useCanvasInteractionSession({
@@ -111,7 +109,7 @@ export function CanvasStage({
     onUpdateItems: updateSelectedItems,
     onAddItem,
     onSetActiveTool: setActiveTool,
-    stageRef,
+    stageRef: stageRef,
     viewport: viewportState.viewport,
   });
 
@@ -176,6 +174,7 @@ export function CanvasStage({
       className="canvas-stage-screen"
       ref={viewport.viewportRef}
       data-testid="canvas-stage-root"
+      style={{ cursor: viewport.getStageCursor(Boolean(session)) }}
     >
       <div
         className={showExportBoundsCue ? 'canvas-export-bounds-cue active' : 'canvas-export-bounds-cue'}
@@ -200,7 +199,8 @@ export function CanvasStage({
         zoom={viewport.zoom}
         zoomStep={viewport.zoomOutFromHudStep}
       />
-      <CanvasScene
+      <PixiCanvasScene
+        ref={stageRef}
         activeTool={activeTool}
         beginCropFullResize={beginCropFullResize}
         beginCropFullRotate={beginCropFullRotate}
@@ -223,19 +223,15 @@ export function CanvasStage({
         onStageMouseMove={sceneHandlers.onStageMouseMove}
         onStageMouseUp={sceneHandlers.onStageMouseUp}
         onStageWheel={sceneHandlers.onStageWheel}
-        registerShapeRef={registerShapeRef}
         renderedItems={renderedItems}
         renderedSelectedItems={renderedSelectedItems}
-        selectedItemId={selectedItemId}
         selectedRenderedItem={selectedRenderedItem}
         session={session as never}
         showGroupSelection={showGroupInteractionHooks}
         size={viewport.viewportSize}
-        stageCursor={viewport.getStageCursor(Boolean(session))}
-        stageRef={stageRef}
+
         spacebarHeld={viewport.spacebarHeld}
         startPanDrag={viewport.startPanDrag}
-        subgroupOutlineFrames={subgroupOutlineFrames}
         toCanvasPointer={viewport.toCanvasPointer}
         viewportPan={viewport.pan}
         zoom={viewport.zoom}
@@ -262,12 +258,11 @@ export function CanvasStage({
           selectedNodeIds={selectedNodeIds}
           selectedItemViewportRect={selectedItemViewportRect}
           selectedLineHandleRects={selectedLineHandleRects}
-          selectedNode={selectedNode}
+          selectedNode={selectedNode as Parameters<typeof useCanvasDebugSnapshot>[0]['selectedNode']}
           selectedRenderedItem={selectedRenderedItem}
           selectedShapeHandleRects={selectedShapeHandleRects}
           session={session as never}
           showGroupInteractionHooks={showGroupInteractionHooks}
-          stageRef={stageRef}
           subgroupOutlineFrames={subgroupOutlineFrames}
           viewportRef={viewport.viewportRef}
           viewportSize={viewport.viewportSize}
@@ -413,7 +408,6 @@ function CanvasStageDebug({
   selectedShapeHandleRects,
   session,
   showGroupInteractionHooks,
-  stageRef,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
@@ -445,7 +439,6 @@ function CanvasStageDebug({
     selectedShapeHandleRects,
     session,
     showGroupInteractionHooks,
-    stageRef,
     subgroupOutlineFrames,
     viewportRef,
     viewportSize,

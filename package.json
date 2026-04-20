@@ -17,14 +17,17 @@
     "e2e:headed": "node scripts/run-e2e.mjs --headed --grep-invert visual",
     "e2e:screenshots": "node scripts/run-e2e.mjs --grep visual",
     "e2e:screenshots:update": "node scripts/run-e2e.mjs --grep visual --update-snapshots",
-    "e2e:all": "node scripts/run-e2e.mjs"
+    "e2e:all": "node scripts/run-e2e.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "prepare": "git config core.hooksPath .githooks && (git config --worktree core.hooksPath .githooks 2>/dev/null || true)"
   },
   "dependencies": {
+    "@pixi/react": "^8.0.5",
     "@uiw/react-color": "^2.9.6",
-    "konva": "^9.3.20",
+    "pixi-filters": "^6.1.5",
+    "pixi.js": "^8.17.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-konva": "^19.0.7",
     "zod": "^4.1.5",
     "zustand": "^5.0.8"
   },

@@ -15,7 +15,7 @@ import { resetEditorStore } from '../test/editorStore';
 const {
   mockCanvasPersistenceService,
   mockDownloadProject,
-  mockDownloadStageAsPng,
+  mockDownloadCanvasAsPng,
   mockImportImageFile,
   mockReadProjectFile,
   mockRegisterFontFile,
@@ -29,7 +29,7 @@ const {
     clear: vi.fn().mockResolvedValue(undefined),
   },
   mockDownloadProject: vi.fn(),
-  mockDownloadStageAsPng: vi.fn(),
+  mockDownloadCanvasAsPng: vi.fn(),
   mockImportImageFile: vi.fn(),
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
@@ -67,7 +67,7 @@ vi.mock('../editor/persistence/uploadedFontPersistenceService', async () => {
 });
 
 vi.mock('../editor/io/exportPng', () => ({
-  downloadStageAsPng: mockDownloadStageAsPng,
+  downloadCanvasAsPng: mockDownloadCanvasAsPng,
 }));
 
 vi.mock('../editor/io/images', async () => {
@@ -119,7 +119,7 @@ describe('useEditorController', () => {
     mockCanvasPersistenceService.load.mockResolvedValue(null);
     mockCanvasPersistenceService.save.mockResolvedValue(undefined);
     mockDownloadProject.mockReset();
-    mockDownloadStageAsPng.mockReset();
+    mockDownloadCanvasAsPng.mockReset();
     mockImportImageFile.mockReset();
     mockReadProjectFile.mockReset();
     mockRegisterFontFile.mockReset();
@@ -326,8 +326,8 @@ describe('useEditorController', () => {
       style: 'normal',
       kind: 'uploaded',
     });
-    expect(mockDownloadStageAsPng).toHaveBeenCalledOnce();
-    expect(mockDownloadStageAsPng).toHaveBeenCalledWith(stage, 1);
+    expect(mockDownloadCanvasAsPng).toHaveBeenCalledOnce();
+    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(stage, 2048, 2048, 1);
     expect(mockDownloadProject).toHaveBeenCalledOnce();
   });
 

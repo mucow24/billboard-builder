@@ -48,63 +48,61 @@ function expectSavedGroup(project: Record<string, unknown>, nodeId: string): Sav
 }
 
 test.describe('editor shortcuts', () => {
-  test('toggles inspector tabs with the 1, 2, and 3 digit keys', async ({ page }) => {
+  test('toggles inspector tabs and switches tools via keyboard', async ({ page }) => {
     await openFreshEditor(page);
-    await page.evaluate(() => {
-      (document.activeElement as HTMLElement | null)?.blur?.();
+
+    await test.step('toggles inspector tabs with 1/2/3 digit keys', async () => {
+      await page.evaluate(() => {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+      });
+
+      const propertiesTab = page.getByRole('tab', { name: 'Properties' });
+      const layersTab = page.getByRole('tab', { name: /Layers/ });
+      const favoritesTab = page.getByRole('tab', { name: /Favorites/ });
+
+      await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+
+      await page.keyboard.press('2');
+      await expect(layersTab).toHaveAttribute('aria-selected', 'true');
+      await expect(propertiesTab).toHaveAttribute('aria-selected', 'false');
+      await expect(page.getByTestId('layers-tab-body')).toBeVisible();
+
+      await page.keyboard.press('3');
+      await expect(favoritesTab).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByTestId('favorites-tab-body')).toBeVisible();
+
+      await page.keyboard.press('1');
+      await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByTestId('properties-tab-body')).toBeVisible();
+
+      await page.keyboard.press('1');
+      await expect(propertiesTab).toHaveAttribute('aria-selected', 'false');
+      await expect(page.getByTestId('properties-tab-body')).toBeHidden();
+
+      await page.keyboard.press('1');
+      await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByTestId('properties-tab-body')).toBeVisible();
     });
 
-    const propertiesTab = page.getByRole('tab', { name: 'Properties' });
-    const layersTab = page.getByRole('tab', { name: /Layers/ });
-    const favoritesTab = page.getByRole('tab', { name: /Favorites/ });
-
-    // Default state: Properties is open.
-    await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
-
-    await page.keyboard.press('2');
-    await expect(layersTab).toHaveAttribute('aria-selected', 'true');
-    await expect(propertiesTab).toHaveAttribute('aria-selected', 'false');
-    await expect(page.getByTestId('layers-tab-body')).toBeVisible();
-
-    await page.keyboard.press('3');
-    await expect(favoritesTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('favorites-tab-body')).toBeVisible();
-
-    await page.keyboard.press('1');
-    await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('properties-tab-body')).toBeVisible();
-
-    // Pressing the active tab's key collapses the panel.
-    await page.keyboard.press('1');
-    await expect(propertiesTab).toHaveAttribute('aria-selected', 'false');
-    await expect(page.getByTestId('properties-tab-body')).toBeHidden();
-
-    // Pressing it again re-opens the panel on the same tab.
-    await page.keyboard.press('1');
-    await expect(propertiesTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('properties-tab-body')).toBeVisible();
+    await test.step('KB-01 switches tools via hotkeys', async () => {
+      await page.keyboard.press('H');
+      await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('Z');
+      await expect(page.getByRole('button', { name: 'Zoom (Z)' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('T');
+      await expect(page.getByRole('button', { name: 'Text (T)' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('R');
+      await expect(page.getByRole('button', { name: 'Rect (R)' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('O');
+      await expect(page.getByRole('button', { name: 'Ellipse (O)' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('L');
+      await expect(page.getByRole('button', { name: 'Line (L)' })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('V');
+      await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'true');
+    });
   });
 
-  test('KB-01 switches tools through real browser keyboard input', async ({ page }) => {
-    await openFreshEditor(page);
-
-    await page.keyboard.press('H');
-    await expect(page.getByRole('button', { name: 'Hand (H)' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('Z');
-    await expect(page.getByRole('button', { name: 'Zoom (Z)' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('T');
-    await expect(page.getByRole('button', { name: 'Text (T)' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('R');
-    await expect(page.getByRole('button', { name: 'Rect (R)' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('O');
-    await expect(page.getByRole('button', { name: 'Ellipse (O)' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('L');
-    await expect(page.getByRole('button', { name: 'Line (L)' })).toHaveAttribute('aria-pressed', 'true');
-    await page.keyboard.press('V');
-    await expect(page.getByRole('button', { name: 'Select (V)' })).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('nudges, duplicates, deletes, undoes, and redoes against the real document state', async ({ page }) => {
+  test('nudges, duplicates, deletes, undoes, redoes, and ignores invalid group shortcuts on a single rectangle', async ({ page }) => {
     const rectangle = createRectangleFixture({
       id: 'nudge-shape',
       x: 180,
@@ -116,28 +114,45 @@ test.describe('editor shortcuts', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]));
 
-    await clickCanvas(page, { x: 280, y: 240 });
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('Shift+ArrowDown');
+    await test.step('nudge, duplicate, delete, undo, redo', async () => {
+      await clickCanvas(page, { x: 280, y: 240 });
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Shift+ArrowDown');
 
-    const nudgedProject = await saveAndReadProject(page);
+      const nudgedProject = await saveAndReadProject(page);
 
-    const nudgedItem = (nudgedProject.nodes as Array<Record<string, number | string>>)[0];
-    expect(Number(nudgedItem.x)).toBe(181);
-    expect(Number(nudgedItem.y)).toBe(185);
+      const nudgedItem = (nudgedProject.nodes as Array<Record<string, number | string>>)[0];
+      expect(Number(nudgedItem.x)).toBe(181);
+      expect(Number(nudgedItem.y)).toBe(185);
 
-    await page.keyboard.press(`${modifier}+D`);
-    await openLayersTab(page);
-    await expect(page.locator('.layer-row')).toHaveCount(2);
+      await page.keyboard.press(`${modifier}+D`);
+      await openLayersTab(page);
+      await expect(page.locator('.layer-row')).toHaveCount(2);
 
-    await page.keyboard.press('Delete');
-    await expect(page.locator('.layer-row')).toHaveCount(1);
+      await page.keyboard.press('Delete');
+      await expect(page.locator('.layer-row')).toHaveCount(1);
 
-    await page.keyboard.press(`${modifier}+Z`);
-    await expect(page.locator('.layer-row')).toHaveCount(2);
+      await page.keyboard.press(`${modifier}+Z`);
+      await expect(page.locator('.layer-row')).toHaveCount(2);
 
-    await page.keyboard.press(`${modifier}+Shift+Z`);
-    await expect(page.locator('.layer-row')).toHaveCount(1);
+      await page.keyboard.press(`${modifier}+Shift+Z`);
+      await expect(page.locator('.layer-row')).toHaveCount(1);
+    });
+
+    await test.step('ignores invalid group/ungroup shortcuts for single item', async () => {
+      await clickCanvas(page, { x: 280, y: 240 });
+      await page.keyboard.press(`${modifier}+G`);
+      await page.keyboard.press(`Shift+${modifier}+G`);
+
+      const savedProject = await saveAndReadProject(page);
+      expect(savedProject.version).toBe(2);
+      expect(savedProject.nodes).toEqual([
+        expect.objectContaining({
+          id: 'nudge-shape',
+          kind: 'rectangle',
+        }),
+      ]);
+    });
   });
 
   test('selects all and clears selection through keyboard commands', async ({ page }) => {
@@ -419,35 +434,6 @@ test.describe('editor shortcuts', () => {
     expect(groupedNodes).toHaveLength(2);
   });
 
-  test('ignores invalid group and ungroup shortcuts for ineligible selections', async ({ page }) => {
-    const rectangle = createRectangleFixture({
-      id: 'shortcut-noop-rect',
-      name: 'Shortcut Noop Rectangle',
-      x: 180,
-      y: 180,
-      width: 200,
-      height: 120,
-      zIndex: 0,
-    });
-
-    await openFreshEditor(page);
-    await uploadProject(page, createProjectDocument([rectangle]), 'shortcut-noop.json');
-
-    await clickCanvas(page, { x: 280, y: 240 });
-    await page.keyboard.press(`${modifier}+G`);
-    await page.keyboard.press(`Shift+${modifier}+G`);
-
-    const savedProject = await saveAndReadProject(page);
-
-    expect(savedProject.version).toBe(2);
-    expect(savedProject.nodes).toEqual([
-      expect.objectContaining({
-        id: 'shortcut-noop-rect',
-        kind: 'rectangle',
-      }),
-    ]);
-  });
-
   test('CB-06 CB-07 CB-08 prioritizes app clipboard payloads, pastes images, and ignores clipboard events from editable targets', async ({
     page,
   }) => {
@@ -473,7 +459,7 @@ test.describe('editor shortcuts', () => {
     expect((savedProject.nodes as SavedNode[])).toHaveLength(2);
     expect((savedProject.nodes as SavedNode[]).every((node) => node.kind === 'rectangle')).toBe(true);
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     const pastedImage = await pasteImageClipboardFile(page);
     expect(pastedImage.defaultPrevented).toBe(true);
     await openLayersTab(page);
@@ -491,7 +477,7 @@ test.describe('editor shortcuts', () => {
     const ignoredPaste = await pasteClipboardPayloadOnActiveElement(page, copied.payload);
     expect(ignoredPaste.defaultPrevented).toBe(false);
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Reset');
+    await clickToolbarPopoverItem(page, 'File', 'New');
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(0);
   });
