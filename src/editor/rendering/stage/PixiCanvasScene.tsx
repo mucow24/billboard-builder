@@ -292,6 +292,29 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       [marqueeRect],
     );
 
+    // --- Text-create preview rect --------------------------------------------
+    // Rectangles/ellipses/ngons have a visible fill while being dragged out, but
+    // a fresh text item only renders glyphs — without an outline the user can't
+    // see the bounds they're defining. Render a faint outline matching the
+    // marquee styling so the drag has visible feedback.
+    const textCreateRect = useMemo(() => {
+      if (session?.kind !== 'create') return null;
+      const preview = session.previewItem;
+      if (!preview || preview.kind !== 'text') return null;
+      if (preview.width <= 0 || preview.height <= 0) return null;
+      return { x: preview.x, y: preview.y, w: preview.width, h: preview.height };
+    }, [session]);
+
+    const drawTextCreate = useCallback(
+      (g: Graphics) => {
+        g.clear();
+        if (!textCreateRect) return;
+        g.rect(textCreateRect.x, textCreateRect.y, textCreateRect.w, textCreateRect.h);
+        g.stroke({ color: 0x7dd3fc, width: 1.5 / (zoom > 0 ? zoom : 1) });
+      },
+      [textCreateRect, zoom],
+    );
+
     // --- Guide lines ---------------------------------------------------------
     const nz = zoom > 0 ? zoom : 1;
     const guideStrokeWidth = 1 / nz;
@@ -369,6 +392,10 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             {/* Marquee preview */}
             {marqueeRect ? (
               <pixiGraphics label="marquee-preview" draw={drawMarquee} eventMode="none" />
+            ) : null}
+            {/* Text-create preview outline */}
+            {textCreateRect ? (
+              <pixiGraphics label="text-create-preview" draw={drawTextCreate} eventMode="none" />
             ) : null}
             {/* Guide lines (below selection handles) */}
             {guides && guides.length > 0 ? (
