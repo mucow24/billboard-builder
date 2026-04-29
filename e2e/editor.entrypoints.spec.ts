@@ -574,7 +574,22 @@ test.describe('editor canvas entrypoints', () => {
 
       await beginCanvasDrag(page, pickupCase.from);
       await movePointerToCanvasPoint(page, pickupCase.to);
-      await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
+      // Don't just poll on sessionKind === 'drag' — the editor's pickup-drag
+      // path sets `kind: 'drag'` on the pointerdown (before the first
+      // pointermove updates the preview), so the poll can pass while the
+      // preview item is still at its original coords.  Wait for the preview
+      // to actually show the move before reading further snapshot fields.
+      const originalX = Number((pickupCase.item.x ?? pickupCase.item.startX) as number);
+      const originalY = Number((pickupCase.item.y ?? pickupCase.item.startY) as number);
+      await expect
+        .poll(async () => {
+          const snap = await readRenderSnapshot(page);
+          if (snap.sessionKind !== 'drag') return false;
+          const sel = snap.selectedItems[0];
+          if (!sel || sel.id !== pickupCase.id) return false;
+          return sel.geometry.x > originalX && sel.geometry.y > originalY;
+        })
+        .toBe(true);
 
       const previewSnapshot = await readRenderSnapshot(page);
       expect(previewSnapshot.selectedNodeIds).toEqual([pickupCase.id]);
@@ -582,12 +597,8 @@ test.describe('editor canvas entrypoints', () => {
 
       const previewItem = previewSnapshot.selectedItems[0];
       expect(previewItem.id).toBe(pickupCase.id);
-      expect(previewItem.geometry.x).toBeGreaterThan(
-        Number((pickupCase.item.x ?? pickupCase.item.startX) as number),
-      );
-      expect(previewItem.geometry.y).toBeGreaterThan(
-        Number((pickupCase.item.y ?? pickupCase.item.startY) as number),
-      );
+      expect(previewItem.geometry.x).toBeGreaterThan(originalX);
+      expect(previewItem.geometry.y).toBeGreaterThan(originalY);
 
       await releasePointer(page);
 
