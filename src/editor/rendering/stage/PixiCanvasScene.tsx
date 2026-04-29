@@ -250,7 +250,11 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             if ((r + c) % 2 !== 0) continue;
-            g.rect(c * cellSize, r * cellSize, cellSize, cellSize);
+            const x = c * cellSize;
+            const y = r * cellSize;
+            const w = Math.min(cellSize, canvasWidth - x);
+            const h = Math.min(cellSize, canvasHeight - y);
+            g.rect(x, y, w, h);
           }
         }
         g.fill({ color: 0xffffff, alpha: 0.025 });
