@@ -705,10 +705,14 @@ export async function waitForEditor(page: Page) {
   // Wait for the Pixi <Application> to finish initializing.  The in-page
   // test API checks `getCanvas() != null` to know the canvas element is
   // attached; until then any clickItem/dragItem call would throw.
+  // Generous timeout: under workers=8 load, Pixi init has been observed
+  // to take well past 10s on a contended box; 30s gives slow workers
+  // room without making fast paths any slower (the poll exits the
+  // moment rendererReady flips true).
   await expect
     .poll(async () => page.evaluate(() => Boolean(window.__BB_TEST__?.rendererReady?.())), {
       message: 'waiting for Pixi renderer to initialize',
-      timeout: 10_000,
+      timeout: 30_000,
     })
     .toBe(true);
 }
