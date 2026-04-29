@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  clickCanvas,
+  clickItem,
   createNgonFixture,
   createProjectDocument,
-  dragCanvas,
+  dragEmptyCanvas,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
@@ -18,7 +18,7 @@ test.describe('ngon tool flows', () => {
     await openFreshEditor(page);
 
     await selectTool(page, 'Polygon');
-    await dragCanvas(page, { x: 200, y: 200 }, { x: 400, y: 400 });
+    await dragEmptyCanvas(page, { x: 200, y: 200 }, { x: 400, y: 400 });
 
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
@@ -28,7 +28,7 @@ test.describe('ngon tool flows', () => {
     await openFreshEditor(page);
 
     await page.keyboard.press('g');
-    await dragCanvas(page, { x: 150, y: 150 }, { x: 350, y: 350 });
+    await dragEmptyCanvas(page, { x: 150, y: 150 }, { x: 350, y: 350 });
 
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
@@ -42,7 +42,7 @@ test.describe('ngon tool flows', () => {
       'ngon-properties.json',
     );
 
-    await clickCanvas(page, { x: 300, y: 300 });
+    await clickItem(page, 'ngon-props-test');
     await openPropertiesTab(page);
 
     await test.step('shows Sides slider in properties panel', async () => {

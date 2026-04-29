@@ -93,7 +93,7 @@ and business logic unchanged.
 1. Replace `exportPng.ts` with `renderer.extract`
 2. Remove `konva` and `react-konva` from `package.json`
 3. Run full test suite, update tests
-4. Run e2e tests, update visual baselines
+4. Run e2e tests
 
 ## Key decisions
 

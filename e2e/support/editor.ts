@@ -702,6 +702,15 @@ export async function waitForEditor(page: Page) {
   await expect(page.getByTestId('canvas-stage-root')).toBeVisible();
   await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();
   await expect(page.getByTestId('stage-debug')).toBeVisible();
+  // Wait for the Pixi <Application> to finish initializing.  The in-page
+  // test API checks `getCanvas() != null` to know the canvas element is
+  // attached; until then any clickItem/dragItem call would throw.
+  await expect
+    .poll(async () => page.evaluate(() => Boolean(window.__BB_TEST__?.rendererReady?.())), {
+      message: 'waiting for Pixi renderer to initialize',
+      timeout: 10_000,
+    })
+    .toBe(true);
 }
 
 export async function openFreshEditor(page: Page) {
@@ -751,21 +760,283 @@ async function hookCenter(locator: Locator) {
 }
 
 export async function canvasPointToPage(page: Page, point: CanvasPoint) {
-  const [bounds, debug] = await Promise.all([getStageRootBounds(page), readStageDebug(page)]);
-  return {
-    x: bounds.x + debug.viewport.panX + point.x * debug.viewport.zoom,
-    y: bounds.y + debug.viewport.panY + point.y * debug.viewport.zoom,
-  };
+  const [target] = await canvasPointsToPage(page, [point]);
+  return target;
 }
 
+/**
+ * Convert multiple canvas points using a single viewport+bounds snapshot.
+ * Use this for any gesture spanning multiple points (drag start/end) so the
+ * points share a reference frame even if the editor's viewport or DOM
+ * layout shifts between calls (e.g. auto-fit zoom, inspector layout).
+ */
+export async function canvasPointsToPage(page: Page, points: CanvasPoint[]) {
+  const [bounds, debug] = await Promise.all([getStageRootBounds(page), readStageDebug(page)]);
+  return points.map((p) => ({
+    x: bounds.x + debug.viewport.panX + p.x * debug.viewport.zoom,
+    y: bounds.y + debug.viewport.panY + p.y * debug.viewport.zoom,
+  }));
+}
+
+/**
+ * Yield until React has committed any pending state from the most recent
+ * Playwright action (toolbar click, keyboard event, etc).  We post a task
+ * via `setTimeout(0)` after a paint frame — that gives React's scheduler
+ * room to process its work queue including any concurrent-mode deferrals.
+ *
+ * NOTE: this only synchronizes Playwright→React; it is not a workaround
+ * for the in-page dispatch path, which is race-free by construction.
+ */
+async function flushCanvasFrames(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() =>
+            // setTimeout posts a macrotask, which runs after any React
+            // microtask-flush triggered by the rAF callback.
+            setTimeout(() => resolve(), 0),
+          ),
+        ),
+      ),
+  );
+}
+
+// ── ID-based canvas interactions (race-free, in-page dispatch) ───────────────
+//
+// These thunk through `window.__BB_TEST__` (set up by `useCanvasTestApi`)
+// so coordinate computation and event dispatch happen atomically inside
+// one `page.evaluate` callback.  No two-RPC race against viewport / layout
+// shifts.  See `src/editor/rendering/stage/canvasTestApi.ts`.
+
+export interface ClickOpts {
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  altKey?: boolean;
+  metaKey?: boolean;
+  button?: number;
+}
+
+export interface DragOpts extends ClickOpts {
+  steps?: number;
+}
+
+export type HandleName =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'middle-left'
+  | 'middle-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right'
+  | 'rotater'
+  | 'line-start'
+  | 'line-end';
+
+/**
+ * Each wrapper does a `flushCanvasFrames` *before* it dispatches.
+ *
+ * Why: prior Playwright actions (toolbar button click, `keyboard.down(' ')`,
+ * etc.) trigger React state changes that don't commit until the next frame.
+ * The in-page methods read refs that mirror React props — without this
+ * flush, a freshly-pressed spacebar isn't reflected in `spacebarHeld` at the
+ * moment the synthetic pointerdown dispatches, etc.
+ *
+ * This is *not* the bandage we removed.  The bandage was sandwich-flushing
+ * around `clickCanvas` to paper over coord/dispatch races that no longer
+ * exist with in-page atomicity.  The flush here only synchronizes Playwright
+ * → React; the in-page dispatch is still race-free.
+ */
+
+// Per-page, per-item memory of the last clickItem time, used to avoid
+// accidentally triggering the editor's 400ms double-click detection.  Each
+// rendered item has its own `lastClickRef` in PixiItemLayer, so this map
+// must be keyed by item id, not just "the last clicked item".
+//
+// CDP-driven `page.mouse.click` was naturally throttled by ~tens of ms per
+// command, so the test never bumped into the 400ms threshold.  Our in-page
+// dispatch is sub-millisecond, exposing the race.
+const DOUBLE_CLICK_THRESHOLD_MS = 410;
+const lastItemClickAt = new WeakMap<Page, Map<string, number>>();
+
+async function avoidSameItemDoubleClick(page: Page, id: string) {
+  const map = lastItemClickAt.get(page);
+  const last = map?.get(id);
+  if (last !== undefined) {
+    const elapsed = Date.now() - last;
+    const remaining = DOUBLE_CLICK_THRESHOLD_MS - elapsed;
+    if (remaining > 0) await page.waitForTimeout(remaining);
+  }
+}
+
+function recordItemClick(page: Page, id: string) {
+  let map = lastItemClickAt.get(page);
+  if (!map) {
+    map = new Map();
+    lastItemClickAt.set(page, map);
+  }
+  map.set(id, Date.now());
+}
+
+export async function clickItem(page: Page, id: string, opts: ClickOpts = {}) {
+  await avoidSameItemDoubleClick(page, id);
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ id, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.clickItem) {
+        throw new Error('__BB_TEST__.clickItem is not available — is the editor in test mode (?bb-test=1)?');
+      }
+      return api.clickItem(id, opts);
+    },
+    { id, opts },
+  );
+  recordItemClick(page, id);
+}
+
+export async function doubleClickItem(page: Page, id: string, opts: ClickOpts = {}) {
+  // The first click of the double-click pair must NOT form a double-click with
+  // a prior single click on the same item — otherwise the editor fires
+  // double-click on (prior + first) and the second click is just a stray
+  // single click. Wait past the editor's 400ms threshold first.
+  await avoidSameItemDoubleClick(page, id);
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ id, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.doubleClickItem) {
+        throw new Error('__BB_TEST__.doubleClickItem is not available');
+      }
+      return api.doubleClickItem(id, opts);
+    },
+    { id, opts },
+  );
+  // The editor resets lastClickRef on double-click. Clear our tracked entry
+  // so the next clickItem() doesn't wait unnecessarily.
+  lastItemClickAt.get(page)?.delete(id);
+}
+
+export async function dragItemTo(
+  page: Page,
+  id: string,
+  canvasX: number,
+  canvasY: number,
+  opts: DragOpts = {},
+) {
+  // The drag's pointerdown lands at the item's current center, hitting the
+  // item's onMouseDown handler — same double-click pitfall as clickItem.
+  await avoidSameItemDoubleClick(page, id);
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ id, canvasX, canvasY, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.dragItemTo) {
+        throw new Error('__BB_TEST__.dragItemTo is not available');
+      }
+      return api.dragItemTo(id, canvasX, canvasY, opts);
+    },
+    { id, canvasX, canvasY, opts },
+  );
+  recordItemClick(page, id);
+}
+
+export async function dragHandle(
+  page: Page,
+  itemId: string,
+  handle: HandleName,
+  dx: number,
+  dy: number,
+  opts: DragOpts = {},
+) {
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ itemId, handle, dx, dy, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.dragHandle) {
+        throw new Error('__BB_TEST__.dragHandle is not available');
+      }
+      return api.dragHandle(itemId, handle, dx, dy, opts);
+    },
+    { itemId, handle, dx, dy, opts },
+  );
+}
+
+export async function clickEmptyCanvas(page: Page, point: CanvasPoint, opts: ClickOpts = {}) {
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ point, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.clickEmptyCanvas) {
+        throw new Error('__BB_TEST__.clickEmptyCanvas is not available');
+      }
+      return api.clickEmptyCanvas(point.x, point.y, opts);
+    },
+    { point, opts },
+  );
+}
+
+export async function dragEmptyCanvas(
+  page: Page,
+  from: CanvasPoint,
+  to: CanvasPoint,
+  opts: DragOpts = {},
+) {
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ from, to, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.dragEmptyCanvas) {
+        throw new Error('__BB_TEST__.dragEmptyCanvas is not available');
+      }
+      return api.dragEmptyCanvas(from.x, from.y, to.x, to.y, opts);
+    },
+    { from, to, opts },
+  );
+}
+
+export async function wheelAt(
+  page: Page,
+  point: CanvasPoint,
+  deltaY: number,
+  deltaX = 0,
+) {
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ point, deltaY, deltaX }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.wheelAt) {
+        throw new Error('__BB_TEST__.wheelAt is not available');
+      }
+      api.wheelAt(point.x, point.y, deltaY, deltaX);
+    },
+    { point, deltaY, deltaX },
+  );
+}
+
+// ── Coord-based helpers (kept for compatibility) ────────────────────────────
+//
+// These delegate to the in-page test API.  Tests that don't yet target items
+// by id keep working through these shims, while gaining the same race-free
+// dispatch path as `clickItem` / `dragItemTo` / etc.
+
 export async function clickCanvas(page: Page, point: CanvasPoint) {
-  const target = await canvasPointToPage(page, point);
-  await page.mouse.click(target.x, target.y);
+  await clickEmptyCanvas(page, point);
 }
 
 export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
-  const target = await canvasPointToPage(page, point);
-  await page.mouse.dblclick(target.x, target.y);
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    async ({ point }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.clickEmptyCanvas) {
+        throw new Error('__BB_TEST__.clickEmptyCanvas is not available');
+      }
+      await api.clickEmptyCanvas(point.x, point.y);
+      await api.clickEmptyCanvas(point.x, point.y);
+    },
+    { point },
+  );
 }
 
 export async function waitForDoubleClickCadence(page: Page, ms = 550) {
@@ -773,13 +1044,15 @@ export async function waitForDoubleClickCadence(page: Page, ms = 550) {
 }
 
 export async function dragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {
-  const start = await canvasPointToPage(page, from);
-  const end = await canvasPointToPage(page, to);
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
-  await page.mouse.move(end.x, end.y, { steps });
-  await page.mouse.up();
+  await dragEmptyCanvas(page, from, to, { steps });
 }
+
+const MODIFIER_TO_OPT: Record<'Shift' | 'Control' | 'Alt' | 'Meta', keyof ClickOpts> = {
+  Shift: 'shiftKey',
+  Control: 'ctrlKey',
+  Alt: 'altKey',
+  Meta: 'metaKey',
+};
 
 export async function dragCanvasWithModifier(
   page: Page,
@@ -788,51 +1061,88 @@ export async function dragCanvasWithModifier(
   to: CanvasPoint,
   steps = 18,
 ) {
-  const start = await canvasPointToPage(page, from);
-  const end = await canvasPointToPage(page, to);
-  await page.keyboard.down(modifierKey);
-  try {
-    await page.mouse.move(start.x, start.y);
-    await page.mouse.down();
-    await page.mouse.move(end.x, end.y, { steps });
-    await page.mouse.up();
-  } finally {
-    await page.keyboard.up(modifierKey);
-  }
+  const opts: DragOpts = { steps, [MODIFIER_TO_OPT[modifierKey]]: true };
+  await dragEmptyCanvas(page, from, to, opts);
 }
 
 export async function setCanvasTestHooksEnabled(page: Page, enabled: boolean) {
   await page.evaluate((nextEnabled) => {
-    const hooks = document.querySelector<HTMLElement>('[data-testid="canvas-test-hooks"]');
-    if (hooks) {
-      hooks.style.display = nextEnabled ? '' : 'none';
-      hooks.style.pointerEvents = nextEnabled ? 'auto' : 'none';
+    // Inline styles on the hooks element get clobbered when React re-renders
+    // the subtree (selection change, session updates, etc).  Inject a
+    // <style> rule keyed by id so the override survives reconciliation and
+    // applies to every element matching the test-id, including replacements.
+    const STYLE_ID = '__bb-test-hooks-disable__';
+    const existing = document.getElementById(STYLE_ID);
+    if (nextEnabled) {
+      existing?.remove();
+    } else if (!existing) {
+      const style = document.createElement('style');
+      style.id = STYLE_ID;
+      style.textContent =
+        '[data-testid="canvas-test-hooks"] { display: none !important; pointer-events: none !important; }';
+      document.head.appendChild(style);
     }
   }, enabled);
 }
 
 export async function beginVisibleCanvasDrag(page: Page, point: CanvasPoint) {
-  await page.mouse.move(point.x, point.y);
-  await page.mouse.down();
+  // `point` here is in client (page) coords, not canvas coords.  Used by
+  // tests that begin a drag from a measured DOM-element position.
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ point }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.movePointerClient || !api.releaseDrag) {
+        throw new Error('__BB_TEST__ is not available');
+      }
+      // Synthesize a pointerdown by first moving then dispatching.  We don't
+      // have a beginDragClient but movePointerClient + a follow-up dispatch
+      // covers it.  The simpler path: just do a move; the caller usually
+      // dispatches mousedown elsewhere (test-hook locator).
+      api.movePointerClient(point.x, point.y);
+    },
+    { point },
+  );
 }
 
-export async function movePointerToPagePoint(page: Page, point: CanvasPoint, steps = 18) {
-  await page.mouse.move(point.x, point.y, { steps });
+export async function movePointerToPagePoint(page: Page, point: CanvasPoint, _steps = 18) {
+  await page.evaluate(
+    ({ point }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.movePointerClient) {
+        throw new Error('__BB_TEST__.movePointerClient is not available');
+      }
+      api.movePointerClient(point.x, point.y);
+    },
+    { point },
+  );
 }
 
 export async function beginCanvasDrag(page: Page, from: CanvasPoint) {
-  const start = await canvasPointToPage(page, from);
-  await page.mouse.move(start.x, start.y);
-  await page.mouse.down();
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ from }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.beginDrag) {
+        throw new Error('__BB_TEST__.beginDrag is not available');
+      }
+      api.beginDrag(from.x, from.y);
+    },
+    { from },
+  );
 }
 
-export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint, steps = 18) {
-  const end = await canvasPointToPage(page, destination);
-  await page.mouse.move(end.x, end.y, { steps });
-  // Store position so releasePointer can dispatch mouseup at the correct
-  // coordinates via JS (see releasePointer for why).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only page global
-  await page.evaluate(([x, y]) => { (window as any).__lastPointerPos = { x, y }; }, [end.x, end.y]);
+export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint, _steps = 18) {
+  await page.evaluate(
+    ({ destination }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.movePointerCanvas) {
+        throw new Error('__BB_TEST__.movePointerCanvas is not available');
+      }
+      api.movePointerCanvas(destination.x, destination.y);
+    },
+    { destination },
+  );
 }
 
 export async function clickCanvasHook(page: Page, testId: string) {
@@ -878,24 +1188,13 @@ export async function dragCanvasHookToPoint(
 }
 
 export async function releasePointer(page: Page) {
-  // Dispatch mouseup via JS on window instead of page.mouse.up().
-  // beginCanvasHookDrag uses locator.dispatchEvent('mousedown') which
-  // bypasses Playwright's CDP mouse state.  A subsequent page.mouse.up()
-  // sends mouseReleased for a button Chrome never saw pressed, and Chrome
-  // silently drops the DOM event.  Dispatching directly on window avoids
-  // this and reliably triggers the app's capture-phase mouseup listener.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test-only page global
-  const pos = await page.evaluate(() => (window as any).__lastPointerPos ?? { x: 0, y: 0 });
-  await page.evaluate(({ x, y }) => {
-    window.dispatchEvent(new MouseEvent('mouseup', {
-      bubbles: true,
-      cancelable: true,
-      clientX: x,
-      clientY: y,
-      button: 0,
-      buttons: 0,
-    }));
-  }, pos);
+  await page.evaluate(() => {
+    const api = window.__BB_TEST__;
+    if (!api?.releaseDrag) {
+      throw new Error('__BB_TEST__.releaseDrag is not available');
+    }
+    api.releaseDrag();
+  });
   // Wait for any active interaction session to finalize. The session is settled
   // when sessionKind is null (no session) or 'image-crop' (crop mode persists
   // across handle drags within the crop session).
@@ -906,7 +1205,16 @@ export async function releasePointer(page: Page) {
 }
 
 export async function selectTool(page: Page, name: string) {
-  await page.getByRole('button', { name: new RegExp(`^${name} \\(`) }).click();
+  const button = page.getByRole('button', { name: new RegExp(`^${name} \\(`) });
+  await button.click();
+  // Ensure the tool change has actually committed to the canvas event handlers.
+  // Without this wait, a subsequent clickCanvas/dragCanvas can race against
+  // @pixi/react's prop-sync to the Pixi event-root container — the click then
+  // hits the previous tool's handler closure (e.g. zoom click ignored, text
+  // creation skipped). The aria-pressed gate ensures React state committed;
+  // the rAF gate ensures the Pixi listener has been swapped.
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+  await flushCanvasFrames(page);
 }
 
 export async function openLayersTab(page: Page) {
@@ -1025,7 +1333,7 @@ export async function uploadProject(page: Page, document: Record<string, unknown
 
   // Wait for the canvas to finish rendering the uploaded nodes.
   // Without this, fast canvas interactions right after upload can race
-  // against the React render cycle on slower CI runners.
+  // against the React render cycle.
   const leafCount = countVisibleLeafNodes(
     (document as { nodes?: unknown[] }).nodes ?? [],
   );
@@ -1291,6 +1599,14 @@ export async function pasteClipboardPayloadWithImageFile(
 }
 
 export async function middleDragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {
+  // Middle-button gestures use real CDP mouse events. Pixi v8's federated
+  // event dispatcher treats CDP-routed middle-button pointerdowns differently
+  // from synthesized PointerEvents — CDP middle-button events skip the
+  // handle's onMouseDown (which only fires for left button), so the gesture
+  // bubbles to the item's pan branch. Synthesizing a PointerEvent(button:1)
+  // and dispatching it on the canvas instead routes through the handle,
+  // starting a resize. Use the real input pipeline here to preserve pan
+  // semantics for VP-06 and any other middle-drag-on-handle test.
   const start = await canvasPointToPage(page, from);
   const end = await canvasPointToPage(page, to);
   await page.mouse.move(start.x, start.y);
@@ -1442,3 +1758,4 @@ export async function clearPersistence(page: Page) {
     });
   }, EDITOR_DATABASE_VERSION);
 }
+

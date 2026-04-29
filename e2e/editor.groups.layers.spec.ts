@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   clickLayerRow,
-  clickCanvas,
+  clickItem,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
@@ -545,9 +545,7 @@ test.describe('editor group layers and inspector flows', () => {
 
     // Build a mixed-parent selection through the visible browser path: one
     // child leaf from inside the group plus one top-level sibling.
-    await page.keyboard.down('Shift');
-    await clickCanvas(page, { x: 710, y: 280 });
-    await page.keyboard.up('Shift');
+    await clickItem(page, 'mixed-parent-top-level', { shiftKey: true });
 
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();

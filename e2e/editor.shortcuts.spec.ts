@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   APP_CLIPBOARD_MIME_TYPE,
-  clickCanvas,
+  clickItem,
   clickLayerRow,
   clickToolbarPopoverItem,
   copySelectionToClipboardPayload,
@@ -12,7 +12,7 @@ import {
   createProjectDocument,
   createRectangleFixture,
   cutSelectionToClipboardPayload,
-  dragCanvas,
+  dragEmptyCanvas,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
@@ -115,7 +115,7 @@ test.describe('editor shortcuts', () => {
     await uploadProject(page, createProjectDocument([rectangle]));
 
     await test.step('nudge, duplicate, delete, undo, redo', async () => {
-      await clickCanvas(page, { x: 280, y: 240 });
+      await clickItem(page, 'nudge-shape');
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('Shift+ArrowDown');
 
@@ -140,7 +140,7 @@ test.describe('editor shortcuts', () => {
     });
 
     await test.step('ignores invalid group/ungroup shortcuts for single item', async () => {
-      await clickCanvas(page, { x: 280, y: 240 });
+      await clickItem(page, 'nudge-shape');
       await page.keyboard.press(`${modifier}+G`);
       await page.keyboard.press(`Shift+${modifier}+G`);
 
@@ -187,7 +187,7 @@ test.describe('editor shortcuts', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('canvas-group-rotater')).toHaveCount(0);
 
-    await dragCanvas(page, { x: 80, y: 80 }, { x: 380, y: 320 });
+    await dragEmptyCanvas(page, { x: 80, y: 80 }, { x: 380, y: 320 });
     await expect(page.getByTestId('canvas-group-rotater')).toBeAttached();
   });
 
@@ -450,7 +450,7 @@ test.describe('editor shortcuts', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'clipboard-priority.json');
 
-    await clickCanvas(page, { x: 280, y: 240 });
+    await clickItem(page, 'clipboard-priority-rect');
     const copied = await copySelectionToClipboardPayload(page);
     const prioritizedPaste = await pasteClipboardPayloadWithImageFile(page, copied.payload);
     expect(prioritizedPaste.defaultPrevented).toBe(true);

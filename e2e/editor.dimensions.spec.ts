@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
-  clickCanvas,
+  clickItem,
   createImageFixture,
   createProjectDocument,
   createRectangleFixture,
@@ -12,7 +12,7 @@ import {
 } from './support/editor';
 
 test.describe('editor dimensions widget', () => {
-  async function openGeometry(page: Parameters<typeof clickCanvas>[0]) {
+  async function openGeometry(page: Page) {
     await openPropertiesTab(page);
     await page.getByRole('button', { name: 'Geometry' }).click();
   }
@@ -21,7 +21,7 @@ test.describe('editor dimensions widget', () => {
     const rect = createRectangleFixture({ id: 'dim-rect', x: 120, y: 120 });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rect]), 'dim-01.json');
-    await clickCanvas(page, { x: 230, y: 190 });
+    await clickItem(page, 'dim-rect');
     await openGeometry(page);
 
     await expect(page.getByRole('spinbutton', { name: 'Width', exact: true })).toBeVisible();
@@ -40,7 +40,7 @@ test.describe('editor dimensions widget', () => {
     const rect = createRectangleFixture({ id: 'dim-rect', x: 120, y: 120 });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rect]), 'dim-02.json');
-    await clickCanvas(page, { x: 230, y: 190 });
+    await clickItem(page, 'dim-rect');
     await openGeometry(page);
 
     await page.getByRole('spinbutton', { name: 'Width', exact: true }).fill('300');
@@ -56,7 +56,7 @@ test.describe('editor dimensions widget', () => {
     const rect = createRectangleFixture({ id: 'dim-rect', x: 120, y: 120, width: 200 });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rect]), 'dim-03.json');
-    await clickCanvas(page, { x: 230, y: 190 });
+    await clickItem(page, 'dim-rect');
     await openGeometry(page);
 
     await page.getByRole('spinbutton', { name: 'Width %' }).fill('50');
@@ -72,7 +72,7 @@ test.describe('editor dimensions widget', () => {
     const rect = createRectangleFixture({ id: 'dim-rect', x: 120, y: 120 });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rect]), 'dim-04.json');
-    await clickCanvas(page, { x: 230, y: 190 });
+    await clickItem(page, 'dim-rect');
     await openGeometry(page);
 
     await page.getByRole('button', { name: 'Lock aspect ratio' }).click();
@@ -93,7 +93,7 @@ test.describe('editor dimensions widget', () => {
     });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rect]), 'dim-05.json');
-    await clickCanvas(page, { x: 320, y: 220 });
+    await clickItem(page, 'dim-rect');
     await openGeometry(page);
 
     await page.getByRole('button', { name: 'Lock aspect ratio' }).click();
@@ -110,7 +110,7 @@ test.describe('editor dimensions widget', () => {
     const rect = createRectangleFixture({ id: 'dim-rect', x: 120, y: 120 });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rect]), 'dim-06.json');
-    await clickCanvas(page, { x: 230, y: 190 });
+    await clickItem(page, 'dim-rect');
     await openGeometry(page);
 
     await page.getByRole('button', { name: 'Lock aspect ratio' }).click();
@@ -135,7 +135,7 @@ test.describe('editor dimensions widget', () => {
     });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([image]), 'dim-07.json');
-    await clickCanvas(page, { x: 500, y: 400 });
+    await clickItem(page, 'dim-image');
     await openGeometry(page);
 
     await expect(page.getByRole('button', { name: 'Reset to original size' })).toBeVisible();
@@ -153,7 +153,7 @@ test.describe('editor dimensions widget', () => {
     });
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([image]), 'dim-08.json');
-    await clickCanvas(page, { x: 300, y: 250 });
+    await clickItem(page, 'dim-image');
     await openGeometry(page);
 
     await page.getByRole('button', { name: 'Reset to original size' }).click();

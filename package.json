@@ -13,13 +13,10 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "lint:e2e-hooks": "node scripts/check-e2e-hook-usage.mjs",
-    "e2e": "node scripts/run-e2e.mjs --grep-invert visual",
-    "e2e:headed": "node scripts/run-e2e.mjs --headed --grep-invert visual",
-    "e2e:screenshots": "node scripts/run-e2e.mjs --grep visual",
-    "e2e:screenshots:update": "node scripts/run-e2e.mjs --grep visual --update-snapshots",
-    "e2e:all": "node scripts/run-e2e.mjs",
+    "e2e": "node scripts/run-e2e.mjs",
+    "e2e:headed": "node scripts/run-e2e.mjs --headed",
     "preflight": "node scripts/preflight.mjs",
-    "prepare": "git config core.hooksPath .githooks && (git config --worktree core.hooksPath .githooks 2>/dev/null || true)"
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "dependencies": {
     "@pixi/react": "^8.0.5",

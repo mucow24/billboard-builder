@@ -34,6 +34,8 @@ TextureSource.defaultOptions.autoGenerateMipmaps = true;
 
 interface PixiCanvasSceneProps {
   activeTool: CanvasTool;
+  /** Optional callback fired once Pixi `<Application>` has finished init. */
+  onRendererReady?: () => void;
   beginCropFullResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   beginCropFullRotate: (pointer: Point, source?: PointerGestureSource) => void;
   beginCropPan: (pointer: Point, source?: PointerGestureSource) => void;
@@ -111,6 +113,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
   function PixiCanvasScene(
     {
       activeTool,
+      onRendererReady,
       beginCropFullResize,
       beginCropFullRotate,
       beginCropPan,
@@ -329,7 +332,10 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
         autoDensity
         antialias
         backgroundAlpha={0}
-        onInit={() => setRendererReady(true)}
+        onInit={() => {
+          setRendererReady(true);
+          onRendererReady?.();
+        }}
         className="editor-stage editor-stage-fullscreen"
       >
         {/* Root event container — covers the full viewport for stage-level events. */}

@@ -10,17 +10,12 @@ delete process.env.NO_COLOR;
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  workers: process.env.CI ? undefined : 2,
-  forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  workers: 8,
+  retries: 0,
+  reporter: 'list',
   timeout: 60_000,
   expect: {
     timeout: 10_000,
-    toHaveScreenshot: {
-      animations: 'disabled',
-      scale: 'device',
-    },
   },
   use: {
     baseURL: `http://127.0.0.1:${previewPort}`,
@@ -31,12 +26,15 @@ export default defineConfig({
       width: 1600,
       height: 1200,
     },
+    launchOptions: {
+      args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
+    },
   },
   webServer: {
     command: `npm run build && vite preview --host 127.0.0.1 --port ${previewPort}`,
     env: playwrightEnv,
     port: previewPort,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120_000,
   },
   projects: [

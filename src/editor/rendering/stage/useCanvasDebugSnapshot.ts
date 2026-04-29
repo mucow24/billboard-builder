@@ -8,16 +8,12 @@ import {
   RESIZE_HANDLE_NAMES,
   type Point,
 } from '../interactionGeometry';
+import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
 import { getRenderBox } from '../transformGeometry';
+import { useCanvasTestApi } from './canvasTestApi';
 import { getShapeOverlayHandlePoints } from './overlayGeometry';
 
-declare global {
-  interface Window {
-    __BB_TEST__?: {
-      captureRenderSnapshot?: () => unknown;
-    };
-  }
-}
+// `Window.__BB_TEST__` is declared in `./canvasTestApi.ts`; both files share it.
 
 function buildHandleDebug(clientRect: {
   x: number;
@@ -109,10 +105,12 @@ interface UseCanvasDebugSnapshotParams {
     x: () => number;
     y: () => number;
   } | null;
+  rendererReady?: boolean;
   selectedRenderedItem: CanvasItem | null;
   selectedShapeHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   session: { kind: string; handle?: string } | null;
   showGroupInteractionHooks: boolean;
+  stageRef: React.RefObject<CanvasRendererHandle | null>;
   subgroupOutlineFrames: Array<{
     nodeId: string;
     bounds: { x: number; y: number; width: number; height: number };
@@ -146,13 +144,19 @@ export function useCanvasDebugSnapshot({
   selectedNode,
   selectedRenderedItem,
   selectedShapeHandleRects,
+  rendererReady = false,
   session,
   showGroupInteractionHooks,
+  stageRef,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
   zoom,
 }: UseCanvasDebugSnapshotParams) {
+  // Register the in-page test API on `window.__BB_TEST__` for e2e tests to
+  // drive item interactions by id rather than by canvas coordinates.
+  useCanvasTestApi({ stageRef, renderedItems, pan, zoom, rendererReady });
+
   const debugInfo = useMemo(
     () => ({
       stageSize: viewportSize,

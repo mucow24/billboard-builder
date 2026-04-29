@@ -93,18 +93,17 @@ export function useCropSession({
 
   const updateCropSession = useCallback((nextSession: ImageCropSessionState | null) => {
     cropSessionRef.current = nextSession;
-    if (nextSession === null) {
-      if (cropSessionRafRef.current !== null) {
-        cancelAnimationFrame(cropSessionRafRef.current);
-        cropSessionRafRef.current = null;
-      }
-      setCropSession(null);
-    } else if (cropSessionRafRef.current === null) {
-      cropSessionRafRef.current = requestAnimationFrame(() => {
-        cropSessionRafRef.current = null;
-        setCropSession(cropSessionRef.current);
-      });
+    if (cropSessionRafRef.current !== null) {
+      cancelAnimationFrame(cropSessionRafRef.current);
+      cropSessionRafRef.current = null;
     }
+    // Update React state synchronously.  React's auto-batching coalesces
+    // multiple updates per event-handler call, so we don't need the rAF
+    // batching that was here previously — and that rAF prevented the
+    // state-driven `useEffect` (which registers the window mousemove
+    // listener for crop drags) from running in time during e2e tests
+    // where headless Chromium throttles requestAnimationFrame.
+    setCropSession(nextSession);
   }, []);
 
   const startCropSession = useCallback((item: ImageCanvasItem) => {

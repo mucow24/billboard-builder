@@ -5,7 +5,7 @@ import {
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
-  dragCanvas,
+  dragEmptyCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
   readStageDebug,
@@ -52,7 +52,7 @@ test.describe('rotated group browser geometry', () => {
       'rotated-group-geometry.json'
     );
 
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
     let baseline = await rotateGroupTo(page, 33);
 
     await beginCanvasHookDrag(page, 'canvas-group-overlay');
@@ -156,7 +156,7 @@ test.describe('rotated group browser geometry', () => {
       'mixed-rotated-group.json'
     );
 
-    await dragCanvas(page, { x: 70, y: 90 }, { x: 520, y: 290 });
+    await dragEmptyCanvas(page, { x: 70, y: 90 }, { x: 520, y: 290 });
     let baseline = await rotateGroupTo(page, 127);
 
     await beginCanvasHookDrag(page, 'canvas-group-rotater');

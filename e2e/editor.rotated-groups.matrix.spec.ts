@@ -5,7 +5,7 @@ import {
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
-  dragCanvas,
+  dragEmptyCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
   readStageDebug,
@@ -108,7 +108,7 @@ test.describe('rotated group browser matrix', () => {
           `${fixture.name}-${matrixCase.name.replace(/\s+/g, '-')}.json`
         );
 
-        await dragCanvas(page, fixture.dragStart, fixture.dragEnd);
+        await dragEmptyCanvas(page, fixture.dragStart, fixture.dragEnd);
         let baseline = await rotateGroupTo(page, matrixCase.angle);
 
         if (matrixCase.handle === 'drag') {

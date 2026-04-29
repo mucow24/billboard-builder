@@ -2,13 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   beginCanvasDrag,
-  clickCanvas,
+  clickEmptyCanvas,
+  clickItem,
   createGroupedProjectDocument,
   createGroupNodeFixture,
   createImageFixture,
   createRectangleFixture,
   doubleClickCanvas,
-  dragCanvas,
+  doubleClickItem,
+  dragEmptyCanvas,
   dragCanvasWithModifier,
   movePointerToCanvasPoint,
   openFreshEditor,
@@ -18,7 +20,6 @@ import {
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
-  waitForDoubleClickCadence,
   collectLeafNodes,
 } from './support/editor';
 
@@ -55,9 +56,7 @@ test.describe('editor image crop', () => {
     await uploadProject(page, createGroupedProjectDocument([image]), 'crop-zoom-stable.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 600, y: 365 });
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'crop-zoom-stable-image');
     await expect.poll(async () => (await readStageDebug(page)).cropSession !== null).toBe(true);
     await setCanvasTestHooksEnabled(page, true);
 
@@ -109,7 +108,7 @@ test.describe('editor image crop', () => {
     await openLayersTab(page);
     await expect(page.locator('.layer-row.active')).toHaveCount(0);
 
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'one-gesture-image');
 
     const cropSession = await expectCropMode(page);
     expect(cropSession.previewItem.width).toBeGreaterThan(0);
@@ -138,20 +137,18 @@ test.describe('editor image crop', () => {
     await uploadProject(page, groupedDocument, 'grouped-image-crop.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 600, y: 365 });
+    await clickItem(page, 'grouped-image');
     await openLayersTab(page);
     await expectActiveLayerId(page, 'image-group');
 
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'grouped-image');
 
     await openLayersTab(page);
     await expectActiveLayerId(page, 'grouped-image');
     expect((await readStageDebug(page)).sessionKind ?? null).not.toBe('image-crop');
     expect((await readStageDebug(page)).cropSession ?? null).toBeNull();
 
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'grouped-image');
 
     const cropSession = await expectCropMode(page);
     expect(cropSession.previewItem.width).toBeGreaterThan(0);
@@ -196,9 +193,7 @@ test.describe('editor image crop', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     await test.step('resize crop bounds, pan image, commit on blank click', async () => {
-      await clickCanvas(page, { x: 600, y: 365 });
-      await waitForDoubleClickCadence(page);
-      await doubleClickCanvas(page, { x: 600, y: 365 });
+      await doubleClickItem(page, 'crop-image');
 
       let cropSession = await expectCropMode(page);
       expect(cropSession.crop.width).toBe(100);
@@ -206,7 +201,7 @@ test.describe('editor image crop', () => {
       if (!startHandle) {
         throw new Error('Expected a crop right handle.');
       }
-      await dragCanvas(page, startHandle, { x: startHandle.x + 24, y: startHandle.y });
+      await dragEmptyCanvas(page, startHandle, { x: startHandle.x + 24, y: startHandle.y });
 
       cropSession = await expectCropMode(page);
       expect(cropSession.crop.width).toBeGreaterThan(100);
@@ -215,12 +210,12 @@ test.describe('editor image crop', () => {
         x: cropSession.previewItem.x + cropSession.previewItem.width / 2,
         y: cropSession.previewItem.y + cropSession.previewItem.height / 2,
       };
-      await dragCanvas(page, cropCenter, { x: cropCenter.x + 18, y: cropCenter.y + 10 });
+      await dragEmptyCanvas(page, cropCenter, { x: cropCenter.x + 18, y: cropCenter.y + 10 });
 
       cropSession = await expectCropMode(page);
       expect(cropSession.crop.x).toBeLessThan(20);
 
-      await clickCanvas(page, { x: 120, y: 120 });
+      await clickEmptyCanvas(page, { x: 120, y: 120 });
       await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
       expect((await readStageDebug(page)).sessionKind ?? null).not.toBe('image-crop');
 
@@ -238,18 +233,16 @@ test.describe('editor image crop', () => {
     });
 
     await test.step('commits crop and switches selection to another item', async () => {
-      await clickCanvas(page, { x: 600, y: 365 });
-      await waitForDoubleClickCadence(page);
-      await doubleClickCanvas(page, { x: 600, y: 365 });
+      await doubleClickItem(page, 'crop-image');
 
       const cropSession = await expectCropMode(page);
       const handle = cropSession.cropHandlePoints?.['middle-right'];
       if (!handle) {
         throw new Error('Expected a crop right handle.');
       }
-      await dragCanvas(page, handle, { x: handle.x + 24, y: handle.y });
+      await dragEmptyCanvas(page, handle, { x: handle.x + 24, y: handle.y });
 
-      await clickCanvas(page, { x: 260, y: 240 });
+      await clickItem(page, 'crop-switch-rect');
       await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
 
       await openLayersTab(page);
@@ -295,16 +288,14 @@ test.describe('editor image crop', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     await test.step('double-clicking inside the crop exits crop mode and commits', async () => {
-      await clickCanvas(page, { x: 600, y: 365 });
-      await waitForDoubleClickCadence(page);
-      await doubleClickCanvas(page, { x: 600, y: 365 });
+      await doubleClickItem(page, 'crop-exit-snap-image');
 
       let cropSession = await expectCropMode(page);
       const handle = cropSession.cropHandlePoints?.['middle-right'];
       if (!handle) {
         throw new Error('Expected a crop right handle.');
       }
-      await dragCanvas(page, handle, { x: handle.x + 24, y: handle.y });
+      await dragEmptyCanvas(page, handle, { x: handle.x + 24, y: handle.y });
 
       cropSession = await expectCropMode(page);
       const insideCropPoint = {
@@ -328,9 +319,7 @@ test.describe('editor image crop', () => {
       await uploadProject(page, project, 'crop-snap.json');
       await setCanvasTestHooksEnabled(page, false);
 
-      await clickCanvas(page, { x: 600, y: 365 });
-      await waitForDoubleClickCadence(page);
-      await doubleClickCanvas(page, { x: 600, y: 365 });
+      await doubleClickItem(page, 'crop-exit-snap-image');
 
       const cropSession = await expectCropMode(page);
       const handle = cropSession.cropHandlePoints?.['middle-right'];
@@ -343,7 +332,7 @@ test.describe('editor image crop', () => {
       await expect(page.getByTestId('guide-count')).not.toContainText('Guides: 0');
       await releasePointer(page);
 
-      await clickCanvas(page, { x: 120, y: 120 });
+      await clickEmptyCanvas(page, { x: 120, y: 120 });
       const savedProject = await saveAndReadProject(page);
       const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
         (item) => item.id === 'crop-exit-snap-image',
@@ -355,9 +344,7 @@ test.describe('editor image crop', () => {
       await uploadProject(page, project, 'crop-snap-ctrl.json');
       await setCanvasTestHooksEnabled(page, false);
 
-      await clickCanvas(page, { x: 600, y: 365 });
-      await waitForDoubleClickCadence(page);
-      await doubleClickCanvas(page, { x: 600, y: 365 });
+      await doubleClickItem(page, 'crop-exit-snap-image');
 
       const ctrlCrop = await expectCropMode(page);
       const ctrlHandle = ctrlCrop.cropHandlePoints?.['middle-right'];
@@ -373,7 +360,7 @@ test.describe('editor image crop', () => {
       );
       await expect(page.getByTestId('guide-count')).toContainText('Guides: 0');
 
-      await clickCanvas(page, { x: 120, y: 120 });
+      await clickEmptyCanvas(page, { x: 120, y: 120 });
       const ctrlProject = await saveAndReadProject(page);
       const ctrlImage = collectLeafNodes(ctrlProject.nodes as Array<Record<string, unknown>>).find(
         (item) => item.id === 'crop-exit-snap-image',
@@ -409,9 +396,7 @@ test.describe('editor image crop', () => {
     );
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 600, y: 365 });
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'crop-transform-image');
 
     let cropSession = await expectCropMode(page);
     expect(cropSession.fullImageItem.rotation).toBe(0);
@@ -419,7 +404,7 @@ test.describe('editor image crop', () => {
     if (!fullResizeHandle) {
       throw new Error('Expected a full-image resize handle.');
     }
-    await dragCanvas(page, fullResizeHandle, { x: fullResizeHandle.x + 40, y: fullResizeHandle.y });
+    await dragEmptyCanvas(page, fullResizeHandle, { x: fullResizeHandle.x + 40, y: fullResizeHandle.y });
 
     cropSession = await expectCropMode(page);
     expect(cropSession.fullImageItem.width).toBeGreaterThan(160);
@@ -428,7 +413,7 @@ test.describe('editor image crop', () => {
     if (!fullRotater) {
       throw new Error('Expected a full-image rotater.');
     }
-    await dragCanvas(page, fullRotater, {
+    await dragEmptyCanvas(page, fullRotater, {
       x: cropSession.fullImageItem.x + cropSession.fullImageItem.width + 40,
       y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
     });
@@ -486,9 +471,7 @@ test.describe('editor image crop', () => {
     );
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 600, y: 365 });
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'crop-source-rotate-image');
 
     let cropSession = await expectCropMode(page);
     const initialTopLeft = cropSession.cropHandleViewportPoints?.['top-left'];
@@ -498,7 +481,7 @@ test.describe('editor image crop', () => {
       throw new Error('Expected crop and full-image handles.');
     }
 
-    await dragCanvas(page, fullRotater, {
+    await dragEmptyCanvas(page, fullRotater, {
       x: cropSession.fullImageItem.x + cropSession.fullImageItem.width + 40,
       y: cropSession.fullImageItem.y + cropSession.fullImageItem.height / 2,
     });
@@ -532,9 +515,7 @@ test.describe('editor image crop', () => {
     await uploadProject(page, savedProject as Record<string, unknown>, 'crop-source-rotate-reload.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 600, y: 365 });
-    await waitForDoubleClickCadence(page);
-    await doubleClickCanvas(page, { x: 600, y: 365 });
+    await doubleClickItem(page, 'crop-source-rotate-image');
 
     cropSession = await expectCropMode(page);
     expect(Math.abs(cropSession.fullImageItem.rotation)).toBeGreaterThan(10);

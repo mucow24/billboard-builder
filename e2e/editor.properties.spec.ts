@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
-  clickCanvas,
+  clickItem,
   createImageFixture,
   createLineFixture,
   createProjectDocument,
@@ -56,10 +56,8 @@ test.describe('editor properties flows', () => {
     await expect(page.getByText('Nothing selected')).toBeVisible();
 
     await uploadProject(page, createProjectDocument([first, second]), 'properties-multi.json');
-    await clickCanvas(page, { x: 220, y: 210 });
-    await page.keyboard.down('Shift');
-    await clickCanvas(page, { x: 450, y: 265 });
-    await page.keyboard.up('Shift');
+    await clickItem(page, 'multi-opacity-first');
+    await clickItem(page, 'multi-opacity-second', { shiftKey: true });
     await openPropertiesTab(page);
 
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
@@ -118,10 +116,8 @@ test.describe('editor properties flows', () => {
       'properties-shared-cross-kind.json',
     );
 
-    await clickCanvas(page, { x: 225, y: 215 });
-    await page.keyboard.down('Shift');
-    await clickCanvas(page, { x: 510, y: 220 });
-    await page.keyboard.up('Shift');
+    await clickItem(page, 'shared-rect');
+    await clickItem(page, 'shared-text', { shiftKey: true });
     await openPropertiesTab(page);
 
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
@@ -186,7 +182,7 @@ test.describe('editor properties flows', () => {
 
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([text]), 'properties-text.json');
-    await clickCanvas(page, { x: 260, y: 220 });
+    await clickItem(page, 'properties-text');
     await openPropertiesTab(page);
 
     await page.getByLabel('Text content').fill('Edited text from Properties');
@@ -285,7 +281,7 @@ test.describe('editor properties flows', () => {
       'properties-shape-line-image.json',
     );
 
-    await clickCanvas(page, { x: 220, y: 200 });
+    await clickItem(page, 'properties-rect');
     await openPropertiesTab(page);
     await page.getByLabel('Fill', { exact: true }).click();
     await page.getByLabel('Fill hex').fill('#123456ff');
@@ -299,14 +295,14 @@ test.describe('editor properties flows', () => {
     await page.getByRole('spinbutton', { name: 'Rotation' }).fill('22');
     await page.getByRole('spinbutton', { name: 'Rotation' }).press('Enter');
 
-    await clickCanvas(page, { x: 220, y: 540 });
+    await clickItem(page, 'properties-line');
     await openPropertiesTab(page);
     await page.getByRole('spinbutton', { name: 'Width value' }).fill('9');
     await page.getByRole('spinbutton', { name: 'Start X' }).fill('150');
     await page.getByRole('spinbutton', { name: 'End Y' }).fill('590');
     await page.getByRole('spinbutton', { name: 'End Y' }).press('Enter');
 
-    await clickCanvas(page, { x: 620, y: 220 });
+    await clickItem(page, 'properties-image');
     await openPropertiesTab(page);
     await page.getByRole('button', { name: 'Mirror' }).click();
     await expect(page.getByRole('button', { name: 'Mirror' })).toHaveAttribute(
@@ -366,7 +362,7 @@ test.describe('editor properties flows', () => {
 
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'properties-blur.json');
-    await clickCanvas(page, { x: 280, y: 250 });
+    await clickItem(page, 'blur-rect');
     await openPropertiesTab(page);
 
     await page.getByRole('button', { name: 'Blur' }).click();
@@ -413,7 +409,7 @@ test.describe('editor properties flows', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle, text]), 'properties-gradients.json');
 
-    await clickCanvas(page, { x: 270, y: 240 });
+    await clickItem(page, 'gradient-rect');
     await openPropertiesTab(page);
     let inspector = page.getByTestId('properties-tab-body');
     await expect(inspector.getByLabel('Secondary fill')).toBeEnabled();
@@ -422,7 +418,7 @@ test.describe('editor properties flows', () => {
     await page.getByLabel('Secondary fill hex').fill('#00ff00ff');
     await page.getByLabel('Secondary fill hex').press('Enter');
 
-    await clickCanvas(page, { x: 580, y: 220 });
+    await clickItem(page, 'gradient-text');
     await openPropertiesTab(page);
     inspector = page.getByTestId('properties-tab-body');
     await inspector.getByRole('button', { name: 'Toggle gradient' }).click();
@@ -472,7 +468,7 @@ test.describe('editor properties flows', () => {
       createProjectDocument([rectangle]),
       'properties-drag-undo.json',
     );
-    await clickCanvas(page, { x: 280, y: 250 });
+    await clickItem(page, 'drag-rect');
     await openPropertiesTab(page);
 
     await page.getByRole('button', { name: 'Geometry' }).click();
@@ -550,7 +546,7 @@ test.describe('editor properties flows', () => {
     const inspector = page.getByTestId('properties-tab-body');
 
     // Rectangle: stroke width, corner radius, rotation, blur radius, shadow fields
-    await clickCanvas(page, { x: 230, y: 220 });
+    await clickItem(page, 'slider-rect');
     await openPropertiesTab(page);
     await expect(inspector.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
     await expectSliders(page, 'Stroke', ['Width']);
@@ -559,7 +555,7 @@ test.describe('editor properties flows', () => {
     await expectSliders(page, 'Shadow', ['Blur Radius', 'Opacity', 'Offset X', 'Offset Y']);
 
     // Text: font size, line height, character spacing, rotation
-    await clickCanvas(page, { x: 560, y: 208 });
+    await clickItem(page, 'slider-text');
     await openPropertiesTab(page);
     await expect(inspector.getByRole('heading', { name: 'Text' })).toBeVisible();
     await expectSliders(page, 'Text', ['Size']);
@@ -569,7 +565,7 @@ test.describe('editor properties flows', () => {
     await expectSliders(page, 'Geometry', ['Rotation']);
 
     // Image: opacity, rotation
-    await clickCanvas(page, { x: 220, y: 420 });
+    await clickItem(page, 'slider-image');
     await openPropertiesTab(page);
     await expect(inspector.getByText('Slider Image')).toBeVisible();
     await expectSliders(page, 'Image', ['Opacity']);

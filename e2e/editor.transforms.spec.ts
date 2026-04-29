@@ -1,19 +1,20 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  clickCanvas,
+  clickItem,
   collectLeafNodes,
+  dragEmptyCanvas,
+  dragHandle,
+  dragItemTo,
   createImageFixture,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
-  dragCanvas,
   dragCanvasWithModifier,
   dragCanvasHookToPoint,
   middleDragCanvas,
   openFreshEditor,
-  waitForDoubleClickCadence,
   openLayersTab,
   openPropertiesTab,
   readStageDebug,
@@ -79,12 +80,11 @@ test.describe('editor transforms', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     await test.step('ST-01: drag', async () => {
-      await clickCanvas(page, { x: 240, y: 200 });
+      await clickItem(page, 'drag-resize-rect');
       await openPropertiesTab(page);
       await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
-      await waitForDoubleClickCadence(page);
 
-      await dragCanvas(page, { x: 240, y: 200 }, { x: 360, y: 300 });
+      await dragItemTo(page, 'drag-resize-rect', 420, 300);
 
       await openPropertiesTab(page);
       await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
@@ -148,12 +148,11 @@ test.describe('editor transforms', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     // ST-04: Select and drag
-    await clickCanvas(page, { x: 250, y: 180 });
+    await clickItem(page, 'transform-text');
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
 
-    await waitForDoubleClickCadence(page);
-    await dragCanvas(page, { x: 250, y: 180 }, { x: 370, y: 260 });
+    await dragItemTo(page, 'transform-text', 410, 266);
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
 
@@ -231,12 +230,11 @@ test.describe('editor transforms', () => {
     await setCanvasTestHooksEnabled(page, false);
 
     // ST-10: Select and drag the line body
-    await clickCanvas(page, { x: 260, y: 540 });
+    await clickItem(page, 'transform-line');
     const stageDebug = await readStageDebug(page);
     expect(stageDebug.hasLineHandles).toBe(true);
-    await waitForDoubleClickCadence(page);
 
-    await dragCanvas(page, { x: 260, y: 540 }, { x: 360, y: 620 });
+    await dragItemTo(page, 'transform-line', 360, 620);
 
     let savedProject = await saveAndReadProject(page);
     let savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
@@ -248,10 +246,8 @@ test.describe('editor transforms', () => {
     expect(Number(savedLine?.endY)).toBeGreaterThan(620);
 
     // ST-11: Drag start endpoint
-    // The start handle should be near the saved startX/startY
     const startX = Number(savedLine?.startX);
-    const startY = Number(savedLine?.startY);
-    await dragCanvas(page, { x: startX, y: startY }, { x: startX - 80, y: startY + 40 });
+    await dragHandle(page, 'transform-line', 'line-start', -80, 40);
 
     savedProject = await saveAndReadProject(page);
     savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
@@ -261,8 +257,7 @@ test.describe('editor transforms', () => {
 
     // ST-12: Drag end endpoint
     const endX = Number(savedLine?.endX);
-    const endY = Number(savedLine?.endY);
-    await dragCanvas(page, { x: endX, y: endY }, { x: endX + 80, y: endY - 30 });
+    await dragHandle(page, 'transform-line', 'line-end', 80, -30);
 
     savedProject = await saveAndReadProject(page);
     savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
@@ -287,12 +282,12 @@ test.describe('editor transforms', () => {
     await uploadProject(page, createProjectDocument([image]), 'transform-image.json');
 
     // ST-07: Select and drag
-    await clickCanvas(page, { x: 600, y: 325 });
+    await clickItem(page, image.id);
     await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(true);
     await openPropertiesTab(page);
     await expect(page.getByLabel('Preserve aspect ratio')).toBeVisible();
 
-    await dragCanvas(page, { x: 600, y: 325 }, { x: 720, y: 405 });
+    await dragItemTo(page, image.id, 720, 405);
 
     // ST-08: Resize via real handle bounding box
     const resizeBox = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
@@ -377,7 +372,7 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, document, 'rotated-snap-enabled.json');
     await setCanvasTestHooksEnabled(page, false);
-    await dragCanvas(page, clickPoint, dragTarget);
+    await dragEmptyCanvas(page, clickPoint, dragTarget);
     const snappedProject = await saveAndReadProject(page);
 
     await openFreshEditor(page);
@@ -423,16 +418,20 @@ test.describe('editor transforms', () => {
 
     const document = createProjectDocument([movable, sibling]);
 
+    // Original test dragged from canvas (300,180) to (584,180) — a 284px
+    // delta.  dragItemTo starts at the item's center (320,180); shift the
+    // target by the same offset to preserve the exact cursor delta the test
+    // was written against (so the snap-vs-no-snap comparison stays valid).
     await openFreshEditor(page);
     await uploadProject(page, document, 'snap-enabled.json');
-    await clickCanvas(page, { x: 300, y: 180 });
-    await dragCanvas(page, { x: 300, y: 180 }, { x: 584, y: 180 });
+    await clickItem(page, movable.id);
+    await dragItemTo(page, movable.id, 604, 180);
     const snappedProject = await saveAndReadProject(page);
 
     await openFreshEditor(page);
     await uploadProject(page, document, 'snap-disabled.json');
-    await clickCanvas(page, { x: 300, y: 180 });
-    await dragCanvasWithModifier(page, 'Control', { x: 300, y: 180 }, { x: 584, y: 180 });
+    await clickItem(page, movable.id);
+    await dragItemTo(page, movable.id, 604, 180, { ctrlKey: true });
     const unsnappedProject = await saveAndReadProject(page);
 
     const snappedItem = collectLeafNodes(snappedProject.nodes as Array<Record<string, unknown>>).find(
@@ -471,11 +470,11 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'off-canvas-transform-rect.json');
 
-    await clickCanvas(page, { x: -120, y: 210 });
+    await clickItem(page, 'off-canvas-transform-rect');
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.hasShapeHandles).toBe(true);
 
-    await dragCanvas(page, { x: -180, y: 210 }, { x: -260, y: 210 });
+    await dragHandle(page, 'off-canvas-transform-rect', 'middle-left', -80, 0);
 
     stageDebug = await readStageDebug(page);
     expect(stageDebug.hasShapeHandles).toBe(true);
@@ -504,7 +503,7 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'middle-pan-selected-rect.json');
 
-    await clickCanvas(page, { x: 240, y: 200 });
+    await clickItem(page, 'middle-pan-selected-rect');
     const initialDebug = await readStageDebug(page);
     expect(initialDebug.hasShapeHandles).toBe(true);
 
@@ -545,16 +544,10 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'shift-toggle-rect.json');
 
-    const bodyPoint = { x: 320, y: 180 };
-    await clickCanvas(page, bodyPoint);
+    await clickItem(page, rectangle.id);
     expect((await readStageDebug(page)).hasShapeHandles).toBe(true);
 
-    await page.keyboard.down('Shift');
-    try {
-      await clickCanvas(page, bodyPoint);
-    } finally {
-      await page.keyboard.up('Shift');
-    }
+    await clickItem(page, rectangle.id, { shiftKey: true });
 
     const debug = await readStageDebug(page);
     expect(debug.hasShapeHandles).toBe(false);
@@ -595,7 +588,7 @@ test.describe('editor transforms', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([first, second]));
 
-    await dragCanvas(page, { x: 80, y: 80 }, { x: 340, y: 220 });
+    await dragEmptyCanvas(page, { x: 80, y: 80 }, { x: 340, y: 220 });
     await expect(page.getByTestId('canvas-group-rotater')).toBeAttached();
 
     const rotatedDebug = await readStageDebug(page);

@@ -61,6 +61,7 @@ export function CanvasStage({
   );
 
   const [lastTestHookEvent, setLastTestHookEvent] = useState<string | null>(null);
+  const [rendererReady, setRendererReady] = useState(false);
 
   const viewportState = useCanvasViewport({
     activeTool,
@@ -202,6 +203,7 @@ export function CanvasStage({
       <PixiCanvasScene
         ref={stageRef}
         activeTool={activeTool}
+        onRendererReady={() => setRendererReady(true)}
         beginCropFullResize={beginCropFullResize}
         beginCropFullRotate={beginCropFullRotate}
         beginCropPan={beginCropPan}
@@ -262,7 +264,9 @@ export function CanvasStage({
           selectedRenderedItem={selectedRenderedItem}
           selectedShapeHandleRects={selectedShapeHandleRects}
           session={session as never}
+          rendererReady={rendererReady}
           showGroupInteractionHooks={showGroupInteractionHooks}
+          stageRef={stageRef}
           subgroupOutlineFrames={subgroupOutlineFrames}
           viewportRef={viewport.viewportRef}
           viewportSize={viewport.viewportSize}
@@ -404,10 +408,12 @@ function CanvasStageDebug({
   selectedItemViewportRect,
   selectedLineHandleRects,
   selectedNode,
+  rendererReady,
   selectedRenderedItem,
   selectedShapeHandleRects,
   session,
   showGroupInteractionHooks,
+  stageRef,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
@@ -429,6 +435,7 @@ function CanvasStageDebug({
     previewItem,
     renderedItems,
     renderedSelectedItems,
+    rendererReady,
     selectedDocumentItem,
     lastDrilldownSource,
     selectedNodeIds,
@@ -439,6 +446,7 @@ function CanvasStageDebug({
     selectedShapeHandleRects,
     session,
     showGroupInteractionHooks,
+    stageRef,
     subgroupOutlineFrames,
     viewportRef,
     viewportSize,

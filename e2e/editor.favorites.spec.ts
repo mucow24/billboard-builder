@@ -3,7 +3,8 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import {
-  clickCanvas,
+  clickEmptyCanvas,
+  clickItem,
   createProjectDocument,
   createGroupedProjectDocument,
   createRectangleFixture,
@@ -39,7 +40,7 @@ test.describe('editor favorite library flows', () => {
       'favorite-library.json',
     );
 
-    await clickCanvas(page, { x: 240, y: 220 });
+    await clickItem(page, 'favorite-rectangle');
     await page.getByRole('button', { name: 'Save as favorite' }).click();
     await expect(page.getByRole('status')).toHaveText('Added to favorites');
 
@@ -81,13 +82,13 @@ test.describe('editor favorite library flows', () => {
     );
 
     // Save first item as favorite
-    await clickCanvas(page, { x: 140, y: 140 });
+    await clickItem(page, 'rect-a');
     await page.getByRole('button', { name: 'Save as favorite' }).click();
     await expect(page.getByRole('status')).toHaveText('Added to favorites');
 
     // Deselect, then save second item as favorite
-    await clickCanvas(page, { x: 500, y: 500 });
-    await clickCanvas(page, { x: 340, y: 340 });
+    await clickEmptyCanvas(page, { x: 500, y: 500 });
+    await clickItem(page, 'rect-b');
     await page.getByRole('button', { name: 'Save as favorite' }).click();
     await expect(page.getByRole('status')).toHaveText('Added to favorites');
 
@@ -141,13 +142,13 @@ test.describe('editor favorite library flows', () => {
     );
 
     // Save first item as favorite
-    await clickCanvas(page, { x: 140, y: 140 });
+    await clickItem(page, 'rect-c');
     await page.getByRole('button', { name: 'Save as favorite' }).click();
     await expect(page.getByRole('status')).toHaveText('Added to favorites');
 
     // Deselect, then save second item as favorite
-    await clickCanvas(page, { x: 500, y: 500 });
-    await clickCanvas(page, { x: 340, y: 340 });
+    await clickEmptyCanvas(page, { x: 500, y: 500 });
+    await clickItem(page, 'rect-d');
     await page.getByRole('button', { name: 'Save as favorite' }).click();
     await expect(page.getByRole('status')).toHaveText('Added to favorites');
 
@@ -188,13 +189,9 @@ test.describe('editor favorite library flows', () => {
 
     // Save three rectangles as favorites. uniquifyFavoriteName produces:
     //   "Rectangle favorite", "Rectangle favorite (2)", "Rectangle favorite (3)".
-    for (const { x, y } of [
-      { x: 120, y: 120 },
-      { x: 280, y: 280 },
-      { x: 460, y: 460 },
-    ]) {
-      await clickCanvas(page, { x: 600, y: 600 }); // deselect
-      await clickCanvas(page, { x, y });
+    for (const id of ['rect-e', 'rect-f', 'rect-g']) {
+      await clickEmptyCanvas(page, { x: 600, y: 600 }); // deselect
+      await clickItem(page, id);
       await page.getByRole('button', { name: 'Save as favorite' }).click();
       await expect(page.getByRole('status')).toHaveText('Added to favorites');
     }
