@@ -19,6 +19,10 @@ describe('useCanvasDebugSnapshot', () => {
 
     const { result, unmount } = renderHook(() =>
       useCanvasDebugSnapshot({
+        beginGroupDrag: () => {},
+        beginGroupResize: () => {},
+        beginGroupRotate: () => {},
+        startPanDrag: () => {},
         groupHandleViewportPoints: { 'middle-right': { x: 200, y: 160 } },
         groupOverlayFrame: { bounds: { x: 10, y: 20, width: 80, height: 50 }, rotation: 15 },
         groupOverlayViewportRect: { left: 100, top: 120, width: 160, height: 100 },
@@ -133,6 +137,10 @@ describe('useCanvasDebugSnapshot', () => {
 
     renderHook(() =>
       useCanvasDebugSnapshot({
+        beginGroupDrag: () => {},
+        beginGroupResize: () => {},
+        beginGroupRotate: () => {},
+        startPanDrag: () => {},
         groupHandleViewportPoints: null,
         groupOverlayFrame: null,
         groupOverlayViewportRect: null,

@@ -240,6 +240,9 @@ export function CanvasStage({
       />
       {debugMode ? (
         <CanvasStageDebug
+          beginGroupDrag={beginGroupDrag}
+          beginGroupResize={beginGroupResize}
+          beginGroupRotate={beginGroupRotate}
           cropFullImageHandleViewportPoints={cropFullImageHandleViewportPoints}
           cropFullImageRotaterViewportPoint={cropFullImageRotaterViewportPoint}
           cropHandleViewportPoints={cropHandleViewportPoints}
@@ -267,6 +270,7 @@ export function CanvasStage({
           rendererReady={rendererReady}
           showGroupInteractionHooks={showGroupInteractionHooks}
           stageRef={stageRef}
+          startPanDrag={viewport.startPanDrag}
           subgroupOutlineFrames={subgroupOutlineFrames}
           viewportRef={viewport.viewportRef}
           viewportSize={viewport.viewportSize}
@@ -387,6 +391,9 @@ function toBoundsCueStyle(rect: { left: number; top: number; width: number; heig
 }
 
 function CanvasStageDebug({
+  beginGroupDrag,
+  beginGroupResize,
+  beginGroupRotate,
   cropFullImageHandleViewportPoints,
   cropFullImageRotaterViewportPoint,
   cropHandleViewportPoints,
@@ -414,12 +421,16 @@ function CanvasStageDebug({
   session,
   showGroupInteractionHooks,
   stageRef,
+  startPanDrag,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
   zoom,
 }: Parameters<typeof useCanvasDebugSnapshot>[0]) {
   const debugInfo = useCanvasDebugSnapshot({
+    beginGroupDrag,
+    beginGroupResize,
+    beginGroupRotate,
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,
     cropHandleViewportPoints,
@@ -447,6 +458,7 @@ function CanvasStageDebug({
     session,
     showGroupInteractionHooks,
     stageRef,
+    startPanDrag,
     subgroupOutlineFrames,
     viewportRef,
     viewportSize,

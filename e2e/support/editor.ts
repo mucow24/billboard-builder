@@ -1132,6 +1132,50 @@ export async function beginCanvasDrag(page: Page, from: CanvasPoint) {
   );
 }
 
+export type GroupHandleName =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'middle-left'
+  | 'middle-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right'
+  | 'rotater'
+  | 'overlay';
+
+/**
+ * Begin a drag from a group-overlay handle (resize / rotater / body).
+ *
+ * Replaces the legacy `beginCanvasHookDrag('canvas-group-handle-*')` flow
+ * which read the test-hook DOM div's `boundingBox()` to find the handle.
+ * Under CPU load, the hook divs sometimes haven't re-rendered to their
+ * post-commit position when boundingBox is read, so the click lands on
+ * the overlay body instead of the handle (group-drag instead of
+ * group-resize).  The in-page version reads handle positions directly
+ * from React state, eliminating the DOM-render race.
+ *
+ * Pair with `movePointerToCanvasPoint` and `releasePointer` like the
+ * legacy hook drag.
+ */
+export async function beginGroupHandleDrag(
+  page: Page,
+  handle: GroupHandleName,
+  opts: ClickOpts = {},
+) {
+  await flushCanvasFrames(page);
+  await page.evaluate(
+    ({ handle, opts }) => {
+      const api = window.__BB_TEST__;
+      if (!api?.beginGroupHandleDrag) {
+        throw new Error('__BB_TEST__.beginGroupHandleDrag is not available');
+      }
+      api.beginGroupHandleDrag(handle, opts);
+    },
+    { handle, opts },
+  );
+}
+
 export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint, _steps = 18) {
   await page.evaluate(
     ({ destination }) => {

@@ -19,6 +19,8 @@
 import { useEffect, useRef } from 'react';
 
 import type { CanvasItem, LineCanvasItem } from '../../document/documentTypes';
+import type { ResizeHandle } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 import type { Point } from '../transformGeometry';
 import { getItemAABB } from '../selectionGeometry';
 import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
@@ -36,6 +38,14 @@ export type ResizeHandleName =
   | 'bottom-right';
 
 export type HandleName = ResizeHandleName | 'rotater' | 'line-start' | 'line-end';
+
+/**
+ * Group-overlay handle target.  `overlay` drags from the group overlay's
+ * center (e.g. for a body drag); the named resize handles and `rotater`
+ * dispatch from their current positions in `groupHandleViewportPoints` /
+ * `groupRotaterViewportPoint`.
+ */
+export type GroupHandleName = ResizeHandleName | 'rotater' | 'overlay';
 
 export interface ClickOpts {
   shiftKey?: boolean;
@@ -88,6 +98,13 @@ export interface BBTestApi {
    * `releaseDrag` for tests that need to inspect mid-drag state.
    */
   beginDrag?: (canvasX: number, canvasY: number, opts?: ClickOpts & { button?: number }) => void;
+  /**
+   * Start a drag from a group-overlay handle (resize / rotater / overlay
+   * body).  Reads handle positions from current React state — no DOM
+   * boundingBox lookup, no test-hook divs needed.  Use with
+   * `movePointerCanvas` and `releaseDrag` to complete the gesture.
+   */
+  beginGroupHandleDrag?: (handle: GroupHandleName, opts?: ClickOpts) => void;
   /** Move the pointer to a canvas point (during an in-progress drag, or as a hover). */
   movePointerCanvas?: (canvasX: number, canvasY: number, opts?: ClickOpts) => void;
   /** Move the pointer to a client (page) coord — for gestures originated outside the canvas (test-hook DOM elements). */
@@ -118,6 +135,29 @@ interface UseCanvasTestApiParams {
   zoom: number;
   /** Set to true once Pixi `<Application>`'s `onInit` has fired. */
   rendererReady: boolean;
+  /** Group-overlay handle positions in viewport space, keyed by name. */
+  groupHandleViewportPoints: Record<string, Point> | null;
+  /** Group rotater handle position in viewport space. */
+  groupRotaterViewportPoint: Point | null;
+  /** Group overlay rect in viewport space, used for body-drag gestures. */
+  groupOverlayViewportRect: { left: number; top: number; width: number; height: number } | null;
+  /**
+   * Editor session functions for group-overlay gestures.  Calling these
+   * directly (the same path the test-hook DOM divs use) bypasses
+   * canvas-coord hit-testing entirely, which lets us start a group
+   * resize/rotate/drag without depending on a Pixi-rendered handle being
+   * present at a specific screen coord — eliminating the under-load
+   * race where React hasn't finished rendering the handles yet.
+   */
+  beginGroupDrag: (pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupResize: (
+    handle: ResizeHandle,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
+  /** Pan the viewport (used for middle-button-drag-on-group gestures). */
+  startPanDrag: (pointer: Point) => void;
 }
 
 export function useCanvasTestApi({
@@ -126,6 +166,13 @@ export function useCanvasTestApi({
   pan,
   zoom,
   rendererReady,
+  groupHandleViewportPoints,
+  groupRotaterViewportPoint,
+  groupOverlayViewportRect,
+  beginGroupDrag,
+  beginGroupResize,
+  beginGroupRotate,
+  startPanDrag,
 }: UseCanvasTestApiParams) {
   // Mirror inputs into refs so the registered methods always observe the
   // current values.  Re-registering on every render would churn `__BB_TEST__`
@@ -140,6 +187,20 @@ export function useCanvasTestApi({
   zoomRef.current = zoom;
   const rendererReadyRef = useRef(rendererReady);
   rendererReadyRef.current = rendererReady;
+  const groupHandleViewportPointsRef = useRef(groupHandleViewportPoints);
+  groupHandleViewportPointsRef.current = groupHandleViewportPoints;
+  const groupRotaterViewportPointRef = useRef(groupRotaterViewportPoint);
+  groupRotaterViewportPointRef.current = groupRotaterViewportPoint;
+  const groupOverlayViewportRectRef = useRef(groupOverlayViewportRect);
+  groupOverlayViewportRectRef.current = groupOverlayViewportRect;
+  const beginGroupDragRef = useRef(beginGroupDrag);
+  beginGroupDragRef.current = beginGroupDrag;
+  const beginGroupResizeRef = useRef(beginGroupResize);
+  beginGroupResizeRef.current = beginGroupResize;
+  const beginGroupRotateRef = useRef(beginGroupRotate);
+  beginGroupRotateRef.current = beginGroupRotate;
+  const startPanDragRef = useRef(startPanDrag);
+  startPanDragRef.current = startPanDrag;
 
   useEffect(() => {
     // Mirror Playwright's modifier-key state so synthetic events carry the
@@ -486,6 +547,71 @@ export function useCanvasTestApi({
       lastPointerClient = { clientX, clientY, opts: merged };
     }
 
+    function beginGroupHandleDrag(handle: GroupHandleName, opts: ClickOpts = {}) {
+      const merged = applyHeldModifiers(opts);
+      const canvas = requireCanvas();
+      // Read group geometry FRESH from refs.  These are canonical React state,
+      // so they're the same source the test-hook DOM divs render from — but
+      // we don't have to wait for the divs to position before clicking.
+      let viewportPoint: Point;
+      if (handle === 'rotater') {
+        const p = groupRotaterViewportPointRef.current;
+        if (!p) {
+          throw new Error('__BB_TEST__: no group rotater available — is a group selected?');
+        }
+        viewportPoint = p;
+      } else if (handle === 'overlay') {
+        const r = groupOverlayViewportRectRef.current;
+        if (!r) {
+          throw new Error('__BB_TEST__: no group overlay rect available — is a group selected?');
+        }
+        viewportPoint = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      } else {
+        const points = groupHandleViewportPointsRef.current;
+        const p = points?.[handle];
+        if (!p) {
+          throw new Error(
+            `__BB_TEST__: no group handle "${handle}" — is a group selected? ` +
+              `Available: [${points ? Object.keys(points).join(', ') : 'none'}]`,
+          );
+        }
+        viewportPoint = p;
+      }
+      // Convert viewport (screen-relative-to-canvas) to canvas-coord pointer.
+      const canvasPointer: Point = {
+        x: (viewportPoint.x - panRef.current.x) / zoomRef.current,
+        y: (viewportPoint.y - panRef.current.y) / zoomRef.current,
+      };
+      const rect = canvas.getBoundingClientRect();
+      const clientX = rect.left + viewportPoint.x;
+      const clientY = rect.top + viewportPoint.y;
+
+      // Middle button = pan, regardless of which handle was targeted.  The
+      // editor's existing test-hook divs route middle-button to startPanDrag;
+      // mirror that.
+      if (merged.button === 1) {
+        startPanDragRef.current(viewportPoint);
+        lastPointerClient = { clientX, clientY, opts: merged };
+        return;
+      }
+
+      // Call the editor's begin* function directly with source 'overlay',
+      // bypassing the canvas event system.  Same path the test-hook DOM divs
+      // take — no Pixi hit-testing, no DOM stale-position race.
+      const source: PointerGestureSource = 'overlay';
+      if (handle === 'rotater') {
+        beginGroupRotateRef.current(canvasPointer, source);
+      } else if (handle === 'overlay') {
+        beginGroupDragRef.current(canvasPointer, source);
+      } else {
+        beginGroupResizeRef.current(handle as ResizeHandle, canvasPointer, source);
+      }
+      // Subsequent movePointerCanvas / releaseDrag dispatch on the canvas;
+      // the editor's window mousemove / mouseup listeners pick those up and
+      // advance the now-active session.
+      lastPointerClient = { clientX, clientY, opts: merged };
+    }
+
     function movePointerCanvas(canvasX: number, canvasY: number, opts: ClickOpts = {}) {
       const merged = applyHeldModifiers(opts);
       const { clientX, clientY } = canvasPointToClient({ x: canvasX, y: canvasY });
@@ -536,6 +662,7 @@ export function useCanvasTestApi({
       clickEmptyCanvas,
       dragEmptyCanvas,
       beginDrag,
+      beginGroupHandleDrag,
       movePointerCanvas,
       movePointerClient,
       releaseDrag,
@@ -556,6 +683,7 @@ export function useCanvasTestApi({
       delete api.clickEmptyCanvas;
       delete api.dragEmptyCanvas;
       delete api.beginDrag;
+      delete api.beginGroupHandleDrag;
       delete api.movePointerCanvas;
       delete api.movePointerClient;
       delete api.releaseDrag;

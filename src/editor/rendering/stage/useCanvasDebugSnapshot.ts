@@ -7,7 +7,9 @@ import {
   localToStage,
   RESIZE_HANDLE_NAMES,
   type Point,
+  type ResizeHandle,
 } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
 import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
 import { getRenderBox } from '../transformGeometry';
 import { useCanvasTestApi } from './canvasTestApi';
@@ -74,6 +76,13 @@ function readViewportHookPoint(node: HTMLElement | null) {
 }
 
 interface UseCanvasDebugSnapshotParams {
+  beginGroupDrag: (pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupResize: (
+    handle: ResizeHandle,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
   cropFullImageHandleViewportPoints?: Record<string, Point> | null;
   cropFullImageRotaterViewportPoint?: Point | null;
   cropHandleViewportPoints?: Record<string, Point> | null;
@@ -111,6 +120,7 @@ interface UseCanvasDebugSnapshotParams {
   session: { kind: string; handle?: string } | null;
   showGroupInteractionHooks: boolean;
   stageRef: React.RefObject<CanvasRendererHandle | null>;
+  startPanDrag: (pointer: Point) => void;
   subgroupOutlineFrames: Array<{
     nodeId: string;
     bounds: { x: number; y: number; width: number; height: number };
@@ -121,6 +131,9 @@ interface UseCanvasDebugSnapshotParams {
 }
 
 export function useCanvasDebugSnapshot({
+  beginGroupDrag,
+  beginGroupResize,
+  beginGroupRotate,
   cropFullImageHandleViewportPoints = null,
   cropFullImageRotaterViewportPoint = null,
   cropHandleViewportPoints = null,
@@ -148,6 +161,7 @@ export function useCanvasDebugSnapshot({
   session,
   showGroupInteractionHooks,
   stageRef,
+  startPanDrag,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
@@ -155,7 +169,20 @@ export function useCanvasDebugSnapshot({
 }: UseCanvasDebugSnapshotParams) {
   // Register the in-page test API on `window.__BB_TEST__` for e2e tests to
   // drive item interactions by id rather than by canvas coordinates.
-  useCanvasTestApi({ stageRef, renderedItems, pan, zoom, rendererReady });
+  useCanvasTestApi({
+    stageRef,
+    renderedItems,
+    pan,
+    zoom,
+    rendererReady,
+    groupHandleViewportPoints,
+    groupRotaterViewportPoint,
+    groupOverlayViewportRect,
+    beginGroupDrag,
+    beginGroupResize,
+    beginGroupRotate,
+    startPanDrag,
+  });
 
   const debugInfo = useMemo(
     () => ({
