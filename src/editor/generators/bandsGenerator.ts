@@ -31,7 +31,11 @@ function drawBands(
       ctx.save();
       ctx.fillStyle = color;
       ctx.globalAlpha = params.stripeGlow;
-      ctx.filter = `blur(${Math.max(1, thickness * 0.35)}px)`;
+      // ctx.filter blur is in physical pixels and ignores ctx transforms,
+      // so multiply by the current x-scale to keep the glow consistent in
+      // logical units when the surface is rendered at a higher pixel scale.
+      const physicalScale = ctx.getTransform().a;
+      ctx.filter = `blur(${Math.max(1, thickness * 0.35) * physicalScale}px)`;
       ctx.beginPath();
       ctx.moveTo(cursor, -span / 2);
       ctx.lineTo(cursor + thickness, -span / 2);

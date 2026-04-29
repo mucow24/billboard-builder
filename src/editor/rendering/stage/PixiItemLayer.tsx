@@ -301,7 +301,7 @@ function buildImageAdjustmentFilters(
 // Image content component (uses hooks for async image loading + masking)
 // ---------------------------------------------------------------------------
 
-export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
+export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zoom?: number }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
 
@@ -321,10 +321,15 @@ export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
     [imageElement],
   );
 
-  const adjustmentFilters = useMemo(
-    () => buildImageAdjustmentFilters(item.adjustments),
-    [item.adjustments],
-  );
+  const adjustmentFilters = useMemo(() => {
+    const filters = buildImageAdjustmentFilters(item.adjustments);
+    if (!filters) return undefined;
+    // Match filter resolution to displayed size so color-corrected pixels
+    // stay sharp on zoom-in (filters render through an offscreen FBO).
+    const filterResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+    for (const f of filters) f.resolution = filterResolution;
+    return filters;
+  }, [item.adjustments, zoom]);
 
   const drawClipMask = useCallback(
     (g: Graphics) => {
@@ -368,16 +373,28 @@ export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
 // Generator content component (renders full-canvas pattern via Canvas2D texture)
 // ---------------------------------------------------------------------------
 
+// Quantize the zoom-driven pixel scale to powers of two so we don't
+// re-rasterize the generator on every zoom tick. Caps at 4× to bound
+// memory (a 2048² canvas at 4× is 8192² — ~256 MB at RGBA8).
+function quantizeGeneratorPixelScale(zoom: number): number {
+  if (zoom <= 1) return 1;
+  if (zoom <= 2) return 2;
+  return 4;
+}
+
 function PixiGeneratorContent({
   item,
   canvasWidth,
   canvasHeight,
+  zoom,
 }: {
   item: GeneratorCanvasItem;
   canvasWidth: number;
   canvasHeight: number;
+  zoom: number;
 }) {
-  const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight);
+  const pixelScale = quantizeGeneratorPixelScale(zoom);
+  const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight, pixelScale);
 
   const texture = useMemo(
     () => (generatorCanvas ? Texture.from(generatorCanvas) : Texture.EMPTY),
@@ -389,7 +406,7 @@ function PixiGeneratorContent({
     if (texture !== Texture.EMPTY) {
       texture.source.update();
     }
-  }, [texture, item.generatorParams, item.seed, canvasWidth, canvasHeight]);
+  }, [texture, item.generatorParams, item.seed, canvasWidth, canvasHeight, pixelScale]);
 
   if (!generatorCanvas) return null;
 
@@ -579,6 +596,12 @@ const PixiItemView = memo(function PixiItemView({
         }));
       }
     }
+    // Filters render their input to an offscreen texture at filter.resolution
+    // (default = renderer resolution). When zoom > 1 that texture is magnified
+    // and the result blurs. Match the resolution to the displayed size so
+    // filtered content stays sharp on zoom-in.
+    const filterResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+    for (const f of filters) f.resolution = filterResolution;
     return filters.length > 0 ? filters : undefined;
   }, [item.blurRadius, item.shadow, item.kind, zoom]);
 
@@ -640,6 +663,7 @@ const PixiItemView = memo(function PixiItemView({
           item={item as GeneratorCanvasItem}
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
+          zoom={zoom}
         />
       </pixiContainer>
     );
@@ -664,7 +688,7 @@ const PixiItemView = memo(function PixiItemView({
       />
     );
   } else if (item.kind === 'image') {
-    children = <PixiImageContent item={item as ImageCanvasItem} />;
+    children = <PixiImageContent item={item as ImageCanvasItem} zoom={zoom} />;
   } else {
     children = <pixiGraphics draw={draw} eventMode="none" />;
   }
