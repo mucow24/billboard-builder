@@ -1715,6 +1715,13 @@ export async function readDownloadedPngSize(download: Download) {
 }
 
 export async function seedPersistence(page: Page, payload: string | Record<string, unknown>) {
+  // The app debounces autosave by 150ms after document/persistenceReady
+  // changes (`useCanvasPersistence`).  Right after `openFreshEditor` boots
+  // an empty document the timer is still running — if we seed IDB before it
+  // fires, the timer's save() races our write and silently overwrites it
+  // with the empty document.  Wait past the debounce so any pending
+  // autosave has completed before we write our test data.
+  await page.waitForTimeout(250);
   const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
   await page.evaluate(async ({ value, version }) => {
     await new Promise<void>((resolve, reject) => {

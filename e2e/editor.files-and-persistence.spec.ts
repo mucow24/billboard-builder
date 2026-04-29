@@ -231,10 +231,6 @@ test.describe('editor file and persistence flows', () => {
     await expect
       .poll(async () => (await readStageDebug(page)).renderedItemCount, {
         message: 'waiting for persisted item to render after reload',
-        // After a reload the app reads IDB and populates renderedItems.
-        // Under workers=8 contention the IDB read + document parse can run
-        // long; give it generous headroom — the poll exits the moment
-        // renderedItemCount goes >= 1 so happy paths are unaffected.
         timeout: 30_000,
       })
       .toBeGreaterThanOrEqual(1);
