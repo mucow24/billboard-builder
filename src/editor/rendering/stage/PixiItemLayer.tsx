@@ -649,8 +649,19 @@ const PixiItemView = memo(function PixiItemView({
   let children: React.ReactNode;
   if (item.kind === 'text') {
     const { style: textStyle, textX, textY } = buildTextStyleProps(item);
+    // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
+    // When zoom > 1 the texture is magnified and turns blurry, so scale
+    // resolution with zoom to keep glyphs sharp on zoom-in.
+    const textResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
     children = (
-      <pixiText text={item.text} style={textStyle} x={textX} y={textY} eventMode="none" />
+      <pixiText
+        text={item.text}
+        style={textStyle}
+        x={textX}
+        y={textY}
+        resolution={textResolution}
+        eventMode="none"
+      />
     );
   } else if (item.kind === 'image') {
     children = <PixiImageContent item={item as ImageCanvasItem} />;
