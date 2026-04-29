@@ -1,7 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BlurFilter, ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
+import { ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
 import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
+
+import { ClampingBlurFilter } from './clampingBlurFilter';
 
 import type {
   CanvasItem,
@@ -325,8 +327,10 @@ export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zo
     const filters = buildImageAdjustmentFilters(item.adjustments);
     if (!filters) return undefined;
     // Match filter resolution to displayed size so color-corrected pixels
-    // stay sharp on zoom-in (filters render through an offscreen FBO).
-    const filterResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+    // stay sharp on zoom-in. Cap at 2× so the FBO doesn't exceed the GPU's
+    // max texture size on large items at extreme zoom (clipping shows up as
+    // rectangular edges on filtered output).
+    const filterResolution = Math.min(2, Math.max(1, zoom)) * (window.devicePixelRatio || 1);
     for (const f of filters) f.resolution = filterResolution;
     return filters;
   }, [item.adjustments, zoom]);
@@ -581,27 +585,49 @@ const PixiItemView = memo(function PixiItemView({
   const itemFilters = useMemo(() => {
     const filters: Filter[] = [];
     if (item.blurRadius > 0) {
-      filters.push(new BlurFilter({ strength: item.blurRadius * zoom }));
+      const strength = item.blurRadius * zoom;
+      // ClampingBlurFilter is a Gaussian BlurFilter with shaders that clamp
+      // sample UVs to the input texture's active frame (uInputClamp).
+      // Pixi's stock BlurFilter samples raw UVs; TexturePool reuses power-
+      // of-two textures whose pixels between the frame and po2 boundary
+      // keep stale data from previous use, and the blur kernel pulls those
+      // bright values into the result. Clamping eliminates that read.
+      const blurFilter = new ClampingBlurFilter({
+        strength,
+        clipToViewport: false,
+      });
+      // With clamping in place, padding determines where the visible blur
+      // halo ends. Pixi's auto-padding (strength*2) cuts the Gaussian tail
+      // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
+      // so pad to 6× for a smooth fadeout.
+      blurFilter.padding = strength * 6;
+      filters.push(blurFilter);
     }
     if (item.kind !== 'text') {
       const s = item.shadow;
       const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
       if (hasShadow) {
-        filters.push(new DropShadowFilter({
+        const shadowBlur = (s.blur / 2) * zoom;
+        const shadowOffsetX = s.offsetX * zoom;
+        const shadowOffsetY = s.offsetY * zoom;
+        const shadowFilter = new DropShadowFilter({
           color: s.color,
           alpha: s.opacity,
-          blur: (s.blur / 2) * zoom,
-          offset: { x: s.offsetX * zoom, y: s.offsetY * zoom },
+          blur: shadowBlur,
+          offset: { x: shadowOffsetX, y: shadowOffsetY },
           quality: 8,
-        }));
+        });
+        shadowFilter.clipToViewport = false;
+        // DropShadowFilter wraps a Kawase blur whose reach scales with
+        // blur × quality. Auto-padding (offset + blur*2 + quality*4) clips
+        // the tail; extend it the same way as BlurFilter.
+        shadowFilter.padding =
+          Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
+          shadowBlur * 6 +
+          32;
+        filters.push(shadowFilter);
       }
     }
-    // Filters render their input to an offscreen texture at filter.resolution
-    // (default = renderer resolution). When zoom > 1 that texture is magnified
-    // and the result blurs. Match the resolution to the displayed size so
-    // filtered content stays sharp on zoom-in.
-    const filterResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
-    for (const f of filters) f.resolution = filterResolution;
     return filters.length > 0 ? filters : undefined;
   }, [item.blurRadius, item.shadow, item.kind, zoom]);
 
