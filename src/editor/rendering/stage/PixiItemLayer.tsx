@@ -1,7 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BlurFilter, ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
+import { ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
 import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
+
+import { ClampingBlurFilter } from './clampingBlurFilter';
 
 import type {
   CanvasItem,
@@ -301,7 +303,7 @@ function buildImageAdjustmentFilters(
 // Image content component (uses hooks for async image loading + masking)
 // ---------------------------------------------------------------------------
 
-export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
+export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zoom?: number }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
 
@@ -321,10 +323,17 @@ export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
     [imageElement],
   );
 
-  const adjustmentFilters = useMemo(
-    () => buildImageAdjustmentFilters(item.adjustments),
-    [item.adjustments],
-  );
+  const adjustmentFilters = useMemo(() => {
+    const filters = buildImageAdjustmentFilters(item.adjustments);
+    if (!filters) return undefined;
+    // Match filter resolution to displayed size so color-corrected pixels
+    // stay sharp on zoom-in. Cap at 2× so the FBO doesn't exceed the GPU's
+    // max texture size on large items at extreme zoom (clipping shows up as
+    // rectangular edges on filtered output).
+    const filterResolution = Math.min(2, Math.max(1, zoom)) * (window.devicePixelRatio || 1);
+    for (const f of filters) f.resolution = filterResolution;
+    return filters;
+  }, [item.adjustments, zoom]);
 
   const drawClipMask = useCallback(
     (g: Graphics) => {
@@ -368,16 +377,28 @@ export function PixiImageContent({ item }: { item: ImageCanvasItem }) {
 // Generator content component (renders full-canvas pattern via Canvas2D texture)
 // ---------------------------------------------------------------------------
 
+// Quantize the zoom-driven pixel scale to powers of two so we don't
+// re-rasterize the generator on every zoom tick. Caps at 4× to bound
+// memory (a 2048² canvas at 4× is 8192² — ~256 MB at RGBA8).
+function quantizeGeneratorPixelScale(zoom: number): number {
+  if (zoom <= 1) return 1;
+  if (zoom <= 2) return 2;
+  return 4;
+}
+
 function PixiGeneratorContent({
   item,
   canvasWidth,
   canvasHeight,
+  zoom,
 }: {
   item: GeneratorCanvasItem;
   canvasWidth: number;
   canvasHeight: number;
+  zoom: number;
 }) {
-  const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight);
+  const pixelScale = quantizeGeneratorPixelScale(zoom);
+  const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight, pixelScale);
 
   const texture = useMemo(
     () => (generatorCanvas ? Texture.from(generatorCanvas) : Texture.EMPTY),
@@ -389,7 +410,7 @@ function PixiGeneratorContent({
     if (texture !== Texture.EMPTY) {
       texture.source.update();
     }
-  }, [texture, item.generatorParams, item.seed, canvasWidth, canvasHeight]);
+  }, [texture, item.generatorParams, item.seed, canvasWidth, canvasHeight, pixelScale]);
 
   if (!generatorCanvas) return null;
 
@@ -564,19 +585,47 @@ const PixiItemView = memo(function PixiItemView({
   const itemFilters = useMemo(() => {
     const filters: Filter[] = [];
     if (item.blurRadius > 0) {
-      filters.push(new BlurFilter({ strength: item.blurRadius * zoom }));
+      const strength = item.blurRadius * zoom;
+      // ClampingBlurFilter is a Gaussian BlurFilter with shaders that clamp
+      // sample UVs to the input texture's active frame (uInputClamp).
+      // Pixi's stock BlurFilter samples raw UVs; TexturePool reuses power-
+      // of-two textures whose pixels between the frame and po2 boundary
+      // keep stale data from previous use, and the blur kernel pulls those
+      // bright values into the result. Clamping eliminates that read.
+      const blurFilter = new ClampingBlurFilter({
+        strength,
+        clipToViewport: false,
+      });
+      // With clamping in place, padding determines where the visible blur
+      // halo ends. Pixi's auto-padding (strength*2) cuts the Gaussian tail
+      // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
+      // so pad to 6× for a smooth fadeout.
+      blurFilter.padding = strength * 6;
+      filters.push(blurFilter);
     }
     if (item.kind !== 'text') {
       const s = item.shadow;
       const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
       if (hasShadow) {
-        filters.push(new DropShadowFilter({
+        const shadowBlur = (s.blur / 2) * zoom;
+        const shadowOffsetX = s.offsetX * zoom;
+        const shadowOffsetY = s.offsetY * zoom;
+        const shadowFilter = new DropShadowFilter({
           color: s.color,
           alpha: s.opacity,
-          blur: (s.blur / 2) * zoom,
-          offset: { x: s.offsetX * zoom, y: s.offsetY * zoom },
+          blur: shadowBlur,
+          offset: { x: shadowOffsetX, y: shadowOffsetY },
           quality: 8,
-        }));
+        });
+        shadowFilter.clipToViewport = false;
+        // DropShadowFilter wraps a Kawase blur whose reach scales with
+        // blur × quality. Auto-padding (offset + blur*2 + quality*4) clips
+        // the tail; extend it the same way as BlurFilter.
+        shadowFilter.padding =
+          Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
+          shadowBlur * 6 +
+          32;
+        filters.push(shadowFilter);
       }
     }
     return filters.length > 0 ? filters : undefined;
@@ -640,6 +689,7 @@ const PixiItemView = memo(function PixiItemView({
           item={item as GeneratorCanvasItem}
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
+          zoom={zoom}
         />
       </pixiContainer>
     );
@@ -649,11 +699,22 @@ const PixiItemView = memo(function PixiItemView({
   let children: React.ReactNode;
   if (item.kind === 'text') {
     const { style: textStyle, textX, textY } = buildTextStyleProps(item);
+    // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
+    // When zoom > 1 the texture is magnified and turns blurry, so scale
+    // resolution with zoom to keep glyphs sharp on zoom-in.
+    const textResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
     children = (
-      <pixiText text={item.text} style={textStyle} x={textX} y={textY} eventMode="none" />
+      <pixiText
+        text={item.text}
+        style={textStyle}
+        x={textX}
+        y={textY}
+        resolution={textResolution}
+        eventMode="none"
+      />
     );
   } else if (item.kind === 'image') {
-    children = <PixiImageContent item={item as ImageCanvasItem} />;
+    children = <PixiImageContent item={item as ImageCanvasItem} zoom={zoom} />;
   } else {
     children = <pixiGraphics draw={draw} eventMode="none" />;
   }

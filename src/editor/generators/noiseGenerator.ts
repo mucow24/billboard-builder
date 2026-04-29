@@ -28,11 +28,17 @@ export const noiseGeneratorSpec: GeneratorSpec<NoiseGeneratorParams> = {
       noiseCanvas = document.createElement('canvas');
       noiseCtx = noiseCanvas.getContext('2d');
     }
-    if (noiseCanvas.width !== w) noiseCanvas.width = w;
-    if (noiseCanvas.height !== h) noiseCanvas.height = h;
+    // Generate noise at the destination's physical pixel size so each output
+    // pixel has its own random sample. Without this, a logical-size noise
+    // canvas drawn into a scaled context produces blocky upscaled noise.
+    const t = ctx.getTransform();
+    const physW = Math.max(1, Math.round(w * t.a));
+    const physH = Math.max(1, Math.round(h * t.d));
+    if (noiseCanvas.width !== physW) noiseCanvas.width = physW;
+    if (noiseCanvas.height !== physH) noiseCanvas.height = physH;
     if (!noiseCtx) return;
 
-    const image = noiseCtx.createImageData(w, h);
+    const image = noiseCtx.createImageData(physW, physH);
     const data = image.data;
     const alpha = Math.round(255 * params.intensity);
     for (let i = 0; i < data.length; i += 4) {
@@ -45,6 +51,8 @@ export const noiseGeneratorSpec: GeneratorSpec<NoiseGeneratorParams> = {
     noiseCtx.putImageData(image, 0, 0);
     ctx.save();
     ctx.globalCompositeOperation = 'overlay';
+    // Bypass the caller's scale transform so noise lands 1:1 in physical pixels.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(noiseCanvas, 0, 0);
     ctx.restore();
   },
