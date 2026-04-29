@@ -35,6 +35,7 @@ export function TextInput({
           disabled={disabled}
           id={inputId}
           value={displayedValue}
+          wrap="off"
           onChange={(event) => onChange(event.target.value)}
         />
       ) : (

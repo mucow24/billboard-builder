@@ -33,8 +33,11 @@ export function measureWordWrappedTextHeight(
   }
 
   context.font = getRenderableCanvasFontDeclaration(item);
-  const spaceWidth = context.measureText(' ').width + item.letterSpacing;
   let lineCount = 0;
+
+  const measureToken = (token: string): number =>
+    context.measureText(token).width +
+    Math.max(token.length - 1, 0) * item.letterSpacing;
 
   for (const paragraph of paragraphs) {
     if (paragraph.length === 0) {
@@ -42,26 +45,30 @@ export function measureWordWrappedTextHeight(
       continue;
     }
 
-    const words = paragraph.split(/\s+/).filter(Boolean);
+    // Tokenize into runs of whitespace and runs of non-whitespace so consecutive
+    // spaces are preserved (matches Pixi `whiteSpace: 'pre-wrap'` rendering).
+    const tokens = paragraph.match(/\s+|\S+/g) ?? [];
     let currentLineWidth = 0;
     let currentLineHasContent = false;
 
-    for (const word of words) {
-      const nextWidth =
-        context.measureText(word).width +
-        Math.max(word.length - 1, 0) * item.letterSpacing;
-      const candidateWidth = currentLineHasContent
-        ? currentLineWidth + spaceWidth + nextWidth
-        : nextWidth;
+    for (const token of tokens) {
+      const isWhitespace = /^\s/.test(token);
+      const tokenWidth = measureToken(token);
 
-      if (currentLineHasContent && candidateWidth > safeWidth) {
-        lineCount += 1;
-        currentLineWidth = nextWidth;
+      if (isWhitespace) {
+        currentLineWidth += tokenWidth;
         currentLineHasContent = true;
         continue;
       }
 
-      currentLineWidth = candidateWidth;
+      if (currentLineHasContent && currentLineWidth + tokenWidth > safeWidth) {
+        lineCount += 1;
+        currentLineWidth = tokenWidth;
+        currentLineHasContent = true;
+        continue;
+      }
+
+      currentLineWidth += tokenWidth;
       currentLineHasContent = true;
     }
 

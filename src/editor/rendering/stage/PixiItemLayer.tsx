@@ -184,7 +184,7 @@ function buildTextStyleProps(item: TextCanvasItem) {
       wordWrap: true,
       wordWrapWidth: contentWidth,
       align: item.align as 'left' | 'center' | 'right',
-      whiteSpace: 'pre-line' as const,
+      whiteSpace: 'pre' as const,
       ...(dropShadow ? { dropShadow } : {}),
     },
     textX: item.padding.left,
