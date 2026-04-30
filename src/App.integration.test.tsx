@@ -279,7 +279,7 @@ describe('App integration', () => {
     fireEvent.click(exportButton);
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();
-    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1);
+    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1, 'Untitled canvas.png');
 
     clickToolbarPopoverItem('File', 'Load...');
     fireEvent.change(screen.getByTestId('project-open-input'), {

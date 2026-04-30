@@ -10,11 +10,11 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-export function downloadProject(document: ProjectDocument) {
+export function downloadProject(document: ProjectDocument, fileName = 'billboard-project.json') {
   const blob = new Blob([serializeProjectDocument(document)], {
     type: 'application/json',
   });
-  downloadBlob(blob, 'billboard-project.json');
+  downloadBlob(blob, fileName);
 }
 
 export async function readProjectFile(file: File): Promise<ProjectDocument> {

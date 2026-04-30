@@ -16,6 +16,8 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     canUndo: false,
     canUngroup: false,
     canvasFocusActive: false,
+    canvasName: 'Untitled canvas',
+    onCanvasNameChange: vi.fn(),
     favoriteCount: 0,
     itemCount: 0,
     onCanvasFocusToggle: vi.fn(),
@@ -122,6 +124,77 @@ describe('Toolbar', () => {
     });
 
     expect(screen.getByRole('status')).toHaveClass('fading');
+  });
+
+  describe('canvas name', () => {
+    it('renders the supplied canvas name', () => {
+      renderToolbar({ canvasName: 'My Banner' });
+
+      expect(screen.getByTestId('canvas-name-display')).toHaveTextContent('My Banner');
+    });
+
+    it('reveals an input prefilled with the current name when clicked', async () => {
+      const user = userEvent.setup();
+      renderToolbar({ canvasName: 'My Banner' });
+
+      await user.click(screen.getByTestId('canvas-name-display'));
+
+      const input = screen.getByTestId('canvas-name-input');
+      expect(input).toHaveValue('My Banner');
+      expect(input).toHaveFocus();
+    });
+
+    it('commits a non-empty value on Enter', async () => {
+      const user = userEvent.setup();
+      const onCanvasNameChange = vi.fn();
+      renderToolbar({ canvasName: 'Untitled canvas', onCanvasNameChange });
+
+      await user.click(screen.getByTestId('canvas-name-display'));
+      const input = screen.getByTestId('canvas-name-input');
+      await user.clear(input);
+      await user.type(input, 'My Banner{Enter}');
+
+      expect(onCanvasNameChange).toHaveBeenCalledWith('My Banner');
+    });
+
+    it('falls back to "Untitled canvas" when the user commits an empty value', async () => {
+      const user = userEvent.setup();
+      const onCanvasNameChange = vi.fn();
+      renderToolbar({ canvasName: 'My Banner', onCanvasNameChange });
+
+      await user.click(screen.getByTestId('canvas-name-display'));
+      const input = screen.getByTestId('canvas-name-input');
+      await user.clear(input);
+      await user.type(input, '{Enter}');
+
+      expect(onCanvasNameChange).toHaveBeenCalledWith('Untitled canvas');
+    });
+
+    it('does not fire onChange when the committed value matches the current name', async () => {
+      const user = userEvent.setup();
+      const onCanvasNameChange = vi.fn();
+      renderToolbar({ canvasName: 'My Banner', onCanvasNameChange });
+
+      await user.click(screen.getByTestId('canvas-name-display'));
+      const input = screen.getByTestId('canvas-name-input');
+      await user.type(input, '{Enter}');
+
+      expect(onCanvasNameChange).not.toHaveBeenCalled();
+    });
+
+    it('cancels the edit on Escape without firing onChange', async () => {
+      const user = userEvent.setup();
+      const onCanvasNameChange = vi.fn();
+      renderToolbar({ canvasName: 'My Banner', onCanvasNameChange });
+
+      await user.click(screen.getByTestId('canvas-name-display'));
+      const input = screen.getByTestId('canvas-name-input');
+      await user.clear(input);
+      await user.type(input, 'Discarded{Escape}');
+
+      expect(onCanvasNameChange).not.toHaveBeenCalled();
+      expect(screen.getByTestId('canvas-name-display')).toHaveTextContent('My Banner');
+    });
   });
 
   it('closes popovers on outside click, escape, and tab', async () => {

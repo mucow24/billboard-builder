@@ -135,6 +135,8 @@ export default function App() {
             canUndo={canUndo}
             canRedo={canRedo}
             canSaveFavorite={selectedNodeIds.length > 0}
+            canvasName={document.name}
+            onCanvasNameChange={(name) => dispatch({ type: 'set_canvas_name', name })}
             favoriteStatusFading={favoriteStatus.fading}
             favoriteStatusMessage={favoriteStatus.message}
             canvasFocusActive={canvasFocusActive}

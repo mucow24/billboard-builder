@@ -245,6 +245,50 @@ test.describe('editor file and persistence flows', () => {
     await expect(page.locator('.layer-row')).toHaveCount(0);
   });
 
+  test('canvas name defaults to "Untitled canvas", is editable, drives the save filename, and persists across reload', async ({ page }) => {
+    await openFreshEditor(page);
+
+    const display = page.getByTestId('canvas-name-display');
+    await expect(display).toHaveText('Untitled canvas');
+
+    await display.click();
+    const input = page.getByTestId('canvas-name-input');
+    await expect(input).toBeVisible();
+    await expect(input).toHaveValue('Untitled canvas');
+    await input.fill('My Banner');
+    await input.press('Enter');
+
+    await expect(display).toHaveText('My Banner');
+
+    const projectDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'File', 'Save');
+    });
+    expect(projectDownload.suggestedFilename()).toBe('My Banner.json');
+
+    const savedDocument = await readDownloadedJson(projectDownload);
+    expect(savedDocument.name).toBe('My Banner');
+
+    // Wait past the 150ms autosave debounce in useCanvasPersistence so
+    // the rename has been written to IDB before we reload.
+    await page.waitForTimeout(250);
+    await page.reload();
+    await waitForEditor(page);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('My Banner');
+
+    await clickToolbarPopoverItem(page, 'File', 'New');
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Untitled canvas');
+
+    const renamedFixture = createProjectDocument([]);
+    (renamedFixture as Record<string, unknown>).name = 'Loaded Project';
+    await uploadProject(page, renamedFixture, 'loaded-project.json');
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Loaded Project');
+
+    const renamedDownload = await captureDownload(page, async () => {
+      await page.getByRole('button', { name: 'Export PNG' }).click();
+    });
+    expect(renamedDownload.suggestedFilename()).toBe('Loaded Project.png');
+  });
+
   test('round-trips grouped documents through save/open and restores grouped persistence on reload', async ({ page }) => {
     const groupedDocument = createGroupedProjectDocument([
       createGroupNodeFixture(

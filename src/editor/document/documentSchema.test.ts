@@ -325,4 +325,21 @@ describe('document schema', () => {
       gradientEnabled: true,
     });
   });
+
+  it('round-trips the canvas name and defaults missing names to "Untitled canvas"', () => {
+    const document = createDefaultProjectDocument();
+    document.name = 'My Banner';
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+    expect(parsed.name).toBe('My Banner');
+
+    const legacy = parseProjectDocument({
+      version: 2,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      nodes: [],
+    });
+    expect(legacy.name).toBe('Untitled canvas');
+  });
 });

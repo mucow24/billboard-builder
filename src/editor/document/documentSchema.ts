@@ -281,6 +281,7 @@ const CanvasNodeSchema: z.ZodTypeAny = z.lazy(() =>
 
 const ProjectFileSchema = z.object({
   version: z.literal(2),
+  name: z.string().optional(),
   canvas: z.object({
     width: z.number().positive(),
     height: z.number().positive(),

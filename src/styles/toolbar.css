@@ -267,6 +267,47 @@
   background: rgba(148, 163, 184, 0.24);
 }
 
+.top-toolbar .top-toolbar-canvas-name {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  height: var(--control-size);
+  min-width: 0;
+  max-width: 28ch;
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.top-toolbar .top-toolbar-canvas-name:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+  cursor: text;
+}
+
+.top-toolbar .top-toolbar-canvas-name:focus-visible {
+  outline: none;
+  border-color: var(--border-active);
+  background: var(--surface-hover);
+}
+
+.top-toolbar .top-toolbar-canvas-name-input {
+  background: var(--surface-base);
+  border-color: var(--border-active);
+  cursor: text;
+  text-overflow: clip;
+}
+
 .top-toolbar-action-strip {
   display: flex;
   align-items: center;

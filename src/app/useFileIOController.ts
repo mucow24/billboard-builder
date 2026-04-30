@@ -1,9 +1,10 @@
 import type { CanvasRendererHandle } from '../editor/rendering/renderer/canvasRendererTypes';
 
 import { downloadCanvasAsPng } from '../editor/io/exportPng';
+import { sanitizeBasename } from '../editor/io/filename';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
-import { createImageItem } from '../editor/document/documentDefaults';
+import { createImageItem, DEFAULT_CANVAS_NAME } from '../editor/document/documentDefaults';
 import type { ProjectDocument } from '../editor/document/documentTypes';
 
 function getPointerCenteredPosition(x: number, y: number) {
@@ -83,11 +84,13 @@ export function useFileIOController({
     if (!handle) {
       return;
     }
-    void downloadCanvasAsPng(handle, document.canvas.width, document.canvas.height, 1);
+    const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
+    void downloadCanvasAsPng(handle, document.canvas.width, document.canvas.height, 1, `${basename}.png`);
   }
 
   function handleSave() {
-    downloadProject(document);
+    const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
+    downloadProject(document, `${basename}.json`);
   }
 
   return {

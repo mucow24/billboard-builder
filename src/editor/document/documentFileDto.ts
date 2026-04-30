@@ -15,6 +15,7 @@ export type CanvasNodeFileV2 = GroupNodeFileV2 | CanvasItemFileV2;
 
 export interface ProjectFileV2 {
   version: 2;
+  name: string;
   canvas: CanvasSize;
   background: string;
   nodes: CanvasNodeFileV2[];

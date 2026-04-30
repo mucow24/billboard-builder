@@ -20,6 +20,7 @@ describe('document defaults', () => {
 
     expect(document).toMatchObject({
       version: 2,
+      name: 'Untitled canvas',
       background: '#ffffff00',
       nodes: [],
       fonts: [],

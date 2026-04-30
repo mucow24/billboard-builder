@@ -336,4 +336,18 @@ describe('editor reducer', () => {
       kind: 'text',
     });
   });
+
+  it('updates the canvas name and pushes a single undo entry', () => {
+    const state = createDefaultEditorState();
+    expect(state.document.name).toBe('Untitled canvas');
+
+    const renamed = reduceEditorState(state, {
+      ...toEditorAction({ type: 'set_canvas_name', name: 'My Banner' }),
+    });
+    expect(renamed.document.name).toBe('My Banner');
+    expect(renamed.history.past).toEqual([state.document]);
+
+    const undone = reduceEditorState(renamed, { family: 'history', type: 'undo' });
+    expect(undone.document.name).toBe('Untitled canvas');
+  });
 });
