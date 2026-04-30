@@ -58,11 +58,8 @@ The dev server starts at `http://localhost:5173` with hot module replacement.
 | `npm run lint` | Run ESLint |
 | `npm test` | Run unit tests with coverage |
 | `npm run test:watch` | Run unit tests in watch mode |
-| `npm run e2e` | Run functional E2E tests |
+| `npm run e2e` | Run E2E tests |
 | `npm run e2e:headed` | Run E2E tests with visible browser |
-| `npm run e2e:screenshots` | Run visual regression tests only |
-| `npm run e2e:screenshots:update` | Regenerate screenshot baselines |
-| `npm run e2e:all` | Run all E2E tests (functional + visual) |
 
 ## Adding Fonts
 
@@ -84,21 +81,11 @@ Uses Vitest with jsdom and React Testing Library. Coverage is reported with V8.
 ### E2E tests
 
 ```bash
-npm run e2e           # functional tests (excludes visual)
-npm run e2e:headed    # functional tests with visible browser
-npm run e2e:all       # functional + visual regression
+npm run e2e           # run E2E tests
+npm run e2e:headed    # run with visible browser
 ```
 
-E2E tests use Playwright against a production build served locally. On Windows, tests automatically delegate to WSL via the `scripts/run-e2e.mjs` wrapper. **Never run `npx playwright test` directly on Windows.**
-
-### Visual regression
-
-Screenshot tests are excluded from the default `npm run e2e` run because snapshots are environment-sensitive (WSL vs CI rendering differences).
-
-```bash
-npm run e2e:screenshots         # run visual tests
-npm run e2e:screenshots:update  # regenerate baselines
-```
+E2E tests use Playwright against a production build served locally.
 
 ## Architecture
 

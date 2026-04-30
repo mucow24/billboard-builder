@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 
 import {
-  beginCanvasHookDrag,
+  beginGroupHandleDrag,
   movePointerToCanvasPoint,
   readRenderSnapshot,
   readStageDebug,
@@ -611,7 +611,7 @@ export async function rotateRenderedGroupTo(page: Page, targetRotationDegrees: n
   const beforeRotate = await readRenderSnapshot(page);
   const initialFrame = requireRenderGroupFrame(beforeRotate, 'before rotating rendered group');
 
-  await beginCanvasHookDrag(page, 'canvas-group-rotater');
+  await beginGroupHandleDrag(page, 'rotater');
   await movePointerToCanvasPoint(page, rotaterDestination({
     x: initialFrame.center.x - initialFrame.width / 2,
     y: initialFrame.center.y - initialFrame.height / 2,
@@ -636,7 +636,7 @@ export async function rotateGroupTo(page: Page, targetRotationDegrees: number) {
   const beforeRotate = await readStageDebug(page);
   const initialFrame = requireGroupFrame(beforeRotate, 'before rotating group');
 
-  await beginCanvasHookDrag(page, 'canvas-group-rotater');
+  await beginGroupHandleDrag(page, 'rotater');
   await movePointerToCanvasPoint(page, rotaterDestination(initialFrame, targetRotationDegrees));
   await expect
     .poll(async () => Math.abs((await readStageDebug(page)).groupFrame?.rotation ?? 0))

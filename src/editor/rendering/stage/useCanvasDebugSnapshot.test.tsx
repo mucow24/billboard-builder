@@ -19,6 +19,10 @@ describe('useCanvasDebugSnapshot', () => {
 
     const { result, unmount } = renderHook(() =>
       useCanvasDebugSnapshot({
+        beginGroupDrag: () => {},
+        beginGroupResize: () => {},
+        beginGroupRotate: () => {},
+        startPanDrag: () => {},
         groupHandleViewportPoints: { 'middle-right': { x: 200, y: 160 } },
         groupOverlayFrame: { bounds: { x: 10, y: 20, width: 80, height: 50 }, rotation: 15 },
         groupOverlayViewportRect: { left: 100, top: 120, width: 160, height: 100 },
@@ -45,7 +49,9 @@ describe('useCanvasDebugSnapshot', () => {
         selectedRenderedItem: rectangle,
         selectedShapeHandleRects: { rotater: { left: 140, top: 70, width: 16, height: 16 } },
         session: { kind: 'group-resize', handle: 'middle-right' },
+        rendererReady: false,
         showGroupInteractionHooks: true,
+        stageRef: { current: null },
         subgroupOutlineFrames: [{ nodeId: 'group-1', bounds: { x: 8, y: 18, width: 84, height: 54 } }],
         viewportRef: { current: null },
         viewportSize: { width: 1280, height: 720 },
@@ -131,6 +137,10 @@ describe('useCanvasDebugSnapshot', () => {
 
     renderHook(() =>
       useCanvasDebugSnapshot({
+        beginGroupDrag: () => {},
+        beginGroupResize: () => {},
+        beginGroupRotate: () => {},
+        startPanDrag: () => {},
         groupHandleViewportPoints: null,
         groupOverlayFrame: null,
         groupOverlayViewportRect: null,
@@ -151,7 +161,9 @@ describe('useCanvasDebugSnapshot', () => {
         selectedRenderedItem: rectangle,
         selectedShapeHandleRects: { rotater: { left: 140, top: 70, width: 16, height: 16 } },
         session: { kind: 'group-drag' },
+        rendererReady: false,
         showGroupInteractionHooks: true,
+        stageRef: { current: null },
         subgroupOutlineFrames: [{ nodeId: 'group-1', bounds: { x: 14, y: 22, width: 108, height: 76 } }],
         viewportRef: { current: root },
         viewportSize: { width: 1280, height: 720 },

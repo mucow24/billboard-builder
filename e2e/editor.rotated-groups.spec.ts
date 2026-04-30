@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  beginCanvasHookDrag,
+  beginGroupHandleDrag,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
-  dragCanvas,
+  dragEmptyCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
   readStageDebug,
@@ -52,10 +52,10 @@ test.describe('rotated group browser geometry', () => {
       'rotated-group-geometry.json'
     );
 
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
     let baseline = await rotateGroupTo(page, 33);
 
-    await beginCanvasHookDrag(page, 'canvas-group-overlay');
+    await beginGroupHandleDrag(page, 'overlay');
     await movePointerToCanvasPoint(page, {
       x: frameCenter(requireGroupFrame(baseline, 'drag baseline')).x + 96,
       y: frameCenter(requireGroupFrame(baseline, 'drag baseline')).y + 68,
@@ -75,7 +75,7 @@ test.describe('rotated group browser geometry', () => {
 
     baseline = await rotateGroupTo(page, 121);
 
-    await beginCanvasHookDrag(page, 'canvas-group-handle-middle-right');
+    await beginGroupHandleDrag(page, 'middle-right');
     await movePointerToCanvasPoint(
       page,
       pointForHandle(requireGroupFrame(baseline, 'side resize baseline'), 'middle-right', {
@@ -95,7 +95,7 @@ test.describe('rotated group browser geometry', () => {
     baseline = await readStageDebug(page);
     assertFiniteGeometry(baseline, 'side resize commit');
 
-    await beginCanvasHookDrag(page, 'canvas-group-handle-bottom-right');
+    await beginGroupHandleDrag(page, 'bottom-right');
     await movePointerToCanvasPoint(
       page,
       pointForHandle(requireGroupFrame(baseline, 'corner resize baseline'), 'bottom-right', {
@@ -156,10 +156,10 @@ test.describe('rotated group browser geometry', () => {
       'mixed-rotated-group.json'
     );
 
-    await dragCanvas(page, { x: 70, y: 90 }, { x: 520, y: 290 });
+    await dragEmptyCanvas(page, { x: 70, y: 90 }, { x: 520, y: 290 });
     let baseline = await rotateGroupTo(page, 127);
 
-    await beginCanvasHookDrag(page, 'canvas-group-rotater');
+    await beginGroupHandleDrag(page, 'rotater');
     await movePointerToCanvasPoint(page, rotaterDestination(requireGroupFrame(baseline, 'mixed rotate baseline'), 41));
     await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('group-rotate');
 
@@ -173,7 +173,7 @@ test.describe('rotated group browser geometry', () => {
     baseline = await readStageDebug(page);
     assertFiniteGeometry(baseline, 'mixed rotate commit');
 
-    await beginCanvasHookDrag(page, 'canvas-group-overlay');
+    await beginGroupHandleDrag(page, 'overlay');
     await movePointerToCanvasPoint(page, {
       x: frameCenter(requireGroupFrame(baseline, 'mixed drag baseline')).x - 84,
       y: frameCenter(requireGroupFrame(baseline, 'mixed drag baseline')).y + 72,
@@ -190,7 +190,7 @@ test.describe('rotated group browser geometry', () => {
     baseline = await readStageDebug(page);
     assertFiniteGeometry(baseline, 'mixed drag commit');
 
-    await beginCanvasHookDrag(page, 'canvas-group-handle-bottom-right');
+    await beginGroupHandleDrag(page, 'bottom-right');
     await movePointerToCanvasPoint(
       page,
       pointForHandle(requireGroupFrame(baseline, 'mixed resize baseline'), 'bottom-right', {

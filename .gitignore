@@ -1,6 +1,7 @@
 .claude/settings.local.json
 .claude/launch.json
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 node_modules
 dist
 coverage

@@ -1,11 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  beginCanvasHookDrag,
-  beginCanvasHookMiddleDrag,
+  beginGroupHandleDrag,
   createProjectDocument,
   createRectangleFixture,
-  dragCanvas,
+  dragEmptyCanvas,
   movePointerToCanvasPoint,
   movePointerToPagePoint,
   openFreshEditor,
@@ -61,7 +60,7 @@ test.describe('grouped manipulation regressions', () => {
   test('keeps rotated group resize previews aligned for every handle', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, rectangleGroupFixture, 'grouped-regression-resize.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
 
     let baseline = await rotateRenderedGroupTo(page, 33);
 
@@ -71,7 +70,7 @@ test.describe('grouped manipulation regressions', () => {
         resizeCase.handle,
         resizeCase.delta
       );
-      await beginCanvasHookDrag(page, `canvas-group-handle-${resizeCase.handle}`);
+      await beginGroupHandleDrag(page, resizeCase.handle);
       await movePointerToCanvasPoint(page, destination);
       await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
 
@@ -104,7 +103,7 @@ test.describe('grouped manipulation regressions', () => {
   test('drops stale capture when switching directly from one resize handle to another', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, rectangleGroupFixture, 'grouped-regression-switch.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
 
     let baseline = await rotateRenderedGroupTo(page, 61);
 
@@ -116,7 +115,7 @@ test.describe('grouped manipulation regressions', () => {
         y: 0,
       }
     );
-    await beginCanvasHookDrag(page, 'canvas-group-handle-middle-right');
+    await beginGroupHandleDrag(page, 'middle-right');
     await movePointerToCanvasPoint(page, firstDestination);
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
     await releasePointer(page);
@@ -132,8 +131,8 @@ test.describe('grouped manipulation regressions', () => {
         y: 60,
       }
     );
-    await beginCanvasHookDrag(page, 'canvas-group-handle-bottom-right');
-    await movePointerToCanvasPoint(page, secondDestination, 4);
+    await beginGroupHandleDrag(page, 'bottom-right');
+    await movePointerToCanvasPoint(page, secondDestination);
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
 
     const preview = await readRenderSnapshot(page);
@@ -152,7 +151,7 @@ test.describe('grouped manipulation regressions', () => {
   test('keeps the manipulation UI visible across commit and immediate re-grab', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, rectangleGroupFixture, 'grouped-regression-visibility.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
 
     let baseline = await rotateRenderedGroupTo(page, 89);
 
@@ -164,7 +163,7 @@ test.describe('grouped manipulation regressions', () => {
         y: 0,
       }
     );
-    await beginCanvasHookDrag(page, 'canvas-group-handle-middle-right');
+    await beginGroupHandleDrag(page, 'middle-right');
     await movePointerToCanvasPoint(page, resizeDestination);
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
 
@@ -177,7 +176,7 @@ test.describe('grouped manipulation regressions', () => {
     assertRenderSelectionUiVisible(baseline, 'visibility commit');
     assertRenderFrameTightlyWrapsItems(baseline, 'visibility commit');
 
-    await beginCanvasHookDrag(page, 'canvas-group-overlay');
+    await beginGroupHandleDrag(page, 'overlay');
     await movePointerToCanvasPoint(page, {
       x: requireRenderGroupFrame(baseline, 'regrab baseline').center.x + 70,
       y: requireRenderGroupFrame(baseline, 'regrab baseline').center.y + 50,
@@ -192,11 +191,11 @@ test.describe('grouped manipulation regressions', () => {
   test('pans the viewport when middle-dragging from the multi-select overlay', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, rectangleGroupFixture, 'grouped-middle-pan.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
 
     const initial = await readStageDebug(page);
 
-    await beginCanvasHookMiddleDrag(page, 'canvas-group-overlay');
+    await beginGroupHandleDrag(page, 'overlay', { button: 1 });
     await movePointerToPagePoint(page, { x: 420, y: 320 });
     await releasePointer(page);
 
@@ -209,7 +208,7 @@ test.describe('grouped manipulation regressions', () => {
   test('snaps multi-select drag and resize interactions with the same guide behavior as single-item transforms', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(page, rectangleGroupFixture, 'grouped-snap-regression.json');
-    await dragCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
+    await dragEmptyCanvas(page, { x: 90, y: 110 }, { x: 470, y: 300 });
 
     let baseline = await readRenderSnapshot(page);
     const initialFrame = requireRenderGroupFrame(baseline, 'initial snap baseline');
@@ -218,7 +217,7 @@ test.describe('grouped manipulation regressions', () => {
       y: initialFrame.center.y,
     };
 
-    await beginCanvasHookDrag(page, 'canvas-group-overlay');
+    await beginGroupHandleDrag(page, 'overlay');
     await movePointerToCanvasPoint(page, dragDestination);
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-drag');
 
@@ -236,7 +235,7 @@ test.describe('grouped manipulation regressions', () => {
       y: resizedBaseline.center.y,
     };
 
-    await beginCanvasHookDrag(page, 'canvas-group-handle-middle-right');
+    await beginGroupHandleDrag(page, 'middle-right');
     await movePointerToCanvasPoint(page, resizeDestination);
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
 

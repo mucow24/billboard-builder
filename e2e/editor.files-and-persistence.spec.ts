@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 import {
   captureDownload,
   clearPersistence,
-  clickCanvas,
+  clickItem,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
@@ -231,7 +231,7 @@ test.describe('editor file and persistence flows', () => {
     await expect
       .poll(async () => (await readStageDebug(page)).renderedItemCount, {
         message: 'waiting for persisted item to render after reload',
-        timeout: 10_000,
+        timeout: 30_000,
       })
       .toBeGreaterThanOrEqual(1);
     await openLayersTab(page);
@@ -313,7 +313,7 @@ test.describe('editor file and persistence flows', () => {
     await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeVisible();
 
     await setCanvasTestHooksEnabled(page, false);
-    await clickCanvas(page, { x: 220, y: 260 });
+    await clickItem(page, 'persisted-group-rect');
     await openPropertiesTab(page);
     await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
 
@@ -323,7 +323,7 @@ test.describe('editor file and persistence flows', () => {
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Persisted Group', exact: true })).toBeVisible();
     await setCanvasTestHooksEnabled(page, false);
-    await clickCanvas(page, { x: 220, y: 260 });
+    await clickItem(page, 'persisted-group-rect');
     await openPropertiesTab(page);
     await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
   });

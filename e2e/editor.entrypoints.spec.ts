@@ -2,14 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   beginCanvasDrag,
-  clickCanvas,
+  clickEmptyCanvas,
+  clickItem,
   createEllipseFixture,
   createImageFixture,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
-  dragCanvas,
+  dragEmptyCanvas,
+  dragItemTo,
   middleDragCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
@@ -21,7 +23,7 @@ import {
   selectTool,
   setCanvasTestHooksEnabled,
   uploadProject,
-  waitForDoubleClickCadence,
+  wheelAt,
 } from './support/editor';
 
 const ZOOM_ALIGNMENT_GRID = 64;
@@ -124,7 +126,7 @@ test.describe('editor canvas entrypoints', () => {
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([rectangle]), 'zoom-stable-selection.json');
 
-    await clickCanvas(page, { x: 260, y: 250 });
+    await clickItem(page, 'zoom-stable-rect');
     await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(true);
 
     const handleBefore = await page.getByTestId('canvas-shape-handle-middle-right').boundingBox();
@@ -236,51 +238,53 @@ test.describe('editor canvas entrypoints', () => {
     );
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 180, y: 165 });
+    await clickItem(page, 'entry-rect');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
 
-    await clickCanvas(page, { x: 420, y: 175 });
+    await clickItem(page, 'entry-ellipse');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: 'Ellipse' })).toBeVisible();
 
-    await clickCanvas(page, { x: 280, y: 360 });
+    await clickItem(page, 'entry-text');
     await openPropertiesTab(page);
     await expect(page.getByLabel('Text content')).toBeVisible();
 
-    await clickCanvas(page, { x: 580, y: 360 });
+    await clickItem(page, 'entry-image');
     await openPropertiesTab(page);
     await expect(page.getByLabel('Preserve aspect ratio')).toBeVisible();
 
-    await clickCanvas(page, { x: 220, y: 540 });
+    await clickItem(page, 'entry-line');
     await openPropertiesTab(page);
     await expect(page.getByRole('button', { name: /Geometry/ })).toBeVisible();
 
     // CS-08: Shift-click second item to multi-select
-    await clickCanvas(page, { x: 180, y: 165 });
-    await page.keyboard.down('Shift');
-    await clickCanvas(page, { x: 420, y: 175 });
-    await page.keyboard.up('Shift');
+    await clickItem(page, 'entry-rect');
+    await clickItem(page, 'entry-ellipse', { shiftKey: true });
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
 
     // Clear selection
-    await clickCanvas(page, { x: 920, y: 920 });
+    await clickEmptyCanvas(page, { x: 920, y: 920 });
     await expectNoActiveSelection(page);
 
     // CS-09: Marquee across items to multi-select
-    await dragCanvas(page, { x: 80, y: 80 }, { x: 560, y: 280 });
+    await dragEmptyCanvas(page, { x: 80, y: 80 }, { x: 560, y: 280 });
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
 
-    await clickCanvas(page, { x: 920, y: 920 });
-    await dragCanvas(page, { x: 920, y: 920 }, { x: 920, y: 920 }, 1);
+    await clickEmptyCanvas(page, { x: 920, y: 920 });
+    await dragEmptyCanvas(page, { x: 920, y: 920 }, { x: 920, y: 920 }, { steps: 1 });
     await expectNoActiveSelection(page);
 
-    await clickCanvas(page, { x: 820, y: 190 });
+    // CS-12: clicking on a locked item (rendered but eventMode='none')
+    // passes through to the empty canvas — no selection.
+    await clickEmptyCanvas(page, { x: 820, y: 190 });
     await expectNoActiveSelection(page);
 
-    await clickCanvas(page, { x: 820, y: 380 });
+    // CS-13: clicking on the location of a hidden item (not rendered at all)
+    // hits empty canvas — no selection.
+    await clickEmptyCanvas(page, { x: 820, y: 380 });
     await expectNoActiveSelection(page);
   });
 
@@ -316,14 +320,14 @@ test.describe('editor canvas entrypoints', () => {
     );
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: -160, y: 200 });
+    await clickItem(page, 'outside-click-rect');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
     let stageDebug = await readStageDebug(page);
     expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['outside-click-rect']);
     expect(stageDebug.hasShapeHandles).toBe(true);
 
-    await clickCanvas(page, { x: -40, y: 420 });
+    await clickItem(page, 'edge-click-rect');
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
     stageDebug = await readStageDebug(page);
@@ -350,7 +354,7 @@ test.describe('editor canvas entrypoints', () => {
     );
     await setCanvasTestHooksEnabled(page, false);
 
-    await clickCanvas(page, { x: 220, y: 220 });
+    await clickItem(page, rectangle.id);
     await openPropertiesTab(page);
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
 
@@ -359,12 +363,7 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.hasShapeHandles).toBe(true);
     expect(stageDebug.hasGroupOverlay).toBe(false);
 
-    await waitForDoubleClickCadence(page);
-    await beginCanvasDrag(page, { x: 220, y: 220 });
-    await movePointerToCanvasPoint(page, { x: 340, y: 300 });
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
-
-    await releasePointer(page);
+    await dragItemTo(page, rectangle.id, 340, 300);
 
     stageDebug = await readStageDebug(page);
     expect(stageDebug.sessionKind).toBeNull();
@@ -430,7 +429,7 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['outside-marquee-rect']);
     expect(stageDebug.hasShapeHandles).toBe(true);
 
-    await clickCanvas(page, { x: 920, y: 920 });
+    await clickEmptyCanvas(page, { x: 920, y: 920 });
     await expectNoActiveSelection(page);
 
     await beginCanvasDrag(page, { x: 120, y: 320 });
@@ -462,7 +461,8 @@ test.describe('editor canvas entrypoints', () => {
     await uploadProject(page, createProjectDocument([offCanvas]), 'off-canvas-pickup.json');
     await setCanvasTestHooksEnabled(page, false);
 
-    await dragCanvas(page, { x: -160, y: 220 }, { x: -20, y: 320 });
+    // CS-18: pickup drag from off-canvas item; targets the off-canvas rect by id.
+    await dragItemTo(page, 'off-canvas-pickup', -120, 280);
 
     const stageDebug = await readStageDebug(page);
     expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual(['off-canvas-pickup']);
@@ -489,7 +489,7 @@ test.describe('editor canvas entrypoints', () => {
     await selectTool(page, 'Zoom');
     await expect(page.getByRole('button', { name: 'Zoom (Z)' })).toHaveAttribute('aria-pressed', 'true');
     await expect(stageSurface).toHaveCSS('cursor', 'zoom-in');
-    await clickCanvas(page, { x: 300, y: 300 });
+    await clickEmptyCanvas(page, { x: 300, y: 300 });
     let stageDebug = await expectVisibleAlignedViewportZoom(page);
     expect(stageDebug.viewport.zoom).toBeGreaterThan(initialDebug.viewport.zoom);
     // Zoom tool auto-reverts to select after click
@@ -499,7 +499,7 @@ test.describe('editor canvas entrypoints', () => {
     await selectTool(page, 'Zoom');
     await page.keyboard.down('Alt');
     await expect(stageSurface).toHaveCSS('cursor', 'zoom-out');
-    await clickCanvas(page, { x: 300, y: 300 });
+    await clickEmptyCanvas(page, { x: 300, y: 300 });
     await page.keyboard.up('Alt');
     stageDebug = await expectVisibleAlignedViewportZoom(page);
     expect(stageDebug.viewport.zoom).toBeLessThanOrEqual(initialDebug.viewport.zoom * 1.01);
@@ -520,7 +520,7 @@ test.describe('editor canvas entrypoints', () => {
     expect(handCursor).toBe('grab');
 
     const handPanStart = await readStageDebug(page);
-    await dragCanvas(page, { x: 220, y: 220 }, { x: 320, y: 300 });
+    await dragEmptyCanvas(page, { x: 220, y: 220 }, { x: 320, y: 300 });
     stageDebug = await readStageDebug(page);
     expect(stageDebug.viewport.panX).not.toBe(handPanStart.viewport.panX);
     expect(stageDebug.viewport.panY).not.toBe(handPanStart.viewport.panY);
@@ -534,7 +534,7 @@ test.describe('editor canvas entrypoints', () => {
     expect(stageDebug.viewport.panY).not.toBe(middlePanStart.viewport.panY);
 
     const preWheelZoom = stageDebug.viewport.zoom;
-    await page.mouse.wheel(0, -240);
+    await wheelAt(page, { x: 300, y: 300 }, -240);
     await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBeGreaterThan(preWheelZoom);
     stageDebug = await expectVisibleAlignedViewportZoom(page);
   });
@@ -567,14 +567,29 @@ test.describe('editor canvas entrypoints', () => {
       );
       await setCanvasTestHooksEnabled(page, false);
 
-      await clickCanvas(page, { x: 90, y: 80 });
+      await clickItem(page, alreadySelected.id);
       let stageDebug = await readStageDebug(page);
       expect(stageDebug.hasShapeHandles).toBe(true);
       expect(stageDebug.selectedItems?.map((item) => item.id)).toEqual([alreadySelected.id]);
 
       await beginCanvasDrag(page, pickupCase.from);
       await movePointerToCanvasPoint(page, pickupCase.to);
-      await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('drag');
+      // Don't just poll on sessionKind === 'drag' — the editor's pickup-drag
+      // path sets `kind: 'drag'` on the pointerdown (before the first
+      // pointermove updates the preview), so the poll can pass while the
+      // preview item is still at its original coords.  Wait for the preview
+      // to actually show the move before reading further snapshot fields.
+      const originalX = Number((pickupCase.item.x ?? pickupCase.item.startX) as number);
+      const originalY = Number((pickupCase.item.y ?? pickupCase.item.startY) as number);
+      await expect
+        .poll(async () => {
+          const snap = await readRenderSnapshot(page);
+          if (snap.sessionKind !== 'drag') return false;
+          const sel = snap.selectedItems[0];
+          if (!sel || sel.id !== pickupCase.id) return false;
+          return sel.geometry.x > originalX && sel.geometry.y > originalY;
+        })
+        .toBe(true);
 
       const previewSnapshot = await readRenderSnapshot(page);
       expect(previewSnapshot.selectedNodeIds).toEqual([pickupCase.id]);
@@ -582,12 +597,8 @@ test.describe('editor canvas entrypoints', () => {
 
       const previewItem = previewSnapshot.selectedItems[0];
       expect(previewItem.id).toBe(pickupCase.id);
-      expect(previewItem.geometry.x).toBeGreaterThan(
-        Number((pickupCase.item.x ?? pickupCase.item.startX) as number),
-      );
-      expect(previewItem.geometry.y).toBeGreaterThan(
-        Number((pickupCase.item.y ?? pickupCase.item.startY) as number),
-      );
+      expect(previewItem.geometry.x).toBeGreaterThan(originalX);
+      expect(previewItem.geometry.y).toBeGreaterThan(originalY);
 
       await releasePointer(page);
 

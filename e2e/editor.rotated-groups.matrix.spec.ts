@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 import {
-  beginCanvasHookDrag,
+  beginGroupHandleDrag,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
-  dragCanvas,
+  dragEmptyCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
   readStageDebug,
@@ -108,20 +108,20 @@ test.describe('rotated group browser matrix', () => {
           `${fixture.name}-${matrixCase.name.replace(/\s+/g, '-')}.json`
         );
 
-        await dragCanvas(page, fixture.dragStart, fixture.dragEnd);
+        await dragEmptyCanvas(page, fixture.dragStart, fixture.dragEnd);
         let baseline = await rotateGroupTo(page, matrixCase.angle);
 
         if (matrixCase.handle === 'drag') {
           baseline = await rotateGroupTo(page, matrixCase.angle + 28);
 
-          await beginCanvasHookDrag(page, 'canvas-group-overlay');
+          await beginGroupHandleDrag(page, 'overlay');
           await movePointerToCanvasPoint(page, {
             x: frameCenter(requireGroupFrame(baseline, 'matrix drag baseline')).x + matrixCase.delta.x,
             y: frameCenter(requireGroupFrame(baseline, 'matrix drag baseline')).y + matrixCase.delta.y,
           });
           await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('group-drag');
         } else {
-          await beginCanvasHookDrag(page, `canvas-group-handle-${matrixCase.handle}`);
+          await beginGroupHandleDrag(page, matrixCase.handle);
           await movePointerToCanvasPoint(
             page,
             pointForHandle(requireGroupFrame(baseline, 'matrix resize baseline'), matrixCase.handle, matrixCase.delta)

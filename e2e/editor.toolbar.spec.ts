@@ -4,14 +4,15 @@ import { expect, test } from '@playwright/test';
 
 import {
   canvasPointToPage,
-  clickCanvas,
+  clickEmptyCanvas,
+  clickItem,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
-  dragCanvas,
+  dragEmptyCanvas,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
@@ -121,15 +122,15 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
 
-    await clickCanvas(page, { x: 220, y: 200 });
+    await clickItem(page, 'toolbar-first');
     await expect(page.getByRole('button', { name: /^Delete/ })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeEnabled();
     await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
 
-    await clickCanvas(page, { x: 50, y: 50 });
+    await clickEmptyCanvas(page, { x: 50, y: 50 });
     await expect(page.getByRole('button', { name: /^Group/ })).toBeDisabled();
 
-    await dragCanvas(page, { x: 100, y: 100 }, { x: 620, y: 420 });
+    await dragEmptyCanvas(page, { x: 100, y: 100 }, { x: 620, y: 420 });
     await expect(page.getByRole('button', { name: /^Group/ })).toBeEnabled();
 
     await page.getByRole('button', { name: /^Group/ }).click();
@@ -188,7 +189,7 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Image', exact: true })).toBeVisible();
 
     // Select the text item so the font picker is available
-    await clickCanvas(page, { x: 240, y: 210 });
+    await clickItem(page, 'toolbar-loaded-text');
     await openPropertiesTab(page);
     await page.getByTestId('font-family-picker-trigger').click();
 
@@ -226,7 +227,7 @@ test.describe('editor toolbar flows', () => {
     await openFreshEditor(page);
     await uploadProject(page, groupedDocument, 'toolbar-grouped.json');
 
-    await clickCanvas(page, { x: 260, y: 240 });
+    await clickItem(page, 'toolbar-group-child');
     await expect(page.getByRole('button', { name: /^Ungroup/ })).toBeEnabled();
 
     await clickToolbarPopoverItem(page, 'File', 'New');

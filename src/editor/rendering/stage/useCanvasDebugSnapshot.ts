@@ -7,17 +7,15 @@ import {
   localToStage,
   RESIZE_HANDLE_NAMES,
   type Point,
+  type ResizeHandle,
 } from '../interactionGeometry';
+import type { PointerGestureSource } from '../interactionSession';
+import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
 import { getRenderBox } from '../transformGeometry';
+import { useCanvasTestApi } from './canvasTestApi';
 import { getShapeOverlayHandlePoints } from './overlayGeometry';
 
-declare global {
-  interface Window {
-    __BB_TEST__?: {
-      captureRenderSnapshot?: () => unknown;
-    };
-  }
-}
+// `Window.__BB_TEST__` is declared in `./canvasTestApi.ts`; both files share it.
 
 function buildHandleDebug(clientRect: {
   x: number;
@@ -78,6 +76,13 @@ function readViewportHookPoint(node: HTMLElement | null) {
 }
 
 interface UseCanvasDebugSnapshotParams {
+  beginGroupDrag: (pointer: Point, source?: PointerGestureSource) => void;
+  beginGroupResize: (
+    handle: ResizeHandle,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
   cropFullImageHandleViewportPoints?: Record<string, Point> | null;
   cropFullImageRotaterViewportPoint?: Point | null;
   cropHandleViewportPoints?: Record<string, Point> | null;
@@ -109,10 +114,13 @@ interface UseCanvasDebugSnapshotParams {
     x: () => number;
     y: () => number;
   } | null;
+  rendererReady?: boolean;
   selectedRenderedItem: CanvasItem | null;
   selectedShapeHandleRects: Record<string, { left: number; top: number; width: number; height: number }> | null;
   session: { kind: string; handle?: string } | null;
   showGroupInteractionHooks: boolean;
+  stageRef: React.RefObject<CanvasRendererHandle | null>;
+  startPanDrag: (pointer: Point) => void;
   subgroupOutlineFrames: Array<{
     nodeId: string;
     bounds: { x: number; y: number; width: number; height: number };
@@ -123,6 +131,9 @@ interface UseCanvasDebugSnapshotParams {
 }
 
 export function useCanvasDebugSnapshot({
+  beginGroupDrag,
+  beginGroupResize,
+  beginGroupRotate,
   cropFullImageHandleViewportPoints = null,
   cropFullImageRotaterViewportPoint = null,
   cropHandleViewportPoints = null,
@@ -146,13 +157,33 @@ export function useCanvasDebugSnapshot({
   selectedNode,
   selectedRenderedItem,
   selectedShapeHandleRects,
+  rendererReady = false,
   session,
   showGroupInteractionHooks,
+  stageRef,
+  startPanDrag,
   subgroupOutlineFrames,
   viewportRef,
   viewportSize,
   zoom,
 }: UseCanvasDebugSnapshotParams) {
+  // Register the in-page test API on `window.__BB_TEST__` for e2e tests to
+  // drive item interactions by id rather than by canvas coordinates.
+  useCanvasTestApi({
+    stageRef,
+    renderedItems,
+    pan,
+    zoom,
+    rendererReady,
+    groupHandleViewportPoints,
+    groupRotaterViewportPoint,
+    groupOverlayViewportRect,
+    beginGroupDrag,
+    beginGroupResize,
+    beginGroupRotate,
+    startPanDrag,
+  });
+
   const debugInfo = useMemo(
     () => ({
       stageSize: viewportSize,

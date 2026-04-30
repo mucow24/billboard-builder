@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
-  clickCanvas,
+  clickEmptyCanvas,
   createGroupNodeFixture,
   createGroupedProjectDocument,
-  dragCanvas,
+  dragEmptyCanvas,
   openFreshEditor,
   openLayersTab,
   readStageDebug,
@@ -44,13 +44,13 @@ test.describe('editor smoke flows', () => {
     await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();
 
     await selectTool(page, 'Rect');
-    await dragCanvas(page, { x: 120, y: 120 }, { x: 340, y: 280 });
+    await dragEmptyCanvas(page, { x: 120, y: 120 }, { x: 340, y: 280 });
 
     await selectTool(page, 'Text');
-    await clickCanvas(page, { x: 540, y: 180 });
+    await clickEmptyCanvas(page, { x: 540, y: 180 });
 
     await selectTool(page, 'Line');
-    await dragCanvas(page, { x: 180, y: 440 }, { x: 520, y: 520 });
+    await dragEmptyCanvas(page, { x: 180, y: 440 }, { x: 520, y: 520 });
 
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(3);
@@ -89,7 +89,7 @@ test.describe('editor smoke flows', () => {
     await expectVisibleAlignedZoom(page);
 
     await page.keyboard.down(' ');
-    await dragCanvas(page, { x: 220, y: 220 }, { x: 320, y: 300 });
+    await dragEmptyCanvas(page, { x: 220, y: 220 }, { x: 320, y: 300 });
     await page.keyboard.up(' ');
 
     const nextDebug = await readStageDebug(page);
