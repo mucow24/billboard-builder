@@ -4,6 +4,7 @@ import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
 
 import { ClampingBlurFilter } from './clampingBlurFilter';
+import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
 
 import type {
   CanvasItem,
@@ -579,11 +580,20 @@ const PixiItemView = memo(function PixiItemView({
 
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;
 
+  const renderBox = useMemo(
+    () => getRenderBox(item),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the specific fields getRenderBox reads
+    [item.kind, item.x, item.y, item.width, item.height, item.scaleX, item.scaleY],
+  );
+
   // Build combined filters: blur + shadow (text handles its own shadow via dropShadow style).
   // DropShadowFilter is a post-processing effect that operates in screen space,
   // so offset and blur must be scaled by the current zoom to match item-space values.
   const itemFilters = useMemo(() => {
     const filters: Filter[] = [];
+    const dpr = window.devicePixelRatio || 1;
+    const maxTextureSize = getMaxTextureSize();
+    const itemMaxDim = Math.max(renderBox.width, renderBox.height, 1);
     if (item.blurRadius > 0) {
       const strength = item.blurRadius * zoom;
       // ClampingBlurFilter is a Gaussian BlurFilter with shaders that clamp
@@ -601,6 +611,8 @@ const PixiItemView = memo(function PixiItemView({
       // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
       // so pad to 6× for a smooth fadeout.
       blurFilter.padding = strength * 6;
+      const blurRegionPx = (itemMaxDim + blurFilter.padding * 2) * zoom;
+      blurFilter.resolution = clampRasterResolution(dpr, blurRegionPx, maxTextureSize);
       filters.push(blurFilter);
     }
     if (item.kind !== 'text') {
@@ -625,17 +637,13 @@ const PixiItemView = memo(function PixiItemView({
           Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
           shadowBlur * 6 +
           32;
+        const shadowRegionPx = (itemMaxDim + shadowFilter.padding * 2) * zoom;
+        shadowFilter.resolution = clampRasterResolution(dpr, shadowRegionPx, maxTextureSize);
         filters.push(shadowFilter);
       }
     }
     return filters.length > 0 ? filters : undefined;
-  }, [item.blurRadius, item.shadow, item.kind, zoom]);
-
-  const renderBox = useMemo(
-    () => getRenderBox(item),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the specific fields getRenderBox reads
-    [item.kind, item.x, item.y, item.width, item.height, item.scaleX, item.scaleY],
-  );
+  }, [item.blurRadius, item.shadow, item.kind, renderBox.width, renderBox.height, zoom]);
 
   const shapeHitArea = useMemo(
     () => new Rectangle(0, 0, renderBox.width, renderBox.height),
@@ -701,8 +709,15 @@ const PixiItemView = memo(function PixiItemView({
     const { style: textStyle, textX, textY } = buildTextStyleProps(item);
     // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
     // When zoom > 1 the texture is magnified and turns blurry, so scale
-    // resolution with zoom to keep glyphs sharp on zoom-in.
-    const textResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+    // resolution with zoom to keep glyphs sharp on zoom-in. Clamp so the
+    // resulting texture stays under the GPU's MAX_TEXTURE_SIZE — past the
+    // cap, glyphs go soft instead of disappearing into a black rect.
+    const requestedResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+    const textResolution = clampRasterResolution(
+      requestedResolution,
+      Math.max(item.width, item.height, 1),
+      getMaxTextureSize(),
+    );
     children = (
       <pixiText
         text={item.text}
