@@ -11,6 +11,7 @@ import { buildRenderableCanvasItems } from './renderAdapter';
 function createGroupedDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
   return {
     version: 2,
+    name: 'Untitled canvas',
     canvas: {
       width: 1024,
       height: 1024,

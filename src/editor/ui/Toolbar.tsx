@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton, ToolbarIcon } from './ToolbarPrimitives';
+import { CanvasNameField } from './CanvasNameField';
 import { joinClassNames, modKey } from './toolbarUtils';
 import { FileMenu } from './ToolbarMenus';
 
@@ -12,6 +13,8 @@ interface ToolbarProps {
   canGroup: boolean;
   canSaveFavorite: boolean;
   canUngroup: boolean;
+  canvasName: string;
+  onCanvasNameChange: (name: string) => void;
   canvasFocusActive: boolean;
   onCanvasFocusToggle: () => void;
   favoriteStatusFading?: boolean;
@@ -42,6 +45,8 @@ export function Toolbar({
   canGroup,
   canSaveFavorite,
   canUngroup,
+  canvasName,
+  onCanvasNameChange,
   canvasFocusActive,
   onCanvasFocusToggle,
   favoriteStatusFading = false,
@@ -173,6 +178,8 @@ export function Toolbar({
             />
           ) : null}
         </div>
+
+        <CanvasNameField name={canvasName} onChange={onCanvasNameChange} />
 
         <div className="top-toolbar-section-divider" aria-hidden="true" />
 

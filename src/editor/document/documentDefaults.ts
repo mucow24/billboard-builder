@@ -22,6 +22,8 @@ import { createGroupNode } from './sceneGraph';
 
 export const DEFAULT_FONT_FAMILY = 'Arial';
 
+export const DEFAULT_CANVAS_NAME = 'Untitled canvas';
+
 export const CANVAS_PRESETS: CanvasPreset[] = [
   { id: 'square-lg', label: '2048 x 2048', width: 2048, height: 2048 },
   { id: 'landscape', label: '2048 x 1024', width: 2048, height: 1024 },
@@ -96,6 +98,7 @@ function createBaseItem<TKind extends CanvasLeafKind>(
 export function createDefaultProjectDocument(): ProjectDocument {
   return {
     version: 2,
+    name: DEFAULT_CANVAS_NAME,
     canvas: DEFAULT_CANVAS,
     background: '#ffffff00',
     nodes: [],

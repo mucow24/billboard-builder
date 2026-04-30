@@ -21,6 +21,7 @@ import type { ProjectDocument } from '../document/documentTypes';
 function createDocument(nodes: ProjectDocument['nodes']): ProjectDocument {
   return {
     version: 2,
+    name: 'Untitled canvas',
     canvas: {
       width: 1024,
       height: 1024,

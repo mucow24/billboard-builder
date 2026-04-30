@@ -170,6 +170,14 @@ function applyDocumentCommandWithEffects(
         },
       };
       break;
+    case 'set_canvas_name':
+      result = {
+        nextDocument: {
+          ...currentDocument,
+          name: command.name,
+        },
+      };
+      break;
     case 'reorder_node':
       result = {
         nextDocument: replaceDocumentNodes(

@@ -327,7 +327,7 @@ describe('useEditorController', () => {
       kind: 'uploaded',
     });
     expect(mockDownloadCanvasAsPng).toHaveBeenCalledOnce();
-    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(stage, 2048, 2048, 1);
+    expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(stage, 2048, 2048, 1, 'Untitled canvas.png');
     expect(mockDownloadProject).toHaveBeenCalledOnce();
   });
 

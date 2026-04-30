@@ -52,4 +52,26 @@ describe('project file helpers', () => {
     expect(click).toHaveBeenCalledOnce();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test');
   });
+
+  it('uses the supplied filename for the download anchor', async () => {
+    const projectDocument = createDefaultProjectDocument();
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn().mockReturnValue('blob:test'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    const anchor = { click: vi.fn(), download: '', href: '' } as unknown as HTMLAnchorElement;
+    const originalCreateElement = document.createElement.bind(document);
+    const createElement = vi.spyOn(document, 'createElement');
+    createElement.mockImplementation((tagName: string) =>
+      tagName === 'a' ? anchor : originalCreateElement(tagName),
+    );
+
+    downloadProject(projectDocument, 'My Banner.json');
+
+    expect(anchor.download).toBe('My Banner.json');
+  });
 });

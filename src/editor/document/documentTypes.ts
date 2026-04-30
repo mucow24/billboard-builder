@@ -302,6 +302,7 @@ export type SelectionItemChange =
 
 export interface ProjectDocument {
   version: 2;
+  name: string;
   canvas: CanvasSize;
   background: string;
   nodes: CanvasNode[];
@@ -321,6 +322,7 @@ export type EditorCommand =
   | { type: 'group_nodes'; nodeIds: string[] }
   | { type: 'ungroup_node'; groupId: string }
   | { type: 'set_canvas_size'; canvas: CanvasSize }
+  | { type: 'set_canvas_name'; name: string }
   | { type: 'set_background'; background: string }
   | { type: 'reorder_node'; nodeId: string; mode: ReorderMode }
   | { type: 'reorder_nodes'; nodeIds: string[]; mode: ReorderMode }

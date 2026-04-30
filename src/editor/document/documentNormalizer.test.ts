@@ -243,4 +243,25 @@ describe('document normalizer', () => {
     expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
   });
 
+  it('coerces missing or whitespace canvas names to "Untitled canvas"', () => {
+    const fromMissing = normalizeProjectDocument({ version: 2, nodes: [], fonts: [] });
+    expect(fromMissing.name).toBe('Untitled canvas');
+
+    const fromWhitespace = normalizeProjectDocument({
+      version: 2,
+      name: '   ',
+      nodes: [],
+      fonts: [],
+    });
+    expect(fromWhitespace.name).toBe('Untitled canvas');
+
+    const fromCustom = normalizeProjectDocument({
+      version: 2,
+      name: '  My Canvas  ',
+      nodes: [],
+      fonts: [],
+    });
+    expect(fromCustom.name).toBe('My Canvas');
+  });
+
 });

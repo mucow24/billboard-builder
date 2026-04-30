@@ -2,6 +2,7 @@ import { clampFinite } from './clampFinite';
 import {
   createDefaultProjectDocument,
   createFullImageCropRect,
+  DEFAULT_CANVAS_NAME,
   DEFAULT_ITEM_SHADOW,
 } from './documentDefaults';
 import { normalizeImageAdjustments } from './imageAdjustments';
@@ -379,8 +380,12 @@ export function normalizeProjectDocument(
     }),
   );
 
+  const trimmedName =
+    typeof input?.name === 'string' ? input.name.trim() : '';
+
   return {
     version: 2,
+    name: trimmedName.length > 0 ? trimmedName : DEFAULT_CANVAS_NAME,
     canvas: {
       width: clampDimension(input?.canvas?.width ?? baseDocument.canvas.width),
       height: clampDimension(input?.canvas?.height ?? baseDocument.canvas.height),

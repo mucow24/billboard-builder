@@ -35,6 +35,7 @@ function toFileNode(node: CanvasNode): CanvasNodeFileV2 {
 export function documentToFileDto(document: ProjectDocument): ProjectFileV2 {
   return {
     version: 2,
+    name: document.name,
     canvas: document.canvas,
     background: document.background,
     nodes: document.nodes.map(toFileNode),
