@@ -1018,15 +1018,10 @@ export async function wheelAt(
   );
 }
 
-// ── Coord-based helpers (kept for compatibility) ────────────────────────────
-//
-// These delegate to the in-page test API.  Tests that don't yet target items
-// by id keep working through these shims, while gaining the same race-free
-// dispatch path as `clickItem` / `dragItemTo` / etc.
-
-export async function clickCanvas(page: Page, point: CanvasPoint) {
-  await clickEmptyCanvas(page, point);
-}
+// ── Coord-based double-click ────────────────────────────────────────────────
+// Used by tests that intentionally click at a coordinate (e.g. inside a crop
+// preview) rather than on a known fixture item.  Delegates to the in-page
+// test API for race-free dispatch.
 
 export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
   await flushCanvasFrames(page);
@@ -1041,14 +1036,6 @@ export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
     },
     { point },
   );
-}
-
-export async function waitForDoubleClickCadence(page: Page, ms = 550) {
-  await page.waitForTimeout(ms);
-}
-
-export async function dragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {
-  await dragEmptyCanvas(page, from, to, { steps });
 }
 
 const MODIFIER_TO_OPT: Record<'Shift' | 'Control' | 'Alt' | 'Meta', keyof ClickOpts> = {
@@ -1087,26 +1074,6 @@ export async function setCanvasTestHooksEnabled(page: Page, enabled: boolean) {
       document.head.appendChild(style);
     }
   }, enabled);
-}
-
-export async function beginVisibleCanvasDrag(page: Page, point: CanvasPoint) {
-  // `point` here is in client (page) coords, not canvas coords.  Used by
-  // tests that begin a drag from a measured DOM-element position.
-  await flushCanvasFrames(page);
-  await page.evaluate(
-    ({ point }) => {
-      const api = window.__BB_TEST__;
-      if (!api?.movePointerClient || !api.releaseDrag) {
-        throw new Error('__BB_TEST__ is not available');
-      }
-      // Synthesize a pointerdown by first moving then dispatching.  We don't
-      // have a beginDragClient but movePointerClient + a follow-up dispatch
-      // covers it.  The simpler path: just do a move; the caller usually
-      // dispatches mousedown elsewhere (test-hook locator).
-      api.movePointerClient(point.x, point.y);
-    },
-    { point },
-  );
 }
 
 export async function movePointerToPagePoint(page: Page, point: CanvasPoint, _steps = 18) {
@@ -1193,11 +1160,6 @@ export async function movePointerToCanvasPoint(page: Page, destination: CanvasPo
   );
 }
 
-export async function clickCanvasHook(page: Page, testId: string) {
-  const center = await hookCenter(page.getByTestId(testId));
-  await page.mouse.click(center.x, center.y);
-}
-
 export async function beginCanvasHookDrag(page: Page, testId: string) {
   const locator = page.getByTestId(testId);
   const start = await hookCenter(locator);
@@ -1205,19 +1167,6 @@ export async function beginCanvasHookDrag(page: Page, testId: string) {
   await locator.dispatchEvent('mousedown', {
     button: 0,
     buttons: 1,
-    bubbles: true,
-    clientX: start.x,
-    clientY: start.y,
-  });
-}
-
-export async function beginCanvasHookMiddleDrag(page: Page, testId: string) {
-  const locator = page.getByTestId(testId);
-  const start = await hookCenter(locator);
-  await page.mouse.move(start.x, start.y);
-  await locator.dispatchEvent('mousedown', {
-    button: 1,
-    buttons: 4,
     bubbles: true,
     clientX: start.x,
     clientY: start.y,
