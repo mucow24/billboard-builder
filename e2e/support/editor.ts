@@ -838,20 +838,10 @@ export type HandleName =
   | 'line-start'
   | 'line-end';
 
-/**
- * Each wrapper does a `flushCanvasFrames` *before* it dispatches.
- *
- * Why: prior Playwright actions (toolbar button click, `keyboard.down(' ')`,
- * etc.) trigger React state changes that don't commit until the next frame.
- * The in-page methods read refs that mirror React props — without this
- * flush, a freshly-pressed spacebar isn't reflected in `spacebarHeld` at the
- * moment the synthetic pointerdown dispatches, etc.
- *
- * This is *not* the bandage we removed.  The bandage was sandwich-flushing
- * around `clickCanvas` to paper over coord/dispatch races that no longer
- * exist with in-page atomicity.  The flush here only synchronizes Playwright
- * → React; the in-page dispatch is still race-free.
- */
+// `flushCanvasFrames` is no longer called by the ID-based wrappers — the
+// in-page dispatch is atomic, so it doesn't need a pre-flush.  It is still
+// used by `selectTool` (which has a separate Pixi event-root prop-sync race
+// that the aria-pressed gate alone doesn't cover).
 
 // Per-page, per-item memory of the last clickItem time, used to avoid
 // accidentally triggering the editor's 400ms double-click detection.  Each
@@ -885,7 +875,6 @@ function recordItemClick(page: Page, id: string) {
 
 export async function clickItem(page: Page, id: string, opts: ClickOpts = {}) {
   await avoidSameItemDoubleClick(page, id);
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ id, opts }) => {
       const api = window.__BB_TEST__;
@@ -905,7 +894,6 @@ export async function doubleClickItem(page: Page, id: string, opts: ClickOpts = 
   // double-click on (prior + first) and the second click is just a stray
   // single click. Wait past the editor's 400ms threshold first.
   await avoidSameItemDoubleClick(page, id);
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ id, opts }) => {
       const api = window.__BB_TEST__;
@@ -931,7 +919,6 @@ export async function dragItemTo(
   // The drag's pointerdown lands at the item's current center, hitting the
   // item's onMouseDown handler — same double-click pitfall as clickItem.
   await avoidSameItemDoubleClick(page, id);
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ id, canvasX, canvasY, opts }) => {
       const api = window.__BB_TEST__;
@@ -953,7 +940,6 @@ export async function dragHandle(
   dy: number,
   opts: DragOpts = {},
 ) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ itemId, handle, dx, dy, opts }) => {
       const api = window.__BB_TEST__;
@@ -967,7 +953,6 @@ export async function dragHandle(
 }
 
 export async function clickEmptyCanvas(page: Page, point: CanvasPoint, opts: ClickOpts = {}) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ point, opts }) => {
       const api = window.__BB_TEST__;
@@ -986,7 +971,6 @@ export async function dragEmptyCanvas(
   to: CanvasPoint,
   opts: DragOpts = {},
 ) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ from, to, opts }) => {
       const api = window.__BB_TEST__;
@@ -1005,7 +989,6 @@ export async function wheelAt(
   deltaY: number,
   deltaX = 0,
 ) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ point, deltaY, deltaX }) => {
       const api = window.__BB_TEST__;
@@ -1018,18 +1001,12 @@ export async function wheelAt(
   );
 }
 
-// ── Coord-based helpers (kept for compatibility) ────────────────────────────
-//
-// These delegate to the in-page test API.  Tests that don't yet target items
-// by id keep working through these shims, while gaining the same race-free
-// dispatch path as `clickItem` / `dragItemTo` / etc.
-
-export async function clickCanvas(page: Page, point: CanvasPoint) {
-  await clickEmptyCanvas(page, point);
-}
+// ── Coord-based double-click ────────────────────────────────────────────────
+// Used by tests that intentionally click at a coordinate (e.g. inside a crop
+// preview) rather than on a known fixture item.  Delegates to the in-page
+// test API for race-free dispatch.
 
 export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     async ({ point }) => {
       const api = window.__BB_TEST__;
@@ -1041,14 +1018,6 @@ export async function doubleClickCanvas(page: Page, point: CanvasPoint) {
     },
     { point },
   );
-}
-
-export async function waitForDoubleClickCadence(page: Page, ms = 550) {
-  await page.waitForTimeout(ms);
-}
-
-export async function dragCanvas(page: Page, from: CanvasPoint, to: CanvasPoint, steps = 18) {
-  await dragEmptyCanvas(page, from, to, { steps });
 }
 
 const MODIFIER_TO_OPT: Record<'Shift' | 'Control' | 'Alt' | 'Meta', keyof ClickOpts> = {
@@ -1089,26 +1058,6 @@ export async function setCanvasTestHooksEnabled(page: Page, enabled: boolean) {
   }, enabled);
 }
 
-export async function beginVisibleCanvasDrag(page: Page, point: CanvasPoint) {
-  // `point` here is in client (page) coords, not canvas coords.  Used by
-  // tests that begin a drag from a measured DOM-element position.
-  await flushCanvasFrames(page);
-  await page.evaluate(
-    ({ point }) => {
-      const api = window.__BB_TEST__;
-      if (!api?.movePointerClient || !api.releaseDrag) {
-        throw new Error('__BB_TEST__ is not available');
-      }
-      // Synthesize a pointerdown by first moving then dispatching.  We don't
-      // have a beginDragClient but movePointerClient + a follow-up dispatch
-      // covers it.  The simpler path: just do a move; the caller usually
-      // dispatches mousedown elsewhere (test-hook locator).
-      api.movePointerClient(point.x, point.y);
-    },
-    { point },
-  );
-}
-
 export async function movePointerToPagePoint(page: Page, point: CanvasPoint, _steps = 18) {
   await page.evaluate(
     ({ point }) => {
@@ -1123,7 +1072,6 @@ export async function movePointerToPagePoint(page: Page, point: CanvasPoint, _st
 }
 
 export async function beginCanvasDrag(page: Page, from: CanvasPoint) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ from }) => {
       const api = window.__BB_TEST__;
@@ -1167,7 +1115,6 @@ export async function beginGroupHandleDrag(
   handle: GroupHandleName,
   opts: ClickOpts = {},
 ) {
-  await flushCanvasFrames(page);
   await page.evaluate(
     ({ handle, opts }) => {
       const api = window.__BB_TEST__;
@@ -1193,11 +1140,6 @@ export async function movePointerToCanvasPoint(page: Page, destination: CanvasPo
   );
 }
 
-export async function clickCanvasHook(page: Page, testId: string) {
-  const center = await hookCenter(page.getByTestId(testId));
-  await page.mouse.click(center.x, center.y);
-}
-
 export async function beginCanvasHookDrag(page: Page, testId: string) {
   const locator = page.getByTestId(testId);
   const start = await hookCenter(locator);
@@ -1205,19 +1147,6 @@ export async function beginCanvasHookDrag(page: Page, testId: string) {
   await locator.dispatchEvent('mousedown', {
     button: 0,
     buttons: 1,
-    bubbles: true,
-    clientX: start.x,
-    clientY: start.y,
-  });
-}
-
-export async function beginCanvasHookMiddleDrag(page: Page, testId: string) {
-  const locator = page.getByTestId(testId);
-  const start = await hookCenter(locator);
-  await page.mouse.move(start.x, start.y);
-  await locator.dispatchEvent('mousedown', {
-    button: 1,
-    buttons: 4,
     bubbles: true,
     clientX: start.x,
     clientY: start.y,

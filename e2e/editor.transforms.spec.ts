@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  beginGroupHandleDrag,
   clickItem,
   collectLeafNodes,
   dragEmptyCanvas,
@@ -12,12 +13,13 @@ import {
   createRectangleFixture,
   createTextFixture,
   dragCanvasWithModifier,
-  dragCanvasHookToPoint,
   middleDragCanvas,
+  movePointerToCanvasPoint,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
   readStageDebug,
+  releasePointer,
   saveAndReadProject,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -598,10 +600,12 @@ test.describe('editor transforms', () => {
     }
     const rotaterDistance = initialFrame.height / 2 + 50;
 
-    await dragCanvasHookToPoint(page, 'canvas-group-rotater', {
+    await beginGroupHandleDrag(page, 'rotater');
+    await movePointerToCanvasPoint(page, {
       x: initialFrame.x + initialFrame.width / 2 + rotaterDistance,
       y: initialFrame.y + initialFrame.height / 2,
     });
+    await releasePointer(page);
 
     const afterRotateDebug = await readStageDebug(page);
     expect(Math.abs(afterRotateDebug.groupFrame?.rotation ?? 0)).toBeGreaterThan(80);
@@ -611,10 +615,12 @@ test.describe('editor transforms', () => {
     if (!rotatedFrame) {
       throw new Error('Expected a committed group frame after rotation.');
     }
-    await dragCanvasHookToPoint(page, 'canvas-group-handle-middle-right', {
+    await beginGroupHandleDrag(page, 'middle-right');
+    await movePointerToCanvasPoint(page, {
       x: rotatedFrame.x + rotatedFrame.width / 2,
       y: rotatedFrame.y + rotatedFrame.width / 2 + 100,
     });
+    await releasePointer(page);
     const resizedDebug = await readStageDebug(page);
     const resizedFrame = resizedDebug.groupFrame;
     const resizedSelection = resizedDebug.selectedItems;
@@ -645,11 +651,15 @@ test.describe('editor transforms', () => {
       expect(Number(savedItem?.y)).toBeCloseTo(resizedItem.y, 3);
     }
 
-    await dragCanvasHookToPoint(page, 'canvas-group-rotater', {
+    await beginGroupHandleDrag(page, 'rotater');
+    await movePointerToCanvasPoint(page, {
       x: rotatedFrame.x + rotatedFrame.width / 2,
       y: rotatedFrame.y + rotatedFrame.height / 2 + rotaterDistance,
     });
-    await dragCanvasHookToPoint(page, 'canvas-group-handle-bottom-right', { x: 360, y: 380 });
+    await releasePointer(page);
+    await beginGroupHandleDrag(page, 'bottom-right');
+    await movePointerToCanvasPoint(page, { x: 360, y: 380 });
+    await releasePointer(page);
 
     const finalProject = await saveAndReadProject(page);
 
