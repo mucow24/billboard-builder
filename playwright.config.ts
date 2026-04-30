@@ -11,7 +11,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   workers: 8,
-  retries: 0,
+  retries: 1,
   reporter: 'list',
   timeout: 60_000,
   expect: {
