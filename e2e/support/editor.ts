@@ -1076,7 +1076,7 @@ export async function setCanvasTestHooksEnabled(page: Page, enabled: boolean) {
   }, enabled);
 }
 
-export async function movePointerToPagePoint(page: Page, point: CanvasPoint, _steps = 18) {
+export async function movePointerToPagePoint(page: Page, point: CanvasPoint) {
   await page.evaluate(
     ({ point }) => {
       const api = window.__BB_TEST__;
@@ -1147,7 +1147,7 @@ export async function beginGroupHandleDrag(
   );
 }
 
-export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint, _steps = 18) {
+export async function movePointerToCanvasPoint(page: Page, destination: CanvasPoint) {
   await page.evaluate(
     ({ destination }) => {
       const api = window.__BB_TEST__;

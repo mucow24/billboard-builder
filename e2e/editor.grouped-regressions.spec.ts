@@ -132,7 +132,7 @@ test.describe('grouped manipulation regressions', () => {
       }
     );
     await beginGroupHandleDrag(page, 'bottom-right');
-    await movePointerToCanvasPoint(page, secondDestination, 4);
+    await movePointerToCanvasPoint(page, secondDestination);
     await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
 
     const preview = await readRenderSnapshot(page);
