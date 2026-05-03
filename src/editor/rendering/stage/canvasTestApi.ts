@@ -588,9 +588,12 @@ export function useCanvasTestApi({
 
       // Middle button = pan, regardless of which handle was targeted.  The
       // editor's existing test-hook divs route middle-button to startPanDrag;
-      // mirror that.
+      // mirror that.  Mark the synthetic gesture as middle-pressed so the
+      // next dispatched pointermove reports buttons=4 instead of 0 (which
+      // would trip the editor's lost-button pan-recovery check).
       if (merged.button === 1) {
         startPanDragRef.current(viewportPoint);
+        pressedButton = 1;
         lastPointerClient = { clientX, clientY, opts: merged };
         return;
       }

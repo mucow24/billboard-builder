@@ -268,14 +268,14 @@ describe('CanvasStage viewport controls', () => {
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
 
     fireEvent.mouseDown(overlayHook, { button: 1, clientX: 300, clientY: 220 });
-    fireEvent.mouseMove(window, { clientX: 360, clientY: 270 });
+    fireEvent.pointerMove(window, { clientX: 360, clientY: 270, buttons: 4 });
 
     const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(mockInteractionSession.beginGroupDrag).not.toHaveBeenCalled();
     expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
     expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
 
-    fireEvent.mouseUp(window, { clientX: 1400, clientY: 900 });
+    fireEvent.pointerUp(window, { clientX: 1400, clientY: 900 });
     expect(window.document.body.style.cursor).toBe('');
     expect(container.querySelector('[data-testid="canvas-group-overlay"]')).not.toBeNull();
   });
@@ -305,7 +305,7 @@ describe('CanvasStage viewport controls', () => {
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
 
     fireEvent.mouseDown(handleHook, { button: 1, clientX: 360, clientY: 220 });
-    fireEvent.mouseMove(window, { clientX: 410, clientY: 260 });
+    fireEvent.pointerMove(window, { clientX: 410, clientY: 260, buttons: 4 });
 
     const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(mockInteractionSession.beginGroupResize).not.toHaveBeenCalled();
@@ -339,7 +339,7 @@ describe('CanvasStage viewport controls', () => {
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
 
     fireEvent.mouseDown(overlayHook, { button: 1, clientX: 240, clientY: 160 });
-    fireEvent.mouseMove(window, { clientX: 300, clientY: 220 });
+    fireEvent.pointerMove(window, { clientX: 300, clientY: 220, buttons: 4 });
 
     const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(mockInteractionSession.handleItemPointerDown).not.toHaveBeenCalled();
@@ -374,14 +374,14 @@ describe('CanvasStage viewport controls', () => {
 
     fireEvent.keyDown(window, { key: ' ' });
     fireEvent.mouseDown(overlayHook, { button: 0, clientX: 240, clientY: 160 });
-    fireEvent.mouseMove(window, { clientX: 300, clientY: 220 });
+    fireEvent.pointerMove(window, { clientX: 300, clientY: 220, buttons: 1 });
 
     const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(mockInteractionSession.handleItemPointerDown).not.toHaveBeenCalled();
     expect(nextDebug.viewport.panX).not.toBe(initialDebug.viewport.panX);
     expect(nextDebug.viewport.panY).not.toBe(initialDebug.viewport.panY);
 
-    fireEvent.mouseUp(window, { button: 0, clientX: 300, clientY: 220 });
+    fireEvent.pointerUp(window, { button: 0, clientX: 300, clientY: 220 });
     fireEvent.keyUp(window, { key: ' ' });
   });
 
@@ -450,7 +450,7 @@ describe('CanvasStage viewport controls', () => {
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
 
     fireEvent.mouseDown(handleHook, { button: 1, clientX: 300, clientY: 130 });
-    fireEvent.mouseMove(window, { clientX: 350, clientY: 180 });
+    fireEvent.pointerMove(window, { clientX: 350, clientY: 180, buttons: 4 });
 
     const nextDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(mockInteractionSession.beginResize).not.toHaveBeenCalled();
