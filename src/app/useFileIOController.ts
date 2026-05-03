@@ -1,6 +1,6 @@
 import type { CanvasRendererHandle } from '../editor/rendering/renderer/canvasRendererTypes';
 
-import { downloadCanvasAsPng } from '../editor/io/exportPng';
+import { copyCanvasToClipboard, downloadCanvasAsPng } from '../editor/io/exportPng';
 import { sanitizeBasename } from '../editor/io/filename';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
@@ -88,6 +88,20 @@ export function useFileIOController({
     void downloadCanvasAsPng(handle, document.canvas.width, document.canvas.height, 1, `${basename}.png`);
   }
 
+  async function handleExportToClipboard(handle: CanvasRendererHandle | null): Promise<boolean> {
+    if (!handle) {
+      return false;
+    }
+    try {
+      await copyCanvasToClipboard(handle, document.canvas.width, document.canvas.height, 1);
+      setErrorMessage(null);
+      return true;
+    } catch (error) {
+      setErrorMessage(`Failed to copy to clipboard: ${getErrorMessage(error, 'Unknown error.')}`);
+      return false;
+    }
+  }
+
   function handleSave() {
     const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
     downloadProject(document, `${basename}.json`);
@@ -99,6 +113,7 @@ export function useFileIOController({
     handleOpenProject,
     handleNewProject,
     handleExport,
+    handleExportToClipboard,
     handleSave,
   };
 }

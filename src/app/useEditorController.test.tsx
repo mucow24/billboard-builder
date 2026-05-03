@@ -16,6 +16,7 @@ const {
   mockCanvasPersistenceService,
   mockDownloadProject,
   mockDownloadCanvasAsPng,
+  mockCopyCanvasToClipboard,
   mockImportImageFile,
   mockReadProjectFile,
   mockRegisterFontFile,
@@ -30,6 +31,7 @@ const {
   },
   mockDownloadProject: vi.fn(),
   mockDownloadCanvasAsPng: vi.fn(),
+  mockCopyCanvasToClipboard: vi.fn(),
   mockImportImageFile: vi.fn(),
   mockReadProjectFile: vi.fn(),
   mockRegisterFontFile: vi.fn(),
@@ -68,6 +70,7 @@ vi.mock('../editor/persistence/uploadedFontPersistenceService', async () => {
 
 vi.mock('../editor/io/exportPng', () => ({
   downloadCanvasAsPng: mockDownloadCanvasAsPng,
+  copyCanvasToClipboard: mockCopyCanvasToClipboard,
 }));
 
 vi.mock('../editor/io/images', async () => {
@@ -309,10 +312,29 @@ describe('useEditorController', () => {
     await act(async () => {
       await result.current.actions.handleOpenProject(makeFileList(new File(['{}'], 'project.json')));
     });
+    mockCopyCanvasToClipboard.mockResolvedValue(undefined);
+    let clipboardOk: boolean | undefined;
+    let clipboardNoHandle: boolean | undefined;
     await act(async () => {
       result.current.actions.handleExport(null);
       result.current.actions.handleExport(stage);
       result.current.actions.handleSave();
+      clipboardNoHandle = await result.current.actions.handleExportToClipboard(null);
+      clipboardOk = await result.current.actions.handleExportToClipboard(stage);
+    });
+    expect(clipboardNoHandle).toBe(false);
+    expect(clipboardOk).toBe(true);
+    expect(mockCopyCanvasToClipboard).toHaveBeenCalledOnce();
+    expect(mockCopyCanvasToClipboard).toHaveBeenCalledWith(stage, 2048, 2048, 1);
+
+    mockCopyCanvasToClipboard.mockRejectedValueOnce(new Error('clipboard nope'));
+    let clipboardFailed: boolean | undefined;
+    await act(async () => {
+      clipboardFailed = await result.current.actions.handleExportToClipboard(stage);
+    });
+    expect(clipboardFailed).toBe(false);
+    await waitFor(() => {
+      expect(result.current.state.errorMessage).toBe('Failed to copy to clipboard: clipboard nope');
     });
 
     await waitFor(() => {

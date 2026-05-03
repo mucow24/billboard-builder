@@ -23,6 +23,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onCanvasFocusToggle: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
+    onExportToClipboard: vi.fn(),
     onGroup: vi.fn(),
     onInspectorTabChange: vi.fn(),
     onLoad: vi.fn(),
@@ -46,7 +47,7 @@ describe('Toolbar', () => {
   it('renders the redesigned toolbar controls and always-visible action icons', () => {
     renderToolbar();
 
-    expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Export/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: /^Undo/ })).toBeDisabled();
@@ -78,13 +79,13 @@ describe('Toolbar', () => {
     expect(onNewProject).toHaveBeenCalledOnce();
   });
 
-  it('publishes export-intent activity on hover and focus for the export button', async () => {
+  it('publishes export-intent activity on hover and focus for the export trigger', async () => {
     const user = userEvent.setup();
     const onExportIntentChange = vi.fn();
 
     renderToolbar({ onExportIntentChange });
 
-    const exportButton = screen.getByRole('button', { name: 'Export PNG' });
+    const exportButton = screen.getByRole('button', { name: /^Export/ });
 
     await user.hover(exportButton);
     expect(onExportIntentChange).toHaveBeenLastCalledWith(true);
@@ -97,6 +98,76 @@ describe('Toolbar', () => {
 
     fireEvent.blur(exportButton);
     expect(onExportIntentChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('does not leave the export-intent cue lit after a click toggles the menu shut', async () => {
+    const user = userEvent.setup();
+    const onExportIntentChange = vi.fn();
+
+    renderToolbar({ onExportIntentChange });
+
+    const exportButton = screen.getByRole('button', { name: /^Export/ });
+
+    await user.hover(exportButton);
+    await user.click(exportButton);
+    // Menu open — cue stays.
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(true);
+
+    await user.click(exportButton);
+    // Menu closed by click. Mouse-leave should clear the cue even though the
+    // browser keeps focus on the trigger after the click.
+    await user.unhover(exportButton);
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('keeps export-intent active while the export menu is open', async () => {
+    const user = userEvent.setup();
+    const onExportIntentChange = vi.fn();
+
+    renderToolbar({ onExportIntentChange });
+
+    const exportTrigger = screen.getByRole('button', { name: /^Export/ });
+    await user.click(exportTrigger);
+
+    expect(onExportIntentChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('routes export menu items through the matching callbacks', async () => {
+    const user = userEvent.setup();
+    const onExport = vi.fn();
+    const onExportToClipboard = vi.fn();
+
+    renderToolbar({ onExport, onExportToClipboard });
+
+    const exportTrigger = screen.getByRole('button', { name: /^Export/ });
+
+    // Trigger itself does not fire onExport — it opens the menu.
+    await user.click(exportTrigger);
+    expect(onExport).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'PNG' }));
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(onExportToClipboard).not.toHaveBeenCalled();
+
+    await user.click(exportTrigger);
+    await user.click(screen.getByRole('button', { name: 'To clipboard' }));
+    expect(onExportToClipboard).toHaveBeenCalledOnce();
+  });
+
+  it('renders the clipboard status bubble next to the export trigger', () => {
+    renderToolbar({ clipboardStatusMessage: 'Copied to clipboard' });
+
+    const bubble = screen.getByText('Copied to clipboard');
+    expect(bubble).toHaveClass('top-toolbar-status-bubble');
+  });
+
+  it('applies the fading state to the clipboard status bubble', () => {
+    renderToolbar({
+      clipboardStatusFading: true,
+      clipboardStatusMessage: 'Copied to clipboard',
+    });
+
+    expect(screen.getByText('Copied to clipboard')).toHaveClass('fading');
   });
 
   it('shows keyboard shortcuts in action button tooltips', () => {
