@@ -274,9 +274,8 @@ describe('App integration', () => {
     render(<App />);
     await screen.findByRole('button', { name: 'File' });
 
-    const exportButton = screen.getByRole('button', { name: 'Export PNG' });
     clickToolbarPopoverItem('File', 'Save');
-    fireEvent.click(exportButton);
+    clickToolbarPopoverItem('Export', 'PNG');
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();
     expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1, 'Untitled canvas.png');

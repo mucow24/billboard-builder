@@ -27,6 +27,7 @@ export default function App() {
   const boundsKeyHeld = useKeyHeld('f');
   const showExportBoundsCue = canvasFocusActive || exportButtonHovered || boundsKeyHeld;
   const favoriteStatus = useStatusToast();
+  const clipboardStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -41,6 +42,7 @@ export default function App() {
       dispatch,
       groupSelectedNodes,
       handleExport,
+      handleExportToClipboard,
       handleFontUpload,
       handleImageUpload,
       handleNewProject,
@@ -139,10 +141,18 @@ export default function App() {
             onCanvasNameChange={(name) => dispatch({ type: 'set_canvas_name', name })}
             favoriteStatusFading={favoriteStatus.fading}
             favoriteStatusMessage={favoriteStatus.message}
+            clipboardStatusFading={clipboardStatus.fading}
+            clipboardStatusMessage={clipboardStatus.message}
             canvasFocusActive={canvasFocusActive}
             onCanvasFocusToggle={handleCanvasFocusToggle}
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
+            onExportToClipboard={async () => {
+              const ok = await handleExportToClipboard(stageRef.current);
+              if (ok) {
+                clipboardStatus.show('Copied to clipboard');
+              }
+            }}
             onExportIntentChange={handleExportIntentChange}
             onGroup={groupSelectedNodes}
             onLoad={() => openInputRef.current?.click()}

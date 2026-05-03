@@ -18,3 +18,19 @@ export async function downloadCanvasAsPng(
   anchor.download = fileName;
   anchor.click();
 }
+
+export async function copyCanvasToClipboard(
+  handle: CanvasRendererHandle,
+  contentWidth: number,
+  contentHeight: number,
+  pixelRatio: number,
+) {
+  const dataUrl = await handle.exportToDataURL({
+    contentWidth,
+    contentHeight,
+    pixelRatio,
+    mimeType: 'image/png',
+  });
+  const blob = await (await fetch(dataUrl)).blob();
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+}

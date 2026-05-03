@@ -162,7 +162,7 @@ describe('App shell', () => {
   it('renders the top toolbar controls', async () => {
     await renderApp();
 
-    expect(screen.getByRole('button', { name: 'Export PNG' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Export/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'File' })).toBeInTheDocument();
   });
 

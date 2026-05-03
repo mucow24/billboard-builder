@@ -191,10 +191,71 @@ test.describe('editor file and persistence flows', () => {
 
     const pngSize = await readDownloadedPngSize(
       await captureDownload(page, async () => {
-        await page.getByRole('button', { name: 'Export PNG' }).click();
+        await clickToolbarPopoverItem(page, 'Export', 'PNG');
       })
     );
     expect(pngSize).toEqual({ width: 1024, height: 1024 });
+  });
+
+  test('writes the canvas to the system clipboard as image/png from the Export menu', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createRectangleFixture({ id: 'clipboard-rect', x: 200, y: 200, width: 240, height: 160 }),
+      ]),
+      'clipboard-fixture.json',
+    );
+
+    // Stub the clipboard API before any user-script can call it. We can't rely
+    // on real clipboard permissions in headless Chromium, so we observe the
+    // call instead and recover the captured Blob via a base64 round-trip
+    // (Blob isn't serializable across the page<->test boundary).
+    await page.evaluate(() => {
+      const captured: Array<{ types: string[]; payloads: Record<string, string> }> = [];
+      const originalClipboardItem = window.ClipboardItem;
+      const PatchedClipboardItem = function (this: object, data: Record<string, Blob>) {
+        Object.defineProperty(this, '__bbData', { value: data, enumerable: false });
+        Object.defineProperty(this, 'types', { value: Object.keys(data), enumerable: true });
+      } as unknown as typeof ClipboardItem;
+      PatchedClipboardItem.supports = originalClipboardItem?.supports ?? (() => true);
+      window.ClipboardItem = PatchedClipboardItem;
+
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {
+          write: async (items: Array<{ __bbData: Record<string, Blob> }>) => {
+            const result: Array<{ types: string[]; payloads: Record<string, string> }> = [];
+            for (const item of items) {
+              const types = Object.keys(item.__bbData);
+              const payloads: Record<string, string> = {};
+              for (const type of types) {
+                const blob = item.__bbData[type];
+                const buffer = await blob.arrayBuffer();
+                payloads[type] = btoa(String.fromCharCode(...new Uint8Array(buffer.slice(0, 8))));
+              }
+              result.push({ types, payloads });
+            }
+            captured.push(...result);
+            (window as unknown as { __clipboardCaptures: typeof captured }).__clipboardCaptures = captured;
+          },
+        },
+      });
+      (window as unknown as { __clipboardCaptures: typeof captured }).__clipboardCaptures = captured;
+    });
+
+    await clickToolbarPopoverItem(page, 'Export', 'To clipboard');
+
+    await expect(page.getByRole('status', { name: '' })).toHaveText('Copied to clipboard');
+
+    const captures = await page.evaluate(
+      () => (window as unknown as { __clipboardCaptures: Array<{ types: string[]; payloads: Record<string, string> }> }).__clipboardCaptures,
+    );
+    expect(captures).toHaveLength(1);
+    expect(captures[0].types).toEqual(['image/png']);
+    // The first 8 bytes of any PNG blob are the PNG signature: 89 50 4E 47 0D 0A 1A 0A.
+    // Base64 of that signature is 'iVBORw0KGgo='.
+    expect(captures[0].payloads['image/png']).toBe('iVBORw0KGgo=');
   });
 
   test('resets to a new empty project through the real toolbar flow', async ({ page }) => {
@@ -284,7 +345,7 @@ test.describe('editor file and persistence flows', () => {
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Loaded Project');
 
     const renamedDownload = await captureDownload(page, async () => {
-      await page.getByRole('button', { name: 'Export PNG' }).click();
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
     });
     expect(renamedDownload.suggestedFilename()).toBe('Loaded Project.png');
   });

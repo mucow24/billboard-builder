@@ -40,7 +40,7 @@ test.describe('editor smoke flows', () => {
     await openFreshEditor(page);
 
     await expect(page.getByRole('button', { name: 'File', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
     await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();
 
     await selectTool(page, 'Rect');

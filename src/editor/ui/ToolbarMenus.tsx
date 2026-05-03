@@ -105,3 +105,33 @@ export function FileMenu({
     </div>
   );
 }
+
+interface ExportMenuProps {
+  menuId: string;
+  onExportPng: () => void;
+  onExportToClipboard: () => void;
+  createMenuActionHandler: (action: () => void) => () => void;
+}
+
+export function ExportMenu({
+  menuId,
+  onExportPng,
+  onExportToClipboard,
+  createMenuActionHandler,
+}: ExportMenuProps) {
+  return (
+    <div id={menuId} className="top-toolbar-popover-panel" role="group" aria-label="Export actions">
+      <ToolbarMenuAction label="PNG" onSelect={createMenuActionHandler(onExportPng)}>
+        <path d="M10 3v9" />
+        <path d="M6.5 8.5 10 12l3.5-3.5" />
+        <path d="M4 15.5h12" />
+      </ToolbarMenuAction>
+      <ToolbarMenuAction label="To clipboard" onSelect={createMenuActionHandler(onExportToClipboard)}>
+        <rect x="5" y="4.5" width="10" height="12" rx="1" />
+        <path d="M8 3.5h4v2H8z" />
+        <path d="M7.5 9h5" />
+        <path d="M7.5 12h5" />
+      </ToolbarMenuAction>
+    </div>
+  );
+}

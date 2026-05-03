@@ -78,6 +78,20 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
+.top-toolbar-popover.open > .top-toolbar-button-export {
+  border-color: transparent;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 1), rgba(8, 145, 178, 0.98));
+  box-shadow:
+    0 12px 24px rgba(6, 182, 212, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.top-toolbar .top-toolbar-button-export .top-toolbar-menu-caret {
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .top-toolbar-svg-icon {
   display: inline-flex;
   align-items: center;

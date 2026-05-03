@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import type { InspectorTab } from './inspector/types';
-import { ToolbarActionButton, ToolbarIcon } from './ToolbarPrimitives';
+import { ToolbarActionButton } from './ToolbarPrimitives';
 import { CanvasNameField } from './CanvasNameField';
 import { joinClassNames, modKey } from './toolbarUtils';
-import { FileMenu } from './ToolbarMenus';
+import { ExportMenu, FileMenu } from './ToolbarMenus';
 
 interface ToolbarProps {
   canDelete: boolean;
@@ -19,8 +19,11 @@ interface ToolbarProps {
   onCanvasFocusToggle: () => void;
   favoriteStatusFading?: boolean;
   favoriteStatusMessage?: string | null;
+  clipboardStatusFading?: boolean;
+  clipboardStatusMessage?: string | null;
   onDelete: () => void;
   onExport: () => void;
+  onExportToClipboard: () => void;
   onExportIntentChange?: (active: boolean) => void;
   onGroup: () => void;
   onLoad: () => void;
@@ -51,8 +54,11 @@ export function Toolbar({
   onCanvasFocusToggle,
   favoriteStatusFading = false,
   favoriteStatusMessage = null,
+  clipboardStatusFading = false,
+  clipboardStatusMessage = null,
   onDelete,
   onExport,
+  onExportToClipboard,
   onExportIntentChange,
   onGroup,
   onLoad,
@@ -71,14 +77,17 @@ export function Toolbar({
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
   const fileTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [openMenu, setOpenMenu] = useState<'file' | null>(null);
+  const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [openMenu, setOpenMenu] = useState<'file' | 'export' | null>(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
   const [isExportFocused, setIsExportFocused] = useState(false);
   const fileMenuId = useId();
+  const exportMenuId = useId();
+  const exportMenuOpen = openMenu === 'export';
 
   useEffect(() => {
-    onExportIntentChange?.(isExportHovered || isExportFocused);
-  }, [isExportFocused, isExportHovered, onExportIntentChange]);
+    onExportIntentChange?.(isExportHovered || isExportFocused || exportMenuOpen);
+  }, [exportMenuOpen, isExportFocused, isExportHovered, onExportIntentChange]);
 
   useEffect(() => () => onExportIntentChange?.(false), [onExportIntentChange]);
 
@@ -106,8 +115,9 @@ export function Toolbar({
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
+        const triggerToRefocus = openMenu === 'export' ? exportTriggerRef : fileTriggerRef;
         setOpenMenu(null);
-        window.requestAnimationFrame(() => fileTriggerRef.current?.focus());
+        window.requestAnimationFrame(() => triggerToRefocus.current?.focus());
         return;
       }
 
@@ -120,8 +130,8 @@ export function Toolbar({
     return () => document.removeEventListener('keydown', handleKeyDown, true);
   }, [openMenu]);
 
-  function toggleMenu() {
-    setOpenMenu((current) => (current === 'file' ? null : 'file'));
+  function toggleMenu(menu: 'file' | 'export') {
+    setOpenMenu((current) => (current === menu ? null : menu));
   }
 
   function closeMenu() {
@@ -138,22 +148,54 @@ export function Toolbar({
   return (
     <header ref={rootRef} className="top-toolbar">
       <div className="top-toolbar-row" role="toolbar" aria-label="Project toolbar">
-        <button
-          type="button"
-          className="top-toolbar-button top-toolbar-control top-toolbar-button-export"
-          onClick={onExport}
-          onMouseEnter={() => setIsExportHovered(true)}
-          onMouseLeave={() => setIsExportHovered(false)}
-          onFocus={() => setIsExportFocused(true)}
-          onBlur={() => setIsExportFocused(false)}
-        >
-          <ToolbarIcon>
-            <path d="M10 3v9" />
-            <path d="M6.5 8.5 10 12l3.5-3.5" />
-            <path d="M4 15.5h12" />
-          </ToolbarIcon>
-          <span>Export PNG</span>
-        </button>
+        <div className="top-toolbar-status-anchor">
+          <div className={joinClassNames('top-toolbar-popover', exportMenuOpen && 'open')}>
+            <button
+              ref={exportTriggerRef}
+              type="button"
+              className="top-toolbar-button top-toolbar-control top-toolbar-button-export"
+              aria-controls={exportMenuId}
+              aria-expanded={exportMenuOpen}
+              aria-haspopup="true"
+              onClick={() => {
+                // Closing via click is the user signaling "I'm done." Drop the
+                // browser-default focus the click leaves behind so a subsequent
+                // mouse-leave actually clears the export-bounds cue.
+                if (exportMenuOpen) {
+                  exportTriggerRef.current?.blur();
+                }
+                toggleMenu('export');
+              }}
+              onMouseEnter={() => setIsExportHovered(true)}
+              onMouseLeave={() => setIsExportHovered(false)}
+              onFocus={() => setIsExportFocused(true)}
+              onBlur={() => setIsExportFocused(false)}
+            >
+              <span>Export</span>
+              <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
+            </button>
+            {exportMenuOpen ? (
+              <ExportMenu
+                menuId={exportMenuId}
+                onExportPng={onExport}
+                onExportToClipboard={onExportToClipboard}
+                createMenuActionHandler={createMenuActionHandler}
+              />
+            ) : null}
+          </div>
+          {clipboardStatusMessage ? (
+            <div
+              className={
+                clipboardStatusFading
+                  ? 'top-toolbar-status-bubble fading'
+                  : 'top-toolbar-status-bubble'
+              }
+              role="status"
+            >
+              {clipboardStatusMessage}
+            </div>
+          ) : null}
+        </div>
 
         <div className={openMenu === 'file' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
           <button
@@ -163,7 +205,7 @@ export function Toolbar({
             aria-controls={fileMenuId}
             aria-expanded={openMenu === 'file'}
             aria-haspopup="true"
-            onClick={toggleMenu}
+            onClick={() => toggleMenu('file')}
           >
             <span>File</span>
             <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>

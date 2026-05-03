@@ -24,7 +24,7 @@ test.describe('editor toolbar flows', () => {
   test('renders the top toolbar and opens and closes popovers from the real triggers', async ({ page }) => {
     await openFreshEditor(page);
 
-    await expect(page.getByRole('button', { name: 'Export PNG' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'File', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Undo/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /^Redo/ })).toBeVisible();
@@ -60,7 +60,7 @@ test.describe('editor toolbar flows', () => {
       'toolbar-export-cue.json',
     );
 
-    const exportButton = page.getByRole('button', { name: 'Export PNG' });
+    const exportButton = page.getByRole('button', { name: 'Export', exact: true });
     const canvasButton = page.getByRole('button', { name: 'File', exact: true });
     const exportCue = page.getByTestId('export-bounds-cue');
     const cuePanels = [
@@ -90,6 +90,14 @@ test.describe('editor toolbar flows', () => {
 
     await canvasButton.focus();
     await expect(exportCue).not.toHaveClass(/active/);
+
+    // Opening the export menu should keep the cue active so users see exactly
+    // what the imminent click is going to capture.
+    await exportButton.click();
+    await expect(page.getByRole('button', { name: 'PNG', exact: true })).toBeVisible();
+    await expect(exportCue).toHaveClass(/active/);
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('button', { name: 'PNG', exact: true })).toHaveCount(0);
   });
 
   test('keeps action icons visible and updates enabled states through real selection and history flows', async ({ page }) => {
