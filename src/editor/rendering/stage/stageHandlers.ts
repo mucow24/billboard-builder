@@ -4,7 +4,6 @@ import type { CanvasTool } from '../../document/documentTypes';
 interface BuildStageSceneHandlersParams {
   activeTool: CanvasTool;
   applyZoomToolClick: (point: { x: number; y: number }, zoomOut: boolean) => void;
-  handleScenePointerMove: (pointer: { x: number; y: number } | null) => void;
   handleScenePointerUp: () => boolean;
   handleStageMouseDown: (event: CanvasPointerEvent) => void;
   handleStagePointerMove: (event: CanvasPointerEvent) => void;
@@ -18,7 +17,6 @@ interface BuildStageSceneHandlersParams {
 export function buildStageSceneHandlers({
   activeTool,
   applyZoomToolClick,
-  handleScenePointerMove,
   handleScenePointerUp,
   handleStageMouseDown,
   handleStagePointerMove,
@@ -44,8 +42,6 @@ export function buildStageSceneHandlers({
       handleStageMouseDown(event);
     },
     onStageMouseMove(event: CanvasPointerEvent) {
-      const pointer = event.viewportPointer;
-      handleScenePointerMove(pointer);
       handleStagePointerMove(event);
     },
     onStageMouseUp(event: CanvasPointerEvent) {

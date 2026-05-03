@@ -155,7 +155,7 @@ describe('useCanvasViewport', () => {
     expect(result.current.pan.y * 2).toBeCloseTo(Math.round(result.current.pan.y * 2), 6);
   });
 
-  it('starts and stops pan dragging through stage pointer handlers', () => {
+  it('updates pan from window pointermove while a button is held', () => {
     const { result } = renderHook(() =>
       useCanvasViewport({
         activeTool: 'select',
@@ -164,21 +164,83 @@ describe('useCanvasViewport', () => {
       }),
     );
 
+    const viewportElement = document.createElement('div');
+    viewportElement.getBoundingClientRect = () =>
+      ({
+        width: 1280,
+        height: 720,
+        left: 0,
+        top: 0,
+        right: 1280,
+        bottom: 720,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
+    act(() => {
+      result.current.viewportRef.current = viewportElement;
+    });
+
     act(() => {
       result.current.startPanDrag({ x: 100, y: 100 });
-      result.current.handleStagePointerMove({ x: 140, y: 160 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: 140,
+          clientY: 160,
+          buttons: 4,
+        }),
+      );
     });
 
     expect(result.current.pan).toEqual({ x: 360, y: 100 });
-    let handledPointerUp = false;
+  });
+
+  it('stops pan dragging on window pointerup even when the release stays inside the viewport', () => {
+    const { result } = renderHook(() =>
+      useCanvasViewport({
+        activeTool: 'select',
+        canvasHeight: 1024,
+        canvasWidth: 1024,
+      }),
+    );
+
+    const viewportElement = document.createElement('div');
+    viewportElement.getBoundingClientRect = () =>
+      ({
+        width: 1280,
+        height: 720,
+        left: 0,
+        top: 0,
+        right: 1280,
+        bottom: 720,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      }) as DOMRect;
+
     act(() => {
-      handledPointerUp = result.current.handleStagePointerUp();
+      result.current.viewportRef.current = viewportElement;
     });
-    expect(handledPointerUp).toBe(true);
+
+    act(() => {
+      result.current.startPanDrag({ x: 100, y: 100 });
+    });
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', {
+          clientX: 140,
+          clientY: 160,
+        }),
+      );
+    });
+
     expect(result.current.handleStagePointerUp()).toBe(false);
   });
 
-  it('ignores window mousemove while the pointer remains inside the viewport bounds', () => {
+  it('recovers a stuck pan when a window pointermove arrives with no buttons held', () => {
     const { result } = renderHook(() =>
       useCanvasViewport({
         activeTool: 'select',
@@ -210,93 +272,10 @@ describe('useCanvasViewport', () => {
     });
     act(() => {
       window.dispatchEvent(
-        new MouseEvent('mousemove', {
-          clientX: 140,
-          clientY: 160,
-        }),
-      );
-    });
-
-    expect(result.current.pan).toEqual({ x: 320, y: 40 });
-  });
-
-  it('continues pan dragging through window events only after the pointer leaves the viewport', () => {
-    const { result } = renderHook(() =>
-      useCanvasViewport({
-        activeTool: 'select',
-        canvasHeight: 1024,
-        canvasWidth: 1024,
-      }),
-    );
-
-    const viewportElement = document.createElement('div');
-    viewportElement.getBoundingClientRect = () =>
-      ({
-        width: 1280,
-        height: 720,
-        left: 0,
-        top: 0,
-        right: 1280,
-        bottom: 720,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect;
-
-    act(() => {
-      result.current.viewportRef.current = viewportElement;
-    });
-
-    act(() => {
-      result.current.startPanDrag({ x: 100, y: 100 });
-    });
-    act(() => {
-      window.dispatchEvent(
-        new MouseEvent('mousemove', {
-          clientX: 1400,
-          clientY: 860,
-        }),
-      );
-    });
-
-    expect(result.current.pan).toEqual({ x: 1620, y: 800 });
-  });
-
-  it('stops pan dragging on window mouseup even when the release stays inside the viewport', () => {
-    const { result } = renderHook(() =>
-      useCanvasViewport({
-        activeTool: 'select',
-        canvasHeight: 1024,
-        canvasWidth: 1024,
-      }),
-    );
-
-    const viewportElement = document.createElement('div');
-    viewportElement.getBoundingClientRect = () =>
-      ({
-        width: 1280,
-        height: 720,
-        left: 0,
-        top: 0,
-        right: 1280,
-        bottom: 720,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }) as DOMRect;
-
-    act(() => {
-      result.current.viewportRef.current = viewportElement;
-    });
-
-    act(() => {
-      result.current.startPanDrag({ x: 100, y: 100 });
-    });
-    act(() => {
-      window.dispatchEvent(
-        new MouseEvent('mouseup', {
-          clientX: 140,
-          clientY: 160,
+        new PointerEvent('pointermove', {
+          clientX: 200,
+          clientY: 200,
+          buttons: 0,
         }),
       );
     });

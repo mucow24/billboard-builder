@@ -149,7 +149,6 @@ export function CanvasStage({
       viewport.applyZoomToolClick(point, zoomOut);
       setActiveTool('select');
     },
-    handleScenePointerMove: viewport.handleStagePointerMove,
     handleScenePointerUp: viewport.handleStagePointerUp,
     handleStageMouseDown,
     handleStagePointerMove,

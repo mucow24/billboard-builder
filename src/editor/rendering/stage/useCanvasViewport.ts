@@ -25,11 +25,6 @@ interface UseCanvasViewportParams {
   canvasWidth: number;
 }
 
-interface ViewportPoint {
-  x: number;
-  y: number;
-}
-
 type PanUpdate = Point | ((currentPan: Point) => Point);
 
 export function useCanvasViewport({
@@ -41,7 +36,6 @@ export function useCanvasViewport({
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
-  const [isPanDragging, setIsPanDragging] = useState(false);
   const panDragRef = useRef<{ startPointer: Point; startPan: Point } | null>(null);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
@@ -136,7 +130,6 @@ export function useCanvasViewport({
       return;
     }
     panDragRef.current = null;
-    setIsPanDragging(false);
     window.document.body.style.cursor = '';
   }, []);
 
@@ -145,34 +138,17 @@ export function useCanvasViewport({
       startPointer,
       startPan: { ...panRef.current },
     };
-    setIsPanDragging(true);
     window.document.body.style.cursor = 'grabbing';
   }, []);
 
-  const isClientPointInsideViewport = useCallback((clientX: number, clientY: number) => {
-    const bounds = viewportRef.current?.getBoundingClientRect();
-    if (!bounds) {
-      return false;
-    }
-    return (
-      clientX >= bounds.left &&
-      clientX <= bounds.right &&
-      clientY >= bounds.top &&
-      clientY <= bounds.bottom
-    );
-  }, []);
-
   useEffect(() => {
-    if (!isPanDragging) {
-      return;
-    }
-
-    function handleWindowMouseMove(event: MouseEvent) {
+    function handleWindowPointerMove(event: PointerEvent) {
       const current = panDragRef.current;
       if (!current) {
         return;
       }
-      if (isClientPointInsideViewport(event.clientX, event.clientY)) {
+      if (event.buttons === 0) {
+        stopPanDrag();
         return;
       }
       const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
@@ -188,19 +164,22 @@ export function useCanvasViewport({
       });
     }
 
-    function handleWindowMouseUp(event: MouseEvent) {
-      void event;
-      stopPanDrag();
+    function handleWindowPointerUp() {
+      if (panDragRef.current) {
+        stopPanDrag();
+      }
     }
 
-    window.addEventListener('mousemove', handleWindowMouseMove);
-    window.addEventListener('mouseup', handleWindowMouseUp);
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleWindowMouseMove);
-      window.removeEventListener('mouseup', handleWindowMouseUp);
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerUp);
       window.document.body.style.cursor = '';
     };
-  }, [getViewportPointerFromClient, isClientPointInsideViewport, isPanDragging, setAlignedPan, stopPanDrag]);
+  }, [getViewportPointerFromClient, setAlignedPan, stopPanDrag]);
 
   const viewport = useMemo(
     () => ({ zoom, panX: pan.x, panY: pan.y }),
@@ -253,17 +232,6 @@ export function useCanvasViewport({
     [activeTool, modifierKeys.altKey, spacebarHeld],
   );
 
-  const handleStagePointerMove = useCallback((pointer: ViewportPoint | null) => {
-    const current = panDragRef.current;
-    if (!current || !pointer) {
-      return;
-    }
-    setAlignedPan({
-      x: current.startPan.x + (pointer.x - current.startPointer.x),
-      y: current.startPan.y + (pointer.y - current.startPointer.y),
-    });
-  }, [setAlignedPan]);
-
   const handleStagePointerUp = useCallback(() => {
     if (!panDragRef.current) {
       return false;
@@ -308,7 +276,6 @@ export function useCanvasViewport({
     fitCanvasToViewport,
     getViewportPointerFromClient,
     handleStagePointerLeave,
-    handleStagePointerMove,
     handleStagePointerUp,
     isPanGesture,
     pan,

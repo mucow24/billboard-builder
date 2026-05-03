@@ -50,3 +50,23 @@ vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
   return null;
 });
 vi.stubGlobal('cancelAnimationFrame', () => {});
+
+// jsdom doesn't implement PointerEvent.  Production code listens for
+// pointermove/pointerup on the window (the only events Chromium fires for
+// CDP-driven middle-button gestures).  Fall back to a MouseEvent-derived
+// shim so tests can dispatch pointer events without crashing.
+if (typeof globalThis.PointerEvent === 'undefined') {
+  class TestPointerEvent extends MouseEvent {
+    pointerId: number;
+    pointerType: string;
+    isPrimary: boolean;
+
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 1;
+      this.pointerType = init.pointerType ?? 'mouse';
+      this.isPrimary = init.isPrimary ?? true;
+    }
+  }
+  globalThis.PointerEvent = TestPointerEvent as unknown as typeof PointerEvent;
+}
