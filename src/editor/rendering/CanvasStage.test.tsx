@@ -1,5 +1,5 @@
 // This file intentionally mocks Konva and the interaction session; it covers stage wiring without a real canvas.
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React, { createRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -111,9 +111,9 @@ function setupStore(overrides: StoreOverrides = {}) {
   });
 }
 
-function CanvasStage(props: Partial<React.ComponentProps<typeof ActualCanvasStage>> & StoreOverrides) {
-  const { activeTool, document, selectedNodeIds, ...rest } = props;
-  setupStore({ activeTool, document, selectedNodeIds });
+type StageProps = Partial<React.ComponentProps<typeof ActualCanvasStage>> & StoreOverrides;
+
+function stageElement(rest: Partial<React.ComponentProps<typeof ActualCanvasStage>>) {
   return (
     <ActualCanvasStage
       debugMode
@@ -124,6 +124,29 @@ function CanvasStage(props: Partial<React.ComponentProps<typeof ActualCanvasStag
       {...rest}
     />
   );
+}
+
+// Apply store overrides outside of render() / rerender() so the zustand
+// setState doesn't fire while React is rendering — which would trigger a
+// "Cannot update a component while rendering a different component" warning.
+function renderStage(props: StageProps = {}) {
+  const { activeTool, document, selectedNodeIds, ...rest } = props;
+  setupStore({ activeTool, document, selectedNodeIds });
+  return render(stageElement(rest));
+}
+
+function rerenderStage(
+  rerender: ReturnType<typeof render>['rerender'],
+  props: StageProps = {},
+) {
+  const { activeTool, document, selectedNodeIds, ...rest } = props;
+  // Wrap in act() because setupStore triggers a zustand setState that
+  // synchronously notifies mounted subscribers (the rendered CanvasStage),
+  // and React requires those updates to be wrapped during tests.
+  act(() => {
+    setupStore({ activeTool, document, selectedNodeIds });
+  });
+  rerender(stageElement(rest));
 }
 
 describe('CanvasStage viewport controls', () => {
@@ -222,9 +245,7 @@ describe('CanvasStage viewport controls', () => {
 
   it('renders zoom controls and updates the readout', async () => {
     const user = userEvent.setup();
-    render(
-      <CanvasStage />,
-    );
+    renderStage();
 
     expect(screen.getByRole('button', { name: 'Fit canvas to viewport' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Set zoom to 100%' })).toBeInTheDocument();
@@ -257,12 +278,10 @@ describe('CanvasStage viewport controls', () => {
       selectedItemId: first.id,
     });
 
-    const { container } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[first.id, second.id]}
-      />,
-    );
+    const { container } = renderStage({
+      document,
+      selectedNodeIds: [first.id, second.id],
+    });
 
     const overlayHook = screen.getByTestId('canvas-group-overlay');
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
@@ -294,12 +313,10 @@ describe('CanvasStage viewport controls', () => {
       selectedItemId: first.id,
     });
 
-    render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[first.id, second.id]}
-      />,
-    );
+    renderStage({
+      document,
+      selectedNodeIds: [first.id, second.id],
+    });
 
     const handleHook = screen.getByTestId('canvas-group-handle-middle-right');
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
@@ -328,12 +345,10 @@ describe('CanvasStage viewport controls', () => {
       },
     });
 
-    render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[rectangle.id]}
-      />,
-    );
+    renderStage({
+      document,
+      selectedNodeIds: [rectangle.id],
+    });
 
     const overlayHook = screen.getByTestId('canvas-selected-item-overlay');
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
@@ -362,12 +377,10 @@ describe('CanvasStage viewport controls', () => {
       },
     });
 
-    render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[rectangle.id]}
-      />,
-    );
+    renderStage({
+      document,
+      selectedNodeIds: [rectangle.id],
+    });
 
     const overlayHook = screen.getByTestId('canvas-selected-item-overlay');
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
@@ -400,12 +413,10 @@ describe('CanvasStage viewport controls', () => {
       },
     });
 
-    render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[rectangle.id]}
-      />,
-    );
+    renderStage({
+      document,
+      selectedNodeIds: [rectangle.id],
+    });
 
     fireEvent.mouseDown(screen.getByTestId('canvas-selected-item-overlay'), {
       button: 0,
@@ -439,12 +450,10 @@ describe('CanvasStage viewport controls', () => {
       selectedRenderedItem: rectangle,
     });
 
-    render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={[rectangle.id]}
-      />,
-    );
+    renderStage({
+      document,
+      selectedNodeIds: [rectangle.id],
+    });
 
     const handleHook = screen.getByTestId('canvas-shape-handle-middle-right');
     const initialDebug = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
@@ -486,12 +495,10 @@ describe('CanvasStage viewport controls', () => {
       },
     });
 
-    const { rerender } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={['first', 'second']}
-      />,
-    );
+    const { rerender } = renderStage({
+      document,
+      selectedNodeIds: ['first', 'second'],
+    });
 
     let debugInfo = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(debugInfo.sessionKind).toBe('group-drag');
@@ -538,12 +545,10 @@ describe('CanvasStage viewport controls', () => {
       },
     });
 
-    rerender(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={['first', 'second']}
-      />,
-    );
+    rerenderStage(rerender, {
+      document,
+      selectedNodeIds: ['first', 'second'],
+    });
 
     debugInfo = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
     expect(debugInfo.sessionKind).toBe('group-resize');
@@ -626,12 +631,10 @@ describe('CanvasStage viewport controls', () => {
       },
     ];
 
-    const { rerender } = render(
-      <CanvasStage
-        document={document}
-        selectedNodeIds={['first', 'second']}
-      />,
-    );
+    const { rerender } = renderStage({
+      document,
+      selectedNodeIds: ['first', 'second'],
+    });
 
     for (const testCase of cases) {
       Object.assign(mockInteractionSession, {
@@ -642,12 +645,10 @@ describe('CanvasStage viewport controls', () => {
         session: testCase.session,
       });
 
-      rerender(
-        <CanvasStage
-          document={document}
-          selectedNodeIds={['first', 'second']}
-        />,
-      );
+      rerenderStage(rerender, {
+        document,
+        selectedNodeIds: ['first', 'second'],
+      });
 
       const debugInfo = JSON.parse(screen.getByTestId('stage-debug').textContent ?? '{}');
       expect(debugInfo.sessionKind).toBe(testCase.kind);

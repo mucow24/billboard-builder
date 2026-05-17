@@ -56,20 +56,28 @@ describe('browser font loader', () => {
   });
 
   it('keeps loading valid bundled fonts when one source fails', async () => {
-    const fonts = await loadFontEntries([
-      ['src/assets/fonts/Good-One.ttf', '/fonts/good-one.ttf'],
-      ['src/assets/fonts/Broken-One.ttf', '/fonts/broken-one.ttf'],
-    ]);
+    // The production code intentionally console.warn's when a font fails to
+    // load; silence it here so this success-path test doesn't pollute stderr.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const fonts = await loadFontEntries([
+        ['src/assets/fonts/Good-One.ttf', '/fonts/good-one.ttf'],
+        ['src/assets/fonts/Broken-One.ttf', '/fonts/broken-one.ttf'],
+      ]);
 
-    expect(fonts).toEqual([
-      {
-        family: 'Good One',
-        sourceName: 'Good-One.ttf',
-        weight: '400',
-        style: 'normal',
-        kind: 'bundled',
-      },
-    ]);
+      expect(fonts).toEqual([
+        {
+          family: 'Good One',
+          sourceName: 'Good-One.ttf',
+          weight: '400',
+          style: 'normal',
+          kind: 'bundled',
+        },
+      ]);
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('registers uploaded font files with uploaded provenance', async () => {
