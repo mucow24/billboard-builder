@@ -1,18 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  CircleIcon,
+  CursorArrowIcon,
+  HandIcon,
+  ImageIcon,
+  MagnifyingGlassIcon,
+  MixIcon,
+  SlashIcon,
+  SquareIcon,
+  TextIcon,
+  VercelLogoIcon,
+} from '@radix-ui/react-icons';
 
 import { getAllGenerators } from '../generators';
 import type { CanvasTool } from '../document/documentTypes';
 import { GENERATOR_ICONS } from './ToolbarMenus';
 
-const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; icon: string }> = [
-  { id: 'select', label: 'Select', hotkey: 'V', icon: '↖' },
-  { id: 'pan', label: 'Hand', hotkey: 'H', icon: '✋' },
-  { id: 'zoom', label: 'Zoom', hotkey: 'Z', icon: '⌕' },
-  { id: 'text', label: 'Text', hotkey: 'T', icon: 'T' },
-  { id: 'rectangle', label: 'Rect', hotkey: 'R', icon: '▭' },
-  { id: 'ellipse', label: 'Ellipse', hotkey: 'O', icon: '◯' },
-  { id: 'ngon', label: 'Polygon', hotkey: 'G', icon: '⬡' },
-  { id: 'line', label: 'Line', hotkey: 'L', icon: '／' },
+type IconComponent = typeof CursorArrowIcon;
+
+const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; Icon: IconComponent }> = [
+  { id: 'select', label: 'Select', hotkey: 'V', Icon: CursorArrowIcon },
+  { id: 'pan', label: 'Hand', hotkey: 'H', Icon: HandIcon },
+  { id: 'zoom', label: 'Zoom', hotkey: 'Z', Icon: MagnifyingGlassIcon },
+  { id: 'text', label: 'Text', hotkey: 'T', Icon: TextIcon },
+  { id: 'rectangle', label: 'Rect', hotkey: 'R', Icon: SquareIcon },
+  { id: 'ellipse', label: 'Ellipse', hotkey: 'O', Icon: CircleIcon },
+  { id: 'ngon', label: 'Polygon', hotkey: 'G', Icon: VercelLogoIcon },
+  { id: 'line', label: 'Line', hotkey: 'L', Icon: SlashIcon },
 ];
 
 interface ToolPaletteProps {
@@ -65,8 +79,8 @@ export function ToolPalette({ activeTool, onChange, onImageUpload, onAddGenerato
           title={`${tool.label} (${tool.hotkey})`}
           aria-pressed={tool.id === activeTool}
         >
-          <span className="tool-button-icon" aria-hidden="true">
-            {tool.icon}
+          <span className="tool-button-icon tool-button-radix-icon" aria-hidden="true">
+            <tool.Icon width={20} height={20} />
           </span>
           <span className="sr-only">{tool.label}</span>
         </button>
@@ -81,12 +95,8 @@ export function ToolPalette({ activeTool, onChange, onImageUpload, onAddGenerato
         title="Add image"
         onClick={onImageUpload}
       >
-        <span className="tool-button-icon tool-button-svg-icon" aria-hidden="true">
-          <svg viewBox="0 0 20 20">
-            <rect x="3.5" y="4.5" width="13" height="11" rx="1.5" />
-            <path d="m6 12 2.4-2.5 2.3 2.2 2.8-3 2.5 3.3" />
-            <path d="M7 8h.01" />
-          </svg>
+        <span className="tool-button-icon tool-button-radix-icon" aria-hidden="true">
+          <ImageIcon width={20} height={20} />
         </span>
       </button>
 
@@ -102,10 +112,8 @@ export function ToolPalette({ activeTool, onChange, onImageUpload, onAddGenerato
           aria-expanded={generatorOpen}
           onClick={() => setGeneratorOpen((open) => !open)}
         >
-          <span className="tool-button-icon tool-button-svg-icon" aria-hidden="true">
-            <svg viewBox="0 0 20 20">
-              <path d="M10 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" />
-            </svg>
+          <span className="tool-button-icon tool-button-radix-icon" aria-hidden="true">
+            <MixIcon width={20} height={20} />
           </span>
         </button>
         {generatorOpen ? (
