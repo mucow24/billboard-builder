@@ -45,7 +45,8 @@ export function ToolbarMenuAction({
 }
 
 interface ToolbarActionButtonProps {
-  children: ReactNode;
+  children?: ReactNode;
+  icon?: ReactNode;
   disabled?: boolean;
   label: string;
   onClick: () => void;
@@ -55,6 +56,7 @@ interface ToolbarActionButtonProps {
 
 export function ToolbarActionButton({
   children,
+  icon,
   disabled,
   label,
   onClick,
@@ -72,7 +74,13 @@ export function ToolbarActionButton({
       onClick={onClick}
       disabled={disabled}
     >
-      <ToolbarIcon>{children}</ToolbarIcon>
+      {icon ? (
+        <span className="top-toolbar-radix-icon" aria-hidden="true">
+          {icon}
+        </span>
+      ) : (
+        <ToolbarIcon>{children}</ToolbarIcon>
+      )}
     </button>
   );
 }

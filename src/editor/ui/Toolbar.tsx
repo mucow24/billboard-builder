@@ -1,4 +1,11 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  Cross2Icon,
+  Link2Icon,
+  LinkBreak2Icon,
+  MaskOnIcon,
+  StarFilledIcon,
+} from '@radix-ui/react-icons';
 
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton } from './ToolbarPrimitives';
@@ -226,12 +233,13 @@ export function Toolbar({
         <div className="top-toolbar-section-divider" aria-hidden="true" />
 
         <div className="top-toolbar-action-strip">
-          <ToolbarActionButton label="Canvas focus" shortcut="F" onClick={onCanvasFocusToggle} pressed={canvasFocusActive}>
-            <path d="M4 8V5a1 1 0 0 1 1-1h3" />
-            <path d="M16 8V5a1 1 0 0 0-1-1h-3" />
-            <path d="M4 12v3a1 1 0 0 0 1 1h3" />
-            <path d="M16 12v3a1 1 0 0 1-1 1h-3" />
-          </ToolbarActionButton>
+          <ToolbarActionButton
+            label="Canvas focus"
+            shortcut="F"
+            onClick={onCanvasFocusToggle}
+            pressed={canvasFocusActive}
+            icon={<MaskOnIcon width={16} height={16} />}
+          />
         </div>
 
         <div className="top-toolbar-section-divider" aria-hidden="true" />
@@ -250,31 +258,34 @@ export function Toolbar({
         <div className="top-toolbar-section-divider" aria-hidden="true" />
 
         <div className="top-toolbar-action-strip">
-          <ToolbarActionButton label="Delete" shortcut="Del" onClick={onDelete} disabled={!canDelete}>
-            <path d="M5 6.5h10" />
-            <path d="M7 6.5v9" />
-            <path d="M13 6.5v9" />
-            <path d="M4.5 6.5 5.5 16h9l1-9.5" />
-            <path d="M7.5 4.5h5" />
-          </ToolbarActionButton>
-          <ToolbarActionButton label="Group" shortcut={`${modKey}+G`} onClick={onGroup} disabled={!canGroup}>
-            <rect x="3.5" y="4.5" width="5.5" height="5.5" rx="1" />
-            <rect x="11" y="4.5" width="5.5" height="5.5" rx="1" />
-            <rect x="7.25" y="10" width="5.5" height="5.5" rx="1" />
-          </ToolbarActionButton>
-          <ToolbarActionButton label="Ungroup" shortcut={`${modKey}+Shift+G`} onClick={onUngroup} disabled={!canUngroup}>
-            <rect x="3.5" y="4.5" width="5.5" height="11" rx="1" />
-            <rect x="11" y="4.5" width="5.5" height="11" rx="1" />
-            <path d="M9.5 10h1" />
-          </ToolbarActionButton>
+          <ToolbarActionButton
+            label="Delete"
+            shortcut="Del"
+            onClick={onDelete}
+            disabled={!canDelete}
+            icon={<Cross2Icon width={16} height={16} />}
+          />
+          <ToolbarActionButton
+            label="Group"
+            shortcut={`${modKey}+G`}
+            onClick={onGroup}
+            disabled={!canGroup}
+            icon={<Link2Icon width={16} height={16} />}
+          />
+          <ToolbarActionButton
+            label="Ungroup"
+            shortcut={`${modKey}+Shift+G`}
+            onClick={onUngroup}
+            disabled={!canUngroup}
+            icon={<LinkBreak2Icon width={16} height={16} />}
+          />
           <div className="top-toolbar-status-anchor">
             <ToolbarActionButton
               label="Save as favorite"
               onClick={onSaveFavorite}
               disabled={!canSaveFavorite}
-            >
-              <path d="m10 3.5 2.1 4.25 4.7.68-3.4 3.31.8 4.68L10 14.2l-4.2 2.22.8-4.68-3.4-3.31 4.7-.68Z" />
-            </ToolbarActionButton>
+              icon={<StarFilledIcon width={16} height={16} />}
+            />
             {favoriteStatusMessage ? (
               <div
                 className={
