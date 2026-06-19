@@ -34,10 +34,10 @@ jobs:
 
       - run: npm ci
 
+      # Production build uses a relative base (see vite.config.ts), so the same
+      # dist/ resolves under the /billboard-builder/ Pages subpath and at root.
       - name: Build
         run: npm run build
-        env:
-          GITHUB_PAGES: 'true' # switches vite base to /billboard-builder/
 
       - uses: actions/configure-pages@v5
 
