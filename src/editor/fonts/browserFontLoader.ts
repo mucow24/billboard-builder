@@ -64,3 +64,13 @@ export async function loadFontEntries(
 export async function loadBundledFonts(): Promise<UploadedFont[]> {
   return loadFontEntries(Object.entries(bundledFontUrls));
 }
+
+/** Resolve a bundled font file's served URL by its source filename, for re-fetching its raw bytes (e.g. SVG export). */
+export function getBundledFontUrl(sourceName: string): string | null {
+  for (const [path, url] of Object.entries(bundledFontUrls)) {
+    if (path === sourceName || path.endsWith(`/${sourceName}`)) {
+      return url;
+    }
+  }
+  return null;
+}

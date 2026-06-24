@@ -23,6 +23,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onCanvasFocusToggle: vi.fn(),
     onDelete: vi.fn(),
     onExport: vi.fn(),
+    onExportSvg: vi.fn(),
     onExportToClipboard: vi.fn(),
     onGroup: vi.fn(),
     onInspectorTabChange: vi.fn(),

@@ -1,6 +1,9 @@
 import type { CanvasRendererHandle } from '../editor/rendering/renderer/canvasRendererTypes';
 
 import { copyCanvasToClipboard, downloadCanvasAsPng } from '../editor/io/exportPng';
+import { runSvgExport } from '../editor/io/svg/browserSvgExport';
+import { downloadSvg } from '../editor/io/svg/downloadSvg';
+import type { SvgExportWarning } from '../editor/io/svg/svgExportTypes';
 import { sanitizeBasename } from '../editor/io/filename';
 import { importImageFile } from '../editor/io/images';
 import { downloadProject, readProjectFile } from '../editor/io/projectFile';
@@ -12,6 +15,11 @@ function getPointerCenteredPosition(x: number, y: number) {
     x: Math.max(16, x - 120),
     y: Math.max(16, y - 60),
   };
+}
+
+function formatSvgExportWarnings(warnings: SvgExportWarning[]): string {
+  const layers = warnings.map((w) => `“${w.itemName}” (${w.fontFamily})`).join(', ');
+  return `Can't export to SVG: ${layers} use system fonts with no embeddable outlines. Switch them to a bundled font to include them.`;
 }
 
 import { getErrorMessage } from './errorUtils';
@@ -102,6 +110,26 @@ export function useFileIOController({
     }
   }
 
+  // SVG export works from the document model (not the renderer handle). If any
+  // text layer can't be vectorized we block the export and name the layers,
+  // rather than ship a degraded file.
+  async function handleExportSvg(): Promise<boolean> {
+    try {
+      const { svg, warnings } = await runSvgExport(document);
+      if (warnings.length > 0) {
+        setErrorMessage(formatSvgExportWarnings(warnings));
+        return false;
+      }
+      const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
+      downloadSvg(svg, `${basename}.svg`);
+      setErrorMessage(null);
+      return true;
+    } catch (error) {
+      setErrorMessage(`Failed to export SVG: ${getErrorMessage(error, 'Unknown error.')}`);
+      return false;
+    }
+  }
+
   function handleSave() {
     const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
     downloadProject(document, `${basename}.json`);
@@ -114,6 +142,7 @@ export function useFileIOController({
     handleNewProject,
     handleExport,
     handleExportToClipboard,
+    handleExportSvg,
     handleSave,
   };
 }

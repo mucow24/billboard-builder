@@ -109,6 +109,7 @@ export function FileMenu({
 interface ExportMenuProps {
   menuId: string;
   onExportPng: () => void;
+  onExportSvg: () => void;
   onExportToClipboard: () => void;
   createMenuActionHandler: (action: () => void) => () => void;
 }
@@ -116,6 +117,7 @@ interface ExportMenuProps {
 export function ExportMenu({
   menuId,
   onExportPng,
+  onExportSvg,
   onExportToClipboard,
   createMenuActionHandler,
 }: ExportMenuProps) {
@@ -125,6 +127,10 @@ export function ExportMenu({
         <path d="M10 3v9" />
         <path d="M6.5 8.5 10 12l3.5-3.5" />
         <path d="M4 15.5h12" />
+      </ToolbarMenuAction>
+      <ToolbarMenuAction label="SVG" onSelect={createMenuActionHandler(onExportSvg)}>
+        <path d="M4 4.5h12v11H4z" />
+        <path d="M6.5 8l2 4 1.5-3 1.5 3 2-4" />
       </ToolbarMenuAction>
       <ToolbarMenuAction label="To clipboard" onSelect={createMenuActionHandler(onExportToClipboard)}>
         <rect x="5" y="4.5" width="10" height="12" rx="1" />

@@ -30,6 +30,7 @@ interface ToolbarProps {
   clipboardStatusMessage?: string | null;
   onDelete: () => void;
   onExport: () => void;
+  onExportSvg: () => void;
   onExportToClipboard: () => void;
   onExportIntentChange?: (active: boolean) => void;
   onGroup: () => void;
@@ -65,6 +66,7 @@ export function Toolbar({
   clipboardStatusMessage = null,
   onDelete,
   onExport,
+  onExportSvg,
   onExportToClipboard,
   onExportIntentChange,
   onGroup,
@@ -185,6 +187,7 @@ export function Toolbar({
               <ExportMenu
                 menuId={exportMenuId}
                 onExportPng={onExport}
+                onExportSvg={onExportSvg}
                 onExportToClipboard={onExportToClipboard}
                 createMenuActionHandler={createMenuActionHandler}
               />

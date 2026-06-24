@@ -19,6 +19,9 @@ import type {
 } from '../../document/documentTypes';
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
+import { computeGradientEndpoints } from '../geometry/gradientGeometry';
+import { computeNgonPoints } from '../geometry/ngonGeometry';
+import { brightnessContrastMatrix, tintMatrix } from '../geometry/colorAdjustmentMatrix';
 import { getImageNodePresentation } from '../imagePresentation';
 import type { Point } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
@@ -29,10 +32,6 @@ import { useImageElement } from '../useImageElement';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
 const ZERO_PIVOT = { x: 0, y: 0 } as const;
-
-// ---------------------------------------------------------------------------
-// Ngon geometry — ported from ShapeItemView
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Line hit-area helper — builds a narrow polygon along the line
@@ -58,60 +57,8 @@ function buildLineHitPolygon(
 }
 
 // ---------------------------------------------------------------------------
-// Ngon geometry helper
-// ---------------------------------------------------------------------------
-
-function computeNgonPoints(
-  width: number,
-  height: number,
-  sides: number,
-): Array<{ x: number; y: number }> {
-  const offset =
-    sides % 2 === 0 ? -Math.PI / 2 - Math.PI / sides : -Math.PI / 2;
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (let i = 0; i < sides; i++) {
-    const angle = (2 * Math.PI * i) / sides + offset;
-    xs.push(Math.cos(angle));
-    ys.push(Math.sin(angle));
-  }
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const rawW = maxX - minX;
-  const rawH = maxY - minY;
-  return xs.map((x, i) => ({
-    x: ((x - minX) / rawW) * width,
-    y: ((ys[i] - minY) / rawH) * height,
-  }));
-}
-
-// ---------------------------------------------------------------------------
 // Gradient helper
 // ---------------------------------------------------------------------------
-
-function computeGradientEndpoints(
-  item: { gradientEnabled: boolean; gradientAngle: number },
-  width: number,
-  height: number,
-): { x0: number; y0: number; x1: number; y1: number } | null {
-  if (!item.gradientEnabled) return null;
-  const angleRad = (item.gradientAngle * Math.PI) / 180;
-  const sinA = Math.sin(angleRad);
-  const cosA = Math.cos(angleRad);
-  const cx = width / 2;
-  const cy = height / 2;
-  const halfLen =
-    (width / 2) * Math.abs(sinA) + (height / 2) * Math.abs(cosA);
-  return {
-    x0: cx - halfLen * sinA,
-    y0: cy - halfLen * cosA,
-    x1: cx + halfLen * sinA,
-    y1: cy + halfLen * cosA,
-  };
-}
-
 
 type GradientCapable = RectangleCanvasItem | EllipseCanvasItem | NgonCanvasItem | TextCanvasItem;
 
@@ -264,36 +211,19 @@ function buildImageAdjustmentFilters(
 
   const filters: Filter[] = [];
 
-  if (adj.brightness !== 0 || adj.contrast !== 0) {
+  // Matrix math lives in ../geometry/colorAdjustmentMatrix so the SVG exporter
+  // emits the identical adjustment via <feColorMatrix>.
+  const brightnessContrast = brightnessContrastMatrix(adj.brightness, adj.contrast);
+  if (brightnessContrast) {
     const cm = new ColorMatrixFilter();
-    // Konva contrast: factor = ((contrast + 100) / 100)^2, applied around 0.5 midpoint.
-    const factor = adj.contrast !== 0 ? ((adj.contrast + 100) / 100) ** 2 : 1;
-    // Combined brightness (additive) + contrast (scale around 0.5):
-    //   v' = v * factor + brightness * factor + 0.5 * (1 - factor)
-    const offset = adj.brightness * factor + 0.5 * (1 - factor);
-    cm.matrix[0] = factor;
-    cm.matrix[6] = factor;
-    cm.matrix[12] = factor;
-    cm.matrix[4] = offset;
-    cm.matrix[9] = offset;
-    cm.matrix[14] = offset;
+    cm.matrix = brightnessContrast as typeof cm.matrix;
     filters.push(cm);
   }
 
-  if (adj.tintAlpha > 0) {
-    // Blend toward tint color: v' = v * (1 - alpha) + tintChannel * alpha
-    const r = adj.tintRed / 255;
-    const g = adj.tintGreen / 255;
-    const b = adj.tintBlue / 255;
-    const a = adj.tintAlpha;
+  const tint = tintMatrix(adj.tintRed, adj.tintGreen, adj.tintBlue, adj.tintAlpha);
+  if (tint) {
     const cm = new ColorMatrixFilter();
-    cm.matrix[0] = 1 - a;
-    cm.matrix[4] = r * a;
-    cm.matrix[6] = 1 - a;
-    cm.matrix[9] = g * a;
-    cm.matrix[12] = 1 - a;
-    cm.matrix[14] = b * a;
-    cm.matrix[18] = 1;
+    cm.matrix = tint as typeof cm.matrix;
     filters.push(cm);
   }
 
