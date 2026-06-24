@@ -15,19 +15,25 @@ class TestFontFace {
   }
 }
 
-Object.defineProperty(document, 'fonts', {
-  configurable: true,
-  value: {
-    add: vi.fn(),
-  },
-});
+// DOM-dependent stubs are skipped under the `node` test environment (used by
+// e.g. the opentype glyph-outline test), which has no document/HTMLElement.
+if (typeof document !== 'undefined') {
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: {
+      add: vi.fn(),
+    },
+  });
+}
 
 vi.stubGlobal('FontFace', TestFontFace);
 
-Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
-  configurable: true,
-  value: vi.fn(),
-});
+if (typeof HTMLElement !== 'undefined') {
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: vi.fn(),
+  });
+}
 
 
 class TestResizeObserver implements ResizeObserver {
@@ -55,7 +61,7 @@ vi.stubGlobal('cancelAnimationFrame', () => {});
 // pointermove/pointerup on the window (the only events Chromium fires for
 // CDP-driven middle-button gestures).  Fall back to a MouseEvent-derived
 // shim so tests can dispatch pointer events without crashing.
-if (typeof globalThis.PointerEvent === 'undefined') {
+if (typeof globalThis.PointerEvent === 'undefined' && typeof MouseEvent !== 'undefined') {
   class TestPointerEvent extends MouseEvent {
     pointerId: number;
     pointerType: string;
@@ -75,10 +81,12 @@ if (typeof globalThis.PointerEvent === 'undefined') {
 // for a WebGL context to discover MAX_TEXTURE_SIZE and already handles a null
 // return, but jsdom's "not implemented" stub logs to stderr before throwing.
 // Stub the method to return null so the probe falls through cleanly.
-Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
-  configurable: true,
-  value: () => null,
-});
+if (typeof HTMLCanvasElement !== 'undefined') {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => null,
+  });
+}
 
 // Filter known-harmless React warnings caused by mocking @pixi/react.
 // Production uses @pixi/react v8's lowercase JSX (<pixiContainer>, etc.) which

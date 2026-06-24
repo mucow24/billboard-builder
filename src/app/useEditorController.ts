@@ -137,6 +137,7 @@ export function useEditorController() {
     handleOpenProject,
     handleNewProject,
     handleExport,
+    handleExportSvg,
     handleExportToClipboard,
     handleSave,
   } = useFileIOController({
@@ -194,6 +195,7 @@ export function useEditorController() {
       duplicateSelectedNodes: wrappedDuplicateSelectedNodes,
       groupSelectedNodes,
       handleExport,
+      handleExportSvg,
       handleExportToClipboard,
       handleFontUpload,
       handleImageUpload,

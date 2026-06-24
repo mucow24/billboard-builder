@@ -42,6 +42,7 @@ export default function App() {
       dispatch,
       groupSelectedNodes,
       handleExport,
+      handleExportSvg,
       handleExportToClipboard,
       handleFontUpload,
       handleImageUpload,
@@ -147,6 +148,9 @@ export default function App() {
             onCanvasFocusToggle={handleCanvasFocusToggle}
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
+            onExportSvg={() => {
+              void handleExportSvg();
+            }}
             onExportToClipboard={async () => {
               const ok = await handleExportToClipboard(stageRef.current);
               if (ok) {

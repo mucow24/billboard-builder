@@ -5,6 +5,58 @@ function getTextContentWidth(item: TextCanvasItem, width: number): number {
   return Math.max(1, width - item.padding.left - item.padding.right);
 }
 
+/**
+ * Word-wrap `item.text` into lines (each a list of tokens) using the same
+ * tokenization and wrap rule Pixi renders with. `measure` returns a token's width
+ * EXCLUDING letterSpacing; this function adds letterSpacing internally so callers
+ * (height measurement here, glyph positioning in the SVG exporter) stay in lockstep
+ * with Pixi's wrap boundaries.
+ */
+export function layoutWrappedText(
+  item: TextCanvasItem,
+  contentWidth: number,
+  measure: (text: string) => number,
+): string[][] {
+  const measureToken = (token: string): number =>
+    measure(token) + Math.max(token.length - 1, 0) * item.letterSpacing;
+
+  const lines: string[][] = [];
+  for (const paragraph of item.text.split('\n')) {
+    if (paragraph.length === 0) {
+      lines.push([]);
+      continue;
+    }
+
+    // Runs of whitespace and runs of non-whitespace, so consecutive spaces are
+    // preserved (matches Pixi `whiteSpace: 'pre-wrap'`).
+    const tokens = paragraph.match(/\s+|\S+/g) ?? [];
+    let current: string[] = [];
+    let currentWidth = 0;
+    let hasContent = false;
+
+    for (const token of tokens) {
+      const tokenWidth = measureToken(token);
+      const isWhitespace = /^\s/.test(token);
+
+      if (!isWhitespace && hasContent && currentWidth + tokenWidth > contentWidth) {
+        lines.push(current);
+        current = [token];
+        currentWidth = tokenWidth;
+        hasContent = true;
+        continue;
+      }
+
+      current.push(token);
+      currentWidth += tokenWidth;
+      hasContent = true;
+    }
+
+    if (hasContent) lines.push(current);
+  }
+
+  return lines;
+}
+
 export function measureWordWrappedTextHeight(
   item: TextCanvasItem,
   width: number
@@ -33,49 +85,12 @@ export function measureWordWrappedTextHeight(
   }
 
   context.font = getRenderableCanvasFontDeclaration(item);
-  let lineCount = 0;
-
-  const measureToken = (token: string): number =>
-    context.measureText(token).width +
-    Math.max(token.length - 1, 0) * item.letterSpacing;
-
-  for (const paragraph of paragraphs) {
-    if (paragraph.length === 0) {
-      lineCount += 1;
-      continue;
-    }
-
-    // Tokenize into runs of whitespace and runs of non-whitespace so consecutive
-    // spaces are preserved (matches Pixi `whiteSpace: 'pre-wrap'` rendering).
-    const tokens = paragraph.match(/\s+|\S+/g) ?? [];
-    let currentLineWidth = 0;
-    let currentLineHasContent = false;
-
-    for (const token of tokens) {
-      const isWhitespace = /^\s/.test(token);
-      const tokenWidth = measureToken(token);
-
-      if (isWhitespace) {
-        currentLineWidth += tokenWidth;
-        currentLineHasContent = true;
-        continue;
-      }
-
-      if (currentLineHasContent && currentLineWidth + tokenWidth > safeWidth) {
-        lineCount += 1;
-        currentLineWidth = tokenWidth;
-        currentLineHasContent = true;
-        continue;
-      }
-
-      currentLineWidth += tokenWidth;
-      currentLineHasContent = true;
-    }
-
-    if (currentLineHasContent) {
-      lineCount += 1;
-    }
-  }
+  const measuringContext = context;
+  const lineCount = layoutWrappedText(
+    item,
+    safeWidth,
+    (text) => measuringContext.measureText(text).width,
+  ).length;
 
   return Math.max(1, Math.ceil(verticalPadding + lineCount * item.fontSize * item.lineHeight));
 }

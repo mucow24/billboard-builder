@@ -1628,6 +1628,11 @@ export async function readDownloadedJson(download: Download) {
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
+export async function readDownloadedSvg(download: Download) {
+  const filePath = await materializeDownload(download);
+  return fs.readFile(filePath, 'utf8');
+}
+
 export async function assertNoDocumentTextSelection(page: Page) {
   const selectionText = await page.evaluate(() => window.getSelection()?.toString() ?? '');
   expect(selectionText).toBe('');
