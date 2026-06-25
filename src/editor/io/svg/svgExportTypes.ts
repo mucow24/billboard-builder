@@ -31,7 +31,13 @@ export interface FontOutlineProvider {
 export interface TextMeasurer {
   /** Width in px of `text` at the item's resolved font, EXCLUDING letterSpacing. */
   measureWidth(item: TextCanvasItem, text: string): number;
-  /** Baseline offset in px from the line-box top, matching what Pixi renders. */
+  /**
+   * Baseline offset in px from the line-box top for the first line, matching
+   * Pixi's `CanvasTextMetrics`: the actual-ink ascent of `|ÉqÅM` plus
+   * `linePositionYShift`. (Deliberately NOT the font's nominal
+   * `fontBoundingBoxAscent`, which diverges from the on-screen baseline on
+   * decorative faces.) `svgText` adds `lineIndex * lineHeight` for later lines.
+   */
   fontAscent(item: TextCanvasItem): number;
 }
 
