@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getFirstImageFileFromClipboardData, importImageFile } from './images';
 
+const RealFileReader = FileReader;
+
 class MockFileReader {
   onerror: null | (() => void) = null;
   onload: null | (() => void) = null;
@@ -95,6 +97,25 @@ describe('image IO helpers', () => {
     expect(getFirstImageFileFromClipboardData(clipboardData)).toBeNull();
   });
 
+  it('accepts typeless clipboard files with an .svg extension', () => {
+    const svgFile = new File(['<svg/>'], 'dropped.svg', { type: '' });
+    const fromItems = makeClipboardData({ items: [makeClipboardItem(svgFile, '')] });
+    const fromFiles = makeClipboardData({ files: [svgFile] });
+
+    expect(getFirstImageFileFromClipboardData(fromItems)).toBe(svgFile);
+    expect(getFirstImageFileFromClipboardData(fromFiles)).toBe(svgFile);
+  });
+
+  it('still ignores typeless clipboard files without an .svg extension', () => {
+    const unknownFile = new File(['data'], 'archive.zip', { type: '' });
+    const clipboardData = makeClipboardData({
+      items: [makeClipboardItem(unknownFile, '')],
+      files: [unknownFile],
+    });
+
+    expect(getFirstImageFileFromClipboardData(clipboardData)).toBeNull();
+  });
+
   it('imports image metadata from a file upload', async () => {
     const imageFile = new File(['image'], 'poster.png');
 
@@ -117,5 +138,46 @@ describe('image IO helpers', () => {
     const imageFile = new File(['image'], 'broken-preview.png', { type: 'image/png' });
 
     await expect(importImageFile(imageFile)).rejects.toThrow('Failed to load image preview');
+  });
+
+  describe('SVG imports', () => {
+    beforeEach(() => {
+      // SVG imports parse the real file text, so restore jsdom's FileReader
+      // (the Image load-check keeps using MockImage).
+      vi.stubGlobal('FileReader', RealFileReader);
+    });
+
+    it('imports SVG files with dimensions parsed from the markup, not the browser-reported natural size', async () => {
+      const svgText = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 90"><rect fill="#111827"/></svg>';
+      const svgFile = new File([svgText], 'logo.svg', { type: 'image/svg+xml' });
+
+      const asset = await importImageFile(svgFile);
+
+      // MockImage reports 640×320; SVG sizing must come from the parsed viewBox.
+      expect(asset).toMatchObject({
+        mimeType: 'image/svg+xml',
+        width: 160,
+        height: 90,
+        sourceName: 'logo.svg',
+      });
+      expect(asset.src.startsWith('data:image/svg+xml;base64,')).toBe(true);
+    });
+
+    it('routes typeless .svg files through the SVG importer', async () => {
+      const svgText = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="24"/>';
+      const svgFile = new File([svgText], 'typeless.svg', { type: '' });
+
+      await expect(importImageFile(svgFile)).resolves.toMatchObject({
+        mimeType: 'image/svg+xml',
+        width: 48,
+        height: 24,
+      });
+    });
+
+    it('rejects SVG files that are not renderable SVG documents', async () => {
+      const brokenFile = new File(['<svg'], 'broken.svg', { type: 'image/svg+xml' });
+
+      await expect(importImageFile(brokenFile)).rejects.toThrow('SVG markup is not well-formed XML');
+    });
   });
 });
