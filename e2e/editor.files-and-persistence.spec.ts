@@ -89,6 +89,29 @@ test.describe('editor file and persistence flows', () => {
     await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Cal Sans');
   });
 
+  test('sizes uploaded SVGs from their viewBox when explicit dimensions are missing', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await uploadSvgImage(
+      page,
+      'viewbox-only.svg',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180"><rect width="320" height="180" fill="#22d3ee"/></svg>',
+    );
+
+    // Newly added images are auto-selected; sizing must come from the parsed
+    // viewBox rather than the browser-dependent natural size.
+    await expect
+      .poll(async () => {
+        const debug = await readStageDebug(page);
+        return (debug.selectedItems ?? []).map((item) => ({
+          kind: item.kind,
+          width: item.width,
+          height: item.height,
+        }));
+      })
+      .toEqual([{ kind: 'image', width: 320, height: 180 }]);
+  });
+
   test('reload restores uploaded fonts used by the persisted canvas without showing a missing-font warning', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(

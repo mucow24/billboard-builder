@@ -1344,8 +1344,8 @@ export async function uploadProject(page: Page, document: Record<string, unknown
   }
 }
 
-export async function uploadSvgImage(page: Page, name = 'fixture.svg') {
-  const svg = buildSvgFixture();
+export async function uploadSvgImage(page: Page, name = 'fixture.svg', svgMarkup?: string) {
+  const svg = svgMarkup ?? buildSvgFixture();
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),

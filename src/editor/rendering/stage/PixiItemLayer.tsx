@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
+import { CanvasSource, ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
 import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
 
@@ -29,6 +29,8 @@ import { measureWordWrappedTextHeight } from '../textMeasurement';
 import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
 import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
+import { useSvgImageCanvas } from '../useSvgImageCanvas';
+import { computeSvgPixelScale } from './svgRasterScale';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
 const ZERO_PIVOT = { x: 0, y: 0 } as const;
@@ -249,10 +251,48 @@ export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zo
     [item.sourceTransform, item.mirrorHorizontal],
   );
 
-  const texture = useMemo(
-    () => (imageElement ? Texture.from(imageElement) : Texture.EMPTY),
-    [imageElement],
+  // SVG sources are vector data: instead of sampling the natural-size <img>
+  // raster (blurry once stretched or zoomed), redraw them onto a canvas at the
+  // resolution the current presentation needs.
+  const isSvgSource = item.mimeType === 'image/svg+xml';
+  const svgPixelScale = useMemo(
+    () =>
+      isSvgSource
+        ? computeSvgPixelScale({
+            originalWidth: item.originalWidth,
+            originalHeight: item.originalHeight,
+            presentationWidth: presentation.width,
+            presentationHeight: presentation.height,
+            zoom,
+            devicePixelRatio: window.devicePixelRatio || 1,
+            maxTextureSize: getMaxTextureSize(),
+          })
+        : 0,
+    [isSvgSource, item.originalWidth, item.originalHeight, presentation.width, presentation.height, zoom],
   );
+  const svgCanvas = useSvgImageCanvas(
+    isSvgSource ? imageElement : null,
+    item.originalWidth * svgPixelScale,
+    item.originalHeight * svgPixelScale,
+  );
+
+  const texture = useMemo(() => {
+    // Each SVG raster is a fresh private canvas, so build its texture
+    // directly instead of going through Texture.from's global cache.
+    if (svgCanvas) return new Texture({ source: new CanvasSource({ resource: svgCanvas }) });
+    return imageElement ? Texture.from(imageElement) : Texture.EMPTY;
+  }, [svgCanvas, imageElement]);
+
+  // SVG raster textures are replaced wholesale on every scale change —
+  // destroy the superseded ones or their GPU memory accumulates. (The
+  // imageElement fallback textures come from Texture.from's shared cache and
+  // must NOT be destroyed here.)
+  useEffect(() => {
+    if (!svgCanvas || texture === Texture.EMPTY) return;
+    return () => {
+      texture.destroy(true);
+    };
+  }, [texture, svgCanvas]);
 
   const adjustmentFilters = useMemo(() => {
     const filters = buildImageAdjustmentFilters(item.adjustments);
