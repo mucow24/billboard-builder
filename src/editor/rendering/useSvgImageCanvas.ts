@@ -34,6 +34,16 @@ export function useSvgImageCanvas(
       setCanvas(null);
       return;
     }
+    // drawImage re-rasterizes the SVG using the image's *computed* color scheme.
+    // useImageElement loads SVGs inside a forced-light host so imports don't pick
+    // up a dark-mode variant (which often paints solid black), but when the host
+    // was only just attached the light scheme may not be committed yet — the
+    // first raster then samples the stale dark scheme and bakes a black canvas.
+    // Force a style + layout flush so the light scheme is applied before drawing.
+    if (imageElement.parentElement) {
+      void getComputedStyle(imageElement).colorScheme;
+      void imageElement.offsetWidth;
+    }
     ctx.drawImage(imageElement, 0, 0, nextCanvas.width, nextCanvas.height);
 
     setCanvas(nextCanvas);
