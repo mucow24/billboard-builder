@@ -9,7 +9,7 @@ import type { FontOption } from '../FontFamilyPicker';
 import { COMMON_BLUR_DESCRIPTORS, COMMON_SHADOW_DESCRIPTORS } from './inspectorFieldHelpers';
 import { createGeneratorDescriptors } from './generatorInspectorDescriptors';
 import { createImageDescriptors } from './imageInspectorDescriptors';
-import { createShapeDescriptors } from './shapeInspectorDescriptors';
+import { createPolygonDescriptors, createShapeDescriptors } from './shapeInspectorDescriptors';
 import { createTextDescriptors } from './textInspectorDescriptors';
 import { buildFontOptions } from './inspectorModel';
 
@@ -151,6 +151,8 @@ function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
       return [...createShapeDescriptors('ellipse'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'ngon':
       return [...createShapeDescriptors('ngon'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
+    case 'polygon':
+      return [...createPolygonDescriptors(item.closed), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'line':
       return [...createShapeDescriptors('line'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'generator':

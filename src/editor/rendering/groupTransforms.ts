@@ -1,4 +1,5 @@
-import type { CanvasItem } from '../document/documentTypes';
+import type { CanvasItem, PolygonCanvasItem } from '../document/documentTypes';
+import { polygonBounds } from '../document/polygonVertices';
 
 import { getItemSelectionPoints } from './selectionGeometry';
 import type { Point, RenderBox } from './transformGeometry';
@@ -27,6 +28,16 @@ function rotatePoint(point: Point, center: Point, deltaDegrees: number): Point {
     x: center.x + dx * cos - dy * sin,
     y: center.y + dx * sin + dy * cos,
   };
+}
+
+// Polygons carry their geometry in the vertex list, so every group transform
+// maps the vertices point-by-point and re-derives the AABB.
+function mapPolygonItem(
+  item: PolygonCanvasItem,
+  mapPoint: (point: Point) => Point,
+): PolygonCanvasItem {
+  const vertices = item.vertices.map((vertex) => mapPoint(vertex));
+  return { ...item, vertices, ...polygonBounds(vertices), scaleX: 1, scaleY: 1 };
 }
 
 function normalizeRect(rect: RenderBox): RenderBox {
@@ -251,7 +262,9 @@ function rebuildShapeItemFromCorners<T extends CanvasItem>(
 }
 
 export function buildGroupDragPreviews(items: CanvasItem[], deltaX: number, deltaY: number): CanvasItem[] {
-  return items.map((item) => item.kind === 'line'
+  return items.map((item) => item.kind === 'polygon'
+    ? mapPolygonItem(item, (point) => ({ x: point.x + deltaX, y: point.y + deltaY }))
+    : item.kind === 'line'
     ? {
         ...item,
         x: item.x + deltaX,
@@ -331,6 +344,9 @@ function buildAxisAlignedGroupResizePreviews(
 ): CanvasItem[] {
   const nextBounds = getResizedBoundsFromHandle(bounds, handle, currentPointer);
   return items.map((item) => {
+    if (item.kind === 'polygon') {
+      return mapPolygonItem(item, (point) => scalePointWithinBounds(point, bounds, nextBounds));
+    }
     if (item.kind === 'line') {
       const start = scalePointWithinBounds({ x: item.startX, y: item.startY }, bounds, nextBounds);
       const end = scalePointWithinBounds({ x: item.endX, y: item.endY }, bounds, nextBounds);
@@ -380,6 +396,9 @@ export function buildGroupResizePreviews(
   const toAxes = getResizedFrameAxes(bounds, handle, currentPointer, frameRotation);
 
   return items.map((item) => {
+    if (item.kind === 'polygon') {
+      return mapPolygonItem(item, (point) => mapPointBetweenResizeFrames(point, fromAxes, toAxes));
+    }
     if (item.kind === 'line') {
       const start = mapPointBetweenResizeFrames(
         { x: item.startX, y: item.startY },
@@ -420,6 +439,9 @@ export function buildGroupRotatePreviews(items: CanvasItem[], bounds: RenderBox,
     deltaDegrees = Math.round(deltaDegrees / 15) * 15;
   }
   return items.map((item) => {
+    if (item.kind === 'polygon') {
+      return mapPolygonItem(item, (point) => rotatePoint(point, center, deltaDegrees));
+    }
     if (item.kind === 'line') {
       const start = rotatePoint({ x: item.startX, y: item.startY }, center, deltaDegrees);
       const end = rotatePoint({ x: item.endX, y: item.endY }, center, deltaDegrees);

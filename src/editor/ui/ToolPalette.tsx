@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   CircleIcon,
+  Component1Icon,
   CursorArrowIcon,
   HandIcon,
   ImageIcon,
@@ -25,7 +26,8 @@ const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; Icon: IconCo
   { id: 'text', label: 'Text', hotkey: 'T', Icon: TextIcon },
   { id: 'rectangle', label: 'Rect', hotkey: 'R', Icon: SquareIcon },
   { id: 'ellipse', label: 'Ellipse', hotkey: 'O', Icon: CircleIcon },
-  { id: 'ngon', label: 'Polygon', hotkey: 'G', Icon: VercelLogoIcon },
+  { id: 'ngon', label: 'N-gon', hotkey: 'G', Icon: VercelLogoIcon },
+  { id: 'polygon', label: 'Polygon', hotkey: 'P', Icon: Component1Icon },
   { id: 'line', label: 'Line', hotkey: 'L', Icon: SlashIcon },
 ];
 

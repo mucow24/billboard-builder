@@ -48,6 +48,19 @@ interface PixiCanvasSceneProps {
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
+  beginPolygonVertexHandle: (
+    item: Extract<CanvasItem, { kind: 'polygon' }>,
+    vertexIndex: number,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginPolygonEdgeInsert: (
+    item: Extract<CanvasItem, { kind: 'polygon' }>,
+    edgeIndex: number,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  selectedPolygonVertexIndex: number | null;
   beginResize: (
     item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
     handle: ResizeHandle,
@@ -121,6 +134,9 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       beginGroupResize,
       beginGroupRotate,
       beginLineHandle,
+      beginPolygonVertexHandle,
+      beginPolygonEdgeInsert,
+      selectedPolygonVertexIndex,
       beginResize,
       beginRotate,
       commitCropSession,
@@ -436,6 +452,9 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
                 beginGroupResize={beginGroupResize}
                 beginGroupRotate={beginGroupRotate}
                 beginLineHandle={beginLineHandle}
+                beginPolygonVertexHandle={beginPolygonVertexHandle}
+                beginPolygonEdgeInsert={beginPolygonEdgeInsert}
+                selectedPolygonVertexIndex={selectedPolygonVertexIndex}
                 toCanvasPointer={toCanvasPointer}
               />
             )}

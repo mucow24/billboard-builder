@@ -22,6 +22,8 @@ function getSingleNodeFavoriteLabel(node: CanvasNode): string {
     case 'ellipse':
       return 'Ellipse';
     case 'ngon':
+      return 'N-gon';
+    case 'polygon':
       return 'Polygon';
     case 'line':
       return 'Line';

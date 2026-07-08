@@ -6,7 +6,9 @@ import type {
   CanvasItem,
   GeneratorCanvasItem,
   LineCanvasItem,
+  PolygonCanvasItem,
 } from '../../document/documentTypes';
+import { polygonEdgeCount, polygonEdgeMidpoint } from '../../document/polygonVertices';
 import {
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -28,6 +30,13 @@ const BASE_HANDLE_RADIUS = 8;
 const BASE_HANDLE_STROKE_WIDTH = 2;
 const BASE_SELECTION_STROKE_WIDTH = 2;
 const BASE_ROTATE_HANDLE_OFFSET = 50;
+// Edge "+" insert discs are slightly smaller than vertex handles so the two
+// read differently at a glance.
+const BASE_EDGE_ADD_RADIUS = 6;
+// Minimum on-screen edge length (px) for showing an edge "+" disc — a densely
+// traced shape otherwise drowns in overlapping discs when zoomed out. The
+// discs come back as you zoom in; vertex handles always stay.
+const EDGE_ADD_MIN_EDGE_PX = 42;
 
 function getZoomScaledDimensions(zoom: number) {
   const nz = zoom > 0 ? zoom : 1;
@@ -53,6 +62,8 @@ const HANDLE_CURSORS: Record<string, string> = {
   rotater: 'crosshair',
   start: 'move',
   end: 'move',
+  'polygon-vertex': 'move',
+  'polygon-edge-add': 'crosshair',
 };
 
 // ── Generic interactive handle ───────────────────────────────────────────────
@@ -63,6 +74,8 @@ function InteractiveHandle({
   y,
   radius,
   strokeWidth,
+  fillColor = HANDLE_FILL,
+  plusGlyph = false,
   onMouseDown,
 }: {
   name: string;
@@ -70,16 +83,26 @@ function InteractiveHandle({
   y: number;
   radius: number;
   strokeWidth: number;
+  fillColor?: number;
+  // Draws a small "+" over the disc — the polygon edge-split affordance.
+  plusGlyph?: boolean;
   onMouseDown: (e: FederatedPointerEvent) => void;
 }) {
   const draw = useCallback(
     (g: Graphics) => {
       g.clear();
       g.circle(0, 0, radius);
-      g.fill({ color: HANDLE_FILL, alpha: HANDLE_FILL_ALPHA });
+      g.fill({ color: fillColor, alpha: HANDLE_FILL_ALPHA });
       g.stroke({ color: HANDLE_STROKE, width: strokeWidth });
+      if (plusGlyph) {
+        g.moveTo(-radius / 2, 0);
+        g.lineTo(radius / 2, 0);
+        g.moveTo(0, -radius / 2);
+        g.lineTo(0, radius / 2);
+        g.stroke({ color: HANDLE_STROKE, width: strokeWidth });
+      }
     },
-    [radius, strokeWidth],
+    [radius, strokeWidth, fillColor, plusGlyph],
   );
 
   const hitArea = useMemo(
@@ -129,6 +152,19 @@ export interface PixiSelectionOverlayProps {
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
+  beginPolygonVertexHandle: (
+    item: PolygonCanvasItem,
+    vertexIndex: number,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  beginPolygonEdgeInsert: (
+    item: PolygonCanvasItem,
+    edgeIndex: number,
+    pointer: Point,
+    source?: PointerGestureSource,
+  ) => void;
+  selectedPolygonVertexIndex: number | null;
   toCanvasPointer: (pointer: Point) => Point;
 }
 
@@ -145,6 +181,9 @@ export function PixiSelectionOverlay({
   beginGroupResize,
   beginGroupRotate,
   beginLineHandle,
+  beginPolygonVertexHandle,
+  beginPolygonEdgeInsert,
+  selectedPolygonVertexIndex,
   toCanvasPointer,
 }: PixiSelectionOverlayProps) {
   const isMultiSelect = renderedSelectedItems.length > 1;
@@ -183,6 +222,19 @@ export function PixiSelectionOverlay({
     );
   }
 
+  if (selectedRenderedItem.kind === 'polygon') {
+    return (
+      <PolygonSelectionHandles
+        item={selectedRenderedItem as RenderableCanvasItem & { kind: 'polygon' }}
+        zoom={zoom}
+        beginPolygonVertexHandle={beginPolygonVertexHandle}
+        beginPolygonEdgeInsert={beginPolygonEdgeInsert}
+        selectedVertexIndex={selectedPolygonVertexIndex}
+        toCanvasPointer={toCanvasPointer}
+      />
+    );
+  }
+
   return (
     <ShapeSelectionOverlay
       item={selectedRenderedItem}
@@ -214,6 +266,10 @@ function ItemOutlineOnly({
         g.moveTo(li.startX, li.startY);
         g.lineTo(li.endX, li.endY);
         g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
+      } else if (item.kind === 'polygon') {
+        const polygon = item as RenderableCanvasItem & { kind: 'polygon' };
+        drawPolygonChain(g, polygon);
+        g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
       } else {
         g.rect(0, 0, renderBox.width, renderBox.height);
         g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
@@ -222,7 +278,7 @@ function ItemOutlineOnly({
     [item, renderBox.width, renderBox.height, selectionStroke],
   );
 
-  if (item.kind === 'line') {
+  if (item.kind === 'line' || item.kind === 'polygon') {
     return <pixiGraphics draw={drawOutline} eventMode="none" />;
   }
 
@@ -492,6 +548,105 @@ function ShapeSelectionOverlay({
           radius={handleRadius}
           strokeWidth={handleStroke}
           onMouseDown={shapeHandleMouseDownMap[name]}
+        />
+      ))}
+    </pixiContainer>
+  );
+}
+
+// ── Polygon Selection (vertex handles + edge "+" insert discs) ───────────────
+
+// Trace the polygon's vertex chain in absolute canvas coordinates (no fill or
+// stroke applied — callers style it).
+function drawPolygonChain(
+  g: Graphics,
+  polygon: Pick<PolygonCanvasItem, 'vertices' | 'closed'>,
+) {
+  const vertices = polygon.vertices;
+  if (vertices.length < 2) return;
+  g.moveTo(vertices[0].x, vertices[0].y);
+  for (let i = 1; i < vertices.length; i++) {
+    g.lineTo(vertices[i].x, vertices[i].y);
+  }
+  if (polygon.closed) {
+    g.closePath();
+  }
+}
+
+function PolygonSelectionHandles({
+  item,
+  zoom,
+  beginPolygonVertexHandle,
+  beginPolygonEdgeInsert,
+  selectedVertexIndex,
+  toCanvasPointer,
+}: {
+  item: RenderableCanvasItem & { kind: 'polygon' };
+  zoom: number;
+  beginPolygonVertexHandle: PixiSelectionOverlayProps['beginPolygonVertexHandle'];
+  beginPolygonEdgeInsert: PixiSelectionOverlayProps['beginPolygonEdgeInsert'];
+  selectedVertexIndex: number | null;
+  toCanvasPointer: (pointer: Point) => Point;
+}) {
+  const { nz, selectionStroke, handleRadius, handleStroke } = getZoomScaledDimensions(zoom);
+  const edgeAddRadius = BASE_EDGE_ADD_RADIUS / nz;
+
+  const drawOutline = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      drawPolygonChain(g, item);
+      g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
+    },
+    [item, selectionStroke],
+  );
+
+  const vertices = item.vertices;
+  const edgeCount = polygonEdgeCount(vertices.length, item.closed);
+  // Density gate: hide the "+" disc on edges too short on screen to host it.
+  const edgeHandles = useMemo(() => {
+    const handles: Array<{ edgeIndex: number; point: Point }> = [];
+    for (let edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++) {
+      const a = vertices[edgeIndex];
+      const b = vertices[(edgeIndex + 1) % vertices.length];
+      if (Math.hypot(b.x - a.x, b.y - a.y) * zoom < EDGE_ADD_MIN_EDGE_PX) continue;
+      handles.push({ edgeIndex, point: polygonEdgeMidpoint(vertices, edgeIndex) });
+    }
+    return handles;
+  }, [vertices, edgeCount, zoom]);
+
+  return (
+    <pixiContainer label="polygon-selection-overlay">
+      <pixiGraphics draw={drawOutline} eventMode="none" />
+      {/* Edge "+" first so vertex handles paint (and hit) above them. */}
+      {edgeHandles.map(({ edgeIndex, point }) => (
+        <InteractiveHandle
+          key={`edge-${edgeIndex}`}
+          name="polygon-edge-add"
+          x={point.x}
+          y={point.y}
+          radius={edgeAddRadius}
+          strokeWidth={handleStroke}
+          fillColor={SELECTION_STROKE}
+          plusGlyph
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            beginPolygonEdgeInsert(item, edgeIndex, toCanvasPointer({ x: e.global.x, y: e.global.y }));
+          }}
+        />
+      ))}
+      {vertices.map((vertex, vertexIndex) => (
+        <InteractiveHandle
+          key={`vertex-${vertexIndex}`}
+          name="polygon-vertex"
+          x={vertex.x}
+          y={vertex.y}
+          radius={handleRadius}
+          strokeWidth={handleStroke}
+          fillColor={vertexIndex === selectedVertexIndex ? SELECTION_STROKE : HANDLE_FILL}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            beginPolygonVertexHandle(item, vertexIndex, toCanvasPointer({ x: e.global.x, y: e.global.y }));
+          }}
         />
       ))}
     </pixiContainer>

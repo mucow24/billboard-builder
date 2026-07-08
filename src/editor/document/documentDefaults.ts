@@ -14,10 +14,16 @@ import type {
   ImageCanvasItem,
   LineCanvasItem,
   NgonCanvasItem,
+  PolygonCanvasItem,
   ProjectDocument,
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
+import {
+  POLYGON_MIN_VERTICES,
+  polygonBounds,
+  rectanglePolygonVertices,
+} from './polygonVertices';
 import { createGroupNode } from './sceneGraph';
 
 export const DEFAULT_FONT_FAMILY = 'Arial';
@@ -164,7 +170,7 @@ export function createNgonItem(
   position?: Partial<NgonCanvasItem>
 ): NgonCanvasItem {
   return {
-    ...createBaseItem('ngon', 'Polygon'),
+    ...createBaseItem('ngon', 'N-gon'),
     fill: '#f97316',
     secondaryFill: '#0840e9',
     gradientEnabled: false,
@@ -174,6 +180,32 @@ export function createNgonItem(
     sides: 6,
     ...position,
   };
+}
+
+export function createPolygonItem(
+  position?: Partial<PolygonCanvasItem>
+): PolygonCanvasItem {
+  const item: PolygonCanvasItem = {
+    ...createBaseItem('polygon', 'Polygon'),
+    width: 240,
+    height: 240,
+    fill: '#f97316',
+    secondaryFill: '#0840e9',
+    gradientEnabled: false,
+    gradientAngle: 0,
+    stroke: '#6d28d9ff',
+    strokeWidth: 0,
+    vertices: [],
+    closed: true,
+    curveRadius: 0,
+    ...position,
+  };
+  // Vertices are the geometry source of truth; when the caller passes only a
+  // box (create tool, click-to-place), start from the default square.
+  if (item.vertices.length < POLYGON_MIN_VERTICES) {
+    item.vertices = rectanglePolygonVertices(item.x, item.y, item.width, item.height);
+  }
+  return { ...item, ...polygonBounds(item.vertices) };
 }
 
 export function createLineItem(position?: Partial<LineCanvasItem>): LineCanvasItem {

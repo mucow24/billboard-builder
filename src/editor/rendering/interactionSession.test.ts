@@ -7,12 +7,16 @@ import {
   createGroupDragSession,
   createGroupResizeSession,
   createGroupRotateSession,
+  createPolygonEdgeInsertSession,
+  createPolygonVertexSession,
+  getCommitChanges,
   resolveInteractionSession,
   type SelectionFrame,
 } from './interactionSession';
 import {
   createGroupNode,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
 } from '../document/documentDefaults';
 import { buildRenderableCanvasItems } from './renderAdapter';
@@ -138,6 +142,54 @@ describe('interactionSession', () => {
       }),
       nextTool: 'select',
     });
+  });
+
+  it('drops a sub-threshold create preview and commits the centered default on a click', () => {
+    // Regression: a stray same-spot pointermove between down and up builds a
+    // 1x1 preview; a click must still drop the full default-size item centered
+    // on the click, not the degenerate preview.
+    const start = { x: 500, y: 400 };
+    const session = createCreateSession('polygon', start);
+    const moved = resolveInteractionSession(
+      { ...session, snapDisabled: true },
+      start,
+      { stageBounds: canvasBounds },
+    );
+    expect(moved.kind).toBe('create');
+    if (moved.kind !== 'create') return;
+    expect(moved.previewItem).not.toBeNull();
+
+    const commit = buildInteractionCommit(moved, {
+      orderedItems: [],
+      pointer: { x: 501, y: 400 },
+      canvasBounds,
+    });
+    expect(commit.kind).toBe('create');
+    if (commit.kind !== 'create') return;
+    expect(commit.item.kind).toBe('polygon');
+    expect(commit.item.width).toBeGreaterThan(1);
+    expect(commit.item.height).toBeGreaterThan(1);
+    // Centered on the click.
+    expect(commit.item.x + commit.item.width / 2).toBeCloseTo(500, 0);
+    expect(commit.item.y + commit.item.height / 2).toBeCloseTo(400, 0);
+  });
+
+  it('keeps a real drag preview when the pointer traveled past the click threshold', () => {
+    const session = createCreateSession('rectangle', { x: 100, y: 120 });
+    const dragged = resolveInteractionSession(
+      { ...session, snapDisabled: true },
+      { x: 260, y: 300 },
+      { stageBounds: canvasBounds },
+    );
+    if (dragged.kind !== 'create') throw new Error('expected create session');
+
+    const commit = buildInteractionCommit(dragged, {
+      orderedItems: [],
+      pointer: { x: 260, y: 300 },
+      canvasBounds,
+    });
+    if (commit.kind !== 'create') throw new Error('expected create commit');
+    expect(commit.item).toMatchObject({ kind: 'rectangle', x: 100, y: 120, width: 160, height: 180 });
   });
 
   it('builds marquee commits from hit-tested ordered items', () => {
@@ -549,5 +601,99 @@ describe('interactionSession', () => {
     expect(resolved.previewItems).toHaveLength(2);
     // The items should have moved by the drag delta
     expect(resolved.previewItems[0].x).not.toBe(first.x);
+  });
+});
+
+describe('polygon vertex sessions', () => {
+  const stageBounds = { x: 0, y: 0, width: 1024, height: 1024 };
+  const squarePolygon = () =>
+    createPolygonItem({
+      vertices: [
+        { x: 100, y: 100 },
+        { x: 300, y: 100 },
+        { x: 300, y: 300 },
+        { x: 100, y: 300 },
+      ],
+    });
+
+  it('drags a vertex through resolve and commits the updated vertices', () => {
+    const item = squarePolygon();
+    const session = createPolygonVertexSession(item, 1, { x: 300, y: 100 }, []);
+    if (!session) throw new Error('Expected polygon vertex session.');
+    expect(session.insertedVertex).toBe(false);
+
+    const resolved = resolveInteractionSession(
+      { ...session, snapDisabled: true },
+      { x: 360, y: 80 },
+      { stageBounds },
+    );
+    expect(resolved.kind).toBe('polygon-vertex');
+    if (resolved.kind !== 'polygon-vertex') return;
+    if (resolved.previewItem.kind !== 'polygon') throw new Error('expected polygon preview');
+    expect(resolved.previewItem.vertices[1]).toEqual({ x: 360, y: 80 });
+
+    const commit = buildInteractionCommit(resolved, {
+      orderedItems: [item],
+      pointer: { x: 360, y: 80 },
+      canvasBounds: stageBounds,
+    });
+    expect(commit.kind).toBe('single-item');
+    if (commit.kind !== 'single-item') return;
+    expect(commit.changes).toMatchObject({
+      vertices: [
+        { x: 100, y: 100 },
+        { x: 360, y: 80 },
+        { x: 300, y: 300 },
+        { x: 100, y: 300 },
+      ],
+      x: 100,
+      y: 80,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  });
+
+  it('returns null for a vertex session on a missing vertex', () => {
+    expect(createPolygonVertexSession(squarePolygon(), 9, { x: 0, y: 0 }, [])).toBeNull();
+  });
+
+  it('edge insert starts from a preview containing the midpoint vertex', () => {
+    const item = squarePolygon();
+    const session = createPolygonEdgeInsertSession(item, 1, { x: 300, y: 200 }, []);
+    if (!session) throw new Error('Expected edge insert session.');
+
+    expect(session.insertedVertex).toBe(true);
+    expect(session.vertexIndex).toBe(2);
+    if (session.previewItem.kind !== 'polygon') throw new Error('expected polygon preview');
+    expect(session.previewItem.vertices).toHaveLength(5);
+    expect(session.previewItem.vertices[2]).toEqual({ x: 300, y: 200 });
+
+    // A no-move tap still commits the insert (the preview already differs from
+    // the document item).
+    const commit = buildInteractionCommit(session, {
+      orderedItems: [item],
+      pointer: { x: 300, y: 200 },
+      canvasBounds: stageBounds,
+    });
+    expect(commit.kind).toBe('single-item');
+    if (commit.kind !== 'single-item') return;
+    expect((commit.changes as { vertices: unknown[] }).vertices).toHaveLength(5);
+  });
+
+  it('rejects an edge insert for an out-of-range edge index', () => {
+    expect(createPolygonEdgeInsertSession(squarePolygon(), 4, { x: 0, y: 0 }, [])).toBeNull();
+  });
+
+  it('persists vertices plus the derived box on commit', () => {
+    const item = squarePolygon();
+    expect(getCommitChanges(item)).toEqual({
+      vertices: item.vertices,
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 200,
+      scaleX: 1,
+      scaleY: 1,
+    });
   });
 });

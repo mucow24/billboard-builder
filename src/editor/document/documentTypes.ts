@@ -6,6 +6,7 @@ export type CanvasTool =
   | 'rectangle'
   | 'ellipse'
   | 'ngon'
+  | 'polygon'
   | 'line';
 
 export type CanvasLeafKind =
@@ -14,6 +15,7 @@ export type CanvasLeafKind =
   | 'rectangle'
   | 'ellipse'
   | 'ngon'
+  | 'polygon'
   | 'line'
   | 'generator';
 
@@ -150,6 +152,27 @@ export interface NgonCanvasItem extends BaseCanvasItem, GradientFillItem {
   sides: number;
 }
 
+export interface PolygonVertex {
+  x: number;
+  y: number;
+}
+
+export interface PolygonCanvasItem extends BaseCanvasItem, GradientFillItem {
+  kind: 'polygon';
+  stroke: string;
+  strokeWidth: number;
+  // Absolute canvas coordinates, in order, length >= 3 (like line's endpoints,
+  // x/y/width/height hold the derived AABB). Edited via on-canvas vertex
+  // handles; edge midpoints split into new vertices.
+  vertices: PolygonVertex[];
+  // When false the polygon is OPEN: the stroke runs along the vertex chain
+  // with no closing edge and no fill, and hit-testing follows the stroke.
+  closed: boolean;
+  // Corner-rounding radius in canvas units; 0 = sharp corners. Each corner's
+  // trim is clamped to half its shorter adjacent edge, so any value is safe.
+  curveRadius: number;
+}
+
 export interface LineCanvasItem extends BaseCanvasItem {
   kind: 'line';
   stroke: string;
@@ -281,6 +304,7 @@ export type CanvasItem =
   | RectangleCanvasItem
   | EllipseCanvasItem
   | NgonCanvasItem
+  | PolygonCanvasItem
   | LineCanvasItem
   | GeneratorCanvasItem;
 

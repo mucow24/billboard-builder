@@ -160,7 +160,7 @@ const GeneratorParamsSchema = z.discriminatedUnion('generatorType', [
 
 const BaseCanvasItemSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'ngon', 'line', 'generator']),
+  kind: z.enum(['text', 'image', 'rectangle', 'ellipse', 'ngon', 'polygon', 'line', 'generator']),
   name: z.string().min(1),
   x: z.number(),
   y: z.number(),
@@ -240,6 +240,24 @@ const NgonCanvasItemSchema = BaseCanvasItemSchema.extend({
   sides: z.number().int().min(3),
 });
 
+const PolygonVertexSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
+const PolygonCanvasItemSchema = BaseCanvasItemSchema.extend({
+  kind: z.literal('polygon'),
+  fill: z.string(),
+  secondaryFill: z.string().optional(),
+  gradientEnabled: z.boolean().optional(),
+  gradientAngle: z.number().optional(),
+  stroke: z.string(),
+  strokeWidth: z.number().nonnegative(),
+  vertices: z.array(PolygonVertexSchema).min(3),
+  closed: z.boolean().optional(),
+  curveRadius: z.number().nonnegative().optional(),
+});
+
 const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('line'),
   stroke: z.string(),
@@ -262,6 +280,7 @@ const CanvasItemSchema = z.discriminatedUnion('kind', [
   RectangleCanvasItemSchema,
   EllipseCanvasItemSchema,
   NgonCanvasItemSchema,
+  PolygonCanvasItemSchema,
   LineCanvasItemSchema,
   GeneratorCanvasItemSchema,
 ]);

@@ -45,6 +45,8 @@ export function CanvasStage({
   const toggleSelectedNodes = useEditorStore((s) => s.toggleSelectedNodes);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const updateSelectedItems = useEditorStore((s) => s.updateSelectedItems);
+  const selectedPolygonVertex = useEditorStore((s) => s.editor.session.selectedPolygonVertex);
+  const setSelectedPolygonVertex = useEditorStore((s) => s.setSelectedPolygonVertex);
 
   const onUpdateItem = useCallback(
     (itemId: string, changes: Partial<CanvasItem>) => {
@@ -79,6 +81,8 @@ export function CanvasStage({
     beginCropPan,
     beginCropResize,
     beginLineHandle,
+    beginPolygonEdgeInsert,
+    beginPolygonVertexHandle,
     beginResize,
     beginRotate,
     cropSession,
@@ -110,9 +114,16 @@ export function CanvasStage({
     onUpdateItems: updateSelectedItems,
     onAddItem,
     onSetActiveTool: setActiveTool,
+    onSelectPolygonVertex: setSelectedPolygonVertex,
     stageRef: stageRef,
     viewport: viewportState.viewport,
   });
+
+  // The overlay highlights a vertex only on the polygon it belongs to.
+  const selectedPolygonVertexIndex =
+    selectedPolygonVertex && selectedRenderedItem?.id === selectedPolygonVertex.itemId
+      ? selectedPolygonVertex.vertexIndex
+      : null;
 
   const viewport = viewportState;
 
@@ -211,6 +222,9 @@ export function CanvasStage({
         beginGroupResize={beginGroupResize}
         beginGroupRotate={beginGroupRotate}
         beginLineHandle={beginLineHandle}
+        beginPolygonVertexHandle={beginPolygonVertexHandle}
+        beginPolygonEdgeInsert={beginPolygonEdgeInsert}
+        selectedPolygonVertexIndex={selectedPolygonVertexIndex}
         beginResize={beginResize}
         beginRotate={beginRotate}
         cropSession={cropSession as never}

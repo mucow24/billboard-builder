@@ -9,6 +9,7 @@ import {
   itemFilterDef,
   lineShape,
   ngonShape,
+  polygonShape,
   rectShape,
   wrapItem,
 } from './svgPrimitives';
@@ -89,6 +90,13 @@ function serializeLeaf(
         item,
         effectiveOpacity,
         ngonShape(item, gradientOrSolidFill(item, defs, item.width, item.height)),
+        filterAttr,
+      );
+    case 'polygon':
+      return wrapItem(
+        item,
+        effectiveOpacity,
+        polygonShape(item, gradientOrSolidFill(item, defs, item.width, item.height)),
         filterAttr,
       );
     case 'image':

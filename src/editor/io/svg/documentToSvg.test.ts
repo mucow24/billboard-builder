@@ -8,6 +8,7 @@ import {
   createImageItem,
   createLineItem,
   createNgonItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -101,6 +102,44 @@ describe('documentToSvg — ngon', () => {
     const match = svg.match(/<polygon points="([^"]+)"/);
     expect(match).not.toBeNull();
     expect(match![1].trim().split(/\s+/)).toHaveLength(6);
+  });
+});
+
+describe('documentToSvg — polygon', () => {
+  const vertices = [
+    { x: 10, y: 20 },
+    { x: 110, y: 20 },
+    { x: 60, y: 120 },
+  ];
+
+  it('emits a closed <path> in local space inside a translate group', () => {
+    const svg = svgOf([
+      createPolygonItem({ vertices, fill: '#abcdef', strokeWidth: 0 }),
+    ]);
+    expect(svg).toContain('transform="translate(10 20)"');
+    const d = svg.match(/<path d="([^"]+)"/)?.[1];
+    expect(d).toBe('M 0 0 L 100 0 L 50 100 Z');
+    expect(svg).toContain('fill="#abcdef"');
+  });
+
+  it('emits an open stroke-only path with round caps when closed is false', () => {
+    const svg = svgOf([
+      createPolygonItem({ vertices, closed: false, stroke: '#112233ff', strokeWidth: 4 }),
+    ]);
+    const d = svg.match(/<path d="([^"]+)"/)?.[1];
+    expect(d).toBe('M 0 0 L 100 0 L 50 100');
+    expect(svg).toContain('fill="none"');
+    expect(svg).toContain('stroke-linecap="round"');
+    expect(svg).toContain('stroke-width="4"');
+  });
+
+  it('rounds corners with quadratic curves when curveRadius > 0', () => {
+    const svg = svgOf([
+      createPolygonItem({ vertices, curveRadius: 10, strokeWidth: 0 }),
+    ]);
+    const d = svg.match(/<path d="([^"]+)"/)?.[1] ?? '';
+    expect(d.match(/Q /g)).toHaveLength(3);
+    expect(d.endsWith('Z')).toBe(true);
   });
 });
 

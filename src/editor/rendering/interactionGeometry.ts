@@ -2,6 +2,7 @@ import {
   createEllipseItem,
   createLineItem,
   createNgonItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
@@ -10,8 +11,11 @@ import type {
   CanvasTool,
   GuideLine,
   LineCanvasItem,
+  PolygonCanvasItem,
+  PolygonVertex,
   SnapRect,
 } from '../document/documentTypes';
+import { polygonBounds, translatePolygonVertices } from '../document/polygonVertices';
 import { scaleImageSourceTransform } from './imagePresentation';
 import { getItemAABB } from './selectionGeometry';
 import { getRenderBox } from './transformGeometry';
@@ -42,7 +46,9 @@ export interface InteractionItemPreview {
 
 const HANDLE_SIZE = 16;
 const ROTATE_HANDLE_OFFSET = 50;
-const CREATE_CLICK_THRESHOLD = 4;
+// Pointer travel at or below this is a click, not a drag: create tools drop
+// the default-size item centered on the click instead of a drag-sized one.
+export const CREATE_CLICK_THRESHOLD = 4;
 
 export const RESIZE_HANDLE_NAMES: ResizeHandle[] = [
   'top-left',
@@ -195,6 +201,16 @@ export function getShapeHandleRects(
   ) as Record<ResizeHandle | 'rotater', SnapRect>;
 }
 
+/** One HANDLE_SIZE rect per vertex, centered on it (vertex-editing handles). */
+export function getPolygonVertexHandleRects(item: PolygonCanvasItem): SnapRect[] {
+  return item.vertices.map((vertex) => ({
+    x: vertex.x - HANDLE_SIZE / 2,
+    y: vertex.y - HANDLE_SIZE / 2,
+    width: HANDLE_SIZE,
+    height: HANDLE_SIZE,
+  }));
+}
+
 export function getLineHandleRects(item: LineCanvasItem) {
   return {
     start: {
@@ -329,6 +345,20 @@ function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
   };
 }
 
+/** Rebuild a polygon around a new vertex list: derived AABB refreshed, scale reset. */
+export function withPolygonGeometry(
+  item: PolygonCanvasItem,
+  vertices: PolygonVertex[],
+): PolygonCanvasItem {
+  return {
+    ...item,
+    vertices,
+    ...polygonBounds(vertices),
+    scaleX: 1,
+    scaleY: 1,
+  };
+}
+
 function withLineGeometry(
   item: LineCanvasItem,
   startX: number,
@@ -363,6 +393,22 @@ export function solveDragSession(
 ): InteractionItemPreview {
   const deltaX = currentPointer.x - startPointer.x;
   const deltaY = currentPointer.y - startPointer.y;
+
+  if (item.kind === 'polygon') {
+    const rawVertices = translatePolygonVertices(item.vertices, deltaX, deltaY);
+    const rawAABB = polygonBounds(rawVertices);
+    const snapped = snapEnabled
+      ? getSnappedRect(rawAABB, siblingItems, stageRect, threshold, cache)
+      : { rect: rawAABB, guides: [] };
+
+    return {
+      item: withPolygonGeometry(
+        item,
+        translatePolygonVertices(rawVertices, snapped.rect.x - rawAABB.x, snapped.rect.y - rawAABB.y),
+      ),
+      guides: snapped.guides,
+    };
+  }
 
   if (item.kind === 'line') {
     const rawStartX = item.startX + deltaX;
@@ -664,7 +710,83 @@ export function solveLineHandleSession(
   };
 }
 
+/**
+ * Drag one polygon vertex: snap the dragged point against siblings/canvas,
+ * then axis-align it to its two neighbor vertices (mirroring how a line
+ * endpoint aligns to its opposite end).
+ */
+export function solvePolygonVertexSession(
+  item: PolygonCanvasItem,
+  vertexIndex: number,
+  pointer: Point,
+  pointerOffset: Point,
+  siblingItems: CanvasItem[],
+  stageRect: SnapRect,
+  snapEnabled = true,
+  threshold = SNAP_THRESHOLD,
+  cache?: SnapCandidateCache
+): InteractionItemPreview {
+  const vertexCount = item.vertices.length;
+  if (vertexIndex < 0 || vertexIndex >= vertexCount) {
+    return { item, guides: [] };
+  }
+  const adjustedPointer = {
+    x: pointer.x - pointerOffset.x,
+    y: pointer.y - pointerOffset.y,
+  };
+  const snapped = snapEnabled
+    ? getSnappedRect(
+        { x: adjustedPointer.x - 1, y: adjustedPointer.y - 1, width: 2, height: 2 },
+        siblingItems,
+        stageRect,
+        threshold,
+        cache
+      )
+    : { rect: { x: adjustedPointer.x - 1, y: adjustedPointer.y - 1, width: 2, height: 2 }, guides: [] };
+  const nextPoint = {
+    x: snapped.rect.x + 1,
+    y: snapped.rect.y + 1,
+  };
+  const guides = [...snapped.guides];
+  if (snapEnabled) {
+    const neighbors = [
+      item.vertices[(vertexIndex + vertexCount - 1) % vertexCount],
+      item.vertices[(vertexIndex + 1) % vertexCount],
+    ];
+    for (const anchor of neighbors) {
+      if (Math.abs(nextPoint.y - anchor.y) <= threshold) {
+        nextPoint.y = anchor.y;
+        guides.push({ orientation: 'horizontal', position: anchor.y });
+        break;
+      }
+    }
+    for (const anchor of neighbors) {
+      if (Math.abs(nextPoint.x - anchor.x) <= threshold) {
+        nextPoint.x = anchor.x;
+        guides.push({ orientation: 'vertical', position: anchor.x });
+        break;
+      }
+    }
+  }
+
+  const vertices = item.vertices.slice();
+  vertices[vertexIndex] = nextPoint;
+  return { item: withPolygonGeometry(item, vertices), guides };
+}
+
 function centerDefaultItem<T extends CanvasItem>(item: T, pointer: Point): T {
+  if (item.kind === 'polygon') {
+    const bounds = polygonBounds(item.vertices);
+    return withPolygonGeometry(
+      item,
+      translatePolygonVertices(
+        item.vertices,
+        pointer.x - (bounds.x + bounds.width / 2),
+        pointer.y - (bounds.y + bounds.height / 2)
+      )
+    ) as T;
+  }
+
   if (item.kind === 'line') {
     const centerX = (item.startX + item.endX) / 2;
     const centerY = (item.startY + item.endY) / 2;
@@ -699,12 +821,19 @@ function finalizeCreatedItem<T extends CanvasItem>(item: T): T {
 
 export function isCreateTool(
   tool: CanvasTool
-): tool is Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'> {
-  return tool === 'text' || tool === 'rectangle' || tool === 'ellipse' || tool === 'ngon' || tool === 'line';
+): tool is Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'> {
+  return (
+    tool === 'text' ||
+    tool === 'rectangle' ||
+    tool === 'ellipse' ||
+    tool === 'ngon' ||
+    tool === 'polygon' ||
+    tool === 'line'
+  );
 }
 
 export function buildCreatedItem(
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'>,
   startPointer: Point,
   currentPointer: Point
 ): CanvasItem {
@@ -722,6 +851,8 @@ export function buildCreatedItem(
         return centerDefaultItem(createEllipseItem(), startPointer);
       case 'ngon':
         return centerDefaultItem(createNgonItem(), startPointer);
+      case 'polygon':
+        return centerDefaultItem(createPolygonItem(), startPointer);
       case 'line':
         return centerDefaultItem(createLineItem(), startPointer);
     }
@@ -754,11 +885,15 @@ export function buildCreatedItem(
       return createEllipseItem(rect);
     case 'ngon':
       return createNgonItem(rect);
+    case 'polygon':
+      // The factory turns the drag rect into a 4-vertex rectangle ring —
+      // massimo's "start from a square", sized by the drag.
+      return createPolygonItem(rect);
   }
 }
 
 export function getCreatePreview(
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'>,
   startPointer: Point,
   currentPointer: Point
 ) {
@@ -789,5 +924,9 @@ export function getCreatePreview(
       return createEllipseItem(rect);
     case 'ngon':
       return createNgonItem(rect);
+    case 'polygon':
+      // The factory turns the drag rect into a 4-vertex rectangle ring —
+      // massimo's "start from a square", sized by the drag.
+      return createPolygonItem(rect);
   }
 }

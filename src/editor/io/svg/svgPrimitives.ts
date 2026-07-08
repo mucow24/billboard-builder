@@ -5,9 +5,11 @@ import type {
   ImageCanvasItem,
   LineCanvasItem,
   NgonCanvasItem,
+  PolygonCanvasItem,
   RectangleCanvasItem,
 } from '../../document/documentTypes';
 import { computeNgonPoints } from '../../rendering/geometry/ngonGeometry';
+import { buildPolygonPathSegments } from '../../rendering/geometry/polygonGeometry';
 import {
   computeGradientEndpoints,
   type GradientEndpoints,
@@ -88,6 +90,37 @@ export function ngonShape(item: NgonCanvasItem, fillAttr: string): string {
     .map((p) => `${fmt(p.x)},${fmt(p.y)}`)
     .join(' ');
   return `<polygon points="${points}" ${fillAttr}${strokeAttr(item)}/>`;
+}
+
+/**
+ * Freeform polygon as a `<path>` in local (AABB-relative) space, sharing the
+ * renderer's segment builder so canvas and SVG tessellate identically. Open
+ * chains are stroke-only (no fill, no closing edge, round caps).
+ */
+export function polygonShape(item: PolygonCanvasItem, fillAttr: string): string {
+  const local = item.vertices.map((v) => ({ x: v.x - item.x, y: v.y - item.y }));
+  const segments = buildPolygonPathSegments(local, item.curveRadius, item.closed);
+  let d = '';
+  for (const segment of segments) {
+    switch (segment.type) {
+      case 'move':
+        d += `M ${fmt(segment.x)} ${fmt(segment.y)}`;
+        break;
+      case 'line':
+        d += ` L ${fmt(segment.x)} ${fmt(segment.y)}`;
+        break;
+      case 'quad':
+        d += ` Q ${fmt(segment.cx)} ${fmt(segment.cy)} ${fmt(segment.x)} ${fmt(segment.y)}`;
+        break;
+      case 'close':
+        d += ' Z';
+        break;
+    }
+  }
+  const fill = item.closed ? fillAttr : 'fill="none"';
+  const caps = item.closed ? ' stroke-linejoin="round"' : ' stroke-linejoin="round" stroke-linecap="round"';
+  const stroke = strokeAttr(item);
+  return `<path d="${d}" ${fill}${stroke}${stroke ? caps : ''}/>`;
 }
 
 /** Lines use absolute canvas coordinates and carry their own opacity (no transform wrapper). */

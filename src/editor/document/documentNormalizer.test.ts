@@ -4,6 +4,7 @@ import {
   createGroupNode,
   createImageItem,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from './documentDefaults';
@@ -241,6 +242,57 @@ describe('document normalizer', () => {
       fonts: [],
     });
     expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
+  });
+
+  it('re-derives the polygon AABB from its vertices and defaults closed/curveRadius', () => {
+    const polygon = createPolygonItem({
+      vertices: [
+        { x: 50, y: 30 },
+        { x: 250, y: 30 },
+        { x: 150, y: 210 },
+      ],
+    });
+    // Simulate a legacy payload missing the newer fields and carrying a stale box.
+    const legacy = {
+      ...polygon,
+      x: 0,
+      y: 0,
+      width: 5,
+      height: 5,
+      closed: undefined,
+      curveRadius: undefined,
+    };
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [legacy as never],
+      fonts: [],
+    });
+
+    expect(normalized.nodes[0]).toMatchObject({
+      x: 50,
+      y: 30,
+      width: 200,
+      height: 180,
+      closed: true,
+      curveRadius: 0,
+      rotation: 0,
+    });
+  });
+
+  it('rebuilds a rectangle ring when polygon vertices degenerate below the floor', () => {
+    const polygon = createPolygonItem();
+    const broken = { ...polygon, vertices: [{ x: 1, y: 2 }] };
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [broken as never],
+      fonts: [],
+    });
+
+    const item = normalized.nodes[0] as typeof polygon;
+    expect(item.vertices).toHaveLength(4);
+    expect(item.vertices[0]).toEqual({ x: item.x, y: item.y });
   });
 
   it('coerces missing or whitespace canvas names to "Untitled canvas"', () => {

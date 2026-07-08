@@ -92,6 +92,7 @@ export function summarizeFavoriteNodes(nodes: readonly CanvasNode[]): FavoriteNo
     switch (item.kind) {
       case 'rectangle':
       case 'ellipse':
+      case 'polygon':
         pushPreviewColor(item.fill);
         if (item.strokeWidth > 0) {
           pushPreviewColor(item.stroke);

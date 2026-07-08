@@ -288,7 +288,7 @@ export function createNgonFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: 'ngon-item',
     kind: 'ngon',
-    name: 'Polygon',
+    name: 'N-gon',
     x: 200,
     y: 200,
     width: 200,
@@ -336,6 +336,42 @@ export function createLineFixture(overrides: Record<string, unknown> = {}) {
     startY: 160,
     endX: 400,
     endY: 184,
+    ...overrides,
+  };
+}
+
+export function createPolygonFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'polygon-item',
+    kind: 'polygon',
+    name: 'Polygon',
+    x: 200,
+    y: 200,
+    width: 240,
+    height: 240,
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    zIndex: 2,
+    locked: false,
+    lockAspectRatio: false,
+    hidden: false,
+    opacity: 1,
+    shadow: DEFAULT_SHADOW,
+    fill: '#f97316',
+    secondaryFill: '#0840e9',
+    gradientEnabled: false,
+    gradientAngle: 0,
+    stroke: '#6d28d9ff',
+    strokeWidth: 0,
+    vertices: [
+      { x: 200, y: 200 },
+      { x: 440, y: 200 },
+      { x: 440, y: 440 },
+      { x: 200, y: 440 },
+    ],
+    closed: true,
+    curveRadius: 0,
     ...overrides,
   };
 }
@@ -836,7 +872,9 @@ export type HandleName =
   | 'bottom-right'
   | 'rotater'
   | 'line-start'
-  | 'line-end';
+  | 'line-end'
+  | `polygon-vertex-${number}`
+  | `polygon-edge-${number}`;
 
 /**
  * Each wrapper does a `flushCanvasFrames` *before* it dispatches.
