@@ -1,8 +1,26 @@
 import { stageToLocal, type Point } from './interactionGeometry';
+import {
+  distanceToPolygonEdges,
+  pointInPolygonVertices,
+} from './geometry/polygonGeometry';
 import { getRenderBox } from './transformGeometry';
 import type { RenderableCanvasItem } from './renderAdapter';
 
 export function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point) {
+  if (item.kind === 'polygon') {
+    // Match the Pixi hit area: closed hits on fill + stroke band, open hits on
+    // a padded corridor along the stroke chain.
+    if (item.closed) {
+      const rim = item.strokeWidth / 2;
+      return (
+        pointInPolygonVertices(point, item.vertices) ||
+        (rim > 0 && distanceToPolygonEdges(point, item.vertices, true) <= rim)
+      );
+    }
+    const pad = Math.max(item.strokeWidth / 2 + 8, 12);
+    return distanceToPolygonEdges(point, item.vertices, false) <= pad;
+  }
+
   if (item.kind === 'line') {
     const left = Math.min(item.startX, item.endX) - Math.max(item.strokeWidth / 2, 8);
     const right = Math.max(item.startX, item.endX) + Math.max(item.strokeWidth / 2, 8);

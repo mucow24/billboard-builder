@@ -41,7 +41,11 @@ import type {
   UploadedFont,
   SelectionItemChange,
 } from '../document/documentTypes';
-import type { EditorState as CoreEditorState } from '../core/editorState';
+import type {
+  EditorState as CoreEditorState,
+  PolygonVertexSelection,
+} from '../core/editorState';
+import { removePolygonVertex } from '../document/polygonVertices';
 
 export { applyEditorCommand, ensureFontRegistered } from '../core/editorReducer';
 
@@ -68,6 +72,8 @@ export interface EditorStoreState {
   ungroupSelectedNode: () => void;
   duplicateSelectedNodes: () => string[];
   nudgeSelectedNodes: (deltaX: number, deltaY: number) => void;
+  setSelectedPolygonVertex: (selection: PolygonVertexSelection | null) => void;
+  deleteSelectedPolygonVertex: () => boolean;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -261,7 +267,46 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       get().dispatch({ type: 'select_nodes', nodeIds: clones.map((node) => node.id) });
       return clones.filter(isGroupNode).map((node) => node.id);
     },
+    setSelectedPolygonVertex: (selection) =>
+      set((state) =>
+        applyStoreAction(state, {
+          family: 'session',
+          type: 'set_selected_polygon_vertex',
+          selection,
+        })
+      ),
+    deleteSelectedPolygonVertex: () => {
+      const selection = get().editor.session.selectedPolygonVertex;
+      if (!selection) {
+        return false;
+      }
+      const node = getNodeById(get().editor.document.nodes, selection.itemId);
+      if (!node || isGroupNode(node) || node.kind !== 'polygon' || node.locked) {
+        return false;
+      }
+      // Clear the sub-selection either way; the removal itself no-ops at the
+      // 3-vertex floor (matching massimo), keeping the polygon selected.
+      get().setSelectedPolygonVertex(null);
+      const vertices = removePolygonVertex(node.vertices, selection.vertexIndex);
+      if (vertices !== node.vertices) {
+        get().dispatch({ type: 'update_node', itemId: node.id, changes: { vertices } });
+      }
+      return true;
+    },
     nudgeSelectedNodes: (deltaX, deltaY) => {
+      const vertexSelection = get().editor.session.selectedPolygonVertex;
+      if (vertexSelection) {
+        const node = getNodeById(get().editor.document.nodes, vertexSelection.itemId);
+        if (node && !isGroupNode(node) && node.kind === 'polygon' && !node.locked) {
+          const vertices = node.vertices.map((vertex, index) =>
+            index === vertexSelection.vertexIndex
+              ? { x: vertex.x + deltaX, y: vertex.y + deltaY }
+              : vertex
+          );
+          get().dispatch({ type: 'update_node', itemId: node.id, changes: { vertices } });
+          return;
+        }
+      }
       const selectedIds = normalizeSelectionForNodes(
         get().editor.session.selectedNodeIds,
         get().editor.document.nodes
@@ -275,7 +320,16 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         .filter((item) => !item.locked)
         .map((item) => ({
           itemId: item.id,
-          changes: item.kind === 'line'
+          changes: item.kind === 'polygon'
+            ? {
+                // The normalizer re-derives the polygon box from its vertices,
+                // so a nudge must move the vertices themselves.
+                vertices: item.vertices.map((vertex) => ({
+                  x: vertex.x + deltaX,
+                  y: vertex.y + deltaY,
+                })),
+              }
+            : item.kind === 'line'
             ? {
                 startX: item.startX + deltaX,
                 startY: item.startY + deltaY,

@@ -140,7 +140,9 @@ export function buildStageDerivedState(params: {
     !cropSession &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem &&
-    params.selectedRenderedItem.kind !== 'line'
+    params.selectedRenderedItem.kind !== 'line' &&
+    // Polygons edit via vertex handles, not the resize box.
+    params.selectedRenderedItem.kind !== 'polygon'
       ? getResizeHandleViewportRects(
           getShapeOverlayHandlePoints(params.selectedRenderedItem, params.zoom),
           params.viewport.toViewportPoint,

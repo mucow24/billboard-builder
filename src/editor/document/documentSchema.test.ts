@@ -5,6 +5,7 @@ import {
   createGroupNode,
   createImageItem,
   createNgonItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from './documentDefaults';
@@ -280,6 +281,43 @@ describe('document schema', () => {
         background: '#ffffff00',
         fonts: [],
         nodes: [ngon],
+      })
+    ).toThrow();
+  });
+
+  it('round-trips a polygon item and preserves vertices, closed, and curveRadius', () => {
+    const document = createDefaultProjectDocument();
+    const vertices = [
+      { x: 10, y: 10 },
+      { x: 210, y: 10 },
+      { x: 110, y: 190 },
+    ];
+    document.nodes = [createPolygonItem({ vertices, closed: false, curveRadius: 12 })];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+
+    expect(parsed.nodes[0]).toMatchObject({
+      kind: 'polygon',
+      vertices,
+      closed: false,
+      curveRadius: 12,
+    });
+  });
+
+  it('rejects polygon items with fewer than 3 vertices', () => {
+    const polygon = createPolygonItem();
+    polygon.vertices = [
+      { x: 0, y: 0 },
+      { x: 10, y: 10 },
+    ];
+
+    expect(() =>
+      parseProjectDocument({
+        version: 2,
+        canvas: { width: 1024, height: 1024 },
+        background: '#ffffff00',
+        fonts: [],
+        nodes: [polygon],
       })
     ).toThrow();
   });

@@ -119,6 +119,12 @@ export function useEditorShortcuts({
           return;
         }
         event.preventDefault();
+        // A selected polygon vertex takes priority: remove just that vertex
+        // (no-op at the 3-vertex floor) and keep the polygon selected so
+        // editing can continue.
+        if (useEditorStore.getState().deleteSelectedPolygonVertex()) {
+          return;
+        }
         deleteSelectedNodes();
         return;
       }
@@ -130,6 +136,7 @@ export function useEditorShortcuts({
         ['r', 'rectangle'],
         ['o', 'ellipse'],
         ['g', 'ngon'],
+        ['p', 'polygon'],
         ['l', 'line'],
       ]);
       if (event.key === 'Escape') {

@@ -14,6 +14,7 @@ import type {
   ImageCanvasItem,
   LineCanvasItem,
   NgonCanvasItem,
+  PolygonCanvasItem,
   RectangleCanvasItem,
   TextCanvasItem,
 } from '../../document/documentTypes';
@@ -21,6 +22,11 @@ import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
 import { computeGradientEndpoints } from '../geometry/gradientGeometry';
 import { computeNgonPoints } from '../geometry/ngonGeometry';
+import {
+  buildPolygonPathSegments,
+  distanceToPolygonEdges,
+  pointInPolygonVertices,
+} from '../geometry/polygonGeometry';
 import { brightnessContrastMatrix, tintMatrix } from '../geometry/colorAdjustmentMatrix';
 import { getImageNodePresentation } from '../imagePresentation';
 import type { Point } from '../interactionGeometry';
@@ -62,7 +68,12 @@ function buildLineHitPolygon(
 // Gradient helper
 // ---------------------------------------------------------------------------
 
-type GradientCapable = RectangleCanvasItem | EllipseCanvasItem | NgonCanvasItem | TextCanvasItem;
+type GradientCapable =
+  | RectangleCanvasItem
+  | EllipseCanvasItem
+  | NgonCanvasItem
+  | PolygonCanvasItem
+  | TextCanvasItem;
 
 function buildPixiGradient(
   item: GradientCapable,
@@ -189,6 +200,45 @@ function drawNgon(g: Graphics, item: NgonCanvasItem) {
   }
   g.closePath();
   applyFillAndStroke(g, item, item.width, item.height);
+}
+
+function drawPolygon(g: Graphics, item: PolygonCanvasItem) {
+  g.clear();
+  // Vertices are absolute; the container sits at the derived AABB origin, so
+  // draw in local space to keep gradients and filters box-relative.
+  const local = item.vertices.map((v) => ({ x: v.x - item.x, y: v.y - item.y }));
+  const segments = buildPolygonPathSegments(local, item.curveRadius, item.closed);
+  if (segments.length === 0) return;
+  for (const segment of segments) {
+    switch (segment.type) {
+      case 'move':
+        g.moveTo(segment.x, segment.y);
+        break;
+      case 'line':
+        g.lineTo(segment.x, segment.y);
+        break;
+      case 'quad':
+        g.quadraticCurveTo(segment.cx, segment.cy, segment.x, segment.y);
+        break;
+      case 'close':
+        g.closePath();
+        break;
+    }
+  }
+  if (item.closed) {
+    const grad = buildPixiGradient(item, item.width, item.height);
+    g.fill(grad ?? item.fill);
+  }
+  if (item.strokeWidth > 0 && item.stroke && item.stroke !== 'transparent') {
+    // Round joins keep thin corners clean; round caps match an open chain's
+    // rounded joins at its loose ends.
+    g.stroke({
+      color: item.stroke,
+      width: item.strokeWidth,
+      join: 'round',
+      cap: item.closed ? undefined : 'round',
+    });
+  }
 }
 
 function drawLine(g: Graphics, item: LineCanvasItem) {
@@ -493,6 +543,9 @@ const PixiItemView = memo(function PixiItemView({
         case 'ngon':
           drawNgon(g, item);
           break;
+        case 'polygon':
+          drawPolygon(g, item);
+          break;
         case 'line':
           drawLine(g, item);
           break;
@@ -635,6 +688,31 @@ const PixiItemView = memo(function PixiItemView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.kind, renderBox.x, renderBox.y, renderBox.width, renderBox.height]);
 
+  // Exact hit testing in local space against the straight-edged vertex ring:
+  // closed polygons hit on the fill plus the stroke band, open chains hit on a
+  // padded corridor along the stroke (same floor as line hit areas).
+  const polygonHitArea = useMemo(() => {
+    if (item.kind !== 'polygon') return null;
+    const polygon = item as RenderableCanvasItem & { kind: 'polygon' };
+    const local = polygon.vertices.map((v) => ({
+      x: v.x - polygon.x,
+      y: v.y - polygon.y,
+    }));
+    if (polygon.closed) {
+      const rim = polygon.strokeWidth / 2;
+      return {
+        contains: (x: number, y: number) =>
+          pointInPolygonVertices({ x, y }, local) ||
+          (rim > 0 && distanceToPolygonEdges({ x, y }, local, true) <= rim),
+      };
+    }
+    const pad = Math.max(polygon.strokeWidth / 2 + 8, 12);
+    return {
+      contains: (x: number, y: number) =>
+        distanceToPolygonEdges({ x, y }, local, false) <= pad,
+    };
+  }, [item]);
+
   // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
   if (item.kind === 'line') {
     return (
@@ -714,7 +792,7 @@ const PixiItemView = memo(function PixiItemView({
       filters={itemFilters}
       pivot={ZERO_PIVOT}
       eventMode={eventMode}
-      hitArea={shapeHitArea}
+      hitArea={polygonHitArea ?? shapeHitArea}
       onMouseDown={handleMouseDown}
     >
       {children}

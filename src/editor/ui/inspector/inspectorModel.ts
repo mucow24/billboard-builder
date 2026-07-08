@@ -125,6 +125,8 @@ export function getItemGlyph(kind: CanvasItem['kind']): string {
       return '▭';
     case 'ellipse':
       return '◯';
+    case 'polygon':
+      return '⬠';
     case 'line':
       return '／';
     case 'text':
@@ -146,6 +148,8 @@ export function getLayerPrimaryLabel(item: CanvasItem): string {
       return 'Rectangle';
     case 'ellipse':
       return 'Ellipse';
+    case 'polygon':
+      return 'Polygon';
     case 'line':
       return 'Line';
     case 'text':

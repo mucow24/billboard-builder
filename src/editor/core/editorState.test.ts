@@ -15,6 +15,7 @@ describe('editor state', () => {
       missingFontFamilies: [],
       exportScale: 1,
       selectedNodeIds: [],
+      selectedPolygonVertex: null,
     });
     expect(createDefaultHistoryState()).toEqual({
       past: [],
@@ -34,6 +35,7 @@ describe('editor state', () => {
         missingFontFamilies: [],
         exportScale: 1,
         selectedNodeIds: [],
+        selectedPolygonVertex: null,
       },
       history: {
         past: [],

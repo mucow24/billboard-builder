@@ -20,6 +20,8 @@ import {
   createGroupResizeSession,
   createGroupRotateSession,
   createLineHandleSession,
+  createPolygonEdgeInsertSession,
+  createPolygonVertexSession,
   createResizeSession,
   createRotateSession,
   currentSelectionSetSignature,
@@ -47,8 +49,14 @@ import type {
   CanvasTool,
   GuideLine,
   LineCanvasItem,
+  PolygonCanvasItem,
   ProjectDocument,
 } from '../document/documentTypes';
+
+export interface PolygonVertexSelection {
+  itemId: string;
+  vertexIndex: number;
+}
 
 interface UseCanvasInteractionSessionParams {
   activeTool: CanvasTool;
@@ -63,6 +71,7 @@ interface UseCanvasInteractionSessionParams {
   onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
   onSetActiveTool: (tool: CanvasTool) => void;
+  onSelectPolygonVertex?: (selection: PolygonVertexSelection | null) => void;
   stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
@@ -129,6 +138,7 @@ export function useCanvasInteractionSession({
   onUpdateItems,
   onAddItem,
   onSetActiveTool,
+  onSelectPolygonVertex,
   stageRef,
 }: UseCanvasInteractionSessionParams) {
   const shapeRefs = useRef(new Map<string, unknown>());
@@ -535,9 +545,21 @@ export function useCanvasInteractionSession({
         return;
       case 'single-item':
         onUpdateItem(commit.itemId, commit.changes);
+        // Vertex sub-selection follows massimo's semantics: an edge "+" tap
+        // leaves the freshly inserted vertex selected (Delete-ready), and a
+        // no-move click on a vertex handle selects that vertex. A real drag
+        // leaves the sub-selection as it was.
+        if (resolved.kind === 'polygon-vertex' && onSelectPolygonVertex) {
+          const moved =
+            Math.hypot(pointer.x - resolved.pointerStart.x, pointer.y - resolved.pointerStart.y) >
+            PICKUP_DRAG_THRESHOLD;
+          if (resolved.insertedVertex || !moved) {
+            onSelectPolygonVertex({ itemId: resolved.itemId, vertexIndex: resolved.vertexIndex });
+          }
+        }
         return;
     }
-  }, [onAddItem, updateGuides, onSetActiveTool, onSelectNode, onToggleSelectNodes, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
+  }, [onAddItem, updateGuides, onSetActiveTool, onSelectNode, onSelectPolygonVertex, onToggleSelectNodes, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
@@ -594,6 +616,7 @@ export function useCanvasInteractionSession({
           current.kind === 'create' ||
           current.kind === 'drag' ||
           current.kind === 'line-handle' ||
+          current.kind === 'polygon-vertex' ||
           current.kind === 'group-drag' ||
           current.kind === 'group-resize'
             ? modifiers.ctrlKey
@@ -728,7 +751,7 @@ export function useCanvasInteractionSession({
     };
   }, [hasActiveSession, hasCropInteraction, handleWindowMouseMove, handleWindowMouseUp, hasPendingItemGesture, hasPendingMarquee]);
 
-  const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>, pointer: Point) => {
+  const beginCreate = useCallback((tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'>, pointer: Point) => {
     updateSession(createCreateSession(tool, pointer, orderedItems));
   }, [orderedItems, updateSession]);
 
@@ -809,6 +832,42 @@ export function useCanvasInteractionSession({
     );
   }, [orderedItems, updateSession]);
 
+  const beginPolygonVertexHandle = useCallback((
+    item: PolygonCanvasItem,
+    vertexIndex: number,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
+    const nextSession = createPolygonVertexSession(
+      item,
+      vertexIndex,
+      pointer,
+      orderedItems.filter((entry) => entry.id !== item.id),
+      source,
+    );
+    if (nextSession) {
+      updateSession(nextSession);
+    }
+  }, [orderedItems, updateSession]);
+
+  const beginPolygonEdgeInsert = useCallback((
+    item: PolygonCanvasItem,
+    edgeIndex: number,
+    pointer: Point,
+    source: PointerGestureSource = 'stage',
+  ) => {
+    const nextSession = createPolygonEdgeInsertSession(
+      item,
+      edgeIndex,
+      pointer,
+      orderedItems.filter((entry) => entry.id !== item.id),
+      source,
+    );
+    if (nextSession) {
+      updateSession(nextSession);
+    }
+  }, [orderedItems, updateSession]);
+
   const registerShapeRef = useCallback((itemId: string, node: unknown) => {
     if (!node) {
       shapeRefs.current.delete(itemId);
@@ -834,6 +893,11 @@ export function useCanvasInteractionSession({
     source: PointerGestureSource = 'stage',
   ) => {
     const shiftPressed = resolveModifierKeys({ ctrlKey: false, shiftKey }).shiftKey;
+    // Pressing the polygon body (not a handle) drops any vertex sub-selection,
+    // like clicking off a vertex in massimo.
+    if (item.kind === 'polygon') {
+      onSelectPolygonVertex?.(null);
+    }
     const selectedSession = createSelectedDragSession(item, selectionNodeId, pointer, source);
     if (nativeEvent) {
       lastHandledItemPointerEventRef.current = {
@@ -894,6 +958,7 @@ export function useCanvasInteractionSession({
     createSelectedDragSession,
     resolveModifierKeys,
     onSelectNode,
+    onSelectPolygonVertex,
     onToggleSelectNode,
     selectedIdSet,
     setPendingItemGesture,
@@ -1103,6 +1168,8 @@ export function useCanvasInteractionSession({
     beginCropPan,
     beginCropResize,
     beginLineHandle,
+    beginPolygonEdgeInsert,
+    beginPolygonVertexHandle,
     beginResize,
     beginRotate,
     cropSession,

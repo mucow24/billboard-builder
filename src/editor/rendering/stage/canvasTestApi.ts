@@ -37,7 +37,14 @@ export type ResizeHandleName =
   | 'bottom-center'
   | 'bottom-right';
 
-export type HandleName = ResizeHandleName | 'rotater' | 'line-start' | 'line-end';
+export type HandleName =
+  | ResizeHandleName
+  | 'rotater'
+  | 'line-start'
+  | 'line-end'
+  // Vertex handle / edge "+" insert disc of a selected polygon, by index.
+  | `polygon-vertex-${number}`
+  | `polygon-edge-${number}`;
 
 /**
  * Group-overlay handle target.  `overlay` drags from the group overlay's
@@ -287,6 +294,30 @@ export function useCanvasTestApi({
     }
 
     function getHandleCanvasPoint(item: CanvasItem, handle: HandleName): Point {
+      const polygonHandleMatch = /^polygon-(vertex|edge)-(\d+)$/.exec(handle);
+      if (polygonHandleMatch) {
+        if (item.kind !== 'polygon') {
+          throw new Error(
+            `__BB_TEST__: handle "${handle}" requires a polygon item but item "${item.id}" is "${item.kind}"`,
+          );
+        }
+        const index = Number(polygonHandleMatch[2]);
+        const vertices = item.vertices;
+        if (polygonHandleMatch[1] === 'vertex') {
+          const vertex = vertices[index];
+          if (!vertex) {
+            throw new Error(`__BB_TEST__: polygon "${item.id}" has no vertex ${index}`);
+          }
+          return { x: vertex.x, y: vertex.y };
+        }
+        const edgeCount = item.closed ? vertices.length : vertices.length - 1;
+        if (index < 0 || index >= edgeCount) {
+          throw new Error(`__BB_TEST__: polygon "${item.id}" has no edge ${index}`);
+        }
+        const a = vertices[index];
+        const b = vertices[(index + 1) % vertices.length];
+        return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      }
       if (handle === 'line-start' || handle === 'line-end') {
         if (item.kind !== 'line') {
           throw new Error(
@@ -304,7 +335,9 @@ export function useCanvasTestApi({
         );
       }
       const points = getShapeOverlayHandlePoints(item, zoomRef.current);
-      return points[handle];
+      // Polygon handles were fully handled by the regex branch above; TS can't
+      // narrow template-literal names away, so assert the remaining shape set.
+      return points[handle as ResizeHandleName | 'rotater'];
     }
 
     // Tracks whether a button is currently pressed in our synthetic gesture.

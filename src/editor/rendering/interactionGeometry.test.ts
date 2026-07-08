@@ -12,6 +12,7 @@ import {
   rotateVector,
   solveDragSession,
   solveLineHandleSession,
+  solvePolygonVertexSession,
   solveResizeSession,
   solveRotateSession,
   stageToLocal,
@@ -19,6 +20,7 @@ import {
 import {
   createImageItem,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
@@ -648,5 +650,117 @@ describe('interaction geometry', () => {
       width: 150,
       height: 100,
     });
+  });
+});
+
+describe('polygon interactions', () => {
+  const stageRect = { x: 0, y: 0, width: 2048, height: 2048 };
+  const trianglePolygon = () =>
+    createPolygonItem({
+      vertices: [
+        { x: 200, y: 200 },
+        { x: 400, y: 200 },
+        { x: 300, y: 400 },
+      ],
+    });
+
+  it('creates a polygon spanning the drag rect as a 4-vertex ring', () => {
+    const item = buildCreatedItem('polygon', { x: 300, y: 350 }, { x: 100, y: 150 });
+
+    expect(item).toMatchObject({ kind: 'polygon', x: 100, y: 150, width: 200, height: 200 });
+    if (item.kind !== 'polygon') throw new Error('expected polygon');
+    expect(item.vertices).toEqual([
+      { x: 100, y: 150 },
+      { x: 300, y: 150 },
+      { x: 300, y: 350 },
+      { x: 100, y: 350 },
+    ]);
+    expect(item.closed).toBe(true);
+    expect(item.curveRadius).toBe(0);
+  });
+
+  it('creates a centered default polygon for click-without-drag', () => {
+    const item = buildCreatedItem('polygon', { x: 500, y: 420 }, { x: 501, y: 421 });
+
+    expect(item.kind).toBe('polygon');
+    expect(item.x + item.width / 2).toBeCloseTo(500, 0);
+    expect(item.y + item.height / 2).toBeCloseTo(420, 0);
+    if (item.kind !== 'polygon') throw new Error('expected polygon');
+    expect(item.vertices[0]).toEqual({ x: item.x, y: item.y });
+  });
+
+  it('treats the polygon tool as a create tool', () => {
+    expect(isCreateTool('polygon')).toBe(true);
+  });
+
+  it('translates every vertex and the derived box in a whole-shape drag', () => {
+    const item = trianglePolygon();
+    const result = solveDragSession(
+      item,
+      { x: 0, y: 0 },
+      { x: 50, y: -25 },
+      [],
+      stageRect,
+      false,
+    );
+
+    expect(result.item.kind).toBe('polygon');
+    if (result.item.kind !== 'polygon') throw new Error('expected polygon');
+    expect(result.item.vertices).toEqual([
+      { x: 250, y: 175 },
+      { x: 450, y: 175 },
+      { x: 350, y: 375 },
+    ]);
+    expect(result.item).toMatchObject({ x: 250, y: 175, width: 200, height: 200 });
+  });
+
+  it('moves a single vertex and re-derives the box in a vertex drag', () => {
+    const item = trianglePolygon();
+    const result = solvePolygonVertexSession(
+      item,
+      2,
+      { x: 320, y: 500 },
+      { x: 0, y: 0 },
+      [],
+      stageRect,
+      false,
+    );
+
+    if (result.item.kind !== 'polygon') throw new Error('expected polygon');
+    expect(result.item.vertices[2]).toEqual({ x: 320, y: 500 });
+    expect(result.item).toMatchObject({ x: 200, y: 200, width: 200, height: 300 });
+  });
+
+  it('axis-aligns a dragged vertex to its neighbors when snapping', () => {
+    const item = trianglePolygon();
+    // 3px off the first vertex's y — inside the snap threshold.
+    const result = solvePolygonVertexSession(
+      item,
+      2,
+      { x: 320, y: 203 },
+      { x: 0, y: 0 },
+      [],
+      stageRect,
+      true,
+    );
+
+    if (result.item.kind !== 'polygon') throw new Error('expected polygon');
+    expect(result.item.vertices[2].y).toBe(200);
+    expect(result.guides.some((guide) => guide.orientation === 'horizontal' && guide.position === 200)).toBe(true);
+  });
+
+  it('leaves the polygon untouched for an out-of-range vertex index', () => {
+    const item = trianglePolygon();
+    const result = solvePolygonVertexSession(
+      item,
+      7,
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      [],
+      stageRect,
+      false,
+    );
+
+    expect(result.item).toBe(item);
   });
 });

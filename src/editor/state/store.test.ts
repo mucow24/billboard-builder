@@ -5,6 +5,7 @@ import {
   createGroupNode,
   createDefaultProjectDocument,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
@@ -647,5 +648,105 @@ describe('editor store history', () => {
         kind: 'uploaded',
       },
     ]);
+  });
+});
+
+describe('polygon vertex sub-selection', () => {
+  const squareVertices = [
+    { x: 100, y: 100 },
+    { x: 300, y: 100 },
+    { x: 300, y: 300 },
+    { x: 100, y: 300 },
+  ];
+
+  function addSelectedPolygon(overrides: Parameters<typeof createPolygonItem>[0] = {}) {
+    const item = createPolygonItem({ vertices: squareVertices, ...overrides });
+    useEditorStore.getState().dispatch({ type: 'add_node', item });
+    return item;
+  }
+
+  function getPolygon(itemId: string) {
+    const node = getEditorState().document.nodes.find((entry) => entry.id === itemId);
+    if (!node || node.kind !== 'polygon') throw new Error('expected polygon node');
+    return node;
+  }
+
+  beforeEach(() => {
+    resetEditorStore();
+  });
+
+  it('creates a polygon via createItemAt with a starter square ring', () => {
+    useEditorStore.getState().createItemAt('polygon', 50, 60);
+
+    const [node] = getEditorState().document.nodes;
+    expect(node).toMatchObject({ kind: 'polygon', x: 50, y: 60, closed: true });
+    if (node.kind !== 'polygon') throw new Error('expected polygon node');
+    expect(node.vertices).toHaveLength(4);
+  });
+
+  it('deletes the selected vertex and clears the sub-selection', () => {
+    const item = addSelectedPolygon();
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 1 });
+
+    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(true);
+
+    expect(getPolygon(item.id).vertices).toEqual([
+      { x: 100, y: 100 },
+      { x: 300, y: 300 },
+      { x: 100, y: 300 },
+    ]);
+    expect(getEditorState().session.selectedPolygonVertex).toBeNull();
+    // The polygon itself stays selected for further editing.
+    expect(getEditorState().session.selectedNodeIds).toEqual([item.id]);
+  });
+
+  it('no-ops the vertex delete at the 3-vertex floor', () => {
+    const item = addSelectedPolygon({ vertices: squareVertices.slice(0, 3) });
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 0 });
+
+    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(true);
+
+    expect(getPolygon(item.id).vertices).toHaveLength(3);
+    expect(getEditorState().document.nodes).toHaveLength(1);
+  });
+
+  it('nudges only the selected vertex, and the whole ring otherwise', () => {
+    const item = addSelectedPolygon();
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 2 });
+
+    useEditorStore.getState().nudgeSelectedNodes(5, -5);
+    expect(getPolygon(item.id).vertices[2]).toEqual({ x: 305, y: 295 });
+    expect(getPolygon(item.id).vertices[0]).toEqual({ x: 100, y: 100 });
+
+    useEditorStore.getState().setSelectedPolygonVertex(null);
+    useEditorStore.getState().nudgeSelectedNodes(10, 0);
+    expect(getPolygon(item.id).vertices[0]).toEqual({ x: 110, y: 100 });
+    expect(getPolygon(item.id).x).toBe(110);
+  });
+
+  it('drops a dangling vertex sub-selection when the selection changes', () => {
+    const item = addSelectedPolygon();
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 1 });
+    expect(getEditorState().session.selectedPolygonVertex).not.toBeNull();
+
+    useEditorStore.getState().selectSingleNode(undefined);
+
+    expect(getEditorState().session.selectedPolygonVertex).toBeNull();
+  });
+
+  it('drops the sub-selection when undo removes the vertex it points at', () => {
+    const item = addSelectedPolygon();
+    const inserted = [...squareVertices, { x: 200, y: 350 }];
+    useEditorStore.getState().dispatch({
+      type: 'update_node',
+      itemId: item.id,
+      changes: { vertices: inserted },
+    });
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 4 });
+
+    useEditorStore.getState().undo();
+
+    expect(getPolygon(item.id).vertices).toHaveLength(4);
+    expect(getEditorState().session.selectedPolygonVertex).toBeNull();
   });
 });

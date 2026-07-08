@@ -5,6 +5,7 @@ import {
   createImageItem,
   createLineItem,
   createNgonItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -490,5 +491,42 @@ describe('selectionInspectorModel', () => {
     expect(spacingField?.max).toBe(20);
     expect(spacingField?.textMin).toBe(0);
     expect(spacingField?.textMax).toBe(Infinity);
+  });
+});
+
+describe('polygon descriptors', () => {
+  const environment = buildInspectorEnvironment([], []);
+
+  function fieldKeys(item: ReturnType<typeof createPolygonItem>) {
+    return buildSelectionInspectorSections([item], environment).flatMap((section) =>
+      section.fields.map((field) => field.descriptor.propertyKey)
+    );
+  }
+
+  it('shows Closed and Curve radius fields for a polygon', () => {
+    const keys = fieldKeys(createPolygonItem());
+    expect(keys).toContain('closed');
+    expect(keys).toContain('curveRadius');
+    expect(keys).toContain('stroke');
+    expect(keys).toContain('strokeWidth');
+  });
+
+  it('offers the gradient fill only while the polygon is closed', () => {
+    expect(fieldKeys(createPolygonItem())).toContain('gradientFill');
+    expect(fieldKeys(createPolygonItem({ closed: false }))).not.toContain('gradientFill');
+  });
+
+  it('maps the Closed checkbox and Curve radius slider onto the model fields', () => {
+    const polygon = createPolygonItem({ curveRadius: 12 });
+    const sections = buildSelectionInspectorSections([polygon], environment);
+    const fields = sections.flatMap((section) => section.fields);
+
+    const closedField = fields.find((field) => field.descriptor.propertyKey === 'closed');
+    expect(closedField?.state.value).toBe(true);
+    expect(closedField?.descriptor.buildChange({ item: polygon }, false as never)).toEqual({ closed: false });
+
+    const radiusField = fields.find((field) => field.descriptor.propertyKey === 'curveRadius');
+    expect(radiusField?.state.value).toBe(12);
+    expect(radiusField?.descriptor.buildChange({ item: polygon }, -5 as never)).toEqual({ curveRadius: 0 });
   });
 });

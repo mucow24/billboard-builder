@@ -184,6 +184,15 @@ export function cloneCanvasNode(node: CanvasNode, offset = DUPLICATE_ITEM_OFFSET
   }
 
   const nextId = crypto.randomUUID();
+  if (node.kind === 'polygon') {
+    return {
+      ...node,
+      id: nextId,
+      x: node.x + offset,
+      y: node.y + offset,
+      vertices: node.vertices.map((v) => ({ x: v.x + offset, y: v.y + offset })),
+    };
+  }
   if (node.kind === 'line') {
     return {
       ...node,

@@ -21,6 +21,9 @@ export function getItemSelectionPoints(item: CanvasItem): Point[] {
       { x: item.endX, y: item.endY },
     ];
   }
+  if (item.kind === 'polygon') {
+    return item.vertices.map((vertex) => ({ x: vertex.x, y: vertex.y }));
+  }
   const box = getRenderBox(item);
   const radians = (item.rotation * Math.PI) / 180;
   const cos = Math.cos(radians);
@@ -169,9 +172,41 @@ function lineIntersectsRect(line: LineCanvasItem, rect: RenderBox): boolean {
   return false;
 }
 
+function openChainIntersectsRect(vertices: Point[], rect: RenderBox): boolean {
+  if (vertices.some((vertex) => pointInRect(vertex, rect))) {
+    return true;
+  }
+  const corners = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y + rect.height },
+    { x: rect.x, y: rect.y + rect.height },
+  ];
+  for (let index = 0; index < vertices.length - 1; index += 1) {
+    for (let rectIndex = 0; rectIndex < corners.length; rectIndex += 1) {
+      if (
+        segmentsIntersect(
+          vertices[index],
+          vertices[index + 1],
+          corners[rectIndex],
+          corners[(rectIndex + 1) % corners.length],
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function itemIntersectsSelectionRect(item: CanvasItem, rect: RenderBox): boolean {
   if (item.kind === 'line') {
     return lineIntersectsRect(item, rect);
+  }
+  // An OPEN polygon has no interior and no closing edge: only stroke-chain
+  // contact counts, so a marquee inside the mouth of a U-shape selects nothing.
+  if (item.kind === 'polygon' && !item.closed) {
+    return openChainIntersectsRect(getItemSelectionPoints(item), rect);
   }
   const polygon = getItemSelectionPoints(item);
   if (polygon.some((point) => pointInRect(point, rect))) {

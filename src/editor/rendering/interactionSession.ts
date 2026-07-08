@@ -1,12 +1,15 @@
 import {
   buildCreatedItem,
+  CREATE_CLICK_THRESHOLD,
   getCreatePreview,
   getLineHandleRects,
   getShapeHandlePoints,
   solveDragSession,
   solveLineHandleSession,
+  solvePolygonVertexSession,
   solveResizeSession,
   solveRotateSession,
+  withPolygonGeometry,
   type Point,
   type ResizeHandle,
 } from './interactionGeometry';
@@ -27,7 +30,9 @@ import type {
   GeneratorCanvasItem,
   GuideLine,
   LineCanvasItem,
+  PolygonCanvasItem,
 } from '../document/documentTypes';
+import { insertPolygonVertex } from '../document/polygonVertices';
 
 export type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 export type PointerGestureSource = 'stage' | 'overlay';
@@ -44,6 +49,7 @@ interface InteractionSessionBase {
     | 'resize'
     | 'rotate'
     | 'line-handle'
+    | 'polygon-vertex'
     | 'marquee'
     | 'group-drag'
     | 'group-resize'
@@ -57,13 +63,13 @@ interface InteractionSessionBase {
 
 export interface CreateSession extends InteractionSessionBase {
   kind: 'create';
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>;
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'>;
   previewItem: CanvasItem | null;
   siblingItems: CanvasItem[];
 }
 
 interface ItemSession extends InteractionSessionBase {
-  kind: 'drag' | 'resize' | 'rotate' | 'line-handle';
+  kind: 'drag' | 'resize' | 'rotate' | 'line-handle' | 'polygon-vertex';
   itemId: string;
   originalItem: CanvasItem;
   previewItem: CanvasItem;
@@ -90,6 +96,16 @@ export interface LineHandleSession extends ItemSession {
   kind: 'line-handle';
   handle: 'start' | 'end';
   pointerOffset: Point;
+}
+
+export interface PolygonVertexSession extends ItemSession {
+  kind: 'polygon-vertex';
+  vertexIndex: number;
+  pointerOffset: Point;
+  // Set when the gesture began on an edge "+" handle: the session starts from
+  // a preview that already contains the inserted midpoint vertex, so even a
+  // no-move tap commits the insert (and the new vertex ends up selected).
+  insertedVertex: boolean;
 }
 
 export interface MarqueeSession extends InteractionSessionBase {
@@ -131,6 +147,7 @@ export type InteractionSession =
   | ResizeSession
   | RotateSession
   | LineHandleSession
+  | PolygonVertexSession
   | MarqueeSession
   | GroupDragSession
   | GroupResizeSession
@@ -262,6 +279,18 @@ export function getCanvasConstrainedMarqueeRect(
 }
 
 export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
+  if (item.kind === 'polygon') {
+    return {
+      vertices: item.vertices,
+      x: item.x,
+      y: item.y,
+      width: item.width,
+      height: item.height,
+      scaleX: 1,
+      scaleY: 1,
+    };
+  }
+
   if (item.kind === 'line') {
     return {
       startX: item.startX,
@@ -356,7 +385,7 @@ function getGroupResizePointer(
 }
 
 export function createCreateSession(
-  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'line'>,
+  tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'>,
   pointer: Point,
   siblingItems: CanvasItem[] = [],
   pointerSource: PointerGestureSource = 'stage',
@@ -457,6 +486,65 @@ export function createLineHandleSession(
       y: pointer.y - (rect.y + rect.height / 2),
     },
     handle,
+    guides: [],
+    snapDisabled: false,
+  };
+}
+
+export function createPolygonVertexSession(
+  item: PolygonCanvasItem,
+  vertexIndex: number,
+  pointer: Point,
+  siblingItems: CanvasItem[],
+  pointerSource: PointerGestureSource = 'stage',
+): PolygonVertexSession | null {
+  const vertex = item.vertices[vertexIndex];
+  if (!vertex) return null;
+  return {
+    kind: 'polygon-vertex',
+    itemId: item.id,
+    originalItem: item,
+    previewItem: item,
+    siblingItems,
+    pointerStart: pointer,
+    pointerSource,
+    pointerOffset: { x: pointer.x - vertex.x, y: pointer.y - vertex.y },
+    vertexIndex,
+    insertedVertex: false,
+    guides: [],
+    snapDisabled: false,
+  };
+}
+
+/**
+ * Edge "+" gesture: split the edge at its midpoint and immediately drag the
+ * new vertex. The inserted vertex lives only in the session preview until
+ * commit, so even a no-move tap persists it (via getCommitChanges) while an
+ * abandoned gesture leaves the document untouched.
+ */
+export function createPolygonEdgeInsertSession(
+  item: PolygonCanvasItem,
+  edgeIndex: number,
+  pointer: Point,
+  siblingItems: CanvasItem[],
+  pointerSource: PointerGestureSource = 'stage',
+): PolygonVertexSession | null {
+  const vertices = insertPolygonVertex(item.vertices, edgeIndex);
+  if (vertices === item.vertices) return null;
+  const inserted = withPolygonGeometry(item, vertices);
+  const vertexIndex = edgeIndex + 1;
+  const vertex = inserted.vertices[vertexIndex];
+  return {
+    kind: 'polygon-vertex',
+    itemId: item.id,
+    originalItem: inserted,
+    previewItem: inserted,
+    siblingItems,
+    pointerStart: pointer,
+    pointerSource,
+    pointerOffset: { x: pointer.x - vertex.x, y: pointer.y - vertex.y },
+    vertexIndex,
+    insertedVertex: true,
     guides: [],
     snapDisabled: false,
   };
@@ -692,6 +780,20 @@ export function resolveInteractionSession(
       );
       return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
     }
+    case 'polygon-vertex': {
+      const next = solvePolygonVertexSession(
+        current.originalItem as PolygonCanvasItem,
+        current.vertexIndex,
+        pointer,
+        current.pointerOffset,
+        current.siblingItems,
+        stageBounds,
+        !current.snapDisabled,
+        threshold,
+        cache
+      );
+      return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
+    }
     case 'marquee':
       return { ...current, currentPointer: pointer };
     case 'group-drag': {
@@ -807,9 +909,22 @@ export function buildInteractionCommit(
   const { orderedItems, pointer } = context;
 
   if (resolved.kind === 'create') {
+    // A click (pointer travel within the threshold) always drops the default
+    // item centered on the click. The resolver builds a preview on every
+    // move — even a sub-threshold one — so committing the preview here would
+    // turn a click with 1px of jitter into a 1x1 shape, and made the outcome
+    // depend on whether any move event happened to be processed at all.
+    const travel = Math.hypot(
+      pointer.x - resolved.pointerStart.x,
+      pointer.y - resolved.pointerStart.y,
+    );
+    const item =
+      !resolved.previewItem || travel <= CREATE_CLICK_THRESHOLD
+        ? buildCreatedItem(resolved.tool, resolved.pointerStart, pointer)
+        : resolved.previewItem;
     return {
       kind: 'create',
-      item: resolved.previewItem ?? buildCreatedItem(resolved.tool, resolved.pointerStart, pointer),
+      item,
       nextTool: 'select',
     };
   }

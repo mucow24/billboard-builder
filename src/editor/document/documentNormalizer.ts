@@ -18,10 +18,16 @@ import type {
   ImageCanvasItem,
   LineCanvasItem,
   NgonCanvasItem,
+  PolygonCanvasItem,
   ProjectDocument,
   RectangleCanvasItem,
   TextCanvasItem,
 } from './documentTypes';
+import {
+  POLYGON_MIN_VERTICES,
+  polygonBounds,
+  rectanglePolygonVertices,
+} from './polygonVertices';
 
 function clampDimension(value: number): number {
   return clampFinite(value, 1, 1);
@@ -272,6 +278,47 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         sides: Math.max(3, Math.trunc(clampFinite(item.sides, 6, 3))),
       };
       return normalizedNgonItem;
+    }
+    case 'polygon': {
+      // Vertices are the geometry source of truth: clamp them finite, rebuild
+      // a rectangle ring from the item's box if the list degenerated below the
+      // 3-vertex floor, and re-derive the AABB in x/y/width/height.
+      const fallbackVertices = rectanglePolygonVertices(
+        clampFinite(item.x, 0),
+        clampFinite(item.y, 0),
+        clampDimension(item.width),
+        clampDimension(item.height),
+      );
+      const clampedVertices = (Array.isArray(item.vertices) ? item.vertices : []).map(
+        (vertex) => ({
+          x: clampFinite(vertex?.x, 0),
+          y: clampFinite(vertex?.y, 0),
+        }),
+      );
+      const vertices =
+        clampedVertices.length >= POLYGON_MIN_VERTICES ? clampedVertices : fallbackVertices;
+      const normalizedPolygonItem: PolygonCanvasItem = {
+        ...item,
+        ...normalizeGradientFill(item),
+        ...polygonBounds(vertices),
+        // Rotation is not part of the polygon model (rotating rewrites the
+        // vertices instead), so it pins at 0.
+        rotation: 0,
+        scaleX: clampFinite(item.scaleX, 1),
+        scaleY: clampFinite(item.scaleY, 1),
+        zIndex: Math.max(0, Math.trunc(clampFinite(item.zIndex, 0, 0))),
+        locked: Boolean(item.locked),
+        lockAspectRatio: Boolean(item.lockAspectRatio),
+        hidden: Boolean(item.hidden),
+        opacity: clampOpacity(item.opacity),
+        shadow: normalizeShadow(item.shadow),
+        blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
+        strokeWidth: clampFinite(item.strokeWidth, 0, 0),
+        vertices,
+        closed: item.closed !== false,
+        curveRadius: clampFinite(item.curveRadius ?? 0, 0, 0),
+      };
+      return normalizedPolygonItem;
     }
     case 'line': {
       const startX = clampFinite(item.startX, item.x);

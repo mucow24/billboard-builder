@@ -1,4 +1,5 @@
 import {
+  createBooleanField,
   createColorField,
   createDimensionsField,
   createGeometryField,
@@ -9,6 +10,72 @@ import {
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
+
+/**
+ * Freeform polygon fields. Fill (with gradient) applies only while the polygon
+ * is closed — an open chain is stroke-only, so the fill section disappears,
+ * mirroring how massimo greys those controls out.
+ */
+export function createPolygonDescriptors(closed: boolean): InspectorFieldDescriptor[] {
+  const descriptors: InspectorFieldDescriptor[] = [
+    createColorField({
+      buildChange: (_context, nextValue) => ({ stroke: nextValue }),
+      fieldOrder: 10,
+      getValue: (item) => ('stroke' in item ? item.stroke : ''),
+      label: 'Color',
+      propertyKey: 'stroke',
+      sectionKey: 'stroke',
+      sectionLabel: 'Stroke',
+      sectionOrder: SECTION_ORDER.stroke,
+
+      valueType: 'color',
+    }),
+    createNumberField({
+      buildChange: (_context, nextValue) => ({ strokeWidth: nextValue }),
+      digits: 1,
+      fieldOrder: 20,
+      getValue: (item) => ('strokeWidth' in item ? item.strokeWidth : 0),
+      label: 'Width',
+      max: 50,
+      min: 0,
+      propertyKey: 'strokeWidth',
+      sectionKey: 'stroke',
+      sectionLabel: 'Stroke',
+      sectionOrder: SECTION_ORDER.stroke,
+      slider: true,
+      step: 1,
+      textMax: Infinity,
+
+      valueType: 'number',
+    }),
+    createBooleanField({
+      buildChange: (_context, nextValue) => ({ closed: nextValue }),
+      fieldOrder: 40,
+      getValue: (item) => item.kind === 'polygon' && item.closed,
+      label: 'Closed',
+      propertyKey: 'closed',
+      sectionKey: 'geometry',
+      sectionLabel: 'Geometry',
+      sectionOrder: SECTION_ORDER.geometry,
+
+      valueType: 'boolean',
+    }),
+    createGeometryField(
+      'curveRadius',
+      'Curve radius',
+      50,
+      (item) => (item.kind === 'polygon' ? item.curveRadius : 0),
+      (_context, nextValue) => ({ curveRadius: Math.max(0, nextValue) }),
+      { digits: 1, max: 250, min: 0, slider: true, step: 1, textMax: Infinity }
+    ),
+  ];
+
+  if (closed) {
+    descriptors.unshift(createGradientFillDescriptor(), createGradientAngleDescriptor());
+  }
+
+  return descriptors;
+}
 
 export function createShapeDescriptors(
   itemKind: 'ellipse' | 'line' | 'ngon' | 'rectangle'

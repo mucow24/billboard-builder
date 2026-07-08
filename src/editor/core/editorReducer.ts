@@ -3,14 +3,17 @@ import {
   createEllipseItem,
   createLineItem,
   createNgonItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
 import { normalizeProjectDocument } from '../document/documentNormalizer';
 import {
+  getNodeById,
   getNodeIds,
   groupNodes,
   insertNodesAt,
+  isGroupNode,
   moveNode,
   removeNodesByIds,
   reorderNodes,
@@ -336,6 +339,11 @@ function reduceSessionAction(state: EditorState, action: SessionAction): EditorS
         ...state,
         session: { ...state.session, exportScale: action.scale },
       };
+    case 'set_selected_polygon_vertex':
+      return {
+        ...state,
+        session: { ...state.session, selectedPolygonVertex: action.selection },
+      };
   }
 }
 
@@ -429,7 +437,38 @@ function reduceInteractionAction(state: EditorState, action: InteractionAction):
   }
 }
 
+/**
+ * Drop a dangling polygon-vertex sub-selection: it survives only while its
+ * polygon is still a selected polygon item whose vertex list covers the index
+ * (covers deletes, undo/redo, selection changes, and document loads).
+ */
+function reconcilePolygonVertexSelection(state: EditorState): EditorState {
+  const selection = state.session.selectedPolygonVertex;
+  if (!selection) {
+    return state;
+  }
+  const node = getNodeById(state.document.nodes, selection.itemId);
+  const valid =
+    node !== undefined &&
+    !isGroupNode(node) &&
+    node.kind === 'polygon' &&
+    selection.vertexIndex >= 0 &&
+    selection.vertexIndex < node.vertices.length &&
+    state.session.selectedNodeIds.includes(selection.itemId);
+  if (valid) {
+    return state;
+  }
+  return {
+    ...state,
+    session: { ...state.session, selectedPolygonVertex: null },
+  };
+}
+
 export function reduceEditorState(state: EditorState, action: EditorAction): EditorState {
+  return reconcilePolygonVertexSelection(reduceEditorStateForAction(state, action));
+}
+
+function reduceEditorStateForAction(state: EditorState, action: EditorAction): EditorState {
   switch (action.family) {
     case 'document':
       return reduceDocumentAction(state, action);
@@ -511,6 +550,8 @@ export function createItemForKind(
       return createEllipseItem(position);
     case 'ngon':
       return createNgonItem(position);
+    case 'polygon':
+      return createPolygonItem(position);
     case 'line':
       return createLineItem(position);
   }

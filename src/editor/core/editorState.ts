@@ -1,12 +1,22 @@
 import { createDefaultProjectDocument } from '../document/documentDefaults';
 import type { CanvasTool, ProjectDocument, UploadedFont } from '../document/documentTypes';
 
+// A single selected polygon vertex (for handle highlight, Delete, and arrow
+// nudges). Sub-selection within the selected polygon: it never exists without
+// the polygon itself being selected — the reducer reconciles it after every
+// action.
+export interface PolygonVertexSelection {
+  itemId: string;
+  vertexIndex: number;
+}
+
 export interface SessionState {
   activeTool: CanvasTool;
   availableFonts: UploadedFont[];
   missingFontFamilies: string[];
   exportScale: number;
   selectedNodeIds: string[];
+  selectedPolygonVertex: PolygonVertexSelection | null;
 }
 
 export interface HistoryState {
@@ -28,6 +38,7 @@ export function createDefaultSessionState(): SessionState {
     missingFontFamilies: [],
     exportScale: 1,
     selectedNodeIds: [],
+    selectedPolygonVertex: null,
   };
 }
 

@@ -3,6 +3,7 @@ import type {
   EditorCommand,
   UploadedFont,
 } from '../document/documentTypes';
+import type { PolygonVertexSelection } from './editorState';
 
 export type SelectionCommand = Extract<EditorCommand, { type: 'select_nodes' | 'clear_selection' }>;
 export type DocumentCommand = Exclude<EditorCommand, SelectionCommand>;
@@ -14,7 +15,8 @@ export type SessionAction =
   | { family: 'session'; type: 'set_active_tool'; tool: CanvasTool }
   | { family: 'session'; type: 'register_available_font'; font: UploadedFont }
   | { family: 'session'; type: 'set_missing_font_families'; families: string[] }
-  | { family: 'session'; type: 'set_export_scale'; scale: number };
+  | { family: 'session'; type: 'set_export_scale'; scale: number }
+  | { family: 'session'; type: 'set_selected_polygon_vertex'; selection: PolygonVertexSelection | null };
 
 export type HistoryAction =
   | { family: 'history'; type: 'undo' }

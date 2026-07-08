@@ -14,24 +14,24 @@ import {
 } from './support/editor';
 
 test.describe('ngon tool flows', () => {
-  test('selects Polygon tool from toolbar, drags out a polygon, and it appears in layers', async ({ page }) => {
+  test('selects N-gon tool from toolbar, drags out an n-gon, and it appears in layers', async ({ page }) => {
     await openFreshEditor(page);
 
-    await selectTool(page, 'Polygon');
+    await selectTool(page, 'N-gon');
     await dragEmptyCanvas(page, { x: 200, y: 200 }, { x: 400, y: 400 });
 
     await openLayersTab(page);
-    await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^N-gon \(/ })).toBeVisible();
   });
 
-  test('activates polygon tool via G hotkey', async ({ page }) => {
+  test('activates n-gon tool via G hotkey', async ({ page }) => {
     await openFreshEditor(page);
 
     await page.keyboard.press('g');
     await dragEmptyCanvas(page, { x: 150, y: 150 }, { x: 350, y: 350 });
 
     await openLayersTab(page);
-    await expect(page.getByRole('button', { name: /^Polygon \(/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^N-gon \(/ })).toBeVisible();
   });
 
   test('ngon properties: sides slider, value persistence, and gradient', async ({ page }) => {
