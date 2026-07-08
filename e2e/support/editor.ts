@@ -1321,8 +1321,35 @@ export async function clickToolbarPopoverItem(page: Page, triggerName: string, i
 }
 
 export async function addGenerator(page: Page, generatorName: string) {
-  await page.getByRole('button', { name: 'Add generator', exact: true }).click();
-  await page.getByRole('button', { name: generatorName, exact: true }).click();
+  const trigger = page.getByRole('button', { name: 'Add generator', exact: true });
+  // Scope the item to the popover group so a retry can never resolve a
+  // same-named layer row instead of the popover entry.
+  const item = page
+    .getByRole('group', { name: 'Generator types' })
+    .getByRole('button', { name: generatorName, exact: true });
+  const renderedCount = async () => (await readStageDebug(page)).renderedItemCount ?? 0;
+  const before = await renderedCount();
+
+  // Under the full parallel suite (8 workers + software GL) the pick on the
+  // popover item is occasionally lost — addGenerator "returns" but no node is
+  // added (renderedItemCount stays flat, the layer row never appears, and the
+  // next clickLayerRow times out). Rather than trust a single click, drive the
+  // gesture until a new rendered item actually exists. The generous per-attempt
+  // confirmation window means a slow-but-successful add is never re-issued, so
+  // this can't double-add; only a genuinely dropped pick is retried.
+  await expect(async () => {
+    if ((await renderedCount()) > before) {
+      return;
+    }
+    // Only click to open — the trigger toggles, so clicking while it's already
+    // open (e.g. after a dropped pick left it open) would close it.
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
+      await trigger.click();
+    }
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await item.click();
+    await expect.poll(renderedCount, { timeout: 5_000 }).toBeGreaterThan(before);
+  }).toPass({ timeout: 30_000, intervals: [250] });
 }
 
 export async function startToolbarFileChooser(page: Page, triggerName: string, itemName: string): Promise<FileChooser> {

@@ -19,7 +19,11 @@ import {
   assertRenderItemsFollowFrameTransform,
   assertRenderedResizeMatchesPointer,
   assertRenderSelectionUiVisible,
+  moveGroupDragToPointer,
+  moveGroupResizeToPointer,
   pointForRenderedHandle,
+  readGroupFrameWhen,
+  readSettledGroupSnapshot,
   requireRenderGroupFrame,
   rotateRenderedGroupTo,
 } from './support/rotatedGroups';
@@ -71,10 +75,13 @@ test.describe('grouped manipulation regressions', () => {
         resizeCase.delta
       );
       await beginGroupHandleDrag(page, resizeCase.handle);
-      await movePointerToCanvasPoint(page, destination);
-      await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
-
-      const preview = await readRenderSnapshot(page);
+      const preview = await moveGroupResizeToPointer(
+        page,
+        baseline,
+        resizeCase.handle,
+        destination,
+        `${resizeCase.handle} preview`
+      );
       assertRenderSelectionUiVisible(preview, `${resizeCase.handle} preview`);
       assertRenderItemsMatchResizePointer(
         baseline,
@@ -94,7 +101,7 @@ test.describe('grouped manipulation regressions', () => {
       assertRenderFrameTightlyWrapsItems(preview, `${resizeCase.handle} preview`);
 
       await releasePointer(page);
-      baseline = await readRenderSnapshot(page);
+      baseline = await readSettledGroupSnapshot(page, `${resizeCase.handle} commit`);
       assertRenderSelectionUiVisible(baseline, `${resizeCase.handle} commit`);
       assertRenderFrameTightlyWrapsItems(baseline, `${resizeCase.handle} commit`);
     }
@@ -116,11 +123,10 @@ test.describe('grouped manipulation regressions', () => {
       }
     );
     await beginGroupHandleDrag(page, 'middle-right');
-    await movePointerToCanvasPoint(page, firstDestination);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
+    await moveGroupResizeToPointer(page, baseline, 'middle-right', firstDestination, 'first handle preview');
     await releasePointer(page);
 
-    baseline = await readRenderSnapshot(page);
+    baseline = await readSettledGroupSnapshot(page, 'after first handle commit');
     assertRenderSelectionUiVisible(baseline, 'after first handle commit');
 
     const secondDestination = pointForRenderedHandle(
@@ -132,10 +138,13 @@ test.describe('grouped manipulation regressions', () => {
       }
     );
     await beginGroupHandleDrag(page, 'bottom-right');
-    await movePointerToCanvasPoint(page, secondDestination);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
-
-    const preview = await readRenderSnapshot(page);
+    const preview = await moveGroupResizeToPointer(
+      page,
+      baseline,
+      'bottom-right',
+      secondDestination,
+      'second handle preview'
+    );
     assertRenderSelectionUiVisible(preview, 'second handle preview');
     assertRenderItemsMatchResizePointer(
       baseline,
@@ -164,26 +173,29 @@ test.describe('grouped manipulation regressions', () => {
       }
     );
     await beginGroupHandleDrag(page, 'middle-right');
-    await movePointerToCanvasPoint(page, resizeDestination);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
-
-    const preview = await readRenderSnapshot(page);
+    const preview = await moveGroupResizeToPointer(
+      page,
+      baseline,
+      'middle-right',
+      resizeDestination,
+      'visibility preview'
+    );
     assertRenderSelectionUiVisible(preview, 'visibility preview');
     assertRenderedResizeMatchesPointer(baseline, preview, 'middle-right', resizeDestination, 'visibility preview');
     await releasePointer(page);
 
-    baseline = await readRenderSnapshot(page);
+    baseline = await readSettledGroupSnapshot(page, 'visibility commit');
     assertRenderSelectionUiVisible(baseline, 'visibility commit');
     assertRenderFrameTightlyWrapsItems(baseline, 'visibility commit');
 
+    const regrabBaseline = requireRenderGroupFrame(baseline, 'regrab baseline');
     await beginGroupHandleDrag(page, 'overlay');
-    await movePointerToCanvasPoint(page, {
-      x: requireRenderGroupFrame(baseline, 'regrab baseline').center.x + 70,
-      y: requireRenderGroupFrame(baseline, 'regrab baseline').center.y + 50,
-    });
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-drag');
-
-    const dragPreview = await readRenderSnapshot(page);
+    const dragPreview = await moveGroupDragToPointer(
+      page,
+      baseline,
+      { x: regrabBaseline.center.x + 70, y: regrabBaseline.center.y + 50 },
+      'regrab preview'
+    );
     assertRenderSelectionUiVisible(dragPreview, 'regrab preview');
     assertRenderItemsFollowFrameTransform(baseline, dragPreview, 'regrab preview', 'drag');
   });
@@ -219,14 +231,24 @@ test.describe('grouped manipulation regressions', () => {
 
     await beginGroupHandleDrag(page, 'overlay');
     await movePointerToCanvasPoint(page, dragDestination);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-drag');
-
-    let snapshot = await readRenderSnapshot(page);
+    // Gate on the snapped geometry (left edge at 0), not just sessionKind:
+    // the drag snaps the frame to the guide, and reading on the first
+    // 'group-drag' commit can catch the pre-snap frame under load.
+    let snapshot = await readGroupFrameWhen(
+      page,
+      (frame) => Math.abs(frame.x) < 0.05,
+      'snapped drag preview',
+      'group-drag'
+    );
     assertRenderSelectionUiVisible(snapshot, 'snapped drag preview');
     expect(requireRenderGroupFrame(snapshot, 'snapped drag preview').x).toBeCloseTo(0, 1);
     await releasePointer(page);
 
-    baseline = await readRenderSnapshot(page);
+    baseline = await readGroupFrameWhen(
+      page,
+      (frame) => Math.abs(frame.x) < 0.05,
+      'snapped drag commit'
+    );
     expect(requireRenderGroupFrame(baseline, 'snapped drag commit').x).toBeCloseTo(0, 1);
 
     const resizedBaseline = requireRenderGroupFrame(baseline, 'snapped resize baseline');
@@ -237,9 +259,15 @@ test.describe('grouped manipulation regressions', () => {
 
     await beginGroupHandleDrag(page, 'middle-right');
     await movePointerToCanvasPoint(page, resizeDestination);
-    await expect.poll(async () => (await readRenderSnapshot(page)).sessionKind).toBe('group-resize');
-
-    snapshot = await readRenderSnapshot(page);
+    // Gate on the snapped right edge (512), not just sessionKind — the resize
+    // snaps to the canvas edge and the first 'group-resize' commit can still
+    // show the pre-move frame.
+    snapshot = await readGroupFrameWhen(
+      page,
+      (frame) => Math.abs(frame.x + frame.width - 512) < 0.05,
+      'snapped resize preview',
+      'group-resize'
+    );
     assertRenderSelectionUiVisible(snapshot, 'snapped resize preview');
     const resizedFrame = requireRenderGroupFrame(snapshot, 'snapped resize preview');
     expect(resizedFrame.x + resizedFrame.width).toBeCloseTo(512, 1);

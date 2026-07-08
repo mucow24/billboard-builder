@@ -479,6 +479,37 @@ export function assertGroupFrameTightlyWrapsSelectedItems(debug: StageDebugInfo,
   expect(maxY).toBeCloseTo(frame.height / 2, 1);
 }
 
+/**
+ * How far (in canvas px) the group overlay frame is from tightly wrapping its
+ * selected items. Returns null when there is no overlay/items to measure.
+ *
+ * The render snapshot reads the overlay frame from the live DOM but the item
+ * geometry from a React-state closure, so mid-gesture the two can be a commit
+ * apart — the frame reflects the new size while the items still hold the old
+ * one, leaving a visible gap. A near-zero deviation means the closure has
+ * caught up to the DOM and the snapshot is internally consistent.
+ */
+export function renderFrameWrapDeviation(snapshot: RenderSnapshot): number | null {
+  const frame = snapshot.groupOverlay;
+  const items = snapshot.selectedItems;
+  if (!frame || items.length === 0) {
+    return null;
+  }
+  const localPoints = items
+    .flatMap((item) => item.outlinePoints)
+    .map((point) => stageToLocal(point, frame.center, frame.rotation));
+  const minX = Math.min(...localPoints.map((point) => point.x));
+  const maxX = Math.max(...localPoints.map((point) => point.x));
+  const minY = Math.min(...localPoints.map((point) => point.y));
+  const maxY = Math.max(...localPoints.map((point) => point.y));
+  return Math.max(
+    Math.abs(minX + frame.width / 2),
+    Math.abs(maxX - frame.width / 2),
+    Math.abs(minY + frame.height / 2),
+    Math.abs(maxY - frame.height / 2)
+  );
+}
+
 export function assertRenderFrameTightlyWrapsItems(snapshot: RenderSnapshot, label: string) {
   const frame = requireRenderGroupFrame(snapshot, label);
   const localPoints = requireRenderSelectedItems(snapshot, label)
@@ -551,16 +582,17 @@ export function assertRenderItemsFollowFrameTransform(
   }
 }
 
-export function assertRenderedResizeMatchesPointer(
-  before: RenderSnapshot,
-  after: RenderSnapshot,
+/**
+ * Compute the group frame (width/height/center) that a signed resize of
+ * `beforeFrame` should produce when the given handle is dragged to `pointer`.
+ * This is the same math `assertRenderedResizeMatchesPointer` verifies against,
+ * factored out so a poll can wait for the rendered frame to actually reach it.
+ */
+export function expectedResizeFrame(
+  beforeFrame: RenderGroupFrame,
   handle: string,
-  pointer: CanvasPoint,
-  label: string,
-  sizeTolerance = 2.5
-) {
-  const beforeFrame = requireRenderGroupFrame(before, `${label} before`);
-  const afterFrame = requireRenderGroupFrame(after, `${label} after`);
+  pointer: CanvasPoint
+): { width: number; height: number; center: CanvasPoint } {
   const localPointer = stageToLocal(pointer, beforeFrame.center, beforeFrame.rotation);
   let left = -beforeFrame.width / 2;
   let right = beforeFrame.width / 2;
@@ -592,19 +624,240 @@ export function assertRenderedResizeMatchesPointer(
   const normalizedRight = Math.max(left, right);
   const normalizedTop = Math.min(top, bottom);
   const normalizedBottom = Math.max(top, bottom);
-  const expectedCenter = localToStage(
-    {
-      x: (normalizedLeft + normalizedRight) / 2,
-      y: (normalizedTop + normalizedBottom) / 2,
-    },
-    beforeFrame.center,
-    beforeFrame.rotation
-  );
+  return {
+    width: Math.max(1, normalizedRight - normalizedLeft),
+    height: Math.max(1, normalizedBottom - normalizedTop),
+    center: localToStage(
+      {
+        x: (normalizedLeft + normalizedRight) / 2,
+        y: (normalizedTop + normalizedBottom) / 2,
+      },
+      beforeFrame.center,
+      beforeFrame.rotation
+    ),
+  };
+}
+
+export function assertRenderedResizeMatchesPointer(
+  before: RenderSnapshot,
+  after: RenderSnapshot,
+  handle: string,
+  pointer: CanvasPoint,
+  label: string,
+  sizeTolerance = 2.5
+) {
+  const beforeFrame = requireRenderGroupFrame(before, `${label} before`);
+  const afterFrame = requireRenderGroupFrame(after, `${label} after`);
+  const expected = expectedResizeFrame(beforeFrame, handle, pointer);
 
   expect(afterFrame.rotation).toBeCloseTo(beforeFrame.rotation, 1);
-  expect(Math.abs(afterFrame.width - Math.max(1, normalizedRight - normalizedLeft))).toBeLessThanOrEqual(sizeTolerance);
-  expect(Math.abs(afterFrame.height - Math.max(1, normalizedBottom - normalizedTop))).toBeLessThanOrEqual(sizeTolerance);
-  expectPointClose(afterFrame.center, expectedCenter, 3);
+  expect(Math.abs(afterFrame.width - expected.width)).toBeLessThanOrEqual(sizeTolerance);
+  expect(Math.abs(afterFrame.height - expected.height)).toBeLessThanOrEqual(sizeTolerance);
+  expectPointClose(afterFrame.center, expected.center, 3);
+}
+
+// Matches the per-axis tolerance of `assertRenderFrameTightlyWrapsItems`
+// (`toBeCloseTo(_, 1)` ⇒ < 0.05), so a snapshot that clears the convergence
+// gate also clears that assertion.
+const FRAME_WRAP_CONSISTENCY_TOLERANCE = 0.05;
+
+// Minimum overlay-center shift (canvas px) that proves a group drag actually
+// landed, versus a stale pre-move commit whose center hasn't budged. Well
+// below any drag the specs perform and well above measurement noise.
+const GROUP_DRAG_MIN_SHIFT = 20;
+
+/**
+ * True when the snapshot's DOM-sourced overlay frame tightly wraps its
+ * closure-sourced items — i.e. the two data sources are from the same commit.
+ * A skewed snapshot (frame a commit ahead of its items) is what makes the
+ * item-following assertions flake under load, so callers gate on this.
+ */
+export function isRenderSnapshotSelfConsistent(snapshot: RenderSnapshot): boolean {
+  const deviation = renderFrameWrapDeviation(snapshot);
+  return deviation !== null && deviation < FRAME_WRAP_CONSISTENCY_TOLERANCE;
+}
+
+/**
+ * Move the pointer to `pointer` during an in-progress group resize and return
+ * the rendered snapshot once its geometry actually reflects that pointer.
+ *
+ * Why this exists: the editor coalesces gesture updates to one React commit
+ * per animation frame (`updateSession` in useCanvasInteractionSession), and
+ * the render snapshot reads that committed React state — not the live pointer.
+ * `session.kind` flips to 'group-resize' on the *first* commit after the
+ * gesture begins (before the move lands), so polling only on `sessionKind`
+ * can read a stale, zero-delta frame under parallel/SwiftShader load where
+ * animation frames are irregular. Instead we dispatch the move once and poll
+ * (reads only) until the rendered frame converges on the pointer-derived
+ * geometry — the same shape as `rotateRenderedGroupTo`, which waits on the
+ * actual rotation. The poll must not re-dispatch the move: repeated moves
+ * leave extra coalesced commits in flight, and the release that follows then
+ * commits a frame that trails the items by a pixel or two.
+ */
+export async function moveGroupResizeToPointer(
+  page: Page,
+  before: RenderSnapshot,
+  handle: string,
+  pointer: CanvasPoint,
+  label: string,
+  sizeTolerance = 5,
+  centerTolerance = 3
+): Promise<RenderSnapshot> {
+  const beforeFrame = requireRenderGroupFrame(before, `${label} before`);
+  const expected = expectedResizeFrame(beforeFrame, handle, pointer);
+  await movePointerToCanvasPoint(page, pointer);
+
+  let converged: RenderSnapshot | null = null;
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await readRenderSnapshot(page);
+        const frame = snapshot.groupOverlay;
+        if (snapshot.sessionKind !== 'group-resize' || !frame) {
+          return false;
+        }
+        // The frame (read from the DOM) must both reflect the pointer *and*
+        // tightly wrap the items (read from the React-state closure). Requiring
+        // self-consistency keeps us from returning a snapshot whose frame has
+        // advanced a commit ahead of its items — that skew is exactly what
+        // makes assertRenderItemsMatchResizePointer flake under load.
+        const matches =
+          Math.abs(frame.width - expected.width) <= sizeTolerance &&
+          Math.abs(frame.height - expected.height) <= sizeTolerance &&
+          Math.abs(frame.center.x - expected.center.x) <= centerTolerance &&
+          Math.abs(frame.center.y - expected.center.y) <= centerTolerance &&
+          isRenderSnapshotSelfConsistent(snapshot);
+        if (matches) {
+          converged = snapshot;
+        }
+        return matches;
+      },
+      { message: `${label}: waiting for rendered group resize to reach the pointer` }
+    )
+    .toBe(true);
+
+  if (!converged) {
+    throw new Error(`${label}: group resize preview never converged on the pointer`);
+  }
+  return converged;
+}
+
+/**
+ * Read a group-selection snapshot once it is internally consistent — i.e. the
+ * DOM-sourced overlay frame tightly wraps the closure-sourced items. Use this
+ * for reads taken right after a commit (post-`releasePointer`), where the item
+ * closure can momentarily trail the freshly re-rendered overlay by a frame and
+ * make `assertRenderFrameTightlyWrapsItems` flake.
+ */
+export async function readSettledGroupSnapshot(page: Page, label: string): Promise<RenderSnapshot> {
+  let settled: RenderSnapshot | null = null;
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await readRenderSnapshot(page);
+        const ok = isRenderSnapshotSelfConsistent(snapshot);
+        if (ok) {
+          settled = snapshot;
+        }
+        return ok;
+      },
+      { message: `${label}: waiting for a self-consistent committed group snapshot` }
+    )
+    .toBe(true);
+
+  if (!settled) {
+    throw new Error(`${label}: group snapshot never settled`);
+  }
+  return settled;
+}
+
+/**
+ * Move the pointer to `destination` during an in-progress group drag and
+ * return the rendered snapshot once the drag has both landed (the overlay
+ * center has shifted off its pre-drag position) and settled (frame and items
+ * agree). Like `moveGroupResizeToPointer`, this replaces a bare
+ * `sessionKind === 'group-drag'` gate, which can read a frame that moved a
+ * commit ahead of its items and flake `assertRenderItemsFollowFrameTransform`.
+ */
+export async function moveGroupDragToPointer(
+  page: Page,
+  before: RenderSnapshot,
+  destination: CanvasPoint,
+  label: string
+): Promise<RenderSnapshot> {
+  const beforeFrame = requireRenderGroupFrame(before, `${label} before`);
+  await movePointerToCanvasPoint(page, destination);
+
+  let converged: RenderSnapshot | null = null;
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await readRenderSnapshot(page);
+        const frame = snapshot.groupOverlay;
+        if (snapshot.sessionKind !== 'group-drag' || !frame) {
+          return false;
+        }
+        const shift = Math.hypot(
+          frame.center.x - beforeFrame.center.x,
+          frame.center.y - beforeFrame.center.y
+        );
+        const ok = shift > GROUP_DRAG_MIN_SHIFT && isRenderSnapshotSelfConsistent(snapshot);
+        if (ok) {
+          converged = snapshot;
+        }
+        return ok;
+      },
+      { message: `${label}: waiting for the group drag to land and settle` }
+    )
+    .toBe(true);
+
+  if (!converged) {
+    throw new Error(`${label}: group drag preview never settled`);
+  }
+  return converged;
+}
+
+/**
+ * Poll during (or right after) a group gesture until the rendered overlay
+ * frame satisfies `predicate`, then return that snapshot. Use it for snapped
+ * gestures whose settled geometry is a known guide value rather than the raw
+ * pointer: gating on `sessionKind` alone reads whatever frame the first
+ * coalesced commit happened to carry — often the pre-snap (or pre-move) one —
+ * so the assertion sees a half-finished transform under load. Pass
+ * `expectedSessionKind` to also require an active/'null' session phase.
+ */
+export async function readGroupFrameWhen(
+  page: Page,
+  predicate: (frame: RenderGroupFrame) => boolean,
+  label: string,
+  expectedSessionKind?: string | null
+): Promise<RenderSnapshot> {
+  let matched: RenderSnapshot | null = null;
+  await expect
+    .poll(
+      async () => {
+        const snapshot = await readRenderSnapshot(page);
+        const frame = snapshot.groupOverlay;
+        if (!frame) {
+          return false;
+        }
+        if (expectedSessionKind !== undefined && snapshot.sessionKind !== expectedSessionKind) {
+          return false;
+        }
+        const ok = predicate(frame);
+        if (ok) {
+          matched = snapshot;
+        }
+        return ok;
+      },
+      { message: `${label}: waiting for the rendered group frame to settle` }
+    )
+    .toBe(true);
+
+  if (!matched) {
+    throw new Error(`${label}: group frame never settled`);
+  }
+  return matched;
 }
 
 export async function rotateRenderedGroupTo(page: Page, targetRotationDegrees: number) {
