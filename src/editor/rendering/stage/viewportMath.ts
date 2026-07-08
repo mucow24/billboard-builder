@@ -1,6 +1,6 @@
 import type { Point } from '../interactionGeometry';
 
-export const MIN_ZOOM = 0.05;
+export const MIN_ZOOM = 0.001;
 export const MAX_ZOOM = 16;
 const SEAM_ZOOM_ALIGNMENT_GRID = 64;
 

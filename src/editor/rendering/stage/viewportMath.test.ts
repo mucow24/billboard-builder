@@ -14,7 +14,7 @@ import {
 
 describe('viewportMath', () => {
   it('clamps zoom within the supported range', () => {
-    expect(clampZoom(0.01)).toBe(0.05);
+    expect(clampZoom(0.0001)).toBe(0.001);
     expect(clampZoom(2)).toBe(2);
     expect(clampZoom(20)).toBe(16);
   });
