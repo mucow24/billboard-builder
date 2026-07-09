@@ -312,6 +312,20 @@ function snapValue(
   };
 }
 
+/** Map a point proportionally from one axis-aligned rect into another. */
+function scaleRectPoint(
+  point: Point,
+  from: { x: number; y: number; width: number; height: number },
+  to: { x: number; y: number; width: number; height: number }
+): Point {
+  const safeWidth = Math.max(from.width, 1);
+  const safeHeight = Math.max(from.height, 1);
+  return {
+    x: to.x + ((point.x - from.x) / safeWidth) * to.width,
+    y: to.y + ((point.y - from.y) / safeHeight) * to.height,
+  };
+}
+
 function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
   item: T,
   localRect: SnapRect
@@ -322,6 +336,23 @@ function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
     { x: item.x, y: item.y },
     item.rotation
   );
+
+  if (item.kind === 'polygon') {
+    // Polygons carry geometry in their vertex list (rotation stays 0), so a box
+    // resize maps every vertex from the old AABB into the new box and re-derives
+    // the AABB — mirroring how group resize handles polygons.
+    const nextBox = {
+      x: stageOrigin.x,
+      y: stageOrigin.y,
+      width: localRect.width,
+      height: localRect.height,
+    };
+    const vertices = item.vertices.map((vertex) =>
+      scaleRectPoint(vertex, renderBox, nextBox)
+    );
+    return withPolygonGeometry(item, vertices) as T;
+  }
+
   const resizedItem = {
     ...item,
     x: stageOrigin.x,
@@ -625,6 +656,22 @@ export function solveRotateSession(
   const nextAngle = Math.atan2(currentPointer.y - center.y, currentPointer.x - center.x);
   const rawRotation = item.rotation + ((nextAngle - startAngle) * 180) / Math.PI;
   const nextRotation = snapAbsolute ? Math.round(rawRotation / 22.5) * 22.5 : rawRotation;
+
+  if (item.kind === 'polygon') {
+    // Polygons carry geometry in their vertex list (rotation stays 0), so a box
+    // rotate spins the vertices around the box center and re-derives the AABB —
+    // mirroring how group rotate handles polygons. item.rotation is always 0, so
+    // nextRotation is the absolute delta to apply to the original vertices.
+    const rotated = item.vertices.map((vertex) => {
+      const rel = rotateVector(
+        { x: vertex.x - center.x, y: vertex.y - center.y },
+        nextRotation
+      );
+      return { x: center.x + rel.x, y: center.y + rel.y };
+    });
+    return { item: withPolygonGeometry(item, rotated), guides: [] };
+  }
+
   const renderBox = getRenderBox(item);
   const halfVector = rotateVector(
     {

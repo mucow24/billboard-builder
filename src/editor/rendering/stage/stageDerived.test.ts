@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
 } from '../../document/documentDefaults';
 
@@ -116,6 +117,53 @@ describe('stageDerived', () => {
 
     expect(lineDerived.selectedLineHandleRects).not.toBeNull();
     expect(lineDerived.selectedShapeHandleRects).toBeNull();
+  });
+
+  it('gives a selected polygon an outset resize box in addition to its vertex handles', () => {
+    // AABB (100,100,200,200); its vertices sit on the corners.
+    const polygon = createPolygonItem({
+      vertices: [
+        { x: 100, y: 100 },
+        { x: 300, y: 100 },
+        { x: 300, y: 300 },
+        { x: 100, y: 300 },
+      ],
+    });
+
+    const derived = buildStageDerivedState({
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [polygon],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: polygon,
+      session: null,
+      zoom: 1,
+      viewport: {
+        toViewportPoint: (point) => point,
+        toViewportRect: (rect) => ({
+          left: rect.x,
+          top: rect.y,
+          width: rect.width,
+          height: rect.height,
+        }),
+      },
+    });
+
+    expect(derived.selectedShapeHandleRects).not.toBeNull();
+    // The box is pushed 16px outward from the AABB so the corner handles clear
+    // the vertex handles: top-left corner (100,100) → handle centered at (84,84).
+    expect(derived.selectedShapeHandleRects?.['top-left']).toEqual({
+      left: 84 - 8,
+      top: 84 - 8,
+      width: 16,
+      height: 16,
+    });
+    expect(derived.selectedShapeHandleRects?.['bottom-right']).toEqual({
+      left: 316 - 8,
+      top: 316 - 8,
+      width: 16,
+      height: 16,
+    });
   });
 
   it('derives marquee preview geometry from the full drag rect outside the canvas bounds', () => {

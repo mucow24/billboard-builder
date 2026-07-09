@@ -18,6 +18,7 @@ import {
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 import { getRenderBox } from '../transformGeometry';
+import { BASE_POLYGON_SELECTION_OUTSET } from './overlayGeometry';
 
 // ── Colours ──────────────────────────────────────────────────────────────────
 const SELECTION_STROKE = 0x7dd3fc;
@@ -223,15 +224,28 @@ export function PixiSelectionOverlay({
   }
 
   if (selectedRenderedItem.kind === 'polygon') {
+    // Show both: the standard transform box (resize + rotate handles, pushed
+    // outward so it clears the vertices) drawn first, then the on-shape
+    // vertex/edge handles on top.
     return (
-      <PolygonSelectionHandles
-        item={selectedRenderedItem as RenderableCanvasItem & { kind: 'polygon' }}
-        zoom={zoom}
-        beginPolygonVertexHandle={beginPolygonVertexHandle}
-        beginPolygonEdgeInsert={beginPolygonEdgeInsert}
-        selectedVertexIndex={selectedPolygonVertexIndex}
-        toCanvasPointer={toCanvasPointer}
-      />
+      <>
+        <ShapeSelectionOverlay
+          item={selectedRenderedItem}
+          zoom={zoom}
+          outset={BASE_POLYGON_SELECTION_OUTSET}
+          beginResize={beginResize}
+          beginRotate={beginRotate}
+          toCanvasPointer={toCanvasPointer}
+        />
+        <PolygonSelectionHandles
+          item={selectedRenderedItem as RenderableCanvasItem & { kind: 'polygon' }}
+          zoom={zoom}
+          beginPolygonVertexHandle={beginPolygonVertexHandle}
+          beginPolygonEdgeInsert={beginPolygonEdgeInsert}
+          selectedVertexIndex={selectedPolygonVertexIndex}
+          toCanvasPointer={toCanvasPointer}
+        />
+      </>
     );
   }
 
@@ -426,25 +440,42 @@ function GroupSelectionOverlay({
 function ShapeSelectionOverlay({
   item,
   zoom,
+  outset = 0,
   beginResize,
   beginRotate,
   toCanvasPointer,
 }: {
   item: RenderableCanvasItem;
   zoom: number;
+  // Screen-space margin (divided by zoom) to push the box outward from the
+  // render bounds. Non-zero only for polygons, to clear their vertex handles.
+  outset?: number;
   beginResize: PixiSelectionOverlayProps['beginResize'];
   beginRotate: PixiSelectionOverlayProps['beginRotate'];
   toCanvasPointer: (pointer: Point) => Point;
 }) {
-  const { selectionStroke, handleRadius, handleStroke, rotateOffset } = getZoomScaledDimensions(zoom);
+  const { nz, selectionStroke, handleRadius, handleStroke, rotateOffset } = getZoomScaledDimensions(zoom);
+  const outsetScaled = outset / nz;
 
   const renderBox = useMemo(() => getRenderBox(item), [item]);
+  // The selection box, pushed outward by the outset. Handle positions and the
+  // outline both derive from this box; the resize math still anchors to the
+  // true render bounds (the grab-time pointerOffset absorbs the outset).
+  const box = useMemo(
+    () => ({
+      x: renderBox.x - outsetScaled,
+      y: renderBox.y - outsetScaled,
+      width: renderBox.width + outsetScaled * 2,
+      height: renderBox.height + outsetScaled * 2,
+    }),
+    [renderBox, outsetScaled],
+  );
 
   // Compute handle positions in stage (canvas) space.
   const handlePoints = useMemo(() => {
-    const origin = { x: renderBox.x, y: renderBox.y };
-    const w = renderBox.width;
-    const h = renderBox.height;
+    const origin = { x: box.x, y: box.y };
+    const w = box.width;
+    const h = box.height;
 
     const localPoints: Record<ResizeHandle | 'rotater', Point> = {
       'top-left': { x: 0, y: 0 },
@@ -464,16 +495,16 @@ function ShapeSelectionOverlay({
         localToStage(pt, origin, item.rotation),
       ]),
     ) as Record<ResizeHandle | 'rotater', Point>;
-  }, [renderBox, item.rotation, rotateOffset]);
+  }, [box, item.rotation, rotateOffset]);
 
   // Draw selection outline rectangle (inside a rotated container).
   const drawOutline = useCallback(
     (g: Graphics) => {
       g.clear();
-      g.rect(0, 0, renderBox.width, renderBox.height);
+      g.rect(0, 0, box.width, box.height);
       g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
     },
-    [renderBox.width, renderBox.height, selectionStroke],
+    [box.width, box.height, selectionStroke],
   );
 
   // Draw rotation connecting line (in stage space).
@@ -528,8 +559,8 @@ function ShapeSelectionOverlay({
     <pixiContainer label="selection-overlay">
       {/* Outline: drawn in item-local space inside a rotated container */}
       <pixiContainer
-        x={renderBox.x}
-        y={renderBox.y}
+        x={box.x}
+        y={box.y}
         rotation={(item.rotation * Math.PI) / 180}
       >
         <pixiGraphics draw={drawOutline} eventMode="none" />
