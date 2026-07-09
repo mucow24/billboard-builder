@@ -527,6 +527,50 @@ function applyAspectRatio(
   };
 }
 
+const CORNER_RESIZE_HANDLES: ResizeHandle[] = [
+  'top-left',
+  'top-right',
+  'bottom-left',
+  'bottom-right',
+];
+
+function isCornerResizeHandle(handle: ResizeHandle): boolean {
+  return CORNER_RESIZE_HANDLES.includes(handle);
+}
+
+/**
+ * Snap one local resize edge to the nearest stage guide. Returns the local
+ * delta needed to land on it (reverse-mapped through the edge's stage
+ * derivative) plus the guide to draw, or null when nothing is in range.
+ */
+function snapResizeEdge(
+  localEdge: number,
+  axis: 'x' | 'y',
+  origin: Point,
+  rotation: number,
+  siblingItems: CanvasItem[],
+  stageRect: SnapRect,
+  threshold: number | undefined,
+  cache: SnapCandidateCache | undefined
+): { deltaLocal: number; guide: GuideLine } | null {
+  const info = getStageEdgeInfo(localEdge, axis, origin, rotation);
+  const snapped = snapValue(
+    info.stageValue,
+    info.orientation,
+    siblingItems,
+    stageRect,
+    threshold,
+    cache
+  );
+  if (!snapped) {
+    return null;
+  }
+  return {
+    deltaLocal: (snapped.value - info.stageValue) / info.derivative,
+    guide: snapped.guide,
+  };
+}
+
 export function solveResizeSession(
   item: Exclude<CanvasItem, LineCanvasItem>,
   handle: ResizeHandle,
@@ -589,36 +633,80 @@ export function solveResizeSession(
   const guides: GuideLine[] = [];
   if (snapEnabled && isMultipleOf90(item.rotation)) {
     const origin = { x: renderBox.x, y: renderBox.y };
-    if (handle.includes('left') || handle === 'middle-left') {
-      const info = getStageEdgeInfo(ratioEdges.left, 'x', origin, item.rotation);
-      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
-      if (snapped) {
-        ratioEdges.left += (snapped.value - info.stageValue) / info.derivative;
-        guides.push(snapped.guide);
+
+    if (shouldConstrain && isCornerResizeHandle(handle)) {
+      // Proportional corner resize: the aspect ratio is already baked into
+      // ratioEdges, so snapping a single edge onto a guide would stretch the
+      // shape across the snap's whole tolerance band. Instead, turn each moving
+      // edge's snap into a uniform scale about the fixed anchor corner and apply
+      // whichever moves the corner least — the snapping edge still lands on its
+      // guide, but width and height scale together so the ratio stays locked.
+      const movingXEdge = handle.includes('left') ? 'left' : 'right';
+      const movingYEdge = handle.startsWith('top') ? 'top' : 'bottom';
+      const anchorX = handle.includes('left') ? ratioEdges.right : ratioEdges.left;
+      const anchorY = handle.startsWith('top') ? ratioEdges.bottom : ratioEdges.top;
+      const spanX = ratioEdges[movingXEdge] - anchorX;
+      const spanY = ratioEdges[movingYEdge] - anchorY;
+
+      const snapX =
+        Math.abs(spanX) > 1e-6
+          ? snapResizeEdge(ratioEdges[movingXEdge], 'x', origin, item.rotation, siblingItems, stageRect, threshold, cache)
+          : null;
+      const snapY =
+        Math.abs(spanY) > 1e-6
+          ? snapResizeEdge(ratioEdges[movingYEdge], 'y', origin, item.rotation, siblingItems, stageRect, threshold, cache)
+          : null;
+
+      const options: { scale: number; guide: GuideLine }[] = [];
+      if (snapX) {
+        const scale = (spanX + snapX.deltaLocal) / spanX;
+        if (scale > 0) {
+          options.push({ scale, guide: snapX.guide });
+        }
       }
-    }
-    if (handle.includes('right') || handle === 'middle-right') {
-      const info = getStageEdgeInfo(ratioEdges.right, 'x', origin, item.rotation);
-      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
-      if (snapped) {
-        ratioEdges.right += (snapped.value - info.stageValue) / info.derivative;
-        guides.push(snapped.guide);
+      if (snapY) {
+        const scale = (spanY + snapY.deltaLocal) / spanY;
+        if (scale > 0) {
+          options.push({ scale, guide: snapY.guide });
+        }
       }
-    }
-    if (handle.startsWith('top') || handle === 'top-center') {
-      const info = getStageEdgeInfo(ratioEdges.top, 'y', origin, item.rotation);
-      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
-      if (snapped) {
-        ratioEdges.top += (snapped.value - info.stageValue) / info.derivative;
-        guides.push(snapped.guide);
+
+      const winner = options.sort(
+        (left, right) => Math.abs(left.scale - 1) - Math.abs(right.scale - 1)
+      )[0];
+      if (winner) {
+        ratioEdges[movingXEdge] = anchorX + winner.scale * spanX;
+        ratioEdges[movingYEdge] = anchorY + winner.scale * spanY;
+        guides.push(winner.guide);
       }
-    }
-    if (handle.startsWith('bottom') || handle === 'bottom-center') {
-      const info = getStageEdgeInfo(ratioEdges.bottom, 'y', origin, item.rotation);
-      const snapped = snapValue(info.stageValue, info.orientation, siblingItems, stageRect, threshold, cache);
-      if (snapped) {
-        ratioEdges.bottom += (snapped.value - info.stageValue) / info.derivative;
-        guides.push(snapped.guide);
+    } else {
+      if (handle.includes('left') || handle === 'middle-left') {
+        const snapped = snapResizeEdge(ratioEdges.left, 'x', origin, item.rotation, siblingItems, stageRect, threshold, cache);
+        if (snapped) {
+          ratioEdges.left += snapped.deltaLocal;
+          guides.push(snapped.guide);
+        }
+      }
+      if (handle.includes('right') || handle === 'middle-right') {
+        const snapped = snapResizeEdge(ratioEdges.right, 'x', origin, item.rotation, siblingItems, stageRect, threshold, cache);
+        if (snapped) {
+          ratioEdges.right += snapped.deltaLocal;
+          guides.push(snapped.guide);
+        }
+      }
+      if (handle.startsWith('top') || handle === 'top-center') {
+        const snapped = snapResizeEdge(ratioEdges.top, 'y', origin, item.rotation, siblingItems, stageRect, threshold, cache);
+        if (snapped) {
+          ratioEdges.top += snapped.deltaLocal;
+          guides.push(snapped.guide);
+        }
+      }
+      if (handle.startsWith('bottom') || handle === 'bottom-center') {
+        const snapped = snapResizeEdge(ratioEdges.bottom, 'y', origin, item.rotation, siblingItems, stageRect, threshold, cache);
+        if (snapped) {
+          ratioEdges.bottom += snapped.deltaLocal;
+          guides.push(snapped.guide);
+        }
       }
     }
   }
