@@ -29,6 +29,13 @@ const BASE_CROP_HANDLE_HIT_SIZE = 24;
 
 export const OVERLAY_VIEWPORT_HANDLE_SIZE = 16;
 
+// A polygon's vertices sit on (or inside) its AABB, so its vertex-editing
+// handles land exactly on the box's corner/edge handles for a default square.
+// Push the resize/rotate box outward by this margin (screen px, divided by
+// zoom) so the two handle sets never collide. The resize math still anchors to
+// the true AABB — the pointerOffset captured on grab absorbs the outset.
+export const BASE_POLYGON_SELECTION_OUTSET = 16;
+
 function normalizeZoom(zoom: number) {
   return zoom > 0 ? zoom : 1;
 }
@@ -64,9 +71,13 @@ export function getShapeOverlayHandlePoints(
   zoom: number,
 ) {
   const renderBox = getRenderBox(item);
-  const origin = { x: renderBox.x, y: renderBox.y };
-  const width = renderBox.width;
-  const height = renderBox.height;
+  // Polygons get their box pushed outward so its resize/rotate handles clear
+  // the on-shape vertex handles (see BASE_POLYGON_SELECTION_OUTSET).
+  const outset =
+    item.kind === 'polygon' ? scaleOverlayValue(BASE_POLYGON_SELECTION_OUTSET, zoom) : 0;
+  const origin = { x: renderBox.x - outset, y: renderBox.y - outset };
+  const width = renderBox.width + outset * 2;
+  const height = renderBox.height + outset * 2;
   const { rotateHandleOffset } = getCanvasOverlayMetrics(zoom);
 
   const localPoints: Record<ResizeHandle | 'rotater', Point> = {

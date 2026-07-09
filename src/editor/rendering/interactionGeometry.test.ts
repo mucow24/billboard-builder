@@ -763,4 +763,52 @@ describe('polygon interactions', () => {
 
     expect(result.item).toBe(item);
   });
+
+  it('scales every vertex from the old AABB into the resized box on a box resize', () => {
+    const item = trianglePolygon(); // AABB (200,200,200,200)
+    const handle = getShapeHandlePoints(item)['bottom-right'];
+    const result = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: handle.x + 100, y: handle.y + 100 },
+      { x: 0, y: 0 },
+      [],
+      stageRect,
+      false,
+    );
+
+    if (result.item.kind !== 'polygon') throw new Error('expected polygon');
+    // Box grows from 200x200 to 300x300 anchored at (200,200): every vertex
+    // scales by 1.5 about that origin.
+    expect(result.item.vertices).toEqual([
+      { x: 200, y: 200 },
+      { x: 500, y: 200 },
+      { x: 350, y: 500 },
+    ]);
+    expect(result.item).toMatchObject({ x: 200, y: 200, width: 300, height: 300 });
+    // Polygons never carry rotation — the geometry lives in the vertices.
+    expect(result.item.rotation).toBe(0);
+  });
+
+  it('spins every vertex around the box center and re-derives the box on a box rotate', () => {
+    const item = trianglePolygon(); // AABB center (300,300)
+    const center = { x: 300, y: 300 };
+    const result = solveRotateSession(
+      item,
+      { x: center.x, y: center.y - 100 },
+      { x: center.x + 100, y: center.y },
+    );
+
+    if (result.item.kind !== 'polygon') throw new Error('expected polygon');
+    // +90° about (300,300): (x,y) → (cx - (y-cy), cy + (x-cx)).
+    expect(result.item.vertices[0].x).toBeCloseTo(400, 5);
+    expect(result.item.vertices[0].y).toBeCloseTo(200, 5);
+    expect(result.item.vertices[1].x).toBeCloseTo(400, 5);
+    expect(result.item.vertices[1].y).toBeCloseTo(400, 5);
+    expect(result.item.vertices[2].x).toBeCloseTo(200, 5);
+    expect(result.item.vertices[2].y).toBeCloseTo(300, 5);
+    // Rotation is baked into the vertices; the item's rotation field stays 0.
+    expect(result.item.rotation).toBe(0);
+    expect(result.item).toMatchObject({ x: 200, y: 200, width: 200, height: 200 });
+  });
 });

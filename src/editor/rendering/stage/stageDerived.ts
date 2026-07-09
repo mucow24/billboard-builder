@@ -140,9 +140,9 @@ export function buildStageDerivedState(params: {
     !cropSession &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem &&
-    params.selectedRenderedItem.kind !== 'line' &&
-    // Polygons edit via vertex handles, not the resize box.
-    params.selectedRenderedItem.kind !== 'polygon'
+    // Polygons get the resize box in addition to their vertex handles; only
+    // lines (endpoint handles) opt out of the shape box entirely.
+    params.selectedRenderedItem.kind !== 'line'
       ? getResizeHandleViewportRects(
           getShapeOverlayHandlePoints(params.selectedRenderedItem, params.zoom),
           params.viewport.toViewportPoint,

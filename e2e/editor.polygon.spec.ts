@@ -134,6 +134,56 @@ test.describe('polygon tool flows', () => {
     ]);
   });
 
+  test('resizing from a bounding-box handle scales the whole polygon', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadPolygonFixture(page);
+
+    await clickItem(page, 'polygon-item');
+    // The fixture AABB is (200,200) 240x240. Grow from the bottom-right box
+    // handle by (+160,+160): the box becomes 400x400 and every vertex scales
+    // about the (200,200) anchor. Target edges (600) sit clear of the canvas
+    // snap candidates (0 / 512 / 1024), so the result is exact.
+    await dragHandle(page, 'polygon-item', 'bottom-right', 160, 160);
+
+    const saved = await saveAndReadProject(page);
+    expect(saved.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'polygon',
+        vertices: [
+          { x: 200, y: 200 },
+          { x: 600, y: 200 },
+          { x: 600, y: 600 },
+          { x: 200, y: 600 },
+        ],
+      }),
+    ]);
+  });
+
+  test('rotating from the bounding-box rotate handle spins the whole polygon', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadPolygonFixture(page);
+
+    await clickItem(page, 'polygon-item');
+    // Drag the rotate handle straight down (dx=0) far past the box center. Any
+    // point directly below center is +90° from the handle's rest position
+    // (straight up), so this is exactly a 180° turn regardless of zoom.
+    await dragHandle(page, 'polygon-item', 'rotater', 0, 700);
+
+    const saved = await saveAndReadProject(page);
+    expect(saved.nodes).toEqual([
+      expect.objectContaining({
+        kind: 'polygon',
+        // 180° about the AABB center (320,320) maps each corner to its opposite.
+        vertices: [
+          { x: 440, y: 440 },
+          { x: 200, y: 440 },
+          { x: 200, y: 200 },
+          { x: 440, y: 200 },
+        ],
+      }),
+    ]);
+  });
+
   test('click-selecting a vertex and pressing Delete removes it, with a 3-vertex floor', async ({ page }) => {
     await openFreshEditor(page);
     await uploadPolygonFixture(page);
