@@ -384,6 +384,56 @@ function getGroupResizePointer(
   };
 }
 
+/**
+ * A proportional group resize builds a ratio-correct rect (via constrainToRatio)
+ * but then getResizeSnappedRect snaps each edge independently, which breaks the
+ * locked ratio across the snap's tolerance band. Re-derive a proportional rect:
+ * turn each snapped edge into a uniform scale about the fixed anchor corner and
+ * apply the gentler one, so the snapping edge still lands on its guide while
+ * width and height scale together. Mirrors the constrained-corner branch of
+ * solveResizeSession for single items.
+ */
+function constrainSnappedRectToRatio(
+  rawRect: RenderBox,
+  snapped: { rect: RenderBox; guides: GuideLine[] },
+  handle: ResizeHandle,
+): { rect: RenderBox; guides: GuideLine[] } {
+  if (rawRect.width <= 0 || rawRect.height <= 0) {
+    return snapped;
+  }
+  const scaleW = snapped.rect.width / rawRect.width;
+  const scaleH = snapped.rect.height / rawRect.height;
+
+  const options = snapped.guides
+    .map((guide) => ({
+      scale: guide.orientation === 'vertical' ? scaleW : scaleH,
+      guide,
+    }))
+    .filter((option) => option.scale > 0)
+    .sort((left, right) => Math.abs(left.scale - 1) - Math.abs(right.scale - 1));
+  const winner = options[0];
+  if (!winner) {
+    return snapped;
+  }
+
+  const width = rawRect.width * winner.scale;
+  const height = rawRect.height * winner.scale;
+  // getResizeSnappedRect leaves the anchor edges (opposite the dragged handle)
+  // fixed, so rawRect's anchor corner is authoritative; only the moving edges
+  // scale away from it.
+  const anchorX = handle.includes('left') ? rawRect.x + rawRect.width : rawRect.x;
+  const anchorY = handle.includes('top') ? rawRect.y + rawRect.height : rawRect.y;
+  return {
+    rect: {
+      x: handle.includes('left') ? anchorX - width : anchorX,
+      y: handle.includes('top') ? anchorY - height : anchorY,
+      width,
+      height,
+    },
+    guides: [winner.guide],
+  };
+}
+
 export function createCreateSession(
   tool: Extract<CanvasTool, 'text' | 'rectangle' | 'ellipse' | 'ngon' | 'polygon' | 'line'>,
   pointer: Point,
@@ -868,8 +918,13 @@ export function resolveInteractionSession(
         threshold,
         cache
       );
+      // When the aspect ratio is locked, snapping edges independently would
+      // stretch the selection across the snap band, so re-lock it proportionally.
+      const resolved = groupRatioAnchor
+        ? constrainSnappedRectToRatio(rawRect, snapped, current.handle as ResizeHandle)
+        : snapped;
       const resolvedPointer = getGroupResizePointer(
-        snapped.rect,
+        resolved.rect,
         current.handle,
         current.bounds
       );
@@ -877,7 +932,7 @@ export function resolveInteractionSession(
         ...current,
         snapCache: cache,
         currentPointer: resolvedPointer,
-        guides: snapped.guides,
+        guides: resolved.guides,
         previewItems: buildGroupResizePreviews(
           current.originalItems,
           current.bounds,

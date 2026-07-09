@@ -569,6 +569,79 @@ describe('interactionSession', () => {
     expect(b.width / b.height).toBeCloseTo(5, 1);
   });
 
+  it('keeps the group aspect ratio locked when a proportional resize snaps a vertical guide', () => {
+    // Square selection (ratio 1). Drag the bottom-right corner proportionally so
+    // the moving corner lands at (462, 462): the right edge (x=462) is 8px from a
+    // sibling's left edge at x=470 (snaps), while the bottom edge is out of range
+    // of every horizontal guide. Snapping only the right edge used to stretch the
+    // selection across the band; the ratio must stay locked instead.
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 100, height: 100 });
+    const second = createRectangleItem({ id: 'second', x: 200, y: 200, width: 100, height: 100 });
+    const sibling = createRectangleItem({ id: 'guide', x: 470, y: 700, width: 40, height: 40 });
+    const frame: SelectionFrame = { bounds: { x: 100, y: 100, width: 200, height: 200 }, rotation: 0 };
+    const session = createGroupResizeSession('bottom-right', { x: 300, y: 300 }, {
+      selectedItems: [first, second],
+      siblingItems: [sibling],
+      activeSelectionFrame: frame,
+    });
+    if (!session) throw new Error('Expected group resize session.');
+
+    const withShift = { ...session, shiftConstrain: true };
+    const resolved = resolveInteractionSession(
+      withShift,
+      { x: 462, y: 462 },
+      { stageBounds: canvasBounds }
+    );
+    if (resolved.kind !== 'group-resize') throw new Error('Expected group-resize session.');
+
+    expect(resolved.guides).toContainEqual({ orientation: 'vertical', position: 470 });
+    const commit = buildInteractionCommit(resolved, {
+      orderedItems: [first, second],
+      pointer: { x: 462, y: 462 },
+      canvasBounds,
+    });
+    if (commit.kind !== 'group') throw new Error('Expected group commit.');
+    const b = commit.selectionFrame!.bounds;
+    // Right edge snapped to the guide (width 370) and height scaled to match.
+    expect(b.width).toBeCloseTo(370, 1);
+    expect(b.width / b.height).toBeCloseTo(1, 3);
+  });
+
+  it('keeps the group aspect ratio locked when a proportional resize snaps a horizontal guide', () => {
+    // Mirror of the vertical case: the bottom edge (y=462) snaps to a sibling's
+    // top edge at y=470 while the right edge is out of range, so the width must
+    // scale to match the snapped height.
+    const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 100, height: 100 });
+    const second = createRectangleItem({ id: 'second', x: 200, y: 200, width: 100, height: 100 });
+    const sibling = createRectangleItem({ id: 'guide', x: 700, y: 470, width: 40, height: 40 });
+    const frame: SelectionFrame = { bounds: { x: 100, y: 100, width: 200, height: 200 }, rotation: 0 };
+    const session = createGroupResizeSession('bottom-right', { x: 300, y: 300 }, {
+      selectedItems: [first, second],
+      siblingItems: [sibling],
+      activeSelectionFrame: frame,
+    });
+    if (!session) throw new Error('Expected group resize session.');
+
+    const withShift = { ...session, shiftConstrain: true };
+    const resolved = resolveInteractionSession(
+      withShift,
+      { x: 462, y: 462 },
+      { stageBounds: canvasBounds }
+    );
+    if (resolved.kind !== 'group-resize') throw new Error('Expected group-resize session.');
+
+    expect(resolved.guides).toContainEqual({ orientation: 'horizontal', position: 470 });
+    const commit = buildInteractionCommit(resolved, {
+      orderedItems: [first, second],
+      pointer: { x: 462, y: 462 },
+      canvasBounds,
+    });
+    if (commit.kind !== 'group') throw new Error('Expected group commit.');
+    const b = commit.selectionFrame!.bounds;
+    expect(b.height).toBeCloseTo(370, 1);
+    expect(b.width / b.height).toBeCloseTo(1, 3);
+  });
+
   it('snaps group drag using AABB when frame is rotated', () => {
     // Two items at different positions, with a rotated selection frame.
     // The frame rotation means current.bounds is NOT the AABB.
