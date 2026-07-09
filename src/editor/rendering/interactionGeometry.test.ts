@@ -608,6 +608,69 @@ describe('interaction geometry', () => {
     expect(withShift.item.height).toBeCloseTo(withoutShift.item.height, 5);
   });
 
+  it('keeps the aspect ratio locked when a proportional corner resize snaps its vertical edge', () => {
+    // 2:1 rect. Drag the bottom-right corner proportionally so the moving corner
+    // lands at stage (400, 250): right edge x=400, bottom edge y=250. A sibling's
+    // left edge sits at x=404 (4px from the right edge → snaps), while nothing is
+    // within tolerance of the bottom edge. Snapping only the right edge must scale
+    // the height too, or the locked ratio breaks across the snap band.
+    const item = createRectangleItem({ x: 100, y: 100, width: 200, height: 100 });
+    const sibling = createRectangleItem({ x: 404, y: 500, width: 100, height: 50 });
+    const result = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: 400, y: 250 },
+      { x: 0, y: 0 },
+      [sibling],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      undefined,
+      undefined,
+      true // shiftConstrain
+    );
+
+    // Right edge snapped 400 → 404 (width 300 → 304) and height scaled to match.
+    expect(result.item.width).toBeCloseTo(304, 3);
+    expect(result.item.height).toBeCloseTo(152, 3);
+    expect(result.item.width / result.item.height).toBeCloseTo(2, 5);
+    expect(result.item.x).toBeCloseTo(100, 3);
+    expect(result.item.y).toBeCloseTo(100, 3);
+    expect(result.guides).toEqual(
+      expect.arrayContaining([{ orientation: 'vertical', position: 404 }])
+    );
+  });
+
+  it('keeps the aspect ratio locked when a proportional corner resize snaps its horizontal edge', () => {
+    // Same 2:1 rect, dragged so the bottom-right corner lands at stage (700, 400).
+    // A sibling's top edge sits at y=404 (4px from the bottom edge → snaps) while
+    // the right edge (x=700) is out of range of every vertical guide. Snapping the
+    // bottom edge must scale the width proportionally.
+    const item = createRectangleItem({ x: 100, y: 100, width: 200, height: 100 });
+    const sibling = createRectangleItem({ x: 50, y: 404, width: 60, height: 40 });
+    const result = solveResizeSession(
+      item,
+      'bottom-right',
+      { x: 700, y: 400 },
+      { x: 0, y: 0 },
+      [sibling],
+      { x: 0, y: 0, width: 1200, height: 600 },
+      true,
+      undefined,
+      undefined,
+      true // shiftConstrain
+    );
+
+    // Bottom edge snapped 400 → 404 (height 300 → 304) and width scaled to match.
+    expect(result.item.height).toBeCloseTo(304, 3);
+    expect(result.item.width).toBeCloseTo(608, 3);
+    expect(result.item.width / result.item.height).toBeCloseTo(2, 5);
+    expect(result.item.x).toBeCloseTo(100, 3);
+    expect(result.item.y).toBeCloseTo(100, 3);
+    expect(result.guides).toEqual(
+      expect.arrayContaining([{ orientation: 'horizontal', position: 404 }])
+    );
+  });
+
   it('identifies the supported creation tools explicitly', () => {
     expect(isCreateTool('text')).toBe(true);
     expect(isCreateTool('rectangle')).toBe(true);
