@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import { expect, test } from '@playwright/test';
@@ -454,5 +455,70 @@ test.describe('editor file and persistence flows', () => {
     await clickItem(page, 'persisted-group-rect');
     await openPropertiesTab(page);
     await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
+  });
+});
+
+// A dark-mode viewer: colorScheme is set at context creation (its own,
+// non-serial context) so the SVG's prefers-color-scheme media query resolves
+// against a genuine dark preference — exactly like a user whose OS is in dark
+// mode. (page.emulateMedia is avoided: it force-pins the media feature and
+// ignores the color-scheme override the fix relies on, which real Chromium
+// honours.)
+test.describe('imported SVGs under a dark-mode viewer', () => {
+  test.use({ colorScheme: 'dark' });
+
+  test('render their light appearance instead of a black rectangle', async ({ page }) => {
+    await openFreshEditor(page);
+
+    // An SVG rendered through <img> evaluates prefers-color-scheme against the
+    // viewer's theme, so an import with dark-mode style rules would otherwise
+    // paint its dark variant — here a solid black fill. Imports must rasterize
+    // deterministically at their default (light) look.
+    await uploadSvgImage(
+      page,
+      'dark-media.svg',
+      '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">' +
+        '<style>.p{fill:#ff00ff}@media (prefers-color-scheme: dark){.p{fill:#000}}</style>' +
+        '<rect class="p" width="200" height="200"/></svg>',
+    );
+    await expect
+      .poll(async () => (await readStageDebug(page)).renderedItemCount)
+      .toBeGreaterThanOrEqual(1);
+
+    const download = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const buffer = await fs.readFile(await download.path());
+    const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+
+    // The exported item pixels must be the light magenta, not the dark black.
+    const scan = await page.evaluate(async (url) => {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('failed to decode exported png'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let magenta = 0;
+      let opaqueBlack = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+        if (a > 200 && r > 200 && b > 200 && g < 80) magenta++;
+        if (a > 200 && r < 40 && g < 40 && b < 40) opaqueBlack++;
+      }
+      return { magenta, opaqueBlack };
+    }, dataUrl);
+
+    expect(scan.magenta).toBeGreaterThan(0);
+    expect(scan.opaqueBlack).toBe(0);
   });
 });
