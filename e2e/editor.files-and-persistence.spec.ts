@@ -27,6 +27,7 @@ import {
   uploadProject,
   uploadSvgImage,
   waitForEditor,
+  waitForStartupToFinish,
 } from './support/editor';
 import {
   expectPersistedCanvasFontFiles,
@@ -268,6 +269,7 @@ test.describe('editor file and persistence flows', () => {
   // was then drawn with the remaining file, without any missing-font warning.
   test('reload keeps every file of an uploaded font family that the canvas uses', async ({ page }) => {
     await openFreshEditor(page);
+    await waitForStartupToFinish(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'font-family-text' })]),
@@ -293,6 +295,7 @@ test.describe('editor file and persistence flows', () => {
 
   test('reload keeps a font file imported after its family was already in use', async ({ page }) => {
     await openFreshEditor(page);
+    await waitForStartupToFinish(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'late-font-text' })]),
@@ -326,6 +329,7 @@ test.describe('editor file and persistence flows', () => {
   test('reload keeps a font that was imported before startup had finished', async ({ page }) => {
     const project = createProjectDocument([createTextFixture({ id: 'early-import-text' })]);
     await openFreshEditor(page);
+    await waitForStartupToFinish(page);
     await uploadProject(page, project, 'early-import-project.json');
     await selectTextLayerInProperties(page);
     await importUnusedFont(page);

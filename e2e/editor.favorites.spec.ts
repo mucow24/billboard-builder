@@ -14,6 +14,7 @@ import {
   openPropertiesTab,
   openFavoritesTab,
   waitForEditor,
+  waitForStartupToFinish,
   uploadProject,
 } from './support/editor';
 import {
@@ -321,6 +322,7 @@ test.describe('editor favorite library flows', () => {
   // family's other files were deleted on reload and could not be restored.
   test('TL-09 lazily restores every file of a favorite-only uploaded font family after reload', async ({ page }) => {
     await openFreshEditor(page);
+    await waitForStartupToFinish(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'favorite-family-text' })]),
@@ -357,6 +359,9 @@ test.describe('editor favorite library flows', () => {
 
     await page.reload();
     await waitForEditor(page);
+    // Startup replaces the canvas with the saved one when it finishes, which would
+    // discard a favorite inserted before then.
+    await waitForStartupToFinish(page);
     await openFavoritesTab(page);
     await page.getByRole('button', { name: 'Insert Text:Integration text' }).click();
     await openPropertiesTab(page);
