@@ -384,7 +384,244 @@ function expectWholeAndInPlace(reports: CaseReport[], { pixelForPixel }: { pixel
   }
 }
 
+/**
+ * A drop shadow is drawn into the same texture as the text. The texture grows by
+ * the length of the shadow's offset, to the right and downwards, whatever the
+ * shadow's direction and blur, so a shadow thrown up or left, or a blurred one,
+ * falls outside it. Each layer here is an upright "H", whose own ink stays inside
+ * the box, with a shadow that leaves it on the sides named.
+ */
+interface ShadowCase {
+  id: string;
+  leaves: Side[];
+  blur: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+const SHADOW_CASES: ShadowCase[] = [
+  { id: 'shadow down and right', leaves: ['right'], blur: 16, offsetX: 10, offsetY: 10 },
+  { id: 'shadow up and left', leaves: ['left', 'top'], blur: 12, offsetX: -16, offsetY: -16 },
+  { id: 'blurred shadow, no offset', leaves: ['left', 'right'], blur: 12, offsetX: 0, offsetY: 0 },
+];
+const SHADOW_TEXT = { text: 'H', fontFamily: 'Futura Light Condensed', fontSize: 100, color: '#ff0000' };
+const SHADOW_PLACED = SHADOW_CASES.map((entry, index) => ({
+  ...entry,
+  cell: { x: index * CELL.width, y: 0 },
+}));
+const SHADOW_CANVAS = { width: SHADOW_CASES.length * CELL.width, height: CELL.height };
+
+function buildShadowDocument() {
+  return {
+    ...createProjectDocument(
+      SHADOW_PLACED.map((entry, index) =>
+        createTextFixture({
+          id: `shadow-case-${index}`,
+          name: entry.id,
+          zIndex: index + 1,
+          text: SHADOW_TEXT.text,
+          fontFamily: SHADOW_TEXT.fontFamily,
+          fontSize: SHADOW_TEXT.fontSize,
+          lineHeight: LINE_HEIGHT,
+          x: entry.cell.x + BOX.dx,
+          y: entry.cell.y + BOX.dy,
+          width: BOX.width,
+          height: BOX.height,
+          shadow: {
+            color: SHADOW_TEXT.color,
+            blur: entry.blur,
+            offsetX: entry.offsetX,
+            offsetY: entry.offsetY,
+            opacity: 1,
+          },
+        }),
+      ),
+    ),
+    canvas: SHADOW_CANVAS,
+  };
+}
+
+interface ShadowReport {
+  id: string;
+  /** How far the expected shadow reaches past the texture the canvas sizes for it, per side, in px. */
+  reach: Record<Side, number>;
+  /** Clearly visible in the expected render, absent from the canvas. */
+  missing: number;
+  missingAt: string;
+  /** Clearly visible on the canvas, absent from the expected render. */
+  displaced: number;
+  /** Anything at all in the expected render, down to its faint outer edge, where the canvas has nothing. */
+  cutOff: number;
+  /** Bounds [left, top, right, bottom] of everything visible, measured from the layer's top left corner. */
+  canvasBounds: number[] | null;
+  expectedBounds: number[] | null;
+}
+
+/**
+ * Compare the exported canvas with the same text and shadow drawn by a 2D canvas
+ * that has room on every side.
+ */
+async function compareShadowsWithRoomyRender(page: Page): Promise<ShadowReport[]> {
+  const download = await captureDownload(page, async () => {
+    await clickToolbarPopoverItem(page, 'Export', 'PNG');
+  });
+  const png = await fs.readFile(await download.path());
+
+  return page.evaluate(
+    async ({ pngBase64, placed, cell, boxOffset, text, lineHeightFactor }) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${pngBase64}`;
+      await image.decode();
+      const exported = document.createElement('canvas');
+      exported.width = image.naturalWidth;
+      exported.height = image.naturalHeight;
+      const exportedContext = exported.getContext('2d', { willReadFrequently: true })!;
+      exportedContext.drawImage(image, 0, 0);
+
+      return placed.map((entry) => {
+        const roomy = document.createElement('canvas');
+        roomy.width = cell.width;
+        roomy.height = cell.height;
+        const context = roomy.getContext('2d', { willReadFrequently: true })!;
+        context.font = `${text.fontSize}px ${JSON.stringify(text.fontFamily)}`;
+
+        // Where the canvas puts the line, as in the comparison above.
+        const fontInk = context.measureText('|ÉqÅM');
+        const ascent = fontInk.actualBoundingBoxAscent;
+        const descent = fontInk.actualBoundingBoxDescent;
+        const lineHeight = text.fontSize * lineHeightFactor;
+        const baseline = boxOffset.y + ascent + Math.max(0, (lineHeight - (ascent + descent)) / 2);
+
+        // The shadow alone first, then the text over it: the canvas draws the
+        // text far above the texture for the first pass, so that only its
+        // shadow lands inside.
+        const lift = cell.height * 4;
+        context.fillStyle = '#000000';
+        context.shadowColor = text.color;
+        context.shadowBlur = entry.blur;
+        context.shadowOffsetX = entry.offsetX;
+        context.shadowOffsetY = entry.offsetY + lift;
+        context.fillText(text.text, boxOffset.x, baseline - lift);
+        context.shadowColor = 'rgba(0,0,0,0)';
+        context.fillStyle = '#ffffff';
+        context.fillText(text.text, boxOffset.x, baseline);
+
+        // The texture the canvas sizes for this text: its advance box, grown by
+        // the length of the shadow's offset.
+        const metrics = context.measureText(text.text);
+        const distance = Math.hypot(entry.offsetX, entry.offsetY);
+        const texture = {
+          width: Math.ceil(
+            Math.max(metrics.width, metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) + distance,
+          ),
+          height: Math.ceil(Math.max(lineHeight, ascent + descent) + distance),
+        };
+
+        const canvasPixels = exportedContext.getImageData(entry.cell.x, entry.cell.y, cell.width, cell.height).data;
+        const expectedPixels = context.getImageData(0, 0, cell.width, cell.height).data;
+
+        const noBounds = () => ({ left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity, count: 0 });
+        const include = (bounds: ReturnType<typeof noBounds>, x: number, y: number) => {
+          bounds.count += 1;
+          bounds.left = Math.min(bounds.left, x);
+          bounds.top = Math.min(bounds.top, y);
+          bounds.right = Math.max(bounds.right, x + 1);
+          bounds.bottom = Math.max(bounds.bottom, y + 1);
+        };
+        const list = (bounds: ReturnType<typeof noBounds>) =>
+          bounds.count === 0
+            ? null
+            : [bounds.left - boxOffset.x, bounds.top - boxOffset.y, bounds.right - boxOffset.x, bounds.bottom - boxOffset.y];
+
+        const canvasShown = noBounds();
+        const expectedShown = noBounds();
+        const expectedAny = noBounds();
+        const missing = noBounds();
+        const displaced = noBounds();
+        let cutOff = 0;
+        // The two renders blur with different code, which differs by a level or
+        // two of alpha: "visible" and "absent" leave a gap wider than that.
+        const VISIBLE = 32;
+        const ABSENT = 8;
+        const SHOWN = 16;
+        const FAINT = 4;
+        for (let y = 0; y < cell.height; y += 1) {
+          for (let x = 0; x < cell.width; x += 1) {
+            const alphaAt = (y * cell.width + x) * 4 + 3;
+            const onCanvas = canvasPixels[alphaAt];
+            const expected = expectedPixels[alphaAt];
+            if (onCanvas >= SHOWN) include(canvasShown, x, y);
+            if (expected >= SHOWN) include(expectedShown, x, y);
+            if (expected > 0) include(expectedAny, x, y);
+            if (expected >= VISIBLE && onCanvas <= ABSENT) include(missing, x, y);
+            if (onCanvas >= VISIBLE && expected <= ABSENT) include(displaced, x, y);
+            if (expected >= FAINT && onCanvas === 0) cutOff += 1;
+          }
+        }
+
+        const any = list(expectedAny) ?? [0, 0, 0, 0];
+        return {
+          id: entry.id,
+          reach: {
+            left: -any[0],
+            top: -any[1],
+            right: any[2] - texture.width,
+            bottom: any[3] - texture.height,
+          },
+          missing: missing.count,
+          missingAt: JSON.stringify(list(missing)),
+          displaced: displaced.count,
+          cutOff,
+          canvasBounds: list(canvasShown),
+          expectedBounds: list(expectedShown),
+        };
+      });
+    },
+    {
+      pngBase64: png.toString('base64'),
+      placed: SHADOW_PLACED,
+      cell: CELL,
+      boxOffset: { x: BOX.dx, y: BOX.dy },
+      text: SHADOW_TEXT,
+      lineHeightFactor: LINE_HEIGHT,
+    },
+  );
+}
+
 test.describe('text rendering on the canvas', () => {
+  test('geometry: shows the whole drop shadow where it falls outside the text', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForStartupAndFonts(page);
+    await uploadProject(page, buildShadowDocument(), 'text-shadow.json');
+
+    // The canvas fits the window below 100%, where text is rasterised at its own size.
+    expect((await readStageDebug(page)).viewport.zoom).toBeLessThanOrEqual(1);
+
+    for (const report of await compareShadowsWithRoomyRender(page)) {
+      const entry = SHADOW_CASES.find((candidate) => candidate.id === report.id)!;
+      const bounds =
+        `canvas shows ${JSON.stringify(report.canvasBounds)}, expected ${JSON.stringify(report.expectedBounds)} ` +
+        `(left, top, right, bottom from the layer's corner)`;
+
+      // The case is only worth anything while its shadow really leaves the texture.
+      for (const side of entry.leaves) {
+        expect.soft(report.reach[side], `${report.id}: the shadow leaves the texture on the ${side}`).toBeGreaterThan(2);
+      }
+
+      expect
+        .soft(report.missing, `${report.id}: shadow missing from the canvas at ${report.missingAt}; ${bounds}`)
+        .toBe(0);
+      expect.soft(report.cutOff, `${report.id}: the faint edge of the shadow is cut off; ${bounds}`).toBe(0);
+      expect.soft(report.displaced, `${report.id}: canvas shows shadow or ink where none is expected; ${bounds}`).toBe(0);
+
+      const furthestEdge =
+        report.canvasBounds && report.expectedBounds
+          ? Math.max(...report.canvasBounds.map((edge, index) => Math.abs(edge - report.expectedBounds![index])))
+          : Infinity;
+      expect.soft(furthestEdge, `${report.id}: an edge is off by more than a pixel; ${bounds}`).toBeLessThanOrEqual(1);
+    }
+  });
+
   test('geometry: shows the whole glyph where its ink leaves the advance box', async ({ page }) => {
     await openFreshEditor(page);
     await waitForStartupAndFonts(page);
