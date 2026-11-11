@@ -46,7 +46,6 @@ export interface PropertiesPanelProps {
 }
 
 export interface LayersInspectorTabProps {
-  canReorder: boolean;
   collapsedGroupIds: ReadonlySet<string>;
   rows: LayerRow[];
   onDeleteNode: (nodeId: string) => void;

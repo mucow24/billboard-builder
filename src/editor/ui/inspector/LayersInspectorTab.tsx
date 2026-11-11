@@ -15,7 +15,6 @@ import {
   getVisibleLayerRows,
   resolveDropDepth,
 } from './layersTabModel';
-import { InspectorRailIconButton } from './InspectorRailIconButton';
 import { useListReorder } from './useListReorder';
 import type { LayersInspectorTabProps } from './types';
 
@@ -33,7 +32,6 @@ const GRIP_ICON = (
 );
 
 export function LayersInspectorTab({
-  canReorder,
   collapsedGroupIds,
   rows,
   onDeleteNode,
@@ -65,7 +63,7 @@ export function LayersInspectorTab({
   const handleReorder = useCallback(
     (fromIndex: number, rawGapIndex: number, ptrX: number | null) => {
       if (ptrX === null) {
-        // Keyboard reorder: use existing toolbar-style reorder
+        // Keyboard reorder: one step, same as the toolbar's Move up / Move down
         onReorder(rawGapIndex < fromIndex ? 'forward' : 'backward');
         return;
       }
@@ -114,83 +112,9 @@ export function LayersInspectorTab({
       relativeX,
     );
   }, [dragIndex, dropTargetIndex, pointerX, visibleRows]);
-  function renderReorderIcon(kind: 'front' | 'forward' | 'backward' | 'back') {
-    switch (kind) {
-      case 'front':
-        return (
-          <svg viewBox="0 0 12 12" aria-hidden="true">
-            <path d="M2 2.5h8" />
-            <path d="M6 8.5v-4.5" />
-            <path d="M4.25 5.75 6 4l1.75 1.75" />
-          </svg>
-        );
-      case 'forward':
-        return (
-          <svg viewBox="0 0 12 12" aria-hidden="true">
-            <path d="M6 2.5v7" />
-            <path d="M3.5 4.5 6 2l2.5 2.5" />
-          </svg>
-        );
-      case 'backward':
-        return (
-          <svg viewBox="0 0 12 12" aria-hidden="true">
-            <path d="M6 2.5v7" />
-            <path d="M3.5 7.5 6 10l2.5-2.5" />
-          </svg>
-        );
-      case 'back':
-        return (
-          <svg viewBox="0 0 12 12" aria-hidden="true">
-            <path d="M2 9.5h8" />
-            <path d="M6 3.5v4.5" />
-            <path d="M4.25 6.25 6 8l1.75-1.75" />
-          </svg>
-        );
-    }
-  }
 
   return (
     <>
-      <div className="inspector-rail-toolbar">
-        <div
-          className="inspector-rail-toolbar-group"
-          role="group"
-          aria-label="Layer order controls"
-        >
-          <InspectorRailIconButton
-            label="Move to top"
-            disabled={!canReorder}
-            title="Move to top"
-            onClick={() => onReorder('front')}
-          >
-            {renderReorderIcon('front')}
-          </InspectorRailIconButton>
-          <InspectorRailIconButton
-            label="Move up"
-            disabled={!canReorder}
-            title="Move up"
-            onClick={() => onReorder('forward')}
-          >
-            {renderReorderIcon('forward')}
-          </InspectorRailIconButton>
-          <InspectorRailIconButton
-            label="Move down"
-            disabled={!canReorder}
-            title="Move down"
-            onClick={() => onReorder('backward')}
-          >
-            {renderReorderIcon('backward')}
-          </InspectorRailIconButton>
-          <InspectorRailIconButton
-            label="Move to bottom"
-            disabled={!canReorder}
-            title="Move to bottom"
-            onClick={() => onReorder('back')}
-          >
-            {renderReorderIcon('back')}
-          </InspectorRailIconButton>
-        </div>
-      </div>
       <div
         className="layer-list layer-list-tabbed"
         data-testid="layers-layer-list"

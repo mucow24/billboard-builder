@@ -15,7 +15,7 @@ import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
 import { FontImportProvider } from './editor/ui/FontImportContext';
 import type { GuideLine } from './editor/document/documentTypes';
-import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
+import { canGroupNodes, canReorderNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
 /**
  * The editor appears once startup has put the saved canvas in place, and the
@@ -156,6 +156,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             canvas={document.canvas}
             canDelete={selectedNodeIds.length > 0}
             canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
+            canReorder={canReorderNodes(document.nodes, selectedNodeIds)}
             canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
             canUndo={canUndo}
             canRedo={canRedo}
@@ -190,6 +191,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
               });
             }}
             onRedo={redo}
+            onReorder={reorderSelectedNode}
             onSave={handleSave}
             onSaveFavorite={() => {
               if (saveSelectionAsFavorite()) {

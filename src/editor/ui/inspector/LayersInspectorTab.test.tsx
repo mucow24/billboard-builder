@@ -23,7 +23,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([backItem, frontItem])}
         onDeleteNode={onDeleteNode}
         onOpenProperties={vi.fn()}
@@ -53,20 +52,17 @@ describe('LayersInspectorTab', () => {
     expect(onSelectNode).toHaveBeenCalledTimes(1);
   });
 
-  it('opens properties on double-click and wires layer reorder controls', async () => {
-    const user = userEvent.setup();
+  it('opens properties on double-click', () => {
     const onOpenProperties = vi.fn();
-    const onReorder = vi.fn();
     const onSelectNode = vi.fn();
     const item = createRectangleItem();
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
         onOpenProperties={onOpenProperties}
-        onReorder={onReorder}
+        onReorder={vi.fn()}
         onSelectNode={onSelectNode}
         onToggleNode={vi.fn()}
         onToggleNodeLocked={vi.fn()}
@@ -80,23 +76,13 @@ describe('LayersInspectorTab', () => {
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Rectangle' }));
     expect(onSelectNode).toHaveBeenCalledWith(item.id);
     expect(onOpenProperties).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('group', { name: 'Layer order controls' })).toHaveClass(
-      'inspector-rail-toolbar-group',
-    );
-    expect(screen.getByRole('button', { name: 'Move to top' })).toHaveClass(
-      'inspector-rail-icon-button',
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Move to top' }));
-    expect(onReorder).toHaveBeenCalledWith('front');
   });
 
-  it('disables reorder controls without a selection', () => {
+  it('leaves the layer order buttons to the top toolbar', () => {
     const item = createRectangleItem();
 
     render(
       <LayersInspectorTab
-        canReorder={false}
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -107,11 +93,11 @@ describe('LayersInspectorTab', () => {
         onToggleNodeHidden={vi.fn()}
         collapsedGroupIds={new Set()}
         onToggleGroupCollapse={vi.fn()}
-        selectedNodeIds={[]}
+        selectedNodeIds={[item.id]}
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Move to top' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /^Move / })).not.toBeInTheDocument();
   });
 
   it('renders an image thumbnail preview for image rows instead of the fallback glyph', () => {
@@ -124,7 +110,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -156,7 +141,6 @@ describe('LayersInspectorTab', () => {
 
     const { container, rerender } = render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -181,7 +165,6 @@ describe('LayersInspectorTab', () => {
 
     rerender(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -201,7 +184,6 @@ describe('LayersInspectorTab', () => {
 
     rerender(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -228,7 +210,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -256,7 +237,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -284,7 +264,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group, topLevelItem])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -311,7 +290,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -340,7 +318,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -373,7 +350,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -405,7 +381,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -441,7 +416,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -467,7 +441,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([a, b])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
@@ -494,7 +467,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        canReorder
         rows={flattenLayerRows([rect, gen as unknown as CanvasNode])}
         onDeleteNode={vi.fn()}
         onOpenProperties={vi.fn()}
