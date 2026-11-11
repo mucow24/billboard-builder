@@ -9,8 +9,8 @@ import { gotoEditor, waitForEditor } from './support/editor';
 // Two bundled files whose names parse to the same family, weight and style
 // ("Futura", regular, upright). They are different designs with different glyph
 // widths, and the browser renders the family with whichever face it was given last.
-// The test needs such a pair in the bundled set: without one it has nothing to
-// exercise, and the loader's unit tests are what pins the registration order.
+// These tests need such a pair in the bundled set: without one they have nothing
+// to exercise, and the loader's unit tests are what pins the registration order.
 const FAMILY = 'Futura';
 const SAME_VARIANT_FILES = ['Futura Book.otf', 'Futura Regular.ttf'];
 
