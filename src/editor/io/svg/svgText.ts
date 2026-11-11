@@ -8,7 +8,7 @@ import {
   itemFilterDef,
   wrapItem,
 } from './svgPrimitives';
-import type { SvgExportDeps, SvgExportWarning } from './svgExportTypes';
+import type { SvgExportDeps, SvgExportWarning, TextMeasurer } from './svgExportTypes';
 
 /**
  * Serialize a text item as glyph outlines (`<path>`). Layout — wrap, glyph
@@ -41,7 +41,9 @@ export function textSvg(
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
   const measure = (text: string) => deps.measurer.measureWidth(item, text);
 
-  const lines = layoutWrappedText(item, contentWidth, measure);
+  const lines = layoutWrappedText(item, contentWidth, measure).map((tokens) =>
+    drawnLine(tokens.join(''), item, deps.measurer),
+  );
   const lineHeight = item.fontSize * item.lineHeight;
   const measuredHeight = lines.length * lineHeight;
   const contentHeight = box.height - item.padding.top - item.padding.bottom;
@@ -56,24 +58,26 @@ export function textSvg(
   const ascent = deps.measurer.fontAscent(item);
   const glyphPaths: string[] = [];
 
-  lines.forEach((tokens, lineIndex) => {
-    const lineText = tokens.join('');
-    if (lineText.length === 0) return;
+  // Pixi aligns lines inside the box, or inside the widest line when one does not
+  // fit the box (`alignWidth` in `CanvasTextGenerator._renderTextToCanvas`): the
+  // widest line then starts at the box's left edge whatever the alignment.
+  const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
+
+  lines.forEach((line, lineIndex) => {
+    if (line.text.length === 0) return;
 
     const baselineY = textTop + lineIndex * lineHeight + ascent;
-    const textWidth = measure(lineText);
-    const lineWidth = textWidth + Math.max(lineText.length - 1, 0) * item.letterSpacing;
 
     let lineLeft = item.padding.left;
     if (item.align === 'center') {
-      lineLeft += (contentWidth - lineWidth) / 2;
+      lineLeft += (alignWidth - line.width) / 2;
     } else if (item.align === 'right') {
-      lineLeft += contentWidth - lineWidth;
+      lineLeft += alignWidth - line.width;
     }
 
     // Ligatures and other glyphs the font puts in place of characters; see svgTextGlyphs.
-    const substitutions = lineSubstitutions(font, lineText, item.letterSpacing);
-    kernedOffsets(lineText, textWidth, measure).forEach(({ ch, offset }, index) => {
+    const substitutions = lineSubstitutions(font, line.text, item.letterSpacing);
+    kernedOffsets(line.text, line.advance, measure).forEach(({ ch, offset }, index) => {
       const penX = lineLeft + offset + index * item.letterSpacing;
       const path = glyphsPath(font, substitutions?.[index] ?? ch, item.fontSize, penX, baselineY);
       if (path) glyphPaths.push(path);
@@ -86,6 +90,68 @@ export function textSvg(
   const pathEl = `<path d="${glyphPaths.join(' ')}" ${fillAttr}/>`;
   const filterAttr = pushTextFilter(item, defs);
   return wrapItem(item, effectiveOpacity, pathEl, filterAttr);
+}
+
+/** One line of a text item, as the canvas draws it. */
+interface DrawnLine {
+  /** The line without the spaces the canvas takes off its end. */
+  text: string;
+  /** Measured width of `text`: kerning included, letter spacing left out. */
+  advance: number;
+  /** The width the canvas aligns the line by. */
+  width: number;
+}
+
+/**
+ * The spaces Pixi takes off the end of a line, by character code: the characters
+ * it breaks lines at (`BREAKING_SPACES` in pixi.js
+ * `scene/text/canvas/utils/textTokenization`). No-break spaces (U+00A0, U+2007,
+ * U+202F) are not among them, so they stay on the line and keep their width.
+ */
+const BREAKING_SPACES = new Set([
+  0x0009, // tab
+  0x0020, // space
+  0x2000, // en quad
+  0x2001, // em quad
+  0x2002, // en space
+  0x2003, // em space
+  0x2004, // three-per-em space
+  0x2005, // four-per-em space
+  0x2006, // six-per-em space
+  0x2008, // punctuation space
+  0x2009, // thin space
+  0x200a, // hair space
+  0x205f, // medium mathematical space
+  0x3000, // ideographic space
+]);
+
+function withoutTrailingSpaces(text: string): string {
+  let end = text.length;
+  while (end > 0 && BREAKING_SPACES.has(text.charCodeAt(end - 1))) end -= 1;
+  return text.slice(0, end);
+}
+
+/**
+ * Turn a line as `layoutWrappedText` laid it out into the line the canvas draws
+ * and aligns.
+ *
+ * `layoutWrappedText` keeps the space a line wraps at on that line, along with
+ * any spaces the text has before a line break or at its end. Pixi (`wordWrap` in
+ * pixi.js `scene/text/canvas/utils`) takes the spaces off the end of every line
+ * before it measures and draws it. Spaces at the start of a paragraph stay: the
+ * canvas text style sets `whiteSpace: 'pre'`, under which Pixi keeps them.
+ *
+ * Pixi then aligns the line by the larger of its advance width and its ink
+ * width, plus the letter spacing between its characters
+ * (`CanvasTextMetrics._measureText`). The ink is the wider one when a glyph at
+ * either end reaches past its advance, as slanted and swashed glyphs do.
+ */
+function drawnLine(laidOutText: string, item: TextCanvasItem, measurer: TextMeasurer): DrawnLine {
+  const text = withoutTrailingSpaces(laidOutText);
+  const advance = measurer.measureWidth(item, text);
+  const ink = measurer.measureInkWidth?.(item, text) ?? 0;
+  const spacing = Math.max(text.length - 1, 0) * item.letterSpacing;
+  return { text, advance, width: Math.max(advance, ink) + spacing };
 }
 
 /**

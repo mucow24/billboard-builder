@@ -404,6 +404,219 @@ describe('documentToSvg — text kerning', () => {
   });
 });
 
+describe('documentToSvg — text line alignment', () => {
+  // Where the canvas (Pixi) puts a right-aligned or centred line: it takes the
+  // spaces off the end of the line, measures what is left, and aligns that inside
+  // the box. In the fake font every character advances 10px, spaces included, and
+  // every glyph is 10px wide, so a line that ends at the box edge has its last
+  // glyph 10px before it.
+  const noPadding = { top: 0, right: 0, bottom: 0, left: 0 };
+
+  /** Pen X of every glyph, one array per line from the top. */
+  function pensByLine(overrides: Partial<TextCanvasItem>, measurer?: TextMeasurer): number[][] {
+    const { svg } = documentToSvg(
+      docWith({ nodes: [createTextItem(overrides)] }),
+      makeSvgDeps(measurer ? { measurer } : {}),
+    );
+    const lines = new Map<number, number[]>();
+    for (const { penX, baselineY } of glyphPositions(svg)) {
+      lines.set(baselineY, [...(lines.get(baselineY) ?? []), penX]);
+    }
+    return [...lines.entries()].sort(([a], [b]) => a - b).map(([, pens]) => pens);
+  }
+
+  describe('a wrapped paragraph', () => {
+    // "AAAA BBBB" wraps after the space: the first line is "AAAA " as laid out and
+    // "AAAA" as drawn. With letterSpacing 2 a four-letter line is 46px wide.
+    const wrapped = [
+      { letterSpacing: 0, width: 60 },
+      { letterSpacing: 2, width: 70 },
+    ];
+
+    it.each([
+      { ...wrapped[0], line: [20, 30, 40, 50] },
+      { ...wrapped[1], line: [24, 36, 48, 60] },
+    ])(
+      'ends every right-aligned line on its last letter (letterSpacing $letterSpacing)',
+      ({ letterSpacing, width, line }) => {
+        const pens = pensByLine({
+          text: 'AAAA BBBB',
+          align: 'right',
+          letterSpacing,
+          width,
+          padding: noPadding,
+        });
+        // Both lines have four letters, so both end at the box edge. Measured with
+        // its trailing space, the first line would stop a space (and a letter
+        // spacing) short of it.
+        expect(pens).toEqual([line, line]);
+        expect(line[3] + 10).toBe(width);
+      },
+    );
+
+    it.each([
+      { ...wrapped[0], line: [10, 20, 30, 40] },
+      { ...wrapped[1], line: [12, 24, 36, 48] },
+    ])(
+      'centres every centred line on its letters (letterSpacing $letterSpacing)',
+      ({ letterSpacing, width, line }) => {
+        const pens = pensByLine({
+          text: 'AAAA BBBB',
+          align: 'center',
+          letterSpacing,
+          width,
+          padding: noPadding,
+        });
+        expect(pens).toEqual([line, line]);
+        expect((line[0] + line[3] + 10) / 2).toBe(width / 2);
+      },
+    );
+
+    it.each([
+      { ...wrapped[0], line: [0, 10, 20, 30] },
+      { ...wrapped[1], line: [0, 12, 24, 36] },
+    ])(
+      'leaves left-aligned lines where they were (letterSpacing $letterSpacing)',
+      ({ letterSpacing, width, line }) => {
+        const pens = pensByLine({
+          text: 'AAAA BBBB',
+          align: 'left',
+          letterSpacing,
+          width,
+          padding: noPadding,
+        });
+        expect(pens).toEqual([line, line]);
+      },
+    );
+  });
+
+  describe('spaces at the ends of a line', () => {
+    it('ignores spaces before a line break and at the end of the text', () => {
+      // Box 320 wide; "AB" and "CD" are 20px wide.
+      expect(pensByLine({ text: 'AB  \nCD   ', align: 'right' })).toEqual([
+        [300, 310],
+        [300, 310],
+      ]);
+      expect(pensByLine({ text: 'AB  \nCD   ', align: 'center' })).toEqual([
+        [150, 160],
+        [150, 160],
+      ]);
+    });
+
+    it('keeps the spaces a line starts with as part of the line', () => {
+      // "  AB" is 40px wide and its letters are the last two characters.
+      expect(pensByLine({ text: '  AB', align: 'right' })).toEqual([[300, 310]]);
+      expect(pensByLine({ text: '  AB', align: 'center' })).toEqual([[160, 170]]);
+      expect(pensByLine({ text: '  AB  ', align: 'left' })).toEqual([[20, 30]]);
+    });
+
+    const named = (spaces: string[]) =>
+      spaces.map((space) => ({
+        space,
+        name: `U+${space.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`,
+      }));
+
+    // Every character Pixi breaks lines at (BREAKING_SPACES in pixi.js
+    // scene/text/canvas/utils/textTokenization), which are the ones it takes off
+    // a line's end.
+    it.each(
+      named([
+        '\t',
+        ' ',
+        '\u2000',
+        '\u2001',
+        '\u2002',
+        '\u2003',
+        '\u2004',
+        '\u2005',
+        '\u2006',
+        '\u2008',
+        '\u2009',
+        '\u200a',
+        '\u205f',
+        '\u3000',
+      ]),
+    )('ignores a trailing $name', ({ space }) => {
+      expect(pensByLine({ text: `AB${space}`, align: 'right' })).toEqual([[300, 310]]);
+    });
+
+    // No-break spaces are not line-break characters to Pixi. It leaves them on
+    // the line, where they take up room like any other character.
+    it.each(named(['\u00a0', '\u2007', '\u202f']))('keeps a trailing no-break $name', ({ space }) => {
+      const [pens] = pensByLine({ text: `AB${space}`, align: 'right' });
+      expect(pens.slice(0, 2)).toEqual([290, 300]);
+    });
+  });
+
+  describe('a line wider than its box', () => {
+    // "ABCDEFGH" (80px) cannot wrap and overflows the 50px box. Pixi then aligns
+    // every line inside the widest line instead of the box: the long line starts
+    // at the box's left edge and the short ones follow its right end.
+    const overflowing = { text: 'AB ABCDEFGH CD', width: 50, padding: noPadding };
+    const longLine = [0, 10, 20, 30, 40, 50, 60, 70];
+
+    it('aligns right-aligned lines to the end of the widest line', () => {
+      expect(pensByLine({ ...overflowing, align: 'right' })).toEqual([[60, 70], longLine, [60, 70]]);
+    });
+
+    it('centres centred lines on the widest line', () => {
+      expect(pensByLine({ ...overflowing, align: 'center' })).toEqual([[30, 40], longLine, [30, 40]]);
+    });
+
+    it('leaves left-aligned lines at the left edge', () => {
+      expect(pensByLine({ ...overflowing, align: 'left' })).toEqual([[0, 10], longLine, [0, 10]]);
+    });
+  });
+
+  describe('glyphs that reach past their advance', () => {
+    // An italic-like font: a line that ends in "f" has ink 4px wider than its
+    // advance, because the f leans out over the next character's space. Any other
+    // line's ink is 2px narrower than its advance (ordinary side bearings). Pixi
+    // aligns a line by whichever of the two widths is larger.
+    const leaningMeasurer: TextMeasurer = {
+      measureWidth: (_item, text) => text.length * 10,
+      measureInkWidth: (_item, text) => text.length * 10 + (text.endsWith('f') ? 4 : -2),
+      fontAscent: () => 8,
+    };
+
+    it('aligns a line by its ink width where that is wider than its advance', () => {
+      // Advance 30, ink 34, box 320.
+      expect(pensByLine({ text: 'ABf', align: 'right' }, leaningMeasurer)).toEqual([[286, 296, 306]]);
+      expect(pensByLine({ text: 'ABf', align: 'center' }, leaningMeasurer)).toEqual([[143, 153, 163]]);
+      expect(pensByLine({ text: 'ABf', align: 'left' }, leaningMeasurer)).toEqual([[0, 10, 20]]);
+    });
+
+    it('aligns a line by its advance where the ink is narrower', () => {
+      expect(pensByLine({ text: 'AB', align: 'right' }, leaningMeasurer)).toEqual([[300, 310]]);
+      expect(pensByLine({ text: 'AB', align: 'center' }, leaningMeasurer)).toEqual([[150, 160]]);
+    });
+
+    it('adds letter spacing to the ink width', () => {
+      // Ink 34 plus two gaps of 5.
+      expect(pensByLine({ text: 'ABf', align: 'right', letterSpacing: 5 }, leaningMeasurer)).toEqual([
+        [276, 291, 306],
+      ]);
+    });
+
+    it('measures the ink of the line without its trailing spaces', () => {
+      expect(pensByLine({ text: 'ABf  ', align: 'right' }, leaningMeasurer)).toEqual([[286, 296, 306]]);
+    });
+
+    it('counts ink width when it looks for the widest line', () => {
+      // "ABf" has an advance of 30, exactly the box, and ink of 34: the lines are
+      // aligned inside 34px, so "AB" (20px) starts at 14.
+      const pens = pensByLine(
+        { text: 'ABf\nAB', align: 'right', width: 30, padding: noPadding },
+        leaningMeasurer,
+      );
+      expect(pens).toEqual([
+        [0, 10, 20],
+        [14, 24],
+      ]);
+    });
+  });
+});
+
 describe('documentToSvg — text fallback (no outline)', () => {
   it('omits the text and records an unvectorizable-text warning with the reason', () => {
     const { svg, warnings } = documentToSvg(
