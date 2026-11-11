@@ -10,6 +10,7 @@ import {
   openFreshEditor,
   readStageDebug,
   uploadProject,
+  waitForBundledFonts,
   wheelAt,
 } from './support/editor';
 
@@ -137,15 +138,11 @@ function buildDocument() {
 }
 
 /**
- * Startup has finished once the Properties tab counts the registered fonts.
- * Before that the bundled fonts are still loading, so a layer could be drawn in
- * a fallback font, and the end of startup replaces a project loaded in the
- * meantime with the saved canvas.
+ * The bundled fonts keep arriving after the editor appears, and a layer drawn
+ * before its font is registered keeps its fallback look.
  */
 async function waitForStartupAndFonts(page: Page) {
-  await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
-    timeout: 30_000,
-  });
+  await waitForBundledFonts(page);
 
   // The faces these layers need, by name: a font file that failed to load
   // should fail the test here rather than as a wrong-looking glyph.

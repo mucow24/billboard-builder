@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { useCanvasBootstrap } from './useCanvasBootstrap';
 import { useCanvasPersistence } from './useCanvasPersistence';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { useFavoritesController } from './useFavoritesController';
@@ -25,7 +24,20 @@ export interface InspectorPanelState {
   collapsed: boolean;
 }
 
-export function useEditorController() {
+interface UseEditorControllerArgs {
+  /**
+   * Every bundled font has been registered or has failed to load. Until then a
+   * font the document references may simply not have arrived yet.
+   */
+  fontsReady: boolean;
+}
+
+/**
+ * The editor's state and actions. Mount it only once startup has put the saved
+ * canvas in the store (`useEditorStartup`): from its first render the document
+ * is autosaved, and stored fonts that nothing references are deleted.
+ */
+export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingCollapsedGroupIds, setPendingCollapsedGroupIds] = useState<string[]>([]);
   const [inspectorPanel, setInspectorPanel] = useState<InspectorPanelState>({
@@ -97,11 +109,6 @@ export function useEditorController() {
   const canUndo = selectCanUndo(history);
   const canRedo = selectCanRedo(history);
 
-  const { persistenceReady } = useCanvasBootstrap({
-    loadDocument,
-    registerAvailableFont,
-  });
-
   const {
     favorites,
     favoritesReady,
@@ -144,18 +151,17 @@ export function useEditorController() {
   });
 
   useEffect(() => {
-    if (!persistenceReady) {
+    if (!fontsReady) {
       return;
     }
     setMissingFontFamilies(findMissingFonts(document.fonts, availableFonts));
-  }, [availableFonts, document.fonts, persistenceReady, setMissingFontFamilies]);
+  }, [availableFonts, document.fonts, fontsReady, setMissingFontFamilies]);
 
-  useCanvasPersistence({ document, persistenceReady });
+  useCanvasPersistence({ document });
   useUploadedFontPersistence({
     documentFonts: document.fonts,
     favorites,
     favoritesReady,
-    persistenceReady,
   });
 
   useEditorShortcuts({

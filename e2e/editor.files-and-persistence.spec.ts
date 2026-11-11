@@ -5,7 +5,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   captureDownload,
-  clearPersistence,
   clickItem,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
@@ -13,25 +12,26 @@ import {
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
+  holdBundledFonts,
+  openEditorWithSavedCanvas,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
-  primePersistenceBeforeLoad,
   readDownloadedJson,
   readDownloadedPngSize,
   readStageDebug,
   setCanvasTestHooksEnabled,
-  seedPersistence,
   startToolbarFileChooser,
   uploadFont,
   uploadProject,
   uploadSvgImage,
+  waitForBundledFonts,
   waitForEditor,
-  waitForStartupToFinish,
 } from './support/editor';
 import {
   expectPersistedCanvasFontFiles,
   expectPersistedCanvasToReferenceFontFamily,
+  readPersistedCanvasDocument,
   uploadNamedFontFromPath,
 } from './support/persistence';
 
@@ -269,7 +269,6 @@ test.describe('editor file and persistence flows', () => {
   // was then drawn with the remaining file, without any missing-font warning.
   test('reload keeps every file of an uploaded font family that the canvas uses', async ({ page }) => {
     await openFreshEditor(page);
-    await waitForStartupToFinish(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'font-family-text' })]),
@@ -295,7 +294,6 @@ test.describe('editor file and persistence flows', () => {
 
   test('reload keeps a font file imported after its family was already in use', async ({ page }) => {
     await openFreshEditor(page);
-    await waitForStartupToFinish(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'late-font-text' })]),
@@ -323,45 +321,34 @@ test.describe('editor file and persistence flows', () => {
     await expectPersistProbeFamilyRestored(page, widthsBeforeReload);
   });
 
-  // Regression: unused uploaded fonts are deleted once startup has finished, but
-  // the editor can be used before then. A font imported in the meantime was
-  // deleted as unused, and was missing after the next reload.
-  test('reload keeps a font that was imported before startup had finished', async ({ page }) => {
+  // Regression: unused uploaded fonts are deleted at startup. That used to wait
+  // for the bundled fonts while the editor was already usable, and a font
+  // imported in the meantime was deleted as unused: it was missing after the next
+  // reload.
+  test('reload keeps a font that was imported while the bundled fonts were still loading', async ({ page }) => {
     const project = createProjectDocument([createTextFixture({ id: 'early-import-text' })]);
     await openFreshEditor(page);
-    await waitForStartupToFinish(page);
     await uploadProject(page, project, 'early-import-project.json');
     await selectTextLayerInProperties(page);
     await importUnusedFont(page);
     await expectUploadedFontRecordCount(page, 1);
     await expectPersistedCanvasToReferenceFontFamily(page, 'Arial', []);
 
-    // Startup waits for the bundled fonts, so holding them back keeps the next
-    // start unfinished for as long as this test needs.
-    let releaseBundledFonts = () => {};
-    const bundledFontsReleased = new Promise<void>((resolve) => {
-      releaseBundledFonts = resolve;
-    });
-    await page.route(/\.(?:ttf|otf|woff2?)(?:\?.*)?$/, async (route) => {
-      await bundledFontsReleased;
-      await route.continue();
-    });
+    const bundledFonts = await holdBundledFonts(page);
     await page.reload();
     await waitForEditor(page);
 
-    // The saved canvas only appears once startup finishes. Load the project
-    // again to have a text layer, and with it the font picker.
-    await uploadProject(page, project, 'early-import-project.json');
     await selectTextLayerInProperties(page);
     await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'Early-Import-Regular.otf');
-    await expectUploadedFontRecordCount(page, 2);
-
-    releaseBundledFonts();
     await expect
       .poll(async () => readUploadedFontKeys(page), {
         message: 'Expected the startup clean-up to delete the unused font and keep the one just imported.',
       })
       .toEqual(['uploaded:Early-Import-Regular.otf']);
+
+    bundledFonts.release();
+    await waitForBundledFonts(page);
+    expect(await readUploadedFontKeys(page)).toEqual(['uploaded:Early-Import-Regular.otf']);
 
     await selectTextLayerInProperties(page);
     await chooseFontFamily(page, 'Early Import');
@@ -509,9 +496,7 @@ test.describe('editor file and persistence flows', () => {
     ]);
 
     await openFreshEditor(page);
-    await seedPersistence(page, persistedDocument);
-    await page.reload();
-    await waitForEditor(page);
+    await openEditorWithSavedCanvas(page, persistedDocument);
     await expect
       .poll(async () => (await readStageDebug(page)).renderedItemCount, {
         message: 'waiting for persisted item to render after reload',
@@ -521,10 +506,7 @@ test.describe('editor file and persistence flows', () => {
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(1);
 
-    await clearPersistence(page);
-    await primePersistenceBeforeLoad(page, '{not-valid-json');
-    await page.reload();
-    await waitForEditor(page);
+    await openEditorWithSavedCanvas(page, '{not-valid-json');
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(0);
   });
@@ -552,9 +534,12 @@ test.describe('editor file and persistence flows', () => {
     const savedDocument = await readDownloadedJson(projectDownload);
     expect(savedDocument.name).toBe('My Banner');
 
-    // Wait past the 150ms autosave debounce in useCanvasPersistence so
-    // the rename has been written to IDB before we reload.
-    await page.waitForTimeout(250);
+    // The rename is autosaved a moment after it is made: reload once it is stored.
+    await expect
+      .poll(async () => (await readPersistedCanvasDocument(page))?.name, {
+        message: 'waiting for the renamed canvas to be autosaved',
+      })
+      .toBe('My Banner');
     await page.reload();
     await waitForEditor(page);
     await expect(page.getByTestId('canvas-name-display')).toHaveText('My Banner');
@@ -645,9 +630,7 @@ test.describe('editor file and persistence flows', () => {
     await openPropertiesTab(page);
     await expect(page.getByRole('spinbutton', { name: 'Group Opacity value' })).toHaveValue('0.72');
 
-    await seedPersistence(page, savedGroupedDocument);
-    await page.reload();
-    await waitForEditor(page);
+    await openEditorWithSavedCanvas(page, savedGroupedDocument);
     await openLayersTab(page);
     await expect(page.getByRole('button', { name: 'Persisted Group', exact: true })).toBeVisible();
     await setCanvasTestHooksEnabled(page, false);

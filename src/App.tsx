@@ -4,8 +4,10 @@ import type { CanvasRendererHandle } from './editor/rendering/renderer/canvasRen
 
 import { readEditorRuntimeFlags } from './app/editorRuntimeFlags';
 import { useEditorController } from './app/useEditorController';
+import { useEditorStartup } from './app/useEditorStartup';
 import { useKeyHeld } from './app/useKeyHeld';
 import { useStatusToast } from './app/useStatusToast';
+import { removeBootShell } from './bootstrapShell';
 import { CanvasStage } from './editor/rendering/CanvasStage';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
@@ -15,7 +17,25 @@ import { FontImportProvider } from './editor/ui/FontImportContext';
 import type { GuideLine } from './editor/document/documentTypes';
 import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
+/**
+ * The editor appears once startup has put the saved canvas in place, and the
+ * boot spinner stays up until then. Before that there is nothing to use, so
+ * nothing can be done that the saved canvas would replace, and nothing is
+ * autosaved over it.
+ */
 export default function App() {
+  const { canvasReady, fontsReady } = useEditorStartup();
+
+  useLayoutEffect(() => {
+    if (canvasReady) {
+      removeBootShell();
+    }
+  }, [canvasReady]);
+
+  return canvasReady ? <Editor fontsReady={fontsReady} /> : null;
+}
+
+function Editor({ fontsReady }: { fontsReady: boolean }) {
   const runtimeFlags = readEditorRuntimeFlags();
   const stageRef = useRef<CanvasRendererHandle | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -83,7 +103,7 @@ export default function App() {
       selectedNodeIds,
       favorites,
     },
-  } = useEditorController();
+  } = useEditorController({ fontsReady });
 
   useLayoutEffect(() => {
     const element = topbarRef.current;
@@ -114,7 +134,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-fonts-ready={fontsReady}>
       <FontImportProvider onImportFont={() => fontInputRef.current?.click()}>
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage

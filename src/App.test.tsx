@@ -51,7 +51,7 @@ vi.mock('./editor/fonts', async () => {
     );
   return {
     ...actual,
-    loadBundledFonts: vi.fn().mockResolvedValue([]),
+    loadBundledFonts: vi.fn(() => ({ first: Promise.resolve(), all: Promise.resolve([]) })),
     registerUploadedFontBytes: (...args: unknown[]) => mockRegisterUploadedFontBytes(...args),
   };
 });
@@ -133,9 +133,8 @@ function makeClipboardData({
 async function renderApp() {
   render(<App />);
 
-  await waitFor(() => {
-    expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-  });
+  // The editor is rendered once startup has put the saved canvas in place.
+  await screen.findByTestId('mock-stage');
 }
 
 describe('App shell', () => {
@@ -168,7 +167,7 @@ describe('App shell', () => {
 
   it('switches into rectangle creation mode from the tool palette', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderApp();
 
     await user.click(screen.getByRole('button', { name: /Rect/ }));
 
@@ -186,7 +185,7 @@ describe('App shell', () => {
     persistedDocument.nodes = [createRectangleItem()];
     mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
 
-    render(<App />);
+    await renderApp();
 
     await waitFor(() => {
       expect(screen.getByTestId('mock-stage')).toHaveTextContent('Items: 1');
@@ -256,7 +255,7 @@ describe('App shell', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to save favorite: quota nope');
   });
 
-  it('does not show a missing-font warning while uploaded font restoration is still pending', async () => {
+  it('shows neither the editor nor a missing-font warning while uploaded font restoration is still pending', async () => {
     let resolveRestore: ((value: PersistedUploadedFont[]) => void) | undefined;
     const persistedDocument = createDefaultProjectDocument();
     persistedDocument.fonts = [
@@ -289,10 +288,11 @@ describe('App shell', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+      expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenCalled();
     });
 
-    expect(screen.queryByText('Missing fonts')).not.toBeInTheDocument();
+    // The saved canvas is shown only once its fonts are registered.
+    expect(screen.queryByTestId('mock-stage')).not.toBeInTheDocument();
 
     if (resolveRestore) {
       resolveRestore([
@@ -307,14 +307,13 @@ describe('App shell', () => {
       ]);
     }
 
-    await waitFor(() => {
-      expect(mockRegisterUploadedFontBytes).toHaveBeenCalled();
-    });
+    expect(await screen.findByTestId('mock-stage')).toHaveTextContent('Items: 1');
+    expect(mockRegisterUploadedFontBytes).toHaveBeenCalled();
     expect(screen.queryByText('Missing fonts')).not.toBeInTheDocument();
   });
 
   it('persists the latest canvas snapshot after edits', async () => {
-    render(<App />);
+    await renderApp();
 
     await waitFor(() => {
       expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
@@ -334,7 +333,7 @@ describe('App shell', () => {
 
 
   it('persists image adjustments in the latest autosaved canvas snapshot', async () => {
-    render(<App />);
+    await renderApp();
 
     await waitFor(() => {
       expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
@@ -398,7 +397,7 @@ describe('App shell', () => {
       },
     });
 
-    render(<App />);
+    await renderApp();
 
     expect((await screen.findAllByText('Mixed')).length).toBeGreaterThan(0);
     const opacityInputs = await screen.findAllByLabelText('Opacity', { selector: 'input' });
@@ -466,7 +465,7 @@ describe('App shell', () => {
 
   it('supports global tool hotkeys', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderApp();
 
     await user.keyboard('t');
     expect(screen.getByRole('button', { name: /Text/ })).toHaveAttribute(
@@ -494,7 +493,7 @@ describe('App shell', () => {
         selectedNodeIds: [rectangleItem.id],
       },
     });
-    render(<App />);
+    await renderApp();
 
     fireEvent.copy(document.body, {
       clipboardData,
@@ -539,7 +538,7 @@ describe('App shell', () => {
       sourceName: 'clipboard.png',
     });
 
-    render(<App />);
+    await renderApp();
 
     fireEvent.paste(document.body, {
       clipboardData: makeClipboardData({
@@ -596,7 +595,7 @@ describe('App shell', () => {
       },
     });
 
-    render(<App />);
+    await renderApp();
 
     fireEvent.paste(document.body, {
       clipboardData: makeClipboardData({
@@ -660,7 +659,7 @@ describe('App shell', () => {
         selectedNodeIds: [rectangleItem.id],
       },
     });
-    render(<App />);
+    await renderApp();
 
     await user.keyboard('{ArrowRight}');
     expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems)[0].x).toBe(41);
@@ -689,7 +688,7 @@ describe('App shell', () => {
 
   it('shows a visible error when opening an invalid project file', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    await renderApp();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Load...' }));
