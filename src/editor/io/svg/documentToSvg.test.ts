@@ -12,9 +12,9 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
-import type { CanvasNode, ProjectDocument } from '../../document/documentTypes';
+import type { CanvasNode, ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
 import { fakeOutlineFont, makeSvgDeps, nullOutlineProvider } from '../../../test/svgExportFakes';
-import type { FontOutlineProvider } from './svgExportTypes';
+import type { FontOutlineProvider, TextMeasurer } from './svgExportTypes';
 import { documentToSvg } from './documentToSvg';
 
 /** Pull the pen-X start of every glyph out of the emitted `<path d>` (fake glyph encodes it as `M{penX} {baselineY}`). */
@@ -327,6 +327,80 @@ describe('documentToSvg — text outlines (font available)', () => {
     expect(left).toBe(0);
     expect(centre).toBeCloseTo((320 - 20) / 2); // contentWidth 320, line width 20
     expect(right).toBeCloseTo(320 - 20);
+  });
+});
+
+describe('documentToSvg — text kerning', () => {
+  // A font that kerns the pair "AV" 3px tighter. Every character advances 10px
+  // on its own, as in the default fake; a text that contains "AV" measures 3px
+  // narrower per occurrence, which is how canvas `measureText` reports kerning.
+  const kernedMeasurer: TextMeasurer = {
+    measureWidth: (_item, text) => text.length * 10 - 3 * (text.split('AV').length - 1),
+    fontAscent: () => 8,
+  };
+
+  function kernedPositions(overrides: Partial<TextCanvasItem>) {
+    const { svg } = documentToSvg(
+      docWith({ nodes: [createTextItem(overrides)] }),
+      makeSvgDeps({ measurer: kernedMeasurer }),
+    );
+    return glyphPositions(svg);
+  }
+
+  it('measures the kerned pair narrower than its two characters added up', () => {
+    const item = createTextItem({});
+    expect(kernedMeasurer.measureWidth(item, 'AV')).toBe(17);
+    expect(kernedMeasurer.measureWidth(item, 'A') + kernedMeasurer.measureWidth(item, 'V')).toBe(20);
+  });
+
+  it('pulls the second glyph of a kerned pair in by the kerning, and every glyph after it', () => {
+    const positions = kernedPositions({ text: 'BAVB' });
+    // B and A are unkerned. V sits 3px closer to A, and the last B follows V at
+    // V's own advance, so it stays 3px closer too.
+    expect(positions.map((p) => p.penX)).toEqual([0, 10, 17, 27]);
+  });
+
+  it('adds up the kerning of every pair along the line', () => {
+    const positions = kernedPositions({ text: 'AVAV AV' });
+    // The space has no outline, so it leaves a gap but no glyph.
+    expect(positions.map((p) => p.penX)).toEqual([0, 7, 17, 24, 44, 51]);
+  });
+
+  it.each([
+    { letterSpacing: 5, expected: [0, 15, 27, 42] },
+    { letterSpacing: -2, expected: [0, 8, 13, 21] },
+  ])('keeps the kerning when letterSpacing is $letterSpacing', ({ letterSpacing, expected }) => {
+    const positions = kernedPositions({ text: 'BAVB', letterSpacing });
+    expect(positions.map((p) => p.penX)).toEqual(expected);
+  });
+
+  it('ends a right-aligned kerned line at the content edge', () => {
+    const positions = kernedPositions({ text: 'BAVB', align: 'right' });
+    // contentWidth 320, kerned line width 37: the last glyph (10px wide) ends at 320.
+    expect(positions.map((p) => p.penX)).toEqual([283, 293, 300, 310]);
+  });
+
+  it('centres a kerned line with letter spacing on its kerned width', () => {
+    const positions = kernedPositions({ text: 'BAVB', align: 'center', letterSpacing: 5 });
+    // Line width 37 + 3 gaps of 5 = 52, so the line starts at (320 - 52) / 2.
+    expect(positions.map((p) => p.penX)).toEqual([134, 149, 161, 176]);
+  });
+
+  it('kerns each line on its own', () => {
+    const positions = kernedPositions({ text: 'AV\nBAV' });
+    expect(positions.map((p) => p.penX)).toEqual([0, 7, 0, 10, 17]);
+    expect(positions[2].baselineY - positions[0].baselineY).toBeCloseTo(42 * 1.1);
+  });
+
+  it('kerns every line of a wrapped paragraph', () => {
+    const positions = kernedPositions({
+      text: 'AVAV BAV',
+      width: 60,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+    // "AVAV " (44px) and "BAV" (27px) do not fit in 60px together.
+    expect(positions.map((p) => p.penX)).toEqual([0, 7, 17, 24, 0, 10, 17]);
+    expect(positions[4].baselineY - positions[0].baselineY).toBeCloseTo(42 * 1.1);
   });
 });
 
