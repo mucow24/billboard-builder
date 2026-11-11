@@ -1,6 +1,7 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { layoutWrappedText } from '../../rendering/textMeasurement';
+import { glyphsPath, lineSubstitutions } from './svgTextGlyphs';
 import {
   TEXT_SHADOW_BLUR_TO_STDDEV,
   gradientOrSolidFill,
@@ -74,9 +75,11 @@ export function textSvg(
       lineLeft += alignWidth - line.width;
     }
 
+    // Ligatures and other glyphs the font puts in place of characters; see svgTextGlyphs.
+    const substitutions = lineSubstitutions(font, line.text, item.letterSpacing);
     kernedOffsets(line.text, line.advance, measure).forEach(({ ch, offset }, index) => {
       const penX = lineLeft + offset + index * item.letterSpacing;
-      const path = font.glyphPath(ch, item.fontSize, penX, baselineY);
+      const path = glyphsPath(font, substitutions?.[index] ?? ch, item.fontSize, penX, baselineY);
       if (path) glyphPaths.push(path);
     });
   });
@@ -164,8 +167,10 @@ function drawnLine(laidOutText: string, item: TextCanvasItem, measurer: TextMeas
  * single-character widths leaves the kerning out, and the width of the text
  * before a character leaves out the kerning between it and its predecessor.
  *
- * The rule covers kerning only: where the browser joins letters into a ligature
- * (letterSpacing 0), the export still draws the separate letters.
+ * The rule gives positions only. Which glyph is drawn at a character is
+ * `lineSubstitutions`' part: where the browser joins letters into a ligature
+ * (letterSpacing 0), that one glyph is drawn at the first of them and nothing at
+ * the others.
  */
 function kernedOffsets(
   lineText: string,

@@ -21,7 +21,32 @@ export interface OutlineFont {
    * not a finite number.
    */
   glyphPath(ch: string, fontSizePx: number, penX: number, baselineY: number): string | null;
+  /** The same for a glyph the font puts in place of characters, given by its index in the font (see `substitutions`). */
+  glyphPath(glyphIndex: number, fontSizePx: number, penX: number, baselineY: number): string | null;
+  /**
+   * The glyphs the canvas draws in place of the characters' own when it draws
+   * `text` in one piece: ligatures (f + i as one glyph) and the other substitutions
+   * a font applies to all text. Null when `text` has none. A font that cannot
+   * tell (the test fakes) leaves this out, and is drawn one character at a time.
+   */
+  substitutions?(text: string): TextSubstitutions | null;
 }
+
+/** A glyph a font draws in place of one or more characters. */
+export interface SubstituteGlyph {
+  /** Its index in the font, for `OutlineFont.glyphPath`. */
+  glyph: number;
+  /** How far it moves the pen, in em: where a second glyph for the same character starts. */
+  advance: number;
+}
+
+/**
+ * What a font draws for a text, one entry per character (code point): null for a
+ * character that keeps its own glyph, otherwise the glyphs drawn at its position
+ * instead, one after another. The list is empty for a character that an earlier
+ * glyph already covers, such as the i of an fi ligature.
+ */
+export type TextSubstitutions = readonly (readonly SubstituteGlyph[] | null)[];
 
 export type OutlineUnavailableReason = 'system-font' | 'no-bytes' | 'parse-failed';
 

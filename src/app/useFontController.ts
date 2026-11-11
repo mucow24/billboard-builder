@@ -1,8 +1,6 @@
-import { registerFontFile, toFontReference } from '../editor/fonts';
+import { registerFontFile } from '../editor/fonts';
 import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
-import type { CanvasItem, DocumentFontReference, SelectionItemChange, UploadedFont } from '../editor/document/documentTypes';
-import { selectSelectedItem } from '../editor/core/selectors';
-import { useEditorStore } from '../editor/state/store';
+import type { UploadedFont } from '../editor/document/documentTypes';
 import { getErrorMessage } from './errorUtils';
 
 async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
@@ -13,38 +11,16 @@ async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
 }
 
 interface UseFontControllerParams {
-  availableFonts: UploadedFont[];
-  dispatch: (action: { type: 'register_font'; font: DocumentFontReference }) => void;
   registerAvailableFont: (font: UploadedFont) => void;
   setErrorMessage: (message: string | null) => void;
-  updateSelectionItems: (changes: SelectionItemChange) => void;
 }
 
+// Choosing a font for text needs nothing here: the reducer references the family
+// of any text in the document (`reconcileFontReferences`).
 export function useFontController({
-  availableFonts,
-  dispatch,
   registerAvailableFont,
   setErrorMessage,
-  updateSelectionItems,
 }: UseFontControllerParams) {
-  function registerDocumentFontForFamily(fontFamily: string | undefined) {
-    if (typeof fontFamily !== 'string') {
-      return;
-    }
-
-    const matchingFont = availableFonts.find((font) => font.family === fontFamily);
-    if (!matchingFont) {
-      return;
-    }
-
-    // One reference puts the family in the document. The reducer then adds the
-    // family's other uploaded files (`reconcileUploadedFontReferences`).
-    dispatch({
-      type: 'register_font',
-      font: toFontReference(matchingFont),
-    });
-  }
-
   async function handleFontUpload(files: FileList | null) {
     const file = files?.[0];
     if (!file) {
@@ -70,26 +46,7 @@ export function useFontController({
     }
   }
 
-  function handleSelectionItemChange(changes: SelectionItemChange) {
-    updateSelectionItems(changes);
-
-    let resolved: Partial<CanvasItem>;
-    if (typeof changes === 'function') {
-      const { editor } = useEditorStore.getState();
-      const item = selectSelectedItem(editor.document, editor);
-      if (!item) return;
-      resolved = changes(item);
-    } else {
-      resolved = changes;
-    }
-
-    if ('fontFamily' in resolved) {
-      registerDocumentFontForFamily(resolved.fontFamily);
-    }
-  }
-
   return {
     handleFontUpload,
-    handleSelectionItemChange,
   };
 }
