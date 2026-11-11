@@ -85,7 +85,7 @@ npm run e2e           # run E2E tests
 npm run e2e:headed    # run with visible browser
 ```
 
-E2E tests use Playwright against a production build served locally.
+E2E tests use Playwright against a production build served locally. Each run builds the checkout it is started from and serves it on a free port chosen by the operating system, so runs in several checkouts can overlap.
 
 ## Architecture
 
