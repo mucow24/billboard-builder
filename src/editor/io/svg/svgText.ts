@@ -1,6 +1,7 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { layoutWrappedText } from '../../rendering/textMeasurement';
+import { glyphsPath, lineSubstitutions } from './svgTextGlyphs';
 import {
   TEXT_SHADOW_BLUR_TO_STDDEV,
   gradientOrSolidFill,
@@ -69,10 +70,14 @@ export function textSvg(
       penX += contentWidth - lineWidth;
     }
 
+    // Ligatures and other glyphs the font puts in place of characters; see svgTextGlyphs.
+    const substitutions = lineSubstitutions(font, lineText, item.letterSpacing);
+    let index = 0;
     for (const ch of lineText) {
-      const path = font.glyphPath(ch, item.fontSize, penX, baselineY);
+      const path = glyphsPath(font, substitutions?.[index] ?? ch, item.fontSize, penX, baselineY);
       if (path) glyphPaths.push(path);
       penX += measure(ch) + item.letterSpacing;
+      index += 1;
     }
   });
 

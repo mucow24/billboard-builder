@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import opentype from 'opentype.js';
 
 import {
@@ -89,6 +89,91 @@ function bundledGlyphOutline(fontFile: string, ch: string, fontSize: number): st
   return font.charToGlyph(ch).getPath(0, 0, fontSize).toPathData(2);
 }
 
+interface ShapeComparison {
+  /** Ink pixels of the canvas picture and of the exported one inside the box. */
+  canvasInk: number;
+  exportedInk: number;
+  /** Ink pixels of either picture with no ink of the other within `reach` pixels. */
+  stray: number;
+}
+
+/**
+ * How far the shapes of an exported SVG are from what the canvas shows
+ * (`pngBase64`, from Export > PNG), inside each box (canvas coordinates). Both are
+ * drawn at the PNG's size. Ink that the other picture has nowhere near it is
+ * `stray`: nothing for the same glyphs in the same place, however differently
+ * their edges are smoothed, and a visible lump for a glyph that is missing, extra
+ * or another shape.
+ */
+async function compareShapesWithCanvas(
+  page: Page,
+  svg: string,
+  pngBase64: string,
+  canvasWidth: number,
+  boxes: Array<{ x: number; y: number; width: number; height: number }>,
+  reach = 2,
+): Promise<ShapeComparison[]> {
+  return page.evaluate(
+    async ({ svg, pngBase64, canvasWidth, boxes, reach }) => {
+      const load = async (src: string) => {
+        const image = new Image();
+        image.src = src;
+        await image.decode();
+        return image;
+      };
+      const canvasImage = await load(`data:image/png;base64,${pngBase64}`);
+      const exportedImage = await load(`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`);
+      const width = canvasImage.naturalWidth;
+      const height = canvasImage.naturalHeight;
+      const inkOf = (image: HTMLImageElement) => {
+        const surface = document.createElement('canvas');
+        surface.width = width;
+        surface.height = height;
+        const context = surface.getContext('2d', { willReadFrequently: true })!;
+        context.drawImage(image, 0, 0, width, height);
+        const { data } = context.getImageData(0, 0, width, height);
+        const ink = new Uint8Array(width * height);
+        for (let i = 0; i < ink.length; i += 1) ink[i] = data[i * 4 + 3] > 127 ? 1 : 0;
+        return ink;
+      };
+      const canvasInk = inkOf(canvasImage);
+      const exportedInk = inkOf(exportedImage);
+      const scale = width / canvasWidth;
+
+      return boxes.map((box) => {
+        const x0 = Math.max(0, Math.round(box.x * scale));
+        const x1 = Math.min(width, Math.round((box.x + box.width) * scale));
+        const y0 = Math.max(0, Math.round(box.y * scale));
+        const y1 = Math.min(height, Math.round((box.y + box.height) * scale));
+        const near = (ink: Uint8Array, x: number, y: number) => {
+          for (let dy = -reach; dy <= reach; dy += 1) {
+            const row = y + dy;
+            if (row < 0 || row >= height) continue;
+            for (let dx = -reach; dx <= reach; dx += 1) {
+              const column = x + dx;
+              if (column >= 0 && column < width && ink[row * width + column]) return true;
+            }
+          }
+          return false;
+        };
+        const result = { canvasInk: 0, exportedInk: 0, stray: 0 };
+        for (let y = y0; y < y1; y += 1) {
+          for (let x = x0; x < x1; x += 1) {
+            const onCanvas = canvasInk[y * width + x] === 1;
+            const onExport = exportedInk[y * width + x] === 1;
+            if (onCanvas) result.canvasInk += 1;
+            if (onExport) result.exportedInk += 1;
+            if (onCanvas && !near(exportedInk, x, y)) result.stray += 1;
+            if (onExport && !near(canvasInk, x, y)) result.stray += 1;
+          }
+        }
+        return result;
+      });
+    },
+    { svg, pngBase64, canvasWidth, boxes, reach },
+  );
+}
+
 // Real-browser validation of the parts unit tests can't exercise: a generator
 // rasterized through a real 2D canvas, the download, and the SVG actually parsing
 // and rendering. Glyph-shape/text fidelity is covered by the node + unit tests.
@@ -115,6 +200,114 @@ test.describe('SVG export', () => {
       return img.naturalWidth;
     }, svg);
     expect(naturalWidth).toBeGreaterThan(0);
+  });
+
+  // Regression: with letter spacing 0 the canvas draws a line of text in one
+  // piece, so the browser joins letters into the font's ligatures: in Albertus,
+  // f + i become one glyph without a dot on the i. The exporter outlined every
+  // character on its own, so the exported text had other shapes than the canvas.
+  // With any other letter spacing the canvas draws character by character and
+  // forms no ligature, and the export must not either. Which glyphs the browser
+  // draws only shows in a real browser, and the reference is the canvas itself
+  // (Export > PNG), so this lives in e2e.
+  test('exports the ligatures the canvas draws, and only where it draws them', async ({ page }) => {
+    await openFreshEditor(page);
+    // Wait for startup to finish, which the Properties tab shows by counting the
+    // registered fonts. Before that the bundled fonts are still loading, so the
+    // canvas would draw the layers in a fallback font, and the end of startup can
+    // replace a project loaded in the meantime with the saved canvas.
+    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
+      timeout: 30_000,
+    });
+
+    const fontSize = 200;
+    const albertus = { family: 'Albertus MT Std', file: 'Albertus MT Std Regular.otf' };
+    const futura = { family: 'Futura Light Condensed', file: 'Futura Light Condensed.otf' };
+    // `glyphs`: the characters whose outlines the layer must export as, in order.
+    // U+FB01 and U+FB02 are the fi and fl ligatures as characters of their own,
+    // which Albertus maps to the glyphs it joins f + i and f + l into.
+    const layers = [
+      { id: 'fi', font: albertus, text: 'fi', letterSpacing: 0, glyphs: ['\ufb01'] },
+      { id: 'fl', font: albertus, text: 'fl', letterSpacing: 0, glyphs: ['\ufb02'] },
+      { id: 'fi-spaced', font: albertus, text: 'fi', letterSpacing: 10, glyphs: ['f', 'i'] },
+      // A font without ligatures: nothing to join, with or without the fix.
+      { id: 'fi-plain-font', font: futura, text: 'fi', letterSpacing: 0, glyphs: ['f', 'i'] },
+    ].map((layer, index) => ({
+      ...layer,
+      x: 40 + (index % 2) * 480,
+      y: 40 + Math.floor(index / 2) * 300,
+      width: 440,
+      height: 260,
+    }));
+    const doc = {
+      ...createProjectDocument(
+        layers.map((layer, index) =>
+          createTextFixture({
+            id: layer.id,
+            name: layer.id,
+            text: layer.text,
+            fontFamily: layer.font.family,
+            fontSize,
+            letterSpacing: layer.letterSpacing,
+            x: layer.x,
+            y: layer.y,
+            width: layer.width,
+            height: layer.height,
+            zIndex: index + 1,
+          }),
+        ),
+      ),
+      fonts: [albertus, futura].map((font) => ({ family: font.family, sourceName: font.file, kind: 'bundled' })),
+    };
+    await uploadProject(page, doc, 'ligatures.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    // One <path> per layer, in layer order.
+    const exportedPaths = [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+    expect(exportedPaths).toHaveLength(layers.length);
+    expect(exportedPaths.join(' ')).not.toContain('NaN');
+
+    // Each layer exports exactly the glyphs named for it: the ligature where the
+    // canvas joins the letters, the two letters where it does not.
+    const commandsOf = (d: string) => d.match(/[MLCQZ][^MLCQZ]*/g) ?? [];
+    layers.forEach((layer, index) => {
+      let rest = commandsOf(exportedPaths[index]);
+      for (const ch of layer.glyphs) {
+        const expected = bundledGlyphOutline(layer.font.file, ch, fontSize);
+        const count = commandsOf(expected).length;
+        expect(
+          sameShape(rest.slice(0, count).join(''), expected),
+          `layer ${layer.id} draws the glyph of ${JSON.stringify(ch)}`,
+        ).toBe(true);
+        rest = rest.slice(count);
+      }
+      expect(rest, `layer ${layer.id} draws nothing else`).toEqual([]);
+    });
+
+    // ...and those glyphs are what the canvas shows. The letter-spaced layer is left
+    // out here: where its second letter goes is a question of how the canvas spaces
+    // letters, not of which glyphs it draws.
+    const compared = await compareShapesWithCanvas(page, svg, png, doc.canvas.width, layers);
+    expect(compared).toHaveLength(layers.length);
+    layers.forEach((layer, index) => {
+      // The canvas drew the text, in the font: two letters at 200px are thousands of pixels.
+      expect(compared[index].canvasInk, `canvas ink of ${layer.id}`).toBeGreaterThan(3_000);
+      if (layer.letterSpacing !== 0) return;
+      // Every exported shape lies on a canvas shape and the other way round: 0 stray
+      // pixels when the glyphs are the same. The separate f and i of the unfixed
+      // exporter left the dot of the i and the hook of the f, which the ligature
+      // does not have, as 907 stray pixels (1,526 for f and l).
+      expect(compared[index].stray, `stray pixels of ${layer.id}`).toBeLessThan(100);
+    });
   });
 
   // Regression for the Metro.json bug: text baselines must be placed by Pixi's
