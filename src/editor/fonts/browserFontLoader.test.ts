@@ -70,6 +70,14 @@ describe('browser font loader', () => {
     );
   });
 
+  it('loads the bundled fonts in filename order', async () => {
+    const sourceNames = (await loadBundledFonts()).map((font) => font.sourceName);
+
+    // Their faces join document.fonts in this order, which decides which of two
+    // same-variant files text renders with. It must not change between builds.
+    expect(sourceNames).toEqual([...sourceNames].sort());
+  });
+
   it('keeps loading valid bundled fonts when one source fails', async () => {
     // The production code intentionally console.warn's when a font fails to
     // load; silence it here so this success-path test doesn't pollute stderr.
@@ -165,49 +173,112 @@ describe('browser font loader', () => {
     });
   });
 
-  describe('listRegisteredFonts', () => {
-    /** Finish a deferred font load and let the loader add the face to `document.fonts`. */
-    async function finishLoad(url: string) {
-      // Matched by URL alone, however the loader wrote it into the face's source.
-      const pending = [...pendingLoads].find(([source]) => source.includes(url));
-      if (!pending) throw new Error(`No pending font load for ${url}`);
-      pending[1]();
-      await new Promise((settle) => setTimeout(settle, 0));
+  /** Finish a deferred font load and let the loader carry on from it. */
+  async function finishLoad(url: string) {
+    // Matched by URL alone, however the loader wrote it into the face's source.
+    const pending = [...pendingLoads].find(([source]) => source.includes(url));
+    if (!pending) throw new Error(`No pending font load for ${url}`);
+    pending[1]();
+    await new Promise((settle) => setTimeout(settle, 0));
+  }
+
+  /** A real Set stands in for the FontFaceSet: same `add`, same insertion-order iteration. */
+  function stubFontSet() {
+    pendingLoads.clear();
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new Set() });
+  }
+
+  // "Poster Book.otf" and "Poster Regular.ttf" are two files for one family, weight
+  // and style. The browser renders with whichever of their faces was added last.
+  const posterEntries: Array<[string, string]> = [
+    ['src/assets/fonts/Poster Book.otf', '/deferred/poster-book.otf'],
+    ['src/assets/fonts/Poster Regular.ttf', '/deferred/poster-regular.ttf'],
+    ['src/assets/fonts/Poster Bold.otf', '/fonts/poster-bold.otf'],
+  ];
+
+  describe('bundled font registration order', () => {
+    /** The entry URL behind each face in `document.fonts`, in the order the faces were added. */
+    function urlsInDocumentFonts(entries: Array<[string, string]>): string[] {
+      return [...document.fonts].map((fontFace) => {
+        const { source } = fontFace as unknown as MockFontFace;
+        // Matched by URL alone, however the loader wrote it into the face's source.
+        const entry = entries.find(([, url]) => typeof source === 'string' && source.includes(url));
+        return entry ? entry[1] : `no entry for ${String(source)}`;
+      });
     }
 
-    beforeEach(() => {
-      pendingLoads.clear();
-      // A real Set stands in for the FontFaceSet: same `add`, same insertion-order iteration.
-      Object.defineProperty(document, 'fonts', { configurable: true, value: new Set() });
+    beforeEach(stubFontSet);
+
+    it.each([
+      ['the earlier entry', ['/deferred/poster-book.otf', '/deferred/poster-regular.ttf']],
+      ['the later entry', ['/deferred/poster-regular.ttf', '/deferred/poster-book.otf']],
+    ])(
+      'adds faces to document.fonts in entry order when %s finishes loading first',
+      async (_finishesFirst, loadOrder) => {
+        const loading = loadFontEntries(posterEntries);
+        for (const url of loadOrder) {
+          await finishLoad(url);
+        }
+        await loading;
+
+        expect(urlsInDocumentFonts(posterEntries)).toEqual([
+          '/deferred/poster-book.otf',
+          '/deferred/poster-regular.ttf',
+          '/fonts/poster-bold.otf',
+        ]);
+      },
+    );
+
+    it('keeps entry order around a font that fails to load, and still warns about it', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const entries: Array<[string, string]> = [
+          ['src/assets/fonts/Slow-One.ttf', '/deferred/slow-one.ttf'],
+          ['src/assets/fonts/Broken-One.ttf', '/fonts/broken-one.ttf'],
+          ['src/assets/fonts/Quick-One.ttf', '/fonts/quick-one.ttf'],
+        ];
+        const loading = loadFontEntries(entries);
+        await finishLoad('/deferred/slow-one.ttf');
+        const fonts = await loading;
+
+        // The failed font's face never joins document.fonts.
+        expect(urlsInDocumentFonts(entries)).toEqual(['/deferred/slow-one.ttf', '/fonts/quick-one.ttf']);
+        expect(fonts.map((font) => font.sourceName)).toEqual(['Slow-One.ttf', 'Quick-One.ttf']);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+          'Skipping bundled font that failed to load.',
+          expect.any(Error),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
+  });
 
-    it('lists registered files in the order their faces joined document.fonts, not filename order', async () => {
-      const loading = loadFontEntries([
-        ['src/assets/fonts/Poster Book.otf', '/deferred/poster-book.otf'],
-        ['src/assets/fonts/Poster Regular.ttf', '/deferred/poster-regular.ttf'],
-        ['src/assets/fonts/Poster Bold.otf', '/fonts/poster-bold.otf'],
-      ]);
+  describe('listRegisteredFonts', () => {
+    beforeEach(stubFontSet);
+
+    it('lists registered files in the order their faces joined document.fonts: entry order, not load order', async () => {
+      const loading = loadFontEntries(posterEntries);
       await new Promise((settle) => setTimeout(settle, 0));
-      // Nothing is listed until its face has loaded and been added.
-      expect(listRegisteredFonts().map((font) => font.sourceName)).toEqual(['Poster Bold.otf']);
+      // "Poster Bold.otf" has loaded, but it is not listed: its face does not
+      // join document.fonts ahead of the entries before it.
+      expect(listRegisteredFonts()).toEqual([]);
 
-      // The later filename finishes loading first, so the browser sees it first.
+      // The later filename finishes loading first...
       await finishLoad('/deferred/poster-regular.ttf');
+      expect(listRegisteredFonts()).toEqual([]);
       await finishLoad('/deferred/poster-book.otf');
       const fonts = await loading;
 
-      // The loader still reports its results in entry (filename) order...
-      expect(fonts.map((font) => font.sourceName)).toEqual([
-        'Poster Book.otf',
-        'Poster Regular.ttf',
-        'Poster Bold.otf',
-      ]);
-      // ...while the registry reports the order the browser matches faces in.
+      // ...and the registry still reports entry (filename) order: the order the
+      // browser matches faces in, and the order the loader returns its results in.
       expect(listRegisteredFonts()).toEqual([
-        { family: 'Poster', sourceName: 'Poster Bold.otf', weight: '700', style: 'normal', kind: 'bundled' },
-        { family: 'Poster', sourceName: 'Poster Regular.ttf', weight: '400', style: 'normal', kind: 'bundled' },
         { family: 'Poster', sourceName: 'Poster Book.otf', weight: '400', style: 'normal', kind: 'bundled' },
+        { family: 'Poster', sourceName: 'Poster Regular.ttf', weight: '400', style: 'normal', kind: 'bundled' },
+        { family: 'Poster', sourceName: 'Poster Bold.otf', weight: '700', style: 'normal', kind: 'bundled' },
       ]);
+      expect(fonts).toEqual(listRegisteredFonts());
     });
 
     it('lists uploaded fonts after the bundled ones they were registered after', async () => {

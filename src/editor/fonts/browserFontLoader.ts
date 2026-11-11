@@ -33,16 +33,29 @@ function toCssUrl(url: string): string {
   return `url("${escaped}")`;
 }
 
-async function registerFontSource(
+/** Create the `FontFace` for a font source and wait for it to load. The browser cannot render with it yet. */
+async function loadFontFace(
   metadata: ParsedFontMetadata,
-  source: ArrayBuffer | string,
-  kind: UploadedFont['kind']
-): Promise<UploadedFont> {
+  source: ArrayBuffer | string
+): Promise<FontFace> {
   const fontFace = new FontFace(metadata.family, typeof source === 'string' ? toCssUrl(source) : source, {
     weight: metadata.weight,
     style: metadata.style,
   });
   await fontFace.load();
+  return fontFace;
+}
+
+/**
+ * Add a loaded face to `document.fonts`, which is what lets text render with it,
+ * and remember its file. The order of these calls matters: among faces with the
+ * same family, weight and style, text renders with the one added last.
+ */
+function registerFontFace(
+  fontFace: FontFace,
+  metadata: ParsedFontMetadata,
+  kind: UploadedFont['kind']
+): UploadedFont {
   document.fonts.add(fontFace);
   const font: UploadedFont = {
     family: metadata.family,
@@ -60,11 +73,13 @@ async function registerFontSource(
  * order. That is the order the browser matches faces in: among faces with the
  * same family, weight and style, the last one added is the one text renders with.
  *
- * It is not filename order. Bundled fonts load in parallel and join
- * `document.fonts` as each finishes, so which of two same-variant files (e.g.
- * "Futura Bold Italic.otf" and "Futura Bold Oblique.otf") comes last differs
- * from one page load to the next. Resolve against this list, not a sorted one,
- * to get the file the canvas is actually using.
+ * Bundled files are listed in the order `loadFontEntries` was given them
+ * (filename order), whatever order their loads finished in. So of two
+ * same-variant files (e.g. "Futura Bold Italic.otf" and "Futura Bold
+ * Oblique.otf") the same one comes last, and is rendered with, on every page
+ * load. Uploaded files are listed where they were registered, which at startup
+ * is after the bundled ones. Resolve against this list to get the file the
+ * canvas is actually using.
  */
 export function listRegisteredFonts(): UploadedFont[] {
   if (typeof document === 'undefined' || !document.fonts) {
@@ -81,36 +96,45 @@ export function listRegisteredFonts(): UploadedFont[] {
 }
 
 export async function registerFontFile(file: File): Promise<UploadedFont> {
-  const arrayBuffer = await file.arrayBuffer();
-  return registerFontSource(parseFontSourceName(file.name), arrayBuffer, 'uploaded');
+  const metadata = parseFontSourceName(file.name);
+  const fontFace = await loadFontFace(metadata, await file.arrayBuffer());
+  return registerFontFace(fontFace, metadata, 'uploaded');
 }
 
 export async function registerUploadedFontBytes(
   record: PersistedUploadedFont,
 ): Promise<UploadedFont> {
-  return registerFontSource(record, record.bytes, 'uploaded');
+  return registerFontFace(await loadFontFace(record, record.bytes), record, 'uploaded');
 }
 
 export async function loadFontEntries(
   fontEntries: Array<[string, string]>
 ): Promise<UploadedFont[]> {
-  const loadedFonts = await Promise.allSettled(
+  // The fonts load in parallel, and finish in a different order on every page load.
+  const loads = await Promise.allSettled(
     fontEntries.map(async ([path, url]) => {
       const sourceName = path.split('/').at(-1) ?? 'Bundled Font';
-      return registerFontSource(parseFontSourceName(sourceName), url, 'bundled');
+      const metadata = parseFontSourceName(sourceName);
+      return { metadata, fontFace: await loadFontFace(metadata, url) };
     })
   );
 
-  return loadedFonts.flatMap((result) => {
-    if (result.status === 'fulfilled') {
-      return [result.value];
+  // So no face is registered until every load has settled, and then they are
+  // registered in entry order: where two files share a family, weight and style,
+  // the same one is added last, and so rendered with, every time.
+  const fonts: UploadedFont[] = [];
+  for (const load of loads) {
+    if (load.status === 'fulfilled') {
+      fonts.push(registerFontFace(load.value.fontFace, load.value.metadata, 'bundled'));
+    } else {
+      console.warn('Skipping bundled font that failed to load.', load.reason);
     }
-    console.warn('Skipping bundled font that failed to load.', result.reason);
-    return [];
-  });
+  }
+  return fonts;
 }
 
 export async function loadBundledFonts(): Promise<UploadedFont[]> {
+  // Vite emits the glob's files sorted by path, so entry order is filename order.
   return loadFontEntries(Object.entries(bundledFontUrls));
 }
 
