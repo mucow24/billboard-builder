@@ -148,6 +148,14 @@ import {
 import { collectLeafItems } from './editor/document/sceneGraph';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
+import { renderSettled } from './test/renderSettled';
+
+/** Renders the app and returns once startup is over and the editor is up, with its effects run. */
+async function renderApp() {
+  await renderSettled(<App />);
+
+  expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+}
 
 function clickToolbarPopoverItem(triggerName: string, itemName: string) {
   fireEvent.click(screen.getByRole('button', { name: triggerName }));
@@ -178,8 +186,7 @@ describe('App integration', () => {
   });
 
   it('renders the real app shell and applies properties changes through the store/controller path', async () => {
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     const selectedRectangle = createRectangleItem({
       id: 'selected-rectangle',
@@ -211,8 +218,7 @@ describe('App integration', () => {
   });
 
   it('mutates the real document through keyboard shortcuts and controller actions', async () => {
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     const selectedRectangle = createRectangleItem({
       id: 'shortcut-rectangle',
@@ -271,8 +277,7 @@ describe('App integration', () => {
       weight: '400',
     });
 
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     clickToolbarPopoverItem('Canvas', 'Save');
     clickToolbarPopoverItem('Export', 'PNG');
@@ -339,8 +344,7 @@ describe('App integration', () => {
       weight: '400',
     });
 
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
@@ -416,8 +420,11 @@ describe('App integration', () => {
     expect(screen.queryByRole('button', { name: 'Canvas' })).toBeNull();
     expect(mockPersistenceSave).not.toHaveBeenCalled();
 
-    finishLoad(null);
-    await screen.findByRole('button', { name: 'Canvas' });
+    // Released inside `act`, like the startup `renderSettled` runs: see there.
+    await act(async () => {
+      finishLoad(null);
+    });
+    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
     mockPersistenceSave.mockClear();
 
     act(() => {
