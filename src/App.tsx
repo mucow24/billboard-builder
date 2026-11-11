@@ -13,7 +13,7 @@ import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
 import { FontImportProvider } from './editor/ui/FontImportContext';
 import type { GuideLine } from './editor/document/documentTypes';
-import { canGroupNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
+import { canGroupNodes, canReorderNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
 export default function App() {
   const runtimeFlags = readEditorRuntimeFlags();
@@ -136,6 +136,7 @@ export default function App() {
             canvas={document.canvas}
             canDelete={selectedNodeIds.length > 0}
             canGroup={canGroupNodes(document.nodes, selectedNodeIds)}
+            canReorder={canReorderNodes(document.nodes, selectedNodeIds)}
             canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
             canUndo={canUndo}
             canRedo={canRedo}
@@ -170,6 +171,7 @@ export default function App() {
               });
             }}
             onRedo={redo}
+            onReorder={reorderSelectedNode}
             onSave={handleSave}
             onSaveFavorite={() => {
               if (saveSelectionAsFavorite()) {
