@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PersistedUploadedFont } from './fontModel';
+import { getFontRegistrationCount, subscribeToFontRegistrations } from './fontRegistrations';
 import {
   listRegisteredFonts,
   loadBundledFonts,
@@ -171,6 +172,48 @@ describe('browser font loader', () => {
       style: 'normal',
       kind: 'uploaded',
     });
+  });
+
+  // Text drawn before its font was registered has to be drawn again, and the
+  // browser sends no event for a face that joins the font set already loaded.
+  it('announces a font once the browser can render with it, and not before', async () => {
+    const registeredWhenAnnounced: number[] = [];
+    const unsubscribe = subscribeToFontRegistrations(() => {
+      registeredWhenAnnounced.push(vi.mocked(document.fonts.add).mock.calls.length);
+    });
+    try {
+      const before = getFontRegistrationCount('Announced Sans');
+      const bytes = new Uint8Array([1, 2, 3]);
+      const file = new File([bytes], 'AnnouncedSans-Regular.ttf');
+      Object.defineProperty(file, 'arrayBuffer', { configurable: true, value: async () => bytes.buffer });
+
+      await registerFontFile(file);
+      await registerUploadedFontBytes({
+        family: 'Announced Sans',
+        sourceName: 'AnnouncedSans-Bold.ttf',
+        weight: '700',
+        style: 'normal',
+        kind: 'uploaded',
+        bytes: bytes.buffer,
+      });
+      await loadFontEntries([['src/assets/fonts/AnnouncedSans-Italic.ttf', '/fonts/announced-italic.ttf']]);
+
+      expect(getFontRegistrationCount('Announced Sans')).toBe(before + 3);
+      // Each announcement came after its face had been added to document.fonts.
+      expect(registeredWhenAnnounced).toEqual([1, 2, 3]);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not announce a font that failed to load', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await loadFontEntries([['src/assets/fonts/Broken-Announce.ttf', '/fonts/broken-announce.ttf']]);
+      expect(getFontRegistrationCount('Broken Announce')).toBe(0);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   /** Settle a deferred font load and let the loader carry on from it. */

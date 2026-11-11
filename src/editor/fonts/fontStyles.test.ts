@@ -4,6 +4,7 @@ import {
   getRenderableCanvasFontDeclaration,
   getRenderableCombinedFontStyle,
 } from './fontStyles';
+import { announceFontRegistration } from './fontRegistrations';
 import { createTextItem } from '../document/documentDefaults';
 
 interface FontSetMock {
@@ -146,5 +147,21 @@ describe('fontStyles', () => {
 
     expect(getRenderableCombinedFontStyle(item)).toBe('bold italic');
     expect(check).toHaveBeenCalledTimes(2);
+  });
+
+  // The app adds its faces to the font set already loaded, which fires no event.
+  it('asks again once the font loader has registered a font', () => {
+    const check = vi.fn().mockReturnValue(false);
+    setFontCheck(check);
+    const item = createTextItem({ fontFamily: 'Poster Sans', fontWeight: 'bold' });
+
+    expect(getRenderableCombinedFontStyle(item)).toBe('normal');
+
+    check.mockReturnValue(true);
+    expect(getRenderableCombinedFontStyle(item)).toBe('normal');
+
+    announceFontRegistration('Poster Sans');
+
+    expect(getRenderableCombinedFontStyle(item)).toBe('bold');
   });
 });

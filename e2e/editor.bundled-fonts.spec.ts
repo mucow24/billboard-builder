@@ -5,6 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
 import opentype from 'opentype.js';
 
 import { gotoEditor, waitForEditor } from './support/editor';
+import { fontRequestPattern } from './support/fonts';
 
 // Two bundled files whose names parse to the same family, weight and style
 // ("Futura", regular, upright). They are different designs with different glyph
@@ -16,13 +17,6 @@ const SAME_VARIANT_FILES = ['Futura Book.otf', 'Futura Regular.ttf'];
 
 const PROBE_GLYPHS = ['H', 'W', 'a'];
 const PROBE_FONT_SIZE = 1000;
-
-/** Matches the request for a bundled font file, with or without the build's content hash. */
-function fontRequestPattern(fontFile: string): RegExp {
-  const { name, ext } = path.parse(fontFile);
-  const urlName = encodeURIComponent(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`/${urlName}(-[\\w-]+)?\\${ext}$`);
-}
 
 /** The advance width of each probe glyph in a bundled font file, in px at the probe size. */
 function bundledGlyphAdvances(fontFile: string): number[] {
