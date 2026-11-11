@@ -40,6 +40,7 @@ export const CANVAS_PRESETS: CanvasPreset[] = [
 export const WEB_SAFE_FONTS = [
   'Arial',
   'Georgia',
+  'Helvetica',
   'Impact',
   'Tahoma',
   'Times New Roman',
