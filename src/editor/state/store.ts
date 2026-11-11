@@ -8,7 +8,9 @@ import {
   selectSelectedGroup,
   selectSelectedItem,
   selectSelectedItems,
+  selectSelectedNodes,
 } from '../core/selectors';
+import { buildSelectionLockCommands } from '../core/selectionLock';
 import {
   createItemForKind,
   createResetDocumentTransaction,
@@ -59,6 +61,7 @@ export interface EditorStoreState {
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   updateSelectionItems: (changes: SelectionItemChange) => void;
   updateSelectedGroup: (opacity: number) => void;
+  setSelectionLocked: (locked: boolean) => void;
   selectSingleNode: (nodeId?: string) => void;
   selectParentNode: () => boolean;
   toggleSelectedNode: (nodeId: string) => void;
@@ -161,6 +164,25 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return;
       }
       get().dispatch({ type: 'update_group', groupId: selectedGroup.id, changes: { opacity } });
+    },
+    setSelectionLocked: (locked) => {
+      const editor = get().editor;
+      const commands = buildSelectionLockCommands(
+        selectSelectedNodes(editor.document, editor),
+        locked
+      );
+      if (commands.length === 0) {
+        return;
+      }
+      // One transaction, so a multi-node lock is a single undo step. Locking
+      // drops the selection, as the Layers lock button does: a selected item
+      // would keep its live transform handles on the canvas.
+      get().applyTransaction([
+        ...commands.map((command) => ({ family: 'document' as const, command })),
+        ...(locked
+          ? [{ family: 'selection' as const, command: { type: 'clear_selection' as const } }]
+          : []),
+      ]);
     },
     selectSingleNode: (nodeId) =>
       get().dispatch(nodeId ? { type: 'select_nodes', nodeIds: [nodeId] } : { type: 'clear_selection' }),

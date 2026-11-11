@@ -57,6 +57,7 @@ export default function App() {
       selectSingleNode,
       setActiveTool,
       setCanvasSize,
+      setSelectionLocked,
       insertFavorite,
       toggleInspectorTab,
       toggleSelectedNode,
@@ -214,6 +215,7 @@ export default function App() {
                 }}
                 onItemChange={updateSelectionItems}
                 onInsertFavorite={insertFavorite}
+                onSelectionLockedChange={setSelectionLocked}
                 onSelectNode={selectSingleNode}
                 onToggleNode={toggleSelectedNode}
                 onToggleNodeLocked={(nodeId) => {

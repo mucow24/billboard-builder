@@ -7,6 +7,7 @@ import type {
   UploadedFont,
 } from '../../document/documentTypes';
 import type { LayerRow } from '../../document/sceneGraph';
+import type { SelectionLockState } from '../../core/selectionLock';
 import type { StoredFavorite } from '../../persistence/favoriteLibraryService';
 
 export type { SelectionItemChange };
@@ -37,6 +38,8 @@ export interface PropertiesPanelProps {
   onRenameGroup?: (groupId: string, name: string) => void;
   onSelectNode: (nodeId: string) => void;
   onSelectGroupChildren?: () => void;
+  /** Locks or unlocks everything selected; without it the Properties lock button is not shown. */
+  onSelectionLockedChange?: (locked: boolean) => void;
   onToggleNode: (nodeId: string) => void;
   onToggleNodeLocked: (nodeId: string) => void;
   onToggleNodeHidden: (nodeId: string) => void;
@@ -68,8 +71,11 @@ export interface SelectionInspectorProps {
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;
   onSelectGroupChildren?: () => void;
+  onSelectionLockedChange?: (locked: boolean) => void;
   selectedGroup?: GroupNode;
   selectedItem?: CanvasItem;
+  /** Lock state of the selected nodes; null or omitted hides the lock button. */
+  selectionLockState?: SelectionLockState | null;
   selectedNodeCount: number;
   selectedItems: CanvasItem[];
 }
