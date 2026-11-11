@@ -12,7 +12,9 @@ export {
 export {
   loadBundledFonts,
   loadFontEntries,
+  loadFontEntriesInStages,
   registerFontFile,
   registerUploadedFontBytes,
 } from './browserFontLoader';
+export type { FontLoad, FontLoadOptions } from './browserFontLoader';
 export type { PersistedUploadedFont } from './fontModel';

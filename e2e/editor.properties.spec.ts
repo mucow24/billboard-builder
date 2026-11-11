@@ -15,7 +15,6 @@ import {
   openPropertiesTab,
   saveAndReadProject,
   uploadProject,
-  waitForStartupToFinish,
 } from './support/editor';
 
 async function expectSliders(page: Page, sectionName: string, labels: string[]) {
@@ -599,8 +598,6 @@ test.describe('editor properties flows', () => {
     });
 
     await openFreshEditor(page);
-    await openPropertiesTab(page);
-    await waitForStartupToFinish(page);
     await uploadProject(page, createProjectDocument([rectangle, ellipse]), 'properties-lock.json');
 
     // Locking keeps the item selected, so the same button undoes a stray click.

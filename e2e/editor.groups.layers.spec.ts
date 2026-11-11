@@ -17,7 +17,6 @@ import {
   setCanvasTestHooksEnabled,
   uploadProject,
   dragLayerGrip,
-  waitForStartupToFinish,
 } from './support/editor';
 
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
@@ -95,8 +94,6 @@ test.describe('editor group layers and inspector flows', () => {
     ]);
 
     await openFreshEditor(page);
-    await openPropertiesTab(page);
-    await waitForStartupToFinish(page);
     await uploadProject(page, document, 'layers-lock.json');
 
     await openLayersTab(page);
