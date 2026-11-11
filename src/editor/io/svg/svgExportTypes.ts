@@ -15,7 +15,11 @@ import type { GeneratorCanvasItem, TextCanvasItem } from '../../document/documen
  */
 export interface OutlineFont {
   readonly unitsPerEm: number;
-  /** SVG path `d` for `ch` placed with its baseline origin at (penX, baselineY), or null if the glyph has no outline. */
+  /**
+   * SVG path `d` for `ch` placed with its baseline origin at (penX, baselineY), or null
+   * if there is nothing to draw: the glyph has no outline, or its position or size is
+   * not a finite number.
+   */
   glyphPath(ch: string, fontSizePx: number, penX: number, baselineY: number): string | null;
 }
 

@@ -219,6 +219,38 @@ describe('createDocumentFontLoader', () => {
     expect(loaders.loadBundledBytes).not.toHaveBeenCalled();
   });
 
+  it('resolves the variant the same way when the document references every uploaded file of the family', async () => {
+    const boldRef: DocumentFontReference = {
+      family: 'Session Sans',
+      sourceName: 'SessionSans-Bold.ttf',
+      kind: 'uploaded',
+    };
+    const regularRef: DocumentFontReference = {
+      family: 'Session Sans',
+      sourceName: 'SessionSans-Regular.ttf',
+      kind: 'uploaded',
+    };
+    const loaders = trackingLoaders();
+    const load = createDocumentFontLoader(
+      docWithFonts([boldRef, regularRef]),
+      [
+        registered('Session Sans', 'SessionSans-Bold.ttf', '700', 'normal', 'uploaded'),
+        registered('Session Sans', 'SessionSans-Regular.ttf', '400', 'normal', 'uploaded'),
+      ],
+      loaders,
+    );
+
+    expect(await load(textItem('Session Sans'))).toEqual({
+      kind: 'uploaded',
+      bytes: loaders.bytesFor('SessionSans-Regular.ttf'),
+    });
+    expect(await load(textItem('Session Sans', 'bold'))).toEqual({
+      kind: 'uploaded',
+      bytes: loaders.bytesFor('SessionSans-Bold.ttf'),
+    });
+    expect(loaders.loadUploadedBytes.mock.calls.map(([ref]) => ref)).toEqual([regularRef, boldRef]);
+  });
+
   it('loads an uploaded file that overrides a bundled one of the same family and variant', async () => {
     const loaders = trackingLoaders();
     const load = createDocumentFontLoader(

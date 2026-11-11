@@ -72,6 +72,18 @@ function replaceDocumentNodes(document: ProjectDocument, nodes: ProjectDocument[
   };
 }
 
+function isFontReferenced(
+  fonts: readonly DocumentFontReference[],
+  font: DocumentFontReference
+): boolean {
+  return fonts.some(
+    (entry) =>
+      entry.family === font.family &&
+      entry.sourceName === font.sourceName &&
+      entry.kind === font.kind
+  );
+}
+
 export function applyDocumentCommand(
   document: ProjectDocument,
   command: DocumentCommand
@@ -205,15 +217,9 @@ function applyDocumentCommandWithEffects(
         ),
       };
       break;
-    case 'register_font': {
-      const alreadyRegistered = document.fonts.some(
-        (font) =>
-          font.family === command.font.family &&
-          font.sourceName === command.font.sourceName &&
-          font.kind === command.font.kind
-      );
+    case 'register_font':
       result = {
-        nextDocument: alreadyRegistered
+        nextDocument: isFontReferenced(document.fonts, command.font)
           ? currentDocument
           : {
               ...currentDocument,
@@ -221,7 +227,6 @@ function applyDocumentCommandWithEffects(
             },
       };
       break;
-    }
     case 'load_document':
       result = {
         nextDocument: normalizeProjectDocument(command.document as ProjectDocument),
@@ -464,8 +469,43 @@ function reconcilePolygonVertexSelection(state: EditorState): EditorState {
   };
 }
 
+/**
+ * Reference every uploaded file of each font family the document references.
+ *
+ * A family can be uploaded as several files (regular, bold, …) and the browser
+ * picks between them by weight and style. At startup only the uploaded files the
+ * document or a favorite references are restored, and the rest are deleted from
+ * storage, so a file the document leaves out is lost on the next reload and its
+ * text is drawn with a sibling file instead.
+ *
+ * Running after every action keeps the list complete however the family reached
+ * the document (font picker, favorite, opened project, undo/redo) and whenever
+ * another of its files is uploaded. Bundled files load at every start, so the one
+ * reference the family already has is enough for them.
+ */
+function reconcileUploadedFontReferences(state: EditorState): EditorState {
+  const { fonts } = state.document;
+  if (fonts.length === 0) {
+    return state;
+  }
+  const referencedFamilies = new Set(fonts.map((font) => font.family));
+  const unreferenced = state.session.availableFonts
+    .filter((font) => font.kind === 'uploaded' && referencedFamilies.has(font.family))
+    .map(({ family, sourceName, kind }): DocumentFontReference => ({ family, sourceName, kind }))
+    .filter((font) => !isFontReferenced(fonts, font));
+  if (unreferenced.length === 0) {
+    return state;
+  }
+  return {
+    ...state,
+    document: { ...state.document, fonts: [...fonts, ...unreferenced] },
+  };
+}
+
 export function reduceEditorState(state: EditorState, action: EditorAction): EditorState {
-  return reconcilePolygonVertexSelection(reduceEditorStateForAction(state, action));
+  return reconcilePolygonVertexSelection(
+    reconcileUploadedFontReferences(reduceEditorStateForAction(state, action))
+  );
 }
 
 function reduceEditorStateForAction(state: EditorState, action: EditorAction): EditorState {

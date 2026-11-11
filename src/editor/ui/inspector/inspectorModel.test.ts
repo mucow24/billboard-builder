@@ -91,6 +91,41 @@ describe('inspectorModel', () => {
     ]);
   });
 
+  it('lists a family once however many of its files are available or referenced by the document', () => {
+    const options = buildFontOptions(
+      [
+        {
+          family: 'Persist Probe',
+          sourceName: 'PersistProbe-Bold.otf',
+          weight: '700',
+          style: 'normal',
+          kind: 'uploaded',
+        },
+        {
+          family: 'Persist Probe',
+          sourceName: 'PersistProbe-Regular.otf',
+          weight: '400',
+          style: 'normal',
+          kind: 'uploaded',
+        },
+      ],
+      [
+        { family: 'Persist Probe', sourceName: 'PersistProbe-Bold.otf', kind: 'uploaded' },
+        { family: 'Persist Probe', sourceName: 'PersistProbe-Regular.otf', kind: 'uploaded' },
+        { family: 'Ghost Font', sourceName: 'GhostFont-Bold.ttf', kind: 'uploaded' },
+        { family: 'Ghost Font', sourceName: 'GhostFont-Regular.ttf', kind: 'uploaded' },
+      ],
+    );
+
+    expect(options.filter((font) => font.family === 'Persist Probe')).toEqual([
+      { family: 'Persist Probe', sourceName: 'PersistProbe-Bold.otf', kind: 'uploaded' },
+    ]);
+    // A family whose files are all missing stays selectable, also just once.
+    expect(options.filter((font) => font.family === 'Ghost Font')).toEqual([
+      { family: 'Ghost Font', sourceName: 'GhostFont-Bold.ttf', kind: 'uploaded' },
+    ]);
+  });
+
   it('computes text style capability rules for system and uploaded fonts', () => {
     const uploadedText = createTextItem({
       fontFamily: 'Custom Family',
