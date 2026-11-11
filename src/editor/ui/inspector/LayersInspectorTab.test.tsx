@@ -13,13 +13,6 @@ import { flattenLayerRows } from '../../document/sceneGraph';
 
 import { LayersInspectorTab } from './LayersInspectorTab';
 
-const CANVAS_STUB_PROPS = {
-  background: '#ffffff',
-  canvas: { width: 2048, height: 2048, presetId: 'square-lg' as const },
-  onBackgroundChange: vi.fn(),
-  onCanvasSizeChange: vi.fn(),
-} as const;
-
 describe('LayersInspectorTab', () => {
   it('renders layers in z-index order and deletes a layer via its inline delete button', async () => {
     const user = userEvent.setup();
@@ -30,7 +23,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([backItem, frontItem])}
         onDeleteNode={onDeleteNode}
@@ -70,7 +62,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
@@ -105,7 +96,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder={false}
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
@@ -134,7 +124,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
@@ -167,7 +156,6 @@ describe('LayersInspectorTab', () => {
 
     const { container, rerender } = render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -193,7 +181,6 @@ describe('LayersInspectorTab', () => {
 
     rerender(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -214,7 +201,6 @@ describe('LayersInspectorTab', () => {
 
     rerender(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -242,7 +228,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
@@ -271,7 +256,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([item])}
         onDeleteNode={vi.fn()}
@@ -300,7 +284,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group, topLevelItem])}
         onDeleteNode={vi.fn()}
@@ -328,7 +311,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -358,7 +340,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -392,7 +373,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -425,7 +405,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -462,7 +441,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([group])}
         onDeleteNode={vi.fn()}
@@ -489,7 +467,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([a, b])}
         onDeleteNode={vi.fn()}
@@ -517,7 +494,6 @@ describe('LayersInspectorTab', () => {
 
     render(
       <LayersInspectorTab
-        {...CANVAS_STUB_PROPS}
         canReorder
         rows={flattenLayerRows([rect, gen as unknown as CanvasNode])}
         onDeleteNode={vi.fn()}
