@@ -8,8 +8,8 @@ import {
   createTextItem,
 } from '../document/documentDefaults';
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
-import type { DocumentFontReference, UploadedFont } from '../document/documentTypes';
-import { collectLeafItems } from '../document/sceneGraph';
+import type { CanvasNode, DocumentFontReference, UploadedFont } from '../document/documentTypes';
+import { cloneCanvasNode, collectLeafItems } from '../document/sceneGraph';
 import { createDefaultEditorState, type EditorState } from './editorState';
 import { applyEditorCommand, createResetDocumentTransaction, reduceEditorState } from './editorReducer';
 import { createTransactionAction, toEditorAction } from './editorActions';
@@ -353,7 +353,7 @@ describe('editor reducer', () => {
   });
 });
 
-describe('uploaded font files of a referenced family', () => {
+describe('font references of the families text is set in', () => {
   function fontFile(
     sourceName: string,
     overrides: Partial<UploadedFont> = {},
@@ -399,25 +399,32 @@ describe('uploaded font files of a referenced family', () => {
     );
   }
 
-  it('references every uploaded file of a family once one of them is registered', () => {
+  it('references every uploaded file of a family that text is set in', () => {
     const state = makeAvailable(stateWithText(), regular, bold, italic);
-    expect(state.document.fonts).toEqual([]);
 
-    const registered = registerFont(state, regular);
-
-    expect(registered.document.fonts).toEqual([
+    expect(state.document.fonts).toEqual([
       reference(regular),
       reference(bold),
       reference(italic),
     ]);
   });
 
-  it('keeps the registered file first, whichever of the family was uploaded first', () => {
-    const state = makeAvailable(stateWithText(), bold, regular);
+  it('keeps an explicitly registered file first, whichever of the family was uploaded first', () => {
+    const state = makeAvailable(createDefaultEditorState(), bold, regular);
 
-    const registered = registerFont(state, regular);
+    // As when a favorite is inserted together with the references it was saved with.
+    const inserted = reduceEditorState(
+      state,
+      createTransactionAction([
+        toEditorAction({
+          type: 'insert_nodes',
+          nodes: [createTextItem({ id: 'favorite-headline', fontFamily: 'Poster Sans' })],
+        }),
+        toEditorAction({ type: 'register_font', font: reference(regular) }),
+      ]),
+    );
 
-    expect(registered.document.fonts).toEqual([reference(regular), reference(bold)]);
+    expect(inserted.document.fonts).toEqual([reference(regular), reference(bold)]);
   });
 
   it('references a file uploaded after its family was registered, without an undo step', () => {
@@ -543,5 +550,136 @@ describe('uploaded font files of a referenced family', () => {
     );
 
     expect(switched.document.fonts).toEqual([]);
+  });
+
+  describe('when text enters the document', () => {
+    const bundledBold = fontFile('PosterSans-Bold.otf', { kind: 'bundled', weight: '700' });
+    const bundledRegular = fontFile('PosterSans-Regular.otf', { kind: 'bundled' });
+    const otherFamily = fontFile('SessionSans-Regular.ttf', { family: 'Session Sans' });
+
+    /** What a paste dispatches: the pasted nodes, then their selection. */
+    function paste(state: EditorState, ...nodes: CanvasNode[]): EditorState {
+      return reduceEditorState(
+        state,
+        createTransactionAction([
+          toEditorAction({ type: 'insert_nodes', nodes }),
+          toEditorAction({ type: 'select_nodes', nodeIds: nodes.map((node) => node.id) }),
+        ]),
+      );
+    }
+
+    it('references the first file of a bundled family that pasted text is set in', () => {
+      const state = makeAvailable(createDefaultEditorState(), bundledBold, bundledRegular);
+
+      const pasted = paste(state, createTextItem({ id: 'pasted', fontFamily: 'Poster Sans' }));
+
+      // The file the font picker used to register: the first one the family has.
+      expect(pasted.document.fonts).toEqual([reference(bundledBold)]);
+    });
+
+    it('references every uploaded file of the family that pasted text is set in', () => {
+      const state = makeAvailable(createDefaultEditorState(), regular, bold);
+
+      const pasted = paste(state, createTextItem({ id: 'pasted', fontFamily: 'Poster Sans' }));
+
+      expect(pasted.document.fonts).toEqual([reference(regular), reference(bold)]);
+    });
+
+    it('puts the reference back when the only text in a font is cut and pasted', () => {
+      const state = makeAvailable(stateWithText(), regular);
+      const [headline] = state.document.nodes;
+
+      const cut = reduceEditorState(
+        state,
+        toEditorAction({ type: 'delete_nodes', nodeIds: ['headline'] }),
+      );
+      expect(cut.document.fonts).toEqual([]);
+
+      const pasted = paste(cut, cloneCanvasNode(headline));
+
+      expect(pasted.document.fonts).toEqual([reference(regular)]);
+    });
+
+    it('references each family once for text nested in a pasted group', () => {
+      const state = makeAvailable(createDefaultEditorState(), bundledBold, otherFamily);
+
+      const pasted = paste(
+        state,
+        createGroupNode([
+          createTextItem({ id: 'first', fontFamily: 'Poster Sans' }),
+          createRectangleItem({ id: 'shape' }),
+          createGroupNode([
+            createTextItem({ id: 'second', fontFamily: 'Session Sans' }),
+            createTextItem({ id: 'third', fontFamily: 'Poster Sans' }),
+          ]),
+        ]),
+      );
+
+      expect(pasted.document.fonts).toEqual([reference(bundledBold), reference(otherFamily)]);
+    });
+
+    it('adds no reference for a family the session has no file for', () => {
+      const state = makeAvailable(createDefaultEditorState(), regular);
+
+      const pasted = paste(state, createTextItem({ id: 'pasted', fontFamily: 'Arial' }));
+
+      expect(pasted.document.fonts).toEqual([]);
+    });
+
+    it('undoes and redoes a paste together with its font reference', () => {
+      const state = makeAvailable(createDefaultEditorState(), regular);
+
+      const pasted = paste(state, createTextItem({ id: 'pasted', fontFamily: 'Poster Sans' }));
+      expect(pasted.history.past).toHaveLength(1);
+
+      const undone = reduceEditorState(pasted, { family: 'history', type: 'undo' });
+      expect(undone.document.nodes).toEqual([]);
+      expect(undone.document.fonts).toEqual([]);
+
+      const redone = reduceEditorState(undone, { family: 'history', type: 'redo' });
+      expect(redone.document.fonts).toEqual([reference(regular)]);
+    });
+
+    it('references the family that existing text is switched to', () => {
+      const state = makeAvailable(stateWithText('Arial'), bundledBold);
+
+      const switched = reduceEditorState(
+        state,
+        toEditorAction({
+          type: 'update_node',
+          itemId: 'headline',
+          changes: { fontFamily: 'Poster Sans' },
+        }),
+      );
+
+      expect(switched.document.fonts).toEqual([reference(bundledBold)]);
+    });
+
+    it('references the families of a loaded document that came without references', () => {
+      const state = makeAvailable(createDefaultEditorState(), bundledBold);
+
+      const loaded = reduceEditorState(
+        state,
+        toEditorAction({
+          type: 'load_document',
+          document: {
+            ...createDefaultProjectDocument(),
+            nodes: [createTextItem({ id: 'loaded-headline', fontFamily: 'Poster Sans' })],
+          },
+        }),
+      );
+
+      expect(loaded.document.fonts).toEqual([reference(bundledBold)]);
+    });
+
+    it('references a font imported after text was already set in its family, without an undo step', () => {
+      const state = stateWithText();
+      expect(state.document.fonts).toEqual([]);
+
+      const imported = makeAvailable(state, regular);
+
+      expect(imported.document.fonts).toEqual([reference(regular)]);
+      expect(imported.history).toBe(state.history);
+    });
   });
 });

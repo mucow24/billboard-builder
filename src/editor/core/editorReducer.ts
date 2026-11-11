@@ -9,6 +9,7 @@ import {
 } from '../document/documentDefaults';
 import { normalizeProjectDocument } from '../document/documentNormalizer';
 import {
+  collectLeafItems,
   getNodeById,
   getNodeIds,
   groupNodes,
@@ -469,42 +470,75 @@ function reconcilePolygonVertexSelection(state: EditorState): EditorState {
   };
 }
 
+function toFontReference({ family, sourceName, kind }: UploadedFont): DocumentFontReference {
+  return { family, sourceName, kind };
+}
+
 /**
- * Reference every uploaded file of each font family the document references.
+ * Keep the document's font references in step with the fonts its text is set in.
  *
- * A family can be uploaded as several files (regular, bold, …) and the browser
- * picks between them by weight and style. At startup only the uploaded files the
- * document or a favorite references are restored, and the rest are deleted from
- * storage, so a file the document leaves out is lost on the next reload and its
- * text is drawn with a sibling file instead.
+ * The references decide what happens to a font outside the canvas: at startup
+ * only the uploaded files the document or a favorite references are restored and
+ * the rest are deleted from storage, and SVG export treats a family without a
+ * reference as a system font it cannot outline. So text whose family has no
+ * reference loses an uploaded font on the next reload, and cannot be exported.
  *
- * Running after every action keeps the list complete however the family reached
- * the document (font picker, favorite, opened project, undo/redo) and whenever
- * another of its files is uploaded. Bundled files load at every start, so the one
- * reference the family already has is enough for them.
+ * 1. A family that text is set in gets a reference to the first file the session
+ *    has for it, unless it already has one. Text reaches the document in many
+ *    ways (font picker, paste, favorite, text tool, opened project, undo/redo),
+ *    and a reference is dropped as soon as no text uses its family, so a cut
+ *    followed by a paste has to put it back.
+ * 2. A referenced family gets a reference to every uploaded file it has. A
+ *    family can be uploaded as several files (regular, bold, …) which the browser
+ *    picks between by weight and style, and a file left out would be deleted on
+ *    the next reload. Bundled files load at every start, so one reference is
+ *    enough for them.
+ *
+ * Running after every action also covers a font that is uploaded while text
+ * already uses its family.
  */
-function reconcileUploadedFontReferences(state: EditorState): EditorState {
-  const { fonts } = state.document;
-  if (fonts.length === 0) {
+function reconcileFontReferences(state: EditorState): EditorState {
+  const { availableFonts } = state.session;
+  if (availableFonts.length === 0) {
     return state;
   }
+  const { fonts, nodes } = state.document;
   const referencedFamilies = new Set(fonts.map((font) => font.family));
-  const unreferenced = state.session.availableFonts
-    .filter((font) => font.kind === 'uploaded' && referencedFamilies.has(font.family))
-    .map(({ family, sourceName, kind }): DocumentFontReference => ({ family, sourceName, kind }))
-    .filter((font) => !isFontReferenced(fonts, font));
-  if (unreferenced.length === 0) {
+  const added: DocumentFontReference[] = [];
+
+  for (const item of nodes.flatMap(collectLeafItems)) {
+    if (item.kind !== 'text' || referencedFamilies.has(item.fontFamily)) {
+      continue;
+    }
+    const firstFile = availableFonts.find((font) => font.family === item.fontFamily);
+    if (firstFile) {
+      referencedFamilies.add(firstFile.family);
+      added.push(toFontReference(firstFile));
+    }
+  }
+
+  for (const font of availableFonts) {
+    if (font.kind !== 'uploaded' || !referencedFamilies.has(font.family)) {
+      continue;
+    }
+    const reference = toFontReference(font);
+    if (!isFontReferenced(fonts, reference) && !isFontReferenced(added, reference)) {
+      added.push(reference);
+    }
+  }
+
+  if (added.length === 0) {
     return state;
   }
   return {
     ...state,
-    document: { ...state.document, fonts: [...fonts, ...unreferenced] },
+    document: { ...state.document, fonts: [...fonts, ...added] },
   };
 }
 
 export function reduceEditorState(state: EditorState, action: EditorAction): EditorState {
   return reconcilePolygonVertexSelection(
-    reconcileUploadedFontReferences(reduceEditorStateForAction(state, action))
+    reconcileFontReferences(reduceEditorStateForAction(state, action))
   );
 }
 

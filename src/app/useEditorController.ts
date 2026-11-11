@@ -120,15 +120,9 @@ export function useEditorController() {
     setErrorMessage,
   });
 
-  const {
-    handleFontUpload,
-    handleSelectionItemChange,
-  } = useFontController({
-    availableFonts,
-    dispatch,
+  const { handleFontUpload } = useFontController({
     registerAvailableFont,
     setErrorMessage,
-    updateSelectionItems,
   });
 
   const {
@@ -219,7 +213,7 @@ export function useEditorController() {
       undo,
       ungroupSelectedNode,
       updateSelectedGroup,
-      updateSelectionItems: handleSelectionItemChange,
+      updateSelectionItems,
     },
     state: {
       activeTool,
