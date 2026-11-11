@@ -223,6 +223,25 @@ describe('document normalizer', () => {
     ]);
   });
 
+  it('keeps or drops all the font references of a family together', () => {
+    const posterFiles = [
+      { family: 'Poster Sans', sourceName: 'PosterSans-Bold.ttf', kind: 'uploaded' as const },
+      { family: 'Poster Sans', sourceName: 'PosterSans-Regular.ttf', kind: 'uploaded' as const },
+    ];
+    const ghostFiles = [
+      { family: 'Ghost Font', sourceName: 'GhostFont-Bold.ttf', kind: 'uploaded' as const },
+      { family: 'Ghost Font', sourceName: 'GhostFont-Regular.ttf', kind: 'uploaded' as const },
+    ];
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [createTextItem({ id: 'poster-text', fontFamily: 'Poster Sans' })],
+      fonts: [posterFiles[0], ghostFiles[0], posterFiles[1], ghostFiles[1]],
+    });
+
+    expect(normalized.fonts).toEqual(posterFiles);
+  });
+
   it('defaults missing blurRadius to zero and preserves valid values', () => {
     const rectangle = createRectangleItem();
     const withBlur = { ...rectangle, blurRadius: 10 };

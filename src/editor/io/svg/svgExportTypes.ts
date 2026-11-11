@@ -8,12 +8,18 @@ import type { GeneratorCanvasItem, TextCanvasItem } from '../../document/documen
  *
  * opentype is a SHAPE provider only: `OutlineFont.glyphPath` returns a glyph
  * contour; it never reports advances. All positioning comes from the
- * `TextMeasurer` (canvas `measureText`, the exact source Pixi renders with), so
- * kerning/advance fidelity is correct by construction.
+ * `TextMeasurer` (canvas `measureText`, the source Pixi lays text out with).
+ * Measuring does not by itself get kerning right: the widths of single
+ * characters leave it out. `svgText` therefore places each glyph from the
+ * measured width of the rest of its line, which is the rule the canvas follows.
  */
 export interface OutlineFont {
   readonly unitsPerEm: number;
-  /** SVG path `d` for `ch` placed with its baseline origin at (penX, baselineY), or null if the glyph has no outline. */
+  /**
+   * SVG path `d` for `ch` placed with its baseline origin at (penX, baselineY), or null
+   * if there is nothing to draw: the glyph has no outline, or its position or size is
+   * not a finite number.
+   */
   glyphPath(ch: string, fontSizePx: number, penX: number, baselineY: number): string | null;
   /** The same for a glyph the font puts in place of characters, given by its index in the font (see `substitutions`). */
   glyphPath(glyphIndex: number, fontSizePx: number, penX: number, baselineY: number): string | null;
@@ -54,7 +60,11 @@ export interface FontOutlineProvider {
 }
 
 export interface TextMeasurer {
-  /** Width in px of `text` at the item's resolved font, EXCLUDING letterSpacing. */
+  /**
+   * Width in px of `text` at the item's resolved font, EXCLUDING letterSpacing
+   * and INCLUDING the kerning between its characters, as canvas `measureText`
+   * reports it. Glyph placement depends on the kerning being in here.
+   */
   measureWidth(item: TextCanvasItem, text: string): number;
   /**
    * Baseline offset in px from the line-box top for the first line, matching

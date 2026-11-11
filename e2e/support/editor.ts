@@ -761,6 +761,23 @@ export async function openFreshEditor(page: Page) {
   await waitForEditor(page);
 }
 
+/**
+ * Waits until startup has finished: the bundled fonts are registered and the
+ * saved canvas, if there is one, has been loaded.
+ *
+ * `waitForEditor` returns earlier, while the bundled fonts are still loading.
+ * When startup gets there it replaces the document with the saved canvas, so a
+ * project that a test loaded in the meantime is lost. A test that depends on its
+ * document surviving should wait for this before loading it.
+ *
+ * Needs the Properties tab open with nothing selected, as after `openFreshEditor`.
+ */
+export async function waitForStartupToFinish(page: Page) {
+  await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
+    timeout: 30_000,
+  });
+}
+
 export async function gotoEditor(page: Page) {
   await page.goto(EDITOR_TEST_URL);
 }

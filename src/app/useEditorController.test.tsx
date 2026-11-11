@@ -9,6 +9,7 @@ import {
   createTextItem,
 } from '../editor/document/documentDefaults';
 import { collectLeafItems } from '../editor/document/sceneGraph';
+import { parseFontSourceName, type PersistedUploadedFont } from '../editor/fonts';
 import { useEditorStore } from '../editor/state/store';
 import { resetEditorStore } from '../test/editorStore';
 
@@ -709,6 +710,194 @@ describe('useEditorController', () => {
         },
       ]),
     );
+  });
+
+  describe('an uploaded font family with several files', () => {
+    const boldReference = {
+      family: 'Persist Probe',
+      sourceName: 'PersistProbe-Bold.otf',
+      kind: 'uploaded' as const,
+    };
+    const regularReference = {
+      family: 'Persist Probe',
+      sourceName: 'PersistProbe-Regular.otf',
+      kind: 'uploaded' as const,
+    };
+    const boldFont = { ...boldReference, weight: '700' as const, style: 'normal' as const };
+    const regularFont = { ...regularReference, weight: '400' as const, style: 'normal' as const };
+    const storedFonts: PersistedUploadedFont[] = [
+      { ...boldFont, bytes: new Uint8Array([7]).buffer },
+      { ...regularFont, bytes: new Uint8Array([4]).buffer },
+    ];
+
+    function fontUpload(fileName: string): FileList {
+      const file = new File(['font'], fileName, { type: 'font/otf' });
+      Object.defineProperty(file, 'arrayBuffer', {
+        configurable: true,
+        value: async () => new Uint8Array([1]).buffer,
+      });
+      return makeFileList(file);
+    }
+
+    function documentSetInPersistProbe(fonts = [boldReference, regularReference]) {
+      return {
+        ...createDefaultProjectDocument(),
+        fonts,
+        nodes: [createTextItem({ id: 'probe-text', fontFamily: 'Persist Probe' })],
+      };
+    }
+
+    async function renderWithSelectedText() {
+      const textItem = createTextItem({ id: 'font-target' });
+      resetEditorStore({
+        document: { ...createDefaultProjectDocument(), nodes: [textItem] },
+        session: { selectedNodeIds: [textItem.id] },
+      });
+      const rendered = renderHook(() => useEditorController());
+      await waitFor(() => {
+        expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+      });
+      return rendered;
+    }
+
+    beforeEach(() => {
+      // As in the real loader, the family, weight and style come from the file name.
+      mockRegisterFontFile.mockImplementation(async (file: File) => ({
+        ...parseFontSourceName(file.name),
+        kind: 'uploaded',
+      }));
+      mockRegisterUploadedFontBytes.mockImplementation(
+        async ({ family, sourceName, weight, style, kind }: PersistedUploadedFont) => ({
+          family,
+          sourceName,
+          weight,
+          style,
+          kind,
+        }),
+      );
+    });
+
+    it('references every uploaded file of the family chosen for the selected text', async () => {
+      const { result } = await renderWithSelectedText();
+
+      await act(async () => {
+        await result.current.actions.handleFontUpload(fontUpload('PersistProbe-Bold.otf'));
+      });
+      await act(async () => {
+        await result.current.actions.handleFontUpload(fontUpload('PersistProbe-Regular.otf'));
+      });
+      expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
+      // Uploading alone does not put a font in the document.
+      expect(result.current.state.document.fonts).toEqual([]);
+
+      act(() => {
+        result.current.actions.updateSelectionItems({ fontFamily: 'Persist Probe' });
+      });
+
+      expect(result.current.state.document.fonts).toEqual([boldReference, regularReference]);
+    });
+
+    it('references a file uploaded after its family was chosen', async () => {
+      const { result } = await renderWithSelectedText();
+
+      await act(async () => {
+        await result.current.actions.handleFontUpload(fontUpload('PersistProbe-Bold.otf'));
+      });
+      act(() => {
+        result.current.actions.updateSelectionItems({ fontFamily: 'Persist Probe' });
+      });
+      expect(result.current.state.document.fonts).toEqual([boldReference]);
+
+      await act(async () => {
+        await result.current.actions.handleFontUpload(fontUpload('PersistProbe-Regular.otf'));
+      });
+
+      expect(result.current.state.document.fonts).toEqual([boldReference, regularReference]);
+      expect(
+        mockUploadedFontPersistenceService.save.mock.calls.map(([font]) => font.sourceName),
+      ).toEqual(['PersistProbe-Bold.otf', 'PersistProbe-Regular.otf']);
+    });
+
+    it('restores every referenced file at startup and keeps them all when pruning', async () => {
+      const persistedDocument = documentSetInPersistProbe();
+      mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
+      mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue(storedFonts);
+
+      const { result } = renderHook(() => useEditorController());
+
+      await waitFor(() => {
+        expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
+      });
+      expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenCalledWith([
+        boldReference,
+        regularReference,
+      ]);
+      await waitFor(() => {
+        expect(mockUploadedFontPersistenceService.pruneUnreferenced).toHaveBeenCalledWith([
+          boldReference,
+          regularReference,
+        ]);
+      });
+      expect(result.current.state.document.fonts).toEqual([boldReference, regularReference]);
+      expect(result.current.state.missingFontFamilies).toEqual([]);
+    });
+
+    it('saves a favorite with every file of its family and restores them all on insert', async () => {
+      resetEditorStore({
+        document: documentSetInPersistProbe(),
+        session: { selectedNodeIds: ['probe-text'] },
+      });
+      const { result } = renderHook(() => useEditorController());
+      await waitFor(() => {
+        expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
+      });
+
+      act(() => {
+        result.current.actions.saveSelectionAsFavorite();
+        result.current.actions.handleNewProject();
+      });
+      const favorite = result.current.state.favorites[0]!;
+      expect(favorite.fonts).toEqual([boldReference, regularReference]);
+      expect(result.current.state.document.fonts).toEqual([]);
+
+      mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue(storedFonts);
+      await act(async () => {
+        await result.current.actions.insertFavorite(favorite.id);
+      });
+
+      expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenLastCalledWith([
+        boldReference,
+        regularReference,
+      ]);
+      expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
+      expect(result.current.state.document.fonts).toEqual([boldReference, regularReference]);
+    });
+
+    it('references the files uploaded this session when inserting a favorite saved with only one of them', async () => {
+      const savedBeforeTheBoldUpload: StoredFavorite = {
+        id: 'regular-only-favorite',
+        name: 'Regular only',
+        nodes: [createTextItem({ id: 'favorite-text', fontFamily: 'Persist Probe' })],
+        fonts: [regularReference],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+      mockFavoriteLibraryService.load.mockReturnValue([savedBeforeTheBoldUpload] as never);
+      mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([storedFonts[1]]);
+
+      const { result } = renderHook(() => useEditorController());
+      await waitFor(() => {
+        expect(result.current.state.favorites).toHaveLength(1);
+      });
+      await act(async () => {
+        await result.current.actions.handleFontUpload(fontUpload('PersistProbe-Bold.otf'));
+      });
+      await act(async () => {
+        await result.current.actions.insertFavorite('regular-only-favorite');
+      });
+
+      expect(result.current.state.document.fonts).toEqual([regularReference, boldReference]);
+    });
   });
 
   it('returns false when no nodes are selected', async () => {

@@ -94,6 +94,21 @@ export async function expectPersistedCanvasToReferenceFontFamily(
     });
 }
 
+/** Waits until the autosaved canvas references exactly these font files, in this order. */
+export async function expectPersistedCanvasFontFiles(page: Page, expectedSourceNames: string[]) {
+  await expect
+    .poll(async () => {
+      const persistedDocument = await readPersistedCanvasDocument(page);
+      const fonts = Array.isArray(persistedDocument?.fonts) ? persistedDocument.fonts : [];
+      return fonts.map((font) =>
+        font && typeof font === 'object' && 'sourceName' in font ? font.sourceName : null,
+      );
+    }, {
+      message: `Expected the persisted canvas to reference the font files ${expectedSourceNames.join(', ')}.`,
+    })
+    .toEqual(expectedSourceNames);
+}
+
 export async function uploadNamedFontFromPath(
   page: Page,
   filePath: string,

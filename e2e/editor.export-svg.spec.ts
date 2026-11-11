@@ -293,15 +293,12 @@ test.describe('SVG export', () => {
       expect(rest, `layer ${layer.id} draws nothing else`).toEqual([]);
     });
 
-    // ...and those glyphs are what the canvas shows. The letter-spaced layer is left
-    // out here: where its second letter goes is a question of how the canvas spaces
-    // letters, not of which glyphs it draws.
+    // ...and those glyphs are what the canvas shows, in every layer.
     const compared = await compareShapesWithCanvas(page, svg, png, doc.canvas.width, layers);
     expect(compared).toHaveLength(layers.length);
     layers.forEach((layer, index) => {
       // The canvas drew the text, in the font: two letters at 200px are thousands of pixels.
       expect(compared[index].canvasInk, `canvas ink of ${layer.id}`).toBeGreaterThan(3_000);
-      if (layer.letterSpacing !== 0) return;
       // Every exported shape lies on a canvas shape and the other way round: 0 stray
       // pixels when the glyphs are the same. The separate f and i of the unfixed
       // exporter left the dot of the i and the hook of the f, which the ligature
@@ -428,4 +425,145 @@ test.describe('SVG export', () => {
     );
     expect(exportedWith).toEqual(files.map((file) => [file]));
   });
+
+  // Regression: the exporter moved the pen by each character's own width, which
+  // leaves out the kerning the canvas draws with, so kerned text drifted right of
+  // where the canvas shows it. "AVATAR Toy" in Albertus is kerned at almost every
+  // pair: at 120px the exported line ended 96px late. Kerning exists only in a
+  // real browser's text shaping, and the reference is the canvas itself
+  // (Export > PNG), so this lives in e2e. Letter spacing takes a different
+  // drawing path on the canvas (character by character), hence the second layer.
+  test('places kerned text where the canvas draws it, with and without letter spacing', async ({ page }) => {
+    await openFreshEditor(page);
+    // Wait for startup to finish, which the Properties tab shows by counting the
+    // registered fonts. Before that the bundled fonts are still loading, so the
+    // canvas would draw the layers in a fallback font, and the end of startup can
+    // replace a project loaded in the meantime with the saved canvas.
+    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
+      timeout: 30_000,
+    });
+
+    const layers = [
+      { id: 'kerned', letterSpacing: 0, x: 20, y: 40, width: 980, height: 170 },
+      { id: 'kerned-spaced', letterSpacing: 10, x: 20, y: 240, width: 980, height: 170 },
+    ];
+    const doc = {
+      ...createProjectDocument(
+        layers.map((layer, index) =>
+          createTextFixture({
+            ...layer,
+            name: layer.id,
+            text: 'AVATAR Toy',
+            fontFamily: 'Albertus MT Std',
+            fontSize: 120,
+            zIndex: index + 1,
+          }),
+        ),
+      ),
+      fonts: [{ family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' }],
+    };
+    await uploadProject(page, doc, 'kerned-text.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    const compared = await compareInkWithCanvas(page, svg, png, doc.canvas.width, layers);
+
+    expect(compared).toHaveLength(layers.length);
+    for (const layer of compared) {
+      // The canvas drew the line, and it fits its box (nothing cut off at the edges).
+      expect(layer.canvas.pixels).toBeGreaterThan(10_000);
+      expect(layer.canvas.right).toBeLessThan(layer.boxRight - 2);
+      // The exported line starts and ends where the canvas line does. Before the
+      // fix the end was 96px out; 2px allows for anti-aliasing differences.
+      expect(Math.abs(layer.exported.left - layer.canvas.left)).toBeLessThanOrEqual(2);
+      expect(Math.abs(layer.exported.right - layer.canvas.right)).toBeLessThanOrEqual(2);
+      // And the glyphs in between sit on top of the canvas ones: shared ink over
+      // ink in either. About 0.94 when placed right, 0.2 before the fix.
+      expect(layer.overlap).toBeGreaterThan(0.8);
+    }
+  });
 });
+
+interface InkComparison {
+  boxRight: number;
+  canvas: { left: number; right: number; pixels: number };
+  exported: { left: number; right: number; pixels: number };
+  overlap: number;
+}
+
+/**
+ * Compare what the canvas shows (`pngBase64`, from Export > PNG) with an exported
+ * SVG rendered at the same size, inside each box (canvas coordinates): where the
+ * ink of each starts and ends horizontally, how much there is, and how much of it
+ * the two share. All values are in PNG pixels.
+ */
+async function compareInkWithCanvas(
+  page: Page,
+  svg: string,
+  pngBase64: string,
+  canvasWidth: number,
+  boxes: Array<{ x: number; y: number; width: number; height: number }>,
+): Promise<InkComparison[]> {
+  return page.evaluate(
+    async ({ svg, pngBase64, canvasWidth, boxes }) => {
+      const load = async (src: string) => {
+        const image = new Image();
+        image.src = src;
+        await image.decode();
+        return image;
+      };
+      const canvasImage = await load(`data:image/png;base64,${pngBase64}`);
+      const exportedImage = await load(`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`);
+      const width = canvasImage.naturalWidth;
+      const height = canvasImage.naturalHeight;
+      const alphaOf = (image: HTMLImageElement) => {
+        const surface = document.createElement('canvas');
+        surface.width = width;
+        surface.height = height;
+        const context = surface.getContext('2d', { willReadFrequently: true })!;
+        context.drawImage(image, 0, 0, width, height);
+        const { data } = context.getImageData(0, 0, width, height);
+        return (x: number, y: number) => data[(y * width + x) * 4 + 3];
+      };
+      const canvasAlpha = alphaOf(canvasImage);
+      const exportedAlpha = alphaOf(exportedImage);
+      const scale = width / canvasWidth;
+      const addInk = (ink: { left: number; right: number; pixels: number }, x: number) => {
+        ink.pixels += 1;
+        if (x < ink.left) ink.left = x;
+        if (x > ink.right) ink.right = x;
+      };
+
+      return boxes.map((box) => {
+        const x0 = Math.max(0, Math.round(box.x * scale));
+        const x1 = Math.min(width, Math.round((box.x + box.width) * scale));
+        const y0 = Math.max(0, Math.round(box.y * scale));
+        const y1 = Math.min(height, Math.round((box.y + box.height) * scale));
+        const canvas = { left: Infinity, right: -Infinity, pixels: 0 };
+        const exported = { left: Infinity, right: -Infinity, pixels: 0 };
+        let shared = 0;
+        let either = 0;
+        for (let y = y0; y < y1; y += 1) {
+          for (let x = x0; x < x1; x += 1) {
+            const onCanvas = canvasAlpha(x, y) > 127;
+            const onExport = exportedAlpha(x, y) > 127;
+            if (onCanvas) addInk(canvas, x);
+            if (onExport) addInk(exported, x);
+            if (onCanvas && onExport) shared += 1;
+            if (onCanvas || onExport) either += 1;
+          }
+        }
+        return { boxRight: x1, canvas, exported, overlap: either > 0 ? shared / either : 0 };
+      });
+    },
+    { svg, pngBase64, canvasWidth, boxes },
+  );
+}
