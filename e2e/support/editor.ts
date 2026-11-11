@@ -1352,6 +1352,14 @@ export async function addGenerator(page: Page, generatorName: string) {
   }).toPass({ timeout: 30_000, intervals: [250] });
 }
 
+export async function chooseCanvasPreset(page: Page, presetName: string) {
+  await openToolbarPopover(page, 'Canvas');
+  // Scope to the Canvas menu so a same-named inspector control can never match.
+  const canvasMenu = page.getByRole('group', { name: 'Canvas actions' });
+  await canvasMenu.getByRole('button', { name: 'Size', exact: true }).hover();
+  await canvasMenu.getByRole('button', { name: presetName, exact: true }).click();
+}
+
 export async function startToolbarFileChooser(page: Page, triggerName: string, itemName: string): Promise<FileChooser> {
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
@@ -1386,7 +1394,7 @@ function countVisibleLeafNodes(nodes: unknown[]): number {
 }
 
 export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
-  const chooser = await startToolbarFileChooser(page, 'File', 'Load...');
+  const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
   await chooser.setFiles({
     name: fileName,
     mimeType: 'application/json',
@@ -1535,7 +1543,7 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'File', 'Save');
+      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
     }),
   );
 }

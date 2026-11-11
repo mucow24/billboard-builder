@@ -7,13 +7,16 @@ import {
   StarFilledIcon,
 } from '@radix-ui/react-icons';
 
+import type { CanvasSize } from '../document/documentTypes';
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton } from './ToolbarPrimitives';
 import { CanvasNameField } from './CanvasNameField';
 import { joinClassNames, modKey } from './toolbarUtils';
-import { ExportMenu, FileMenu } from './ToolbarMenus';
+import { CanvasMenu, ExportMenu } from './ToolbarMenus';
 
 interface ToolbarProps {
+  background: string;
+  canvas: CanvasSize;
   canDelete: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -28,6 +31,8 @@ interface ToolbarProps {
   favoriteStatusMessage?: string | null;
   clipboardStatusFading?: boolean;
   clipboardStatusMessage?: string | null;
+  onBackgroundChange: (background: string) => void;
+  onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
   onExportSvg: () => void;
@@ -50,6 +55,8 @@ interface ToolbarProps {
 }
 
 export function Toolbar({
+  background,
+  canvas,
   canDelete,
   canUndo,
   canRedo,
@@ -64,6 +71,8 @@ export function Toolbar({
   favoriteStatusMessage = null,
   clipboardStatusFading = false,
   clipboardStatusMessage = null,
+  onBackgroundChange,
+  onCanvasSizeChange,
   onDelete,
   onExport,
   onExportSvg,
@@ -85,12 +94,14 @@ export function Toolbar({
   inspectorPanel,
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
-  const fileTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const canvasPopoverRef = useRef<HTMLDivElement | null>(null);
+  const canvasTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const exportPopoverRef = useRef<HTMLDivElement | null>(null);
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [openMenu, setOpenMenu] = useState<'file' | 'export' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'canvas' | 'export' | null>(null);
   const [isExportHovered, setIsExportHovered] = useState(false);
   const [isExportFocused, setIsExportFocused] = useState(false);
-  const fileMenuId = useId();
+  const canvasMenuId = useId();
   const exportMenuId = useId();
   const exportMenuOpen = openMenu === 'export';
 
@@ -121,25 +132,48 @@ export function Toolbar({
       return;
     }
 
+    const openPopoverRef = openMenu === 'export' ? exportPopoverRef : canvasPopoverRef;
+    const openTriggerRef = openMenu === 'export' ? exportTriggerRef : canvasTriggerRef;
+
+    // The menu's own controls, not the trigger button that opens it.
+    function isInsideOpenMenu(node: EventTarget | null) {
+      return (
+        node instanceof Node &&
+        node !== openTriggerRef.current &&
+        Boolean(openPopoverRef.current?.contains(node))
+      );
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.preventDefault();
-        const triggerToRefocus = openMenu === 'export' ? exportTriggerRef : fileTriggerRef;
         setOpenMenu(null);
-        window.requestAnimationFrame(() => triggerToRefocus.current?.focus());
+        window.requestAnimationFrame(() => openTriggerRef.current?.focus());
         return;
       }
 
-      if (event.key === 'Tab') {
+      // Tab from a control inside the menu (canvas size fields, color picker)
+      // moves focus as usual; handleKeyUp closes the menu once focus has left it.
+      if (event.key === 'Tab' && !isInsideOpenMenu(event.target)) {
+        setOpenMenu(null);
+      }
+    }
+
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.key === 'Tab' && !isInsideOpenMenu(document.activeElement)) {
         setOpenMenu(null);
       }
     }
 
     document.addEventListener('keydown', handleKeyDown, true);
-    return () => document.removeEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keyup', handleKeyUp, true);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keyup', handleKeyUp, true);
+    };
   }, [openMenu]);
 
-  function toggleMenu(menu: 'file' | 'export') {
+  function toggleMenu(menu: 'canvas' | 'export') {
     setOpenMenu((current) => (current === menu ? null : menu));
   }
 
@@ -158,7 +192,7 @@ export function Toolbar({
     <header ref={rootRef} className="top-toolbar">
       <div className="top-toolbar-row" role="toolbar" aria-label="Project toolbar">
         <div className="top-toolbar-status-anchor">
-          <div className={joinClassNames('top-toolbar-popover', exportMenuOpen && 'open')}>
+          <div ref={exportPopoverRef} className={joinClassNames('top-toolbar-popover', exportMenuOpen && 'open')}>
             <button
               ref={exportTriggerRef}
               type="button"
@@ -207,22 +241,26 @@ export function Toolbar({
           ) : null}
         </div>
 
-        <div className={openMenu === 'file' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
+        <div ref={canvasPopoverRef} className={openMenu === 'canvas' ? 'top-toolbar-popover open' : 'top-toolbar-popover'}>
           <button
-            ref={fileTriggerRef}
+            ref={canvasTriggerRef}
             type="button"
             className="top-toolbar-button top-toolbar-control top-toolbar-menu-trigger"
-            aria-controls={fileMenuId}
-            aria-expanded={openMenu === 'file'}
+            aria-controls={canvasMenuId}
+            aria-expanded={openMenu === 'canvas'}
             aria-haspopup="true"
-            onClick={() => toggleMenu('file')}
+            onClick={() => toggleMenu('canvas')}
           >
-            <span>File</span>
+            <span>Canvas</span>
             <span className="top-toolbar-menu-caret" aria-hidden="true">▼</span>
           </button>
-          {openMenu === 'file' ? (
-            <FileMenu
-              menuId={fileMenuId}
+          {openMenu === 'canvas' ? (
+            <CanvasMenu
+              background={background}
+              canvas={canvas}
+              menuId={canvasMenuId}
+              onBackgroundChange={onBackgroundChange}
+              onCanvasSizeChange={onCanvasSizeChange}
               onLoad={onLoad}
               onSave={onSave}
               onNewProject={onNewProject}
