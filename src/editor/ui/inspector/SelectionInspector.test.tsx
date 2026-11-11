@@ -696,4 +696,103 @@ describe('SelectionInspector', () => {
     expect(screen.getByText('2 items selected')).toBeInTheDocument();
     expect(screen.queryByLabelText('Group Opacity')).not.toBeInTheDocument();
   });
+
+  describe('selection lock button', () => {
+    const inspectorProps = {
+      availableFonts: [] as [],
+      fonts: [] as [],
+      onGroupOpacityChange: vi.fn(),
+      onItemChange: vi.fn(),
+    };
+
+    it('locks an unlocked item from the item header', async () => {
+      const user = userEvent.setup();
+      const onSelectionLockedChange = vi.fn();
+      const item = createRectangleItem();
+
+      render(
+        <SelectionInspector
+          {...inspectorProps}
+          onSelectionLockedChange={onSelectionLockedChange}
+          selectedItem={item}
+          selectedNodeCount={1}
+          selectedItems={[item]}
+          selectionLockState="unlocked"
+        />
+      );
+
+      const button = screen.getByRole('button', { name: 'Lock selection' });
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      expect(button.closest('.slim-item-header')).not.toBeNull();
+
+      await user.click(button);
+
+      expect(onSelectionLockedChange).toHaveBeenCalledExactlyOnceWith(true);
+    });
+
+    it('unlocks a locked group from the group header', async () => {
+      const user = userEvent.setup();
+      const onSelectionLockedChange = vi.fn();
+      const child = createRectangleItem();
+      const group = { ...createGroupNode([child], 'Hero Group'), locked: true };
+
+      render(
+        <SelectionInspector
+          {...inspectorProps}
+          onSelectionLockedChange={onSelectionLockedChange}
+          selectedGroup={group}
+          selectedNodeCount={1}
+          selectedItems={[child]}
+          selectionLockState="locked"
+        />
+      );
+
+      const button = screen.getByRole('button', { name: 'Unlock selection' });
+      expect(button).toHaveAttribute('aria-pressed', 'true');
+
+      await user.click(button);
+
+      expect(onSelectionLockedChange).toHaveBeenCalledExactlyOnceWith(false);
+    });
+
+    it('shows a partly locked multi-selection as mixed and locks it on click', async () => {
+      const user = userEvent.setup();
+      const onSelectionLockedChange = vi.fn();
+      const first = createRectangleItem({ locked: true });
+      const second = createRectangleItem();
+
+      render(
+        <SelectionInspector
+          {...inspectorProps}
+          onSelectionLockedChange={onSelectionLockedChange}
+          selectedItem={first}
+          selectedNodeCount={2}
+          selectedItems={[first, second]}
+          selectionLockState="mixed"
+        />
+      );
+
+      const button = screen.getByRole('button', { name: 'Lock selection' });
+      expect(button).toHaveAttribute('aria-pressed', 'mixed');
+      expect(button).toHaveAttribute('title', 'Partly locked: click to lock everything');
+
+      await user.click(button);
+
+      expect(onSelectionLockedChange).toHaveBeenCalledExactlyOnceWith(true);
+    });
+
+    it('is absent with nothing selected', () => {
+      render(
+        <SelectionInspector
+          {...inspectorProps}
+          onSelectionLockedChange={vi.fn()}
+          selectedNodeCount={0}
+          selectedItems={[]}
+          selectionLockState={null}
+        />
+      );
+
+      expect(screen.queryByRole('button', { name: /lock selection/i })).not.toBeInTheDocument();
+    });
+  });
 });

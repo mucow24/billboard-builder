@@ -439,7 +439,7 @@
 
 .slim-item-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 0.42rem;
   align-items: center;
   padding-bottom: 0.34rem;
@@ -469,6 +469,60 @@
   font-size: 0.62rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+/* Lock toggle at the right end of the item header */
+.selection-lock-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.selection-lock-button svg {
+  width: 14px;
+  height: 14px;
+  stroke: #8fa4c8;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.selection-lock-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+}
+
+.selection-lock-button:hover svg,
+.selection-lock-button.locked svg,
+.selection-lock-button.mixed svg {
+  stroke: #e0eaff;
+}
+
+.selection-lock-button.locked {
+  background: rgba(129, 140, 248, 0.32);
+  border-color: rgba(129, 140, 248, 0.6);
+}
+
+.selection-lock-button.mixed {
+  border-style: dashed;
+  border-color: rgba(129, 140, 248, 0.6);
+}
+
+.selection-lock-button.locked:hover {
+  background: rgba(129, 140, 248, 0.5);
+}
+
+.selection-lock-button:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.85);
+  outline-offset: 2px;
 }
 
 /* ── Dimensions widget ────────────────────────────────────────────────────── */

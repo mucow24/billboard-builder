@@ -71,6 +71,57 @@ test.describe('editor group layers and inspector flows', () => {
     await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
   });
 
+  test('keeps the selection when a selected layer is locked or unlocked from its row', async ({
+    page,
+  }) => {
+    const document = createGroupedProjectDocument([
+      createRectangleFixture({
+        id: 'layers-lock-rect',
+        x: 180,
+        y: 180,
+        width: 200,
+        height: 120,
+        zIndex: 0,
+      }),
+      createTextFixture({
+        id: 'layers-lock-text',
+        x: 460,
+        y: 180,
+        width: 280,
+        height: 84,
+        zIndex: 1,
+      }),
+    ]);
+
+    await openFreshEditor(page);
+    await uploadProject(page, document, 'layers-lock.json');
+
+    await openLayersTab(page);
+    const rectRow = page.getByTestId('layers-row-layers-lock-rect');
+    const textRow = page.getByTestId('layers-row-layers-lock-text');
+    await rectRow.click();
+    await textRow.click({ modifiers: ['Shift'] });
+    await expect(page.locator('.layer-row.active')).toHaveCount(2);
+
+    // Locking one row of a multi-selection leaves both rows selected.
+    await rectRow.getByRole('button', { name: 'Lock layer' }).click();
+    await expect(rectRow.getByRole('button', { name: 'Unlock layer' })).toBeVisible();
+    await expect(page.locator('.layer-row.active')).toHaveCount(2);
+
+    // Properties sees the same selection, now partly locked.
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: '2 items selected' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Lock selection', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'mixed');
+
+    // Unlocking keeps it too.
+    await openLayersTab(page);
+    await rectRow.getByRole('button', { name: 'Unlock layer' }).click();
+    await expect(rectRow.getByRole('button', { name: 'Lock layer' })).toBeVisible();
+    await expect(page.locator('.layer-row.active')).toHaveCount(2);
+  });
+
   test('shows an image thumbnail preview for image rows in Layers', async ({ page }) => {
     const document = createGroupedProjectDocument([
       createImageFixture({

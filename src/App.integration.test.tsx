@@ -148,13 +148,15 @@ import {
 import { collectLeafItems } from './editor/document/sceneGraph';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
-import { renderSettled } from './test/renderSettled';
+import { settleRender } from './test/settleRender';
 
-/** Renders the app and returns once startup is over and the editor is up, with its effects run. */
 async function renderApp() {
-  await renderSettled(<App />);
+  const ui = <App />;
+  const view = render(ui);
 
-  expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+  // The editor is rendered once startup has put the saved canvas in place.
+  await screen.findByRole('button', { name: 'Canvas' });
+  settleRender(view, ui);
 }
 
 function clickToolbarPopoverItem(triggerName: string, itemName: string) {
@@ -410,7 +412,8 @@ describe('App integration', () => {
         finishLoad = resolve;
       }),
     );
-    render(<App />);
+    const ui = <App />;
+    const view = render(ui);
     expect(mockPersistenceLoad).toHaveBeenCalledOnce();
 
     // Longer than the autosave debounce.
@@ -420,11 +423,9 @@ describe('App integration', () => {
     expect(screen.queryByRole('button', { name: 'Canvas' })).toBeNull();
     expect(mockPersistenceSave).not.toHaveBeenCalled();
 
-    // Released inside `act`, like the startup `renderSettled` runs: see there.
-    await act(async () => {
-      finishLoad(null);
-    });
-    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
+    finishLoad(null);
+    await screen.findByRole('button', { name: 'Canvas' });
+    settleRender(view, ui);
     mockPersistenceSave.mockClear();
 
     act(() => {

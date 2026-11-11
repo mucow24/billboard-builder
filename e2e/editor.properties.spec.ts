@@ -2,12 +2,16 @@ import { expect, test, type Page } from '@playwright/test';
 
 import {
   clickItem,
+  clickLayerRow,
+  createEllipseFixture,
   createImageFixture,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
+  dragHandle,
   openFreshEditor,
+  openLayersTab,
   openPropertiesTab,
   saveAndReadProject,
   uploadProject,
@@ -570,5 +574,60 @@ test.describe('editor properties flows', () => {
     await expect(inspector.getByText('Slider Image')).toBeVisible();
     await expectSliders(page, 'Image', ['Opacity']);
     await expectSliders(page, 'Geometry', ['Rotation']);
+  });
+
+  test('locks and unlocks the selection from the Properties header', async ({ page }) => {
+    const rectangle = createRectangleFixture({
+      id: 'lock-rect',
+      name: 'Lock Rectangle',
+      x: 140,
+      y: 160,
+      width: 180,
+      height: 120,
+      zIndex: 0,
+    });
+    const ellipse = createEllipseFixture({
+      id: 'lock-ellipse',
+      name: 'Lock Ellipse',
+      x: 420,
+      y: 160,
+      width: 180,
+      height: 120,
+      locked: true,
+      zIndex: 1,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([rectangle, ellipse]), 'properties-lock.json');
+
+    // Locking keeps the item selected, so the same button undoes a stray click.
+    await clickItem(page, 'lock-rect');
+    await openPropertiesTab(page);
+    const lockButton = page.getByRole('button', { name: 'Lock selection', exact: true });
+    const unlockButton = page.getByRole('button', { name: 'Unlock selection', exact: true });
+    await expect(lockButton).toHaveAttribute('aria-pressed', 'false');
+    await lockButton.click();
+    await expect(unlockButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(
+      page.getByTestId('properties-tab-body').getByRole('heading', { name: 'Rectangle' }),
+    ).toBeVisible();
+
+    // The locked selection has no live handles: dragging where the resize
+    // handle was leaves the item's size alone (checked in the saved project).
+    await dragHandle(page, 'lock-rect', 'middle-right', 80, 0);
+
+    // A locked item can still be selected from Layers, and is unlocked in place.
+    await openLayersTab(page);
+    await clickLayerRow(page, 'Ellipse');
+    await openPropertiesTab(page);
+    await expect(unlockButton).toHaveAttribute('aria-pressed', 'true');
+    await unlockButton.click();
+    await expect(lockButton).toHaveAttribute('aria-pressed', 'false');
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({ id: 'lock-rect', locked: true, x: 140, width: 180 }),
+      expect.objectContaining({ id: 'lock-ellipse', locked: false }),
+    ]);
   });
 });
