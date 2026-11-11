@@ -1,8 +1,8 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { useEffect, useState } from 'react';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { renderSettled } from './renderSettled';
+import { settleRender } from './settleRender';
 
 // Outside `act`, React runs the effects of a render in a task of its own, which
 // its scheduler queues with `setImmediate`. `findBy...` resumes the test from a
@@ -61,12 +61,12 @@ async function startupInSteps() {
   await Promise.resolve();
 }
 
-describe('renderSettled', () => {
+describe('settleRender', () => {
   beforeEach(() => {
     editorListening = false;
   });
 
-  it('control: render + findBy returns before the effects when the timer wins', async () => {
+  it('control: findBy alone returns before the effects when the timer wins', async () => {
     // Not a behaviour to rely on. It shows that the ordering forced above is
     // in effect, without which the tests below would prove nothing.
     render(<AppWithStartup startup={startupInSteps} />);
@@ -75,14 +75,17 @@ describe('renderSettled', () => {
     expect(editorListening).toBe(false);
   });
 
-  it('returns once the content of an asynchronous startup is rendered and its effects have run', async () => {
-    await renderSettled(<AppWithStartup startup={startupInSteps} />);
+  it('runs the effects of content that an asynchronous startup put on screen', async () => {
+    const ui = <AppWithStartup startup={startupInSteps} />;
+    const view = render(ui);
+    await screen.findByTestId('editor');
 
-    expect(screen.getByTestId('editor')).toBeInTheDocument();
+    settleRender(view, ui);
+
     expect(editorListening).toBe(true);
   });
 
-  it('leaves a held startup step to the test, which releases it inside act', async () => {
+  it('does the same for a startup step the test held back and then released', async () => {
     let release: () => void = () => {};
     const held = new Promise<void>((resolve) => {
       release = resolve;
@@ -91,14 +94,14 @@ describe('renderSettled', () => {
       await startupInSteps();
       await held;
     };
-
-    await renderSettled(<AppWithStartup startup={startup} />);
+    const ui = <AppWithStartup startup={startup} />;
+    const view = render(ui);
     expect(screen.queryByTestId('editor')).toBeNull();
 
-    await act(async () => {
-      release();
-    });
-    expect(screen.getByTestId('editor')).toBeInTheDocument();
+    release();
+    await screen.findByTestId('editor');
+    settleRender(view, ui);
+
     expect(editorListening).toBe(true);
   });
 });
