@@ -10,6 +10,7 @@ import {
   createDefaultProjectDocument,
   createImageItem,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
 } from '../document/documentDefaults';
 import type {
@@ -2208,5 +2209,272 @@ describe('useCanvasInteractionSession', () => {
     });
 
     expect(result.current.session).toBeNull();
+  });
+
+  describe('alt-click selection cycling', () => {
+    const bottom = createRectangleItem({ id: 'bottom', x: 0, y: 0, width: 300, height: 300 });
+    const lockedMiddle = createRectangleItem({
+      id: 'locked-middle',
+      x: 50,
+      y: 50,
+      width: 200,
+      height: 200,
+      locked: true,
+    });
+    const top = createRectangleItem({ id: 'top', x: 100, y: 100, width: 100, height: 100 });
+    const overlap = { x: 150, y: 150 };
+    const altClick = { altKey: true } as Partial<MouseEvent>;
+
+    function altItemPress(pointer: { x: number; y: number }) {
+      return makeStageEvent(pointer, 'shape', altClick).nativeEvent as MouseEvent;
+    }
+
+    it('selects the item under the pointer without starting a drag when nothing there is selected', () => {
+      const params = createHookParams({ document: createDocument([bottom, lockedMiddle, top]) });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, altItemPress(overlap));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledTimes(1);
+      expect(params.onSelectNode).toHaveBeenCalledWith('top');
+      expect(result.current.session).toBeNull();
+
+      // Moving with the button still down must not pick the item up.
+      act(() => {
+        result.current.handleStagePointerMove(makeStageEvent({ x: 190, y: 190 }, 'shape', altClick));
+      });
+      expect(result.current.session).toBeNull();
+      expect(params.onUpdateItem).not.toHaveBeenCalled();
+    });
+
+    it('steps to the locked item underneath when the pressed item is already selected', () => {
+      const params = createHookParams({
+        document: createDocument([bottom, lockedMiddle, top]),
+        selectedNodeIds: ['top'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, altItemPress(overlap));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledTimes(1);
+      expect(params.onSelectNode).toHaveBeenCalledWith('locked-middle');
+      expect(result.current.session).toBeNull();
+    });
+
+    it('wraps from the bottom of the stack back to the top', () => {
+      const params = createHookParams({
+        document: createDocument([bottom, lockedMiddle, top]),
+        selectedNodeIds: ['bottom'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, altItemPress(overlap));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledWith('top');
+    });
+
+    it('selects a locked item from a canvas-surface press, which is where clicks on locked items land', () => {
+      const params = createHookParams({ document: createDocument([lockedMiddle]) });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent(overlap, 'canvas-background', altClick));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledTimes(1);
+      expect(params.onSelectNode).toHaveBeenCalledWith('locked-middle');
+
+      // No marquee may follow the press.
+      act(() => {
+        result.current.handleStagePointerMove(makeStageEvent({ x: 240, y: 240 }, 'canvas-background', altClick));
+      });
+      expect(result.current.session).toBeNull();
+    });
+
+    it('behaves like a plain blank-canvas click when nothing is under the pointer', () => {
+      const params = createHookParams({
+        document: createDocument([top]),
+        selectedNodeIds: ['top'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent({ x: 600, y: 600 }, 'canvas-background', altClick));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledTimes(1);
+      expect(params.onSelectNode).toHaveBeenCalledWith(undefined);
+    });
+
+    it('leaves a plain click on a locked item alone', () => {
+      const params = createHookParams({ document: createDocument([lockedMiddle]) });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent(overlap, 'canvas-background'));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledTimes(1);
+      expect(params.onSelectNode).toHaveBeenCalledWith(undefined);
+    });
+
+    it('does not cycle with a non-select tool or the middle button', () => {
+      const createParams = createHookParams({
+        activeTool: 'rectangle',
+        document: createDocument([lockedMiddle]),
+      });
+      const middleParams = createHookParams({ document: createDocument([lockedMiddle]) });
+      const { result: createResult } = renderHook(() => useCanvasInteractionSession(createParams));
+      const { result: middleResult } = renderHook(() => useCanvasInteractionSession(middleParams));
+
+      act(() => {
+        createResult.current.handleStageMouseDown(makeStageEvent(overlap, 'canvas-background', altClick));
+      });
+      act(() => {
+        middleResult.current.handleStageMouseDown(
+          makeStageEvent(overlap, 'canvas-background', { altKey: true, button: 1 }),
+        );
+      });
+
+      expect(createParams.onSelectNode).not.toHaveBeenCalledWith('locked-middle');
+      expect(createResult.current.session?.kind).toBe('create');
+      expect(middleParams.onSelectNode).not.toHaveBeenCalledWith('locked-middle');
+    });
+
+    it('commits an open crop session before moving the selection on', () => {
+      const image = createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+      });
+      image.id = 'cropping-image';
+      image.x = 600;
+      image.y = 600;
+      const params = createHookParams({
+        document: createDocument([lockedMiddle, image]),
+        selectedNodeIds: [image.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemDoubleClick(image);
+      });
+      expect(result.current.cropSession).not.toBeNull();
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent(overlap, 'canvas-background', altClick));
+      });
+
+      expect(result.current.cropSession).toBeNull();
+      expect(params.onSelectNode).toHaveBeenCalledWith('locked-middle');
+    });
+  });
+
+  describe('locked selections', () => {
+    it('refuses to resize, rotate or drag a selected locked item', () => {
+      const locked = createRectangleItem({ id: 'locked', x: 100, y: 100, width: 80, height: 40, locked: true });
+      const params = createHookParams({
+        document: createDocument([locked]),
+        selectedNodeIds: [locked.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      expect(result.current.selectionLocked).toBe(true);
+
+      act(() => {
+        result.current.beginResize(locked, 'bottom-right', { x: 180, y: 140 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginRotate(locked, { x: 140, y: 60 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginDrag(locked, { x: 140, y: 120 });
+      });
+      expect(result.current.session).toBeNull();
+    });
+
+    it('refuses to move the endpoints of a selected locked line', () => {
+      const line = createLineItem({ id: 'locked-line', x: 100, y: 100, locked: true });
+      const params = createHookParams({
+        document: createDocument([line]),
+        selectedNodeIds: [line.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.beginLineHandle(line, 'end', { x: line.endX, y: line.endY });
+      });
+
+      expect(result.current.session).toBeNull();
+    });
+
+    it('refuses to move or insert vertices on a selected locked polygon', () => {
+      const polygon = createPolygonItem({ id: 'locked-polygon', locked: true });
+      const params = createHookParams({
+        document: createDocument([polygon]),
+        selectedNodeIds: [polygon.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.beginPolygonVertexHandle(polygon, 0, polygon.vertices[0]);
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginPolygonEdgeInsert(polygon, 0, polygon.vertices[0]);
+      });
+      expect(result.current.session).toBeNull();
+    });
+
+    it('refuses group resize and rotate when any selected item is locked', () => {
+      const unlocked = createRectangleItem({ id: 'unlocked', x: 100, y: 100, width: 80, height: 40 });
+      const locked = createRectangleItem({ id: 'locked', x: 220, y: 100, width: 80, height: 40, locked: true });
+      const params = createHookParams({
+        document: createDocument([unlocked, locked]),
+        selectedNodeIds: [unlocked.id, locked.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      expect(result.current.selectionLocked).toBe(true);
+
+      act(() => {
+        result.current.beginGroupResize('bottom-right', { x: 300, y: 140 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginGroupRotate({ x: 200, y: 60 });
+      });
+      expect(result.current.session).toBeNull();
+    });
+
+    it('still transforms an unlocked selection', () => {
+      const unlocked = createRectangleItem({ id: 'unlocked', x: 100, y: 100, width: 80, height: 40 });
+      const params = createHookParams({
+        document: createDocument([unlocked]),
+        selectedNodeIds: [unlocked.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      expect(result.current.selectionLocked).toBe(false);
+
+      act(() => {
+        result.current.beginResize(unlocked, 'bottom-right', { x: 180, y: 140 });
+      });
+
+      expect(result.current.session?.kind).toBe('resize');
+    });
   });
 });

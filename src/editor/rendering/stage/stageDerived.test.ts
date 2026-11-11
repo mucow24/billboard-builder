@@ -225,6 +225,67 @@ describe('stageDerived', () => {
     expect(derived.showGroupInteractionHooks).toBe(false);
   });
 
+  it('offers no transform handles for a locked selection', () => {
+    const viewport = {
+      toViewportPoint: (point: { x: number; y: number }) => point,
+      toViewportRect: (rect: { x: number; y: number; width: number; height: number }) => ({
+        left: rect.x,
+        top: rect.y,
+        width: rect.width,
+        height: rect.height,
+      }),
+    };
+    const lockedRectangle = createRectangleItem({ id: 'locked', x: 20, y: 30, width: 80, height: 40, locked: true });
+    const lockedLine = createLineItem({ id: 'locked-line', x: 20, y: 30, locked: true });
+    const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
+    const groupFrame = { bounds: { x: 20, y: 30, width: 180, height: 80 }, rotation: 0 };
+
+    const single = buildStageDerivedState({
+      activeTool: 'select',
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [lockedRectangle],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: lockedRectangle,
+      selectionLocked: true,
+      session: null,
+      zoom: 1,
+      viewport,
+    });
+    const line = buildStageDerivedState({
+      activeTool: 'select',
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [lockedLine],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: lockedLine,
+      selectionLocked: true,
+      session: null,
+      zoom: 1,
+      viewport,
+    });
+    const multi = buildStageDerivedState({
+      activeTool: 'select',
+      canvasBounds,
+      renderedGroupBounds: groupFrame.bounds,
+      renderedSelectedItems: [lockedRectangle, second],
+      renderedSelectionFrame: groupFrame,
+      selectedRenderedItem: lockedRectangle,
+      selectionLocked: true,
+      session: null,
+      zoom: 1,
+      viewport,
+    });
+
+    // The selection itself is still shown.
+    expect(single.selectedItemViewportRect).not.toBeNull();
+    expect(single.selectedShapeHandleRects).toBeNull();
+    expect(line.selectedLineHandleRects).toBeNull();
+    expect(multi.groupOverlayViewportRect).not.toBeNull();
+    expect(multi.groupHandleViewportPoints).toBeNull();
+    expect(multi.groupRotaterViewportPoint).toBeNull();
+  });
+
   it('keeps viewport hook handle sizes and rotater offset stable across zoom', () => {
     const rectangle = createRectangleItem({
       x: 20,

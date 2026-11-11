@@ -129,6 +129,8 @@ export interface PixiSelectionOverlayProps {
   selectedRenderedItem: RenderableCanvasItem | null;
   renderedSelectedItems: RenderableCanvasItem[];
   showGroupSelection: boolean;
+  /** The selection contains a locked item or group: draw outlines only, no handles. */
+  selectionLocked?: boolean;
   groupOverlayFrame: {
     bounds: { x: number; y: number; width: number; height: number };
     rotation: number;
@@ -175,6 +177,7 @@ export function PixiSelectionOverlay({
   selectedRenderedItem,
   renderedSelectedItems,
   showGroupSelection,
+  selectionLocked = false,
   groupOverlayFrame,
   zoom,
   beginResize,
@@ -201,6 +204,7 @@ export function PixiSelectionOverlay({
           <GroupSelectionOverlay
             frame={groupOverlayFrame}
             zoom={zoom}
+            locked={selectionLocked}
             beginGroupResize={beginGroupResize}
             beginGroupRotate={beginGroupRotate}
             toCanvasPointer={toCanvasPointer}
@@ -211,6 +215,16 @@ export function PixiSelectionOverlay({
   }
 
   if (!selectedRenderedItem) return null;
+
+  // A locked item can be selected (from Layers, or by alt-clicking it) but not
+  // transformed, so it gets its outline and nothing to grab.
+  if (selectionLocked) {
+    return (
+      <pixiContainer label="locked-selection-overlay">
+        <ItemOutlineOnly item={selectedRenderedItem} zoom={zoom} />
+      </pixiContainer>
+    );
+  }
 
   if (selectedRenderedItem.kind === 'line') {
     return (
@@ -312,12 +326,15 @@ function ItemOutlineOnly({
 function GroupSelectionOverlay({
   frame,
   zoom,
+  locked,
   beginGroupResize,
   beginGroupRotate,
   toCanvasPointer,
 }: {
   frame: NonNullable<PixiSelectionOverlayProps['groupOverlayFrame']>;
   zoom: number;
+  // Outline only: no rotation line, no handles.
+  locked: boolean;
   beginGroupResize: PixiSelectionOverlayProps['beginGroupResize'];
   beginGroupRotate: PixiSelectionOverlayProps['beginGroupRotate'];
   toCanvasPointer: (pointer: Point) => Point;
@@ -417,20 +434,22 @@ function GroupSelectionOverlay({
       </pixiContainer>
 
       {/* Rotation line */}
-      <pixiGraphics draw={drawRotationLine} eventMode="none" />
+      {locked ? null : <pixiGraphics draw={drawRotationLine} eventMode="none" />}
 
       {/* Handles */}
-      {handleEntries.map(([name, point]) => (
-        <InteractiveHandle
-          key={name}
-          name={name}
-          x={point.x}
-          y={point.y}
-          radius={handleRadius}
-          strokeWidth={handleStroke}
-          onMouseDown={groupHandleMouseDownMap[name]}
-        />
-      ))}
+      {locked
+        ? null
+        : handleEntries.map(([name, point]) => (
+            <InteractiveHandle
+              key={name}
+              name={name}
+              x={point.x}
+              y={point.y}
+              radius={handleRadius}
+              strokeWidth={handleStroke}
+              onMouseDown={groupHandleMouseDownMap[name]}
+            />
+          ))}
     </pixiContainer>
   );
 }

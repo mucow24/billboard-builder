@@ -5,16 +5,21 @@ import {
   clickEmptyCanvas,
   clickItem,
   createEllipseFixture,
+  createGroupNodeFixture,
+  createGroupedProjectDocument,
   createImageFixture,
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
   createTextFixture,
+  doubleClickItem,
   dragEmptyCanvas,
+  dragHandle,
   dragItemTo,
   middleDragCanvas,
   movePointerToCanvasPoint,
   openFreshEditor,
+  openLayersTab,
   openPropertiesTab,
   readRenderSnapshot,
   readStageDebug,
@@ -286,6 +291,246 @@ test.describe('editor canvas entrypoints', () => {
     // hits empty canvas — no selection.
     await clickEmptyCanvas(page, { x: 820, y: 380 });
     await expectNoActiveSelection(page);
+  });
+
+  test('CS-19 CS-20 CS-21 CS-22 alt-click selects the item under the cursor, then cycles through covered and locked items', async ({
+    page,
+  }) => {
+    const lockedBackdrop = createRectangleFixture({
+      id: 'cycle-locked-backdrop',
+      name: 'Locked Backdrop',
+      x: 100,
+      y: 100,
+      width: 500,
+      height: 400,
+      locked: true,
+      zIndex: 0,
+    });
+    const middle = createRectangleFixture({
+      id: 'cycle-middle',
+      name: 'Middle Rectangle',
+      x: 200,
+      y: 180,
+      width: 300,
+      height: 240,
+      zIndex: 1,
+    });
+    // An image on top makes the test sensitive to double-click handling: a
+    // double-click on a selected image would open crop mode instead of cycling.
+    const topImage = createImageFixture({
+      id: 'cycle-top-image',
+      name: 'Top Image',
+      x: 280,
+      y: 240,
+      width: 140,
+      height: 120,
+      zIndex: 2,
+    });
+    const elsewhere = createRectangleFixture({
+      id: 'cycle-elsewhere',
+      name: 'Elsewhere Rectangle',
+      x: 760,
+      y: 700,
+      width: 120,
+      height: 120,
+      zIndex: 3,
+    });
+    const allThree = { x: 350, y: 300 };
+    const lockedOnly = { x: 130, y: 130 };
+    const blank = { x: 940, y: 180 };
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([lockedBackdrop, middle, topImage, elsewhere]),
+      'alt-click-cycle.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+    await openLayersTab(page);
+    const expectSelectedLayer = async (id: string) => {
+      await expect(page.locator('.layer-row.active')).toHaveCount(1);
+      await expect(page.locator('.layer-row.active')).toHaveAttribute('data-testid', `layers-row-${id}`);
+    };
+    const documentBefore = await saveAndReadProject(page);
+
+    // A plain click on the stack only ever reaches the top item.
+    await clickEmptyCanvas(page, allThree);
+    await expectSelectedLayer('cycle-top-image');
+    await clickEmptyCanvas(page, blank);
+    await expectNoActiveSelection(page);
+
+    await page.keyboard.down('Alt');
+
+    // CS-19: nothing under the cursor is selected, so alt-click acts like a
+    // plain click and selects the top item.
+    await clickEmptyCanvas(page, allThree);
+    await expectSelectedLayer('cycle-top-image');
+
+    // CS-20: further alt-clicks step down through the covered item and the
+    // locked one, then wrap back to the top.
+    await clickEmptyCanvas(page, allThree);
+    await expectSelectedLayer('cycle-middle');
+    await clickEmptyCanvas(page, allThree);
+    await expectSelectedLayer('cycle-locked-backdrop');
+    await clickEmptyCanvas(page, allThree);
+    await expectSelectedLayer('cycle-top-image');
+
+    // With the selection somewhere else, alt-click starts from the top again.
+    await clickItem(page, 'cycle-elsewhere');
+    await expectSelectedLayer('cycle-elsewhere');
+    await clickEmptyCanvas(page, allThree);
+    await expectSelectedLayer('cycle-top-image');
+
+    // CS-21: a locked item with nothing else under the cursor is selectable.
+    await clickEmptyCanvas(page, lockedOnly);
+    await expectSelectedLayer('cycle-locked-backdrop');
+    await openPropertiesTab(page);
+    await expect(page.getByRole('heading', { name: 'Rectangle' })).toBeVisible();
+    await openLayersTab(page);
+
+    // CS-22: alt-click on blank canvas clears the selection like a plain click.
+    await clickEmptyCanvas(page, blank);
+    await expectNoActiveSelection(page);
+
+    // Alt-press, drag, release over the stack only selects: nothing moves and
+    // no marquee selection replaces it.
+    await dragEmptyCanvas(page, allThree, { x: 560, y: 470 });
+    await expectSelectedLayer('cycle-top-image');
+
+    await page.keyboard.up('Alt');
+
+    // Without Alt the locked item is out of reach again.
+    await clickEmptyCanvas(page, blank);
+    await clickEmptyCanvas(page, lockedOnly);
+    await expectNoActiveSelection(page);
+
+    expect((await readRenderSnapshot(page)).sessionKind ?? null).toBeNull();
+    expect((await saveAndReadProject(page)).nodes).toEqual(documentBefore.nodes);
+  });
+
+  test('CS-23 alt-click treats a group as one stop until it is drilled into', async ({ page }) => {
+    const backdrop = createRectangleFixture({
+      id: 'group-cycle-backdrop',
+      name: 'Backdrop',
+      x: 100,
+      y: 100,
+      width: 500,
+      height: 400,
+      zIndex: 0,
+    });
+    const group = createGroupNodeFixture(
+      [
+        createRectangleFixture({
+          id: 'group-cycle-child-a',
+          name: 'Child A',
+          x: 200,
+          y: 180,
+          width: 300,
+          height: 240,
+          zIndex: 1,
+        }),
+        createRectangleFixture({
+          id: 'group-cycle-child-b',
+          name: 'Child B',
+          x: 280,
+          y: 240,
+          width: 140,
+          height: 120,
+          zIndex: 2,
+        }),
+      ],
+      { id: 'group-cycle-group', name: 'Cycle Group' },
+    );
+    const overlap = { x: 350, y: 300 };
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([backdrop, group]), 'alt-click-group-cycle.json');
+    await setCanvasTestHooksEnabled(page, false);
+    await openLayersTab(page);
+    const expectSelectedLayer = async (id: string) => {
+      await expect(page.locator('.layer-row.active')).toHaveCount(1);
+      await expect(page.locator('.layer-row.active')).toHaveAttribute('data-testid', `layers-row-${id}`);
+    };
+
+    // Undrilled: the two children under the cursor count as the group, once.
+    await page.keyboard.down('Alt');
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('group-cycle-group');
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('group-cycle-backdrop');
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('group-cycle-group');
+    await page.keyboard.up('Alt');
+
+    // Drill into the group the usual way, then cycle its children too.
+    await doubleClickItem(page, 'group-cycle-child-b');
+    await expectSelectedLayer('group-cycle-child-b');
+    await page.keyboard.down('Alt');
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('group-cycle-child-a');
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('group-cycle-backdrop');
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('group-cycle-group');
+    await page.keyboard.up('Alt');
+  });
+
+  test('CS-24 CS-25 a selected locked item has no handles and cannot be resized or rotated until it is unlocked', async ({
+    page,
+  }) => {
+    const locked = createRectangleFixture({
+      id: 'lock-rect',
+      name: 'Locked Rectangle',
+      x: 200,
+      y: 200,
+      width: 300,
+      height: 200,
+      locked: true,
+      zIndex: 0,
+    });
+    const inside = { x: 350, y: 300 };
+    const blank = { x: 900, y: 900 };
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([locked]), 'locked-handles.json');
+    await setCanvasTestHooksEnabled(page, false);
+    await openLayersTab(page);
+    const layerRow = page.getByTestId('layers-row-lock-rect');
+    const documentBefore = await saveAndReadProject(page);
+    const tryToTransform = async () => {
+      // Real presses and drags on the canvas, right where the handles of an
+      // unlocked item would be.
+      await dragHandle(page, 'lock-rect', 'middle-right', 80, 0);
+      await dragHandle(page, 'lock-rect', 'bottom-right', 60, 60);
+      await dragHandle(page, 'lock-rect', 'rotater', 90, 40);
+    };
+
+    // CS-24: selected from the canvas with alt-click.
+    await page.keyboard.down('Alt');
+    await clickEmptyCanvas(page, inside);
+    await page.keyboard.up('Alt');
+    await expect(layerRow).toHaveClass(/active/);
+    await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(false);
+    await tryToTransform();
+    expect((await saveAndReadProject(page)).nodes).toEqual(documentBefore.nodes);
+
+    // CS-25: selected from Layers.
+    await clickEmptyCanvas(page, blank);
+    await expectNoActiveSelection(page);
+    await layerRow.click();
+    await expect(layerRow).toHaveClass(/active/);
+    await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(false);
+    await tryToTransform();
+    expect((await saveAndReadProject(page)).nodes).toEqual(documentBefore.nodes);
+
+    // Unlocking brings the handles back and they work again.
+    await layerRow.getByRole('button', { name: 'Unlock layer' }).click();
+    await clickItem(page, 'lock-rect');
+    await expect(layerRow).toHaveClass(/active/);
+    await expect.poll(async () => (await readStageDebug(page)).hasShapeHandles).toBe(true);
+    await dragHandle(page, 'lock-rect', 'middle-right', 80, 0);
+    const resized = (await saveAndReadProject(page)).nodes[0];
+    expect(resized.width * resized.scaleX).toBeCloseTo(380, 0);
   });
 
   test('CS-15 selects fully off-canvas and edge-overflow items directly in the unclipped scene', async ({

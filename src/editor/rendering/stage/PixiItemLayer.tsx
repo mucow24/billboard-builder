@@ -616,15 +616,21 @@ const PixiItemView = memo(function PixiItemView({
         return;
       }
 
-      // Double-click detection
-      const now = Date.now();
-      if (now - lastClickRef.current < 400) {
+      if (nativeEvent.altKey) {
+        // Alt-clicks cycle the selection through the items under the pointer.
+        // Rapid ones must each count, never pair up into a double-click.
         lastClickRef.current = 0;
-        e.stopPropagation();
-        onItemDoubleClick(item);
-        return;
+      } else {
+        // Double-click detection
+        const now = Date.now();
+        if (now - lastClickRef.current < 400) {
+          lastClickRef.current = 0;
+          e.stopPropagation();
+          onItemDoubleClick(item);
+          return;
+        }
+        lastClickRef.current = now;
       }
-      lastClickRef.current = now;
 
       e.stopPropagation();
       onItemPointerDown(
