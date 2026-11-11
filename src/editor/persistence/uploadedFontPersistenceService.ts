@@ -105,6 +105,8 @@ export function createDefaultRawUploadedFontStore(): RawUploadedFontStore {
 
 export class UploadedFontPersistenceService {
   private readonly store: RawUploadedFontStore;
+  /** Keys saved since this page loaded. See `pruneUnreferenced`. */
+  private readonly keysSavedThisSession = new Set<string>();
 
   constructor(store: RawUploadedFontStore = createDefaultRawUploadedFontStore()) {
     this.store = store;
@@ -115,7 +117,9 @@ export class UploadedFontPersistenceService {
       throw new Error('Only uploaded fonts can be persisted.');
     }
 
-    await this.store.write(toUploadedFontPersistenceKey(font), {
+    const key = toUploadedFontPersistenceKey(font);
+    this.keysSavedThisSession.add(key);
+    await this.store.write(key, {
       family: font.family,
       sourceName: font.sourceName,
       weight: font.weight,
@@ -141,17 +145,24 @@ export class UploadedFontPersistenceService {
     return loadedFonts.flatMap((font) => (font ? [font] : []));
   }
 
+  /**
+   * Delete the stored fonts that nothing references, except those saved since
+   * this page loaded. The prune runs once startup has finished, and the editor is
+   * usable before then: a font imported in the meantime is not referenced until
+   * it is applied to text, and must not be deleted from under the session.
+   */
   async pruneUnreferenced(references: DocumentFontReference[]): Promise<void> {
     const retainedKeys = new Set(dedupeUploadedFontKeys(references));
     const existingKeys = await this.store.keys();
     await Promise.all(
       existingKeys
-        .filter((key) => !retainedKeys.has(key))
+        .filter((key) => !retainedKeys.has(key) && !this.keysSavedThisSession.has(key))
         .map(async (key) => this.store.delete(key)),
     );
   }
 
   async clear(): Promise<void> {
+    this.keysSavedThisSession.clear();
     await this.store.clear();
   }
 }

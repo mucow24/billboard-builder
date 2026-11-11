@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   captureDownload,
@@ -27,13 +27,16 @@ import {
   uploadProject,
   uploadSvgImage,
   waitForEditor,
+  waitForStartupToFinish,
 } from './support/editor';
 import {
+  expectPersistedCanvasFontFiles,
   expectPersistedCanvasToReferenceFontFamily,
   uploadNamedFontFromPath,
 } from './support/persistence';
 
-async function countUploadedFontRecords(page: Parameters<typeof test>[0]['page']) {
+/** The keys of the stored uploaded font files (`uploaded:<file name>`), sorted. */
+async function readUploadedFontKeys(page: Page) {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('billboard-builder', 2);
@@ -42,12 +45,12 @@ async function countUploadedFontRecords(page: Parameters<typeof test>[0]['page']
     });
 
     try {
-      return await new Promise<number>((resolve, reject) => {
+      return await new Promise<string[]>((resolve, reject) => {
         const transaction = database.transaction('uploaded-fonts', 'readonly');
         const store = transaction.objectStore('uploaded-fonts');
-        const request = store.count();
+        const request = store.getAllKeys();
         request.onerror = () => reject(request.error);
-        request.onsuccess = () => resolve(request.result);
+        request.onsuccess = () => resolve(request.result.map(String));
       });
     } finally {
       database.close();
@@ -55,15 +58,94 @@ async function countUploadedFontRecords(page: Parameters<typeof test>[0]['page']
   });
 }
 
-async function expectUploadedFontRecordCount(
-  page: Parameters<typeof test>[0]['page'],
-  expectedCount: number,
-) {
+async function countUploadedFontRecords(page: Page) {
+  return (await readUploadedFontKeys(page)).length;
+}
+
+async function expectUploadedFontRecordCount(page: Page, expectedCount: number) {
   await expect
     .poll(async () => countUploadedFontRecords(page), {
       message: `Expected uploaded font store count to become ${expectedCount}.`,
     })
     .toBe(expectedCount);
+}
+
+function bundledFontPath(fileName: string) {
+  return path.join(process.cwd(), 'src/assets/fonts', fileName);
+}
+
+async function selectTextLayerInProperties(page: Page) {
+  await openLayersTab(page);
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
+  await openPropertiesTab(page);
+}
+
+async function chooseFontFamily(page: Page, family: string) {
+  await page.getByTestId('font-family-picker-trigger').click();
+  await page.getByRole('option', { name: family }).first().click();
+  await expect(page.getByTestId('font-family-picker-trigger')).toContainText(family);
+}
+
+/**
+ * How wide the browser draws a sample in the regular and in the bold weight of a
+ * family. Each value depends on which font file the browser picks for that
+ * weight, so it changes if one of the family's files is missing.
+ */
+async function measureRegularAndBoldText(page: Page, family: string) {
+  return page.evaluate((fontFamily) => {
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) {
+      throw new Error('2D canvas is unavailable.');
+    }
+    const widthAt = (weight: number) => {
+      context.font = `${weight} 200px ${JSON.stringify(fontFamily)}`;
+      return context.measureText('Hamburgefonstiv').width;
+    };
+    return { regular: widthAt(400), bold: widthAt(700) };
+  }, family);
+}
+
+const PERSIST_PROBE_FONT_KEYS = [
+  'uploaded:PersistProbe-Bold.otf',
+  'uploaded:PersistProbe-Regular.otf',
+];
+
+/**
+ * Imports a font the canvas never uses. The startup clean-up deletes it, so its
+ * absence after a reload shows that the clean-up has run.
+ */
+async function importUnusedFont(page: Page) {
+  await uploadNamedFontFromPath(
+    page,
+    bundledFontPath('CalSans-Regular.ttf'),
+    'Unused-Upload-Regular.ttf',
+  );
+}
+
+/**
+ * After a reload: both "Persist Probe" files are still stored and regular and
+ * bold text are drawn exactly as before it.
+ */
+async function expectPersistProbeFamilyRestored(
+  page: Page,
+  widthsBeforeReload: Awaited<ReturnType<typeof measureRegularAndBoldText>>,
+) {
+  await selectTextLayerInProperties(page);
+  await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Persist Probe');
+  await expect
+    .poll(async () => readUploadedFontKeys(page), {
+      message: 'Expected only the two Persist Probe files to remain stored after the reload.',
+    })
+    .toEqual(PERSIST_PROBE_FONT_KEYS);
+  await expect
+    .poll(async () => measureRegularAndBoldText(page, 'Persist Probe'), {
+      message: 'Expected regular and bold text to be drawn with the same files as before the reload.',
+    })
+    .toEqual(widthsBeforeReload);
+  await expect(page.getByText('Missing fonts')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeEnabled();
+  // Still both, now that the start-up work has long finished.
+  expect(await readUploadedFontKeys(page)).toEqual(PERSIST_PROBE_FONT_KEYS);
 }
 
 test.describe('editor file and persistence flows', () => {
@@ -180,6 +262,123 @@ test.describe('editor file and persistence flows', () => {
 
     await page.getByTestId('font-family-picker-trigger').click();
     await expect(page.getByRole('option', { name: 'Uploaded Only' })).toHaveCount(0);
+  });
+
+  // Regression: the canvas referenced only the first file of an uploaded family,
+  // so a reload restored that one and deleted the others. Text in a lost weight
+  // was then drawn with the remaining file, without any missing-font warning.
+  test('reload keeps every file of an uploaded font family that the canvas uses', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForStartupToFinish(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'font-family-text' })]),
+      'font-family-project.json',
+    );
+    await selectTextLayerInProperties(page);
+
+    // The family name, weight and style of an imported font come from its file name.
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'PersistProbe-Bold.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueRoman.otf'), 'PersistProbe-Regular.otf');
+    await importUnusedFont(page);
+    await expectUploadedFontRecordCount(page, 3);
+
+    await chooseFontFamily(page, 'Persist Probe');
+    await expectPersistedCanvasFontFiles(page, ['PersistProbe-Bold.otf', 'PersistProbe-Regular.otf']);
+    const widthsBeforeReload = await measureRegularAndBoldText(page, 'Persist Probe');
+    expect(widthsBeforeReload.bold).not.toBe(widthsBeforeReload.regular);
+
+    await page.reload();
+    await waitForEditor(page);
+    await expectPersistProbeFamilyRestored(page, widthsBeforeReload);
+  });
+
+  test('reload keeps a font file imported after its family was already in use', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForStartupToFinish(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'late-font-text' })]),
+      'late-font-project.json',
+    );
+    await selectTextLayerInProperties(page);
+    const boldToggle = page.getByRole('button', { name: 'Bold', exact: true });
+
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueRoman.otf'), 'PersistProbe-Regular.otf');
+    await chooseFontFamily(page, 'Persist Probe');
+    await expectPersistedCanvasFontFiles(page, ['PersistProbe-Regular.otf']);
+    // The family has no bold file yet.
+    await expect(boldToggle).toBeDisabled();
+
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'PersistProbe-Bold.otf');
+    await expect(boldToggle).toBeEnabled();
+    await importUnusedFont(page);
+    await expectUploadedFontRecordCount(page, 3);
+    await expectPersistedCanvasFontFiles(page, ['PersistProbe-Regular.otf', 'PersistProbe-Bold.otf']);
+    const widthsBeforeReload = await measureRegularAndBoldText(page, 'Persist Probe');
+    expect(widthsBeforeReload.bold).not.toBe(widthsBeforeReload.regular);
+
+    await page.reload();
+    await waitForEditor(page);
+    await expectPersistProbeFamilyRestored(page, widthsBeforeReload);
+  });
+
+  // Regression: unused uploaded fonts are deleted once startup has finished, but
+  // the editor can be used before then. A font imported in the meantime was
+  // deleted as unused, and was missing after the next reload.
+  test('reload keeps a font that was imported before startup had finished', async ({ page }) => {
+    const project = createProjectDocument([createTextFixture({ id: 'early-import-text' })]);
+    await openFreshEditor(page);
+    await waitForStartupToFinish(page);
+    await uploadProject(page, project, 'early-import-project.json');
+    await selectTextLayerInProperties(page);
+    await importUnusedFont(page);
+    await expectUploadedFontRecordCount(page, 1);
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Arial', []);
+
+    // Startup waits for the bundled fonts, so holding them back keeps the next
+    // start unfinished for as long as this test needs.
+    let releaseBundledFonts = () => {};
+    const bundledFontsReleased = new Promise<void>((resolve) => {
+      releaseBundledFonts = resolve;
+    });
+    await page.route(/\.(?:ttf|otf|woff2?)(?:\?.*)?$/, async (route) => {
+      await bundledFontsReleased;
+      await route.continue();
+    });
+    await page.reload();
+    await waitForEditor(page);
+
+    // The saved canvas only appears once startup finishes. Load the project
+    // again to have a text layer, and with it the font picker.
+    await uploadProject(page, project, 'early-import-project.json');
+    await selectTextLayerInProperties(page);
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'Early-Import-Regular.otf');
+    await expectUploadedFontRecordCount(page, 2);
+
+    releaseBundledFonts();
+    await expect
+      .poll(async () => readUploadedFontKeys(page), {
+        message: 'Expected the startup clean-up to delete the unused font and keep the one just imported.',
+      })
+      .toEqual(['uploaded:Early-Import-Regular.otf']);
+
+    await selectTextLayerInProperties(page);
+    await chooseFontFamily(page, 'Early Import');
+    await expectPersistedCanvasFontFiles(page, ['Early-Import-Regular.otf']);
+    const widthsBeforeReload = await measureRegularAndBoldText(page, 'Early Import');
+
+    await page.reload();
+    await waitForEditor(page);
+    await selectTextLayerInProperties(page);
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Early Import');
+    await expect
+      .poll(async () => measureRegularAndBoldText(page, 'Early Import'), {
+        message: 'Expected the imported font to be restored after the reload.',
+      })
+      .toEqual(widthsBeforeReload);
+    await expect(page.getByText('Missing fonts')).toHaveCount(0);
+    expect(await readUploadedFontKeys(page)).toEqual(['uploaded:Early-Import-Regular.otf']);
   });
 
   test('round-trips project save/open and exports a PNG with the canvas dimensions', async ({ page }) => {

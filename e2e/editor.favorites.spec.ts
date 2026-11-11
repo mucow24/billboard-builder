@@ -14,9 +14,11 @@ import {
   openPropertiesTab,
   openFavoritesTab,
   waitForEditor,
+  waitForStartupToFinish,
   uploadProject,
 } from './support/editor';
 import {
+  expectPersistedCanvasFontFiles,
   expectPersistedCanvasToReferenceFontFamily,
   uploadNamedFontFromPath,
 } from './support/persistence';
@@ -314,5 +316,59 @@ test.describe('editor favorite library flows', () => {
     await openPropertiesTab(page);
     await expect(page.getByText('Missing fonts')).toHaveCount(0);
     await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Uploaded Favorite');
+  });
+
+  // Regression: a favorite kept only the first file of an uploaded family, so the
+  // family's other files were deleted on reload and could not be restored.
+  test('TL-09 lazily restores every file of a favorite-only uploaded font family after reload', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForStartupToFinish(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'favorite-family-text' })]),
+      'favorite-font-family.json',
+    );
+
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+
+    // The family name, weight and style of an imported font come from its file name.
+    const fontsDir = path.join(process.cwd(), 'src/assets/fonts');
+    await uploadNamedFontFromPath(page, path.join(fontsDir, 'HelveticaNeueRoman.otf'), 'FavoriteFamily-Regular.otf');
+    await uploadNamedFontFromPath(page, path.join(fontsDir, 'HelveticaNeueBold.otf'), 'FavoriteFamily-Bold.otf');
+    await page.getByTestId('font-family-picker-trigger').click();
+    await page.getByRole('option', { name: 'Favorite Family' }).first().click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Favorite Family');
+    await expectPersistedCanvasFontFiles(page, ['FavoriteFamily-Regular.otf', 'FavoriteFamily-Bold.otf']);
+
+    await page.getByRole('button', { name: 'Save as favorite' }).click();
+    await openFavoritesTab(page);
+    await expect(
+      page.getByRole('button', { name: 'Insert Text:Integration text' }),
+    ).toBeVisible();
+
+    // Take the family off the canvas, so that only the favorite still uses it.
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+    await page.getByTestId('font-family-picker-trigger').click();
+    await page.getByRole('option', { name: 'Arial' }).first().click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Arial');
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Arial', []);
+
+    await page.reload();
+    await waitForEditor(page);
+    // Startup replaces the canvas with the saved one when it finishes, which would
+    // discard a favorite inserted before then.
+    await waitForStartupToFinish(page);
+    await openFavoritesTab(page);
+    await page.getByRole('button', { name: 'Insert Text:Integration text' }).click();
+    await openPropertiesTab(page);
+    await expect(page.getByText('Missing fonts')).toHaveCount(0);
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Favorite Family');
+    // The inserted text is regular weight, and Bold is only offered for it while
+    // the family has a bold file.
+    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeEnabled();
   });
 });

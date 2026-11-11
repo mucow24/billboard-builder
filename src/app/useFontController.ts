@@ -37,6 +37,8 @@ export function useFontController({
       return;
     }
 
+    // One reference puts the family in the document. The reducer then adds the
+    // family's other uploaded files (`reconcileUploadedFontReferences`).
     dispatch({
       type: 'register_font',
       font: toFontReference(matchingFont),

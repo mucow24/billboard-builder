@@ -124,4 +124,17 @@ describe('font registry', () => {
       )
     ).toEqual(['Ghost Font', 'Missing Bundle']);
   });
+
+  it('reports a family the document references by several files once, and only when none of them is available', () => {
+    const ghostFiles = [
+      { family: 'Ghost Font', sourceName: 'GhostFont-Bold.ttf', kind: 'uploaded' as const },
+      { family: 'Ghost Font', sourceName: 'GhostFont-Regular.ttf', kind: 'uploaded' as const },
+    ];
+    const sessionFiles = [
+      { family: 'Session Sans', sourceName: 'SessionSans-Bold.ttf', kind: 'uploaded' as const },
+      { family: 'Session Sans', sourceName: 'SessionSans-Italic.ttf', kind: 'uploaded' as const },
+    ];
+
+    expect(findMissingFonts([...ghostFiles, ...sessionFiles], availableFonts)).toEqual(['Ghost Font']);
+  });
 });
