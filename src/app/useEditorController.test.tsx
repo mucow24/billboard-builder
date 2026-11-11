@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useEditorController } from './useEditorController';
+import { useEditorStartup } from './useEditorStartup';
 import type { StoredFavorite } from '../editor/persistence/favoriteLibraryService';
 import {
   createDefaultProjectDocument,
@@ -98,7 +99,7 @@ vi.mock('../editor/fonts', async () => {
     await vi.importActual<typeof import('../editor/fonts')>('../editor/fonts');
   return {
     ...actual,
-    loadBundledFonts: vi.fn().mockResolvedValue([]),
+    loadBundledFonts: vi.fn(() => ({ first: Promise.resolve(), all: Promise.resolve([]) })),
     registerFontFile: mockRegisterFontFile,
     registerUploadedFontBytes: mockRegisterUploadedFontBytes,
   };
@@ -116,6 +117,15 @@ function makeFileList(...files: File[]): FileList {
     fileList[index] = file;
   });
   return fileList as unknown as FileList;
+}
+
+/** The controller as the app mounts it: after startup has loaded the saved canvas. */
+async function renderControllerAfterStartup() {
+  const startup = renderHook(() => useEditorStartup());
+  await waitFor(() => {
+    expect(startup.result.current.fontsReady).toBe(true);
+  });
+  return renderHook(() => useEditorController({ fontsReady: true }));
 }
 
 describe('useEditorController', () => {
@@ -156,11 +166,8 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     expect(result.current.state.selectedItem?.id).toBe(rectangleItem.id);
     expect(result.current.state.canUndo).toBe(true);
@@ -177,11 +184,8 @@ describe('useEditorController', () => {
       sourceName: 'poster.png',
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
     await act(async () => {
       await result.current.actions.handleImageUpload(makeFileList(file));
     });
@@ -209,11 +213,8 @@ describe('useEditorController', () => {
     mockRegisterFontFile.mockRejectedValue(new Error('font nope'));
     mockReadProjectFile.mockRejectedValue(new Error('project nope'));
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     await act(async () => {
       await result.current.actions.handleImageUpload(makeFileList(imageFile));
@@ -269,11 +270,8 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     await act(async () => {
       await result.current.actions.handleFontUpload(makeFileList(fontFile));
@@ -374,14 +372,33 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     expect(result.current.state.document.fonts).toEqual([]);
     expect(result.current.state.missingFontFamilies).toEqual([]);
+  });
+
+  it('reports a missing font only once the bundled fonts have all been loaded', async () => {
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        fonts: [{ family: 'Slow Font', sourceName: 'SlowFont-Regular.ttf', kind: 'bundled' }],
+        nodes: [createTextItem({ id: 'slow-text', fontFamily: 'Slow Font' })],
+      },
+    });
+
+    const { result, rerender } = renderHook(
+      ({ fontsReady }: { fontsReady: boolean }) => useEditorController({ fontsReady }),
+      { initialProps: { fontsReady: false } },
+    );
+    // The font may simply not have arrived yet.
+    expect(result.current.state.missingFontFamilies).toEqual([]);
+
+    rerender({ fontsReady: true });
+    await waitFor(() => {
+      expect(result.current.state.missingFontFamilies).toEqual(['Slow Font']);
+    });
   });
 
   it('restores uploaded fonts referenced by the persisted canvas document during bootstrap', async () => {
@@ -420,7 +437,7 @@ describe('useEditorController', () => {
       kind: 'uploaded',
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = await renderControllerAfterStartup();
 
     await waitFor(() => {
       expect(result.current.state.availableFonts).toContainEqual({
@@ -462,11 +479,8 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     let wasSaved = false;
     act(() => {
@@ -513,11 +527,8 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     act(() => {
       useEditorStore.getState().loadDocument({
@@ -621,7 +632,7 @@ describe('useEditorController', () => {
       kind: 'uploaded',
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
     await waitFor(() => {
       expect(result.current.state.favorites).toHaveLength(1);
@@ -690,7 +701,7 @@ describe('useEditorController', () => {
     ];
     mockFavoriteLibraryService.load.mockReturnValue(retainedFavorites as never);
 
-    renderHook(() => useEditorController());
+    renderHook(() => useEditorController({ fontsReady: true }));
 
     await waitFor(() => {
       expect(mockUploadedFontPersistenceService.pruneUnreferenced).toHaveBeenCalled();
@@ -753,10 +764,7 @@ describe('useEditorController', () => {
         document: { ...createDefaultProjectDocument(), nodes: [textItem] },
         session: { selectedNodeIds: [textItem.id] },
       });
-      const rendered = renderHook(() => useEditorController());
-      await waitFor(() => {
-        expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-      });
+      const rendered = renderHook(() => useEditorController({ fontsReady: true }));
       return rendered;
     }
 
@@ -823,7 +831,7 @@ describe('useEditorController', () => {
       mockCanvasPersistenceService.load.mockResolvedValue(persistedDocument);
       mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue(storedFonts);
 
-      const { result } = renderHook(() => useEditorController());
+      const { result } = await renderControllerAfterStartup();
 
       await waitFor(() => {
         expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
@@ -847,10 +855,7 @@ describe('useEditorController', () => {
         document: documentSetInPersistProbe(),
         session: { selectedNodeIds: ['probe-text'] },
       });
-      const { result } = renderHook(() => useEditorController());
-      await waitFor(() => {
-        expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-      });
+      const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
       act(() => {
         result.current.actions.saveSelectionAsFavorite();
@@ -885,7 +890,7 @@ describe('useEditorController', () => {
       mockFavoriteLibraryService.load.mockReturnValue([savedBeforeTheBoldUpload] as never);
       mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([storedFonts[1]]);
 
-      const { result } = renderHook(() => useEditorController());
+      const { result } = renderHook(() => useEditorController({ fontsReady: true }));
       await waitFor(() => {
         expect(result.current.state.favorites).toHaveLength(1);
       });
@@ -901,11 +906,8 @@ describe('useEditorController', () => {
   });
 
   it('returns false when no nodes are selected', async () => {
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     expect(result.current.actions.saveSelectionAsFavorite()).toBe(false);
     expect(mockFavoriteLibraryService.save).not.toHaveBeenCalled();
@@ -930,7 +932,7 @@ describe('useEditorController', () => {
     };
     mockFavoriteLibraryService.load.mockReturnValue([favA, favB] as never);
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
     await waitFor(() => {
       expect(result.current.state.favorites).toHaveLength(2);
@@ -960,7 +962,7 @@ describe('useEditorController', () => {
     };
     mockFavoriteLibraryService.load.mockReturnValue([favA] as never);
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
     await waitFor(() => {
       expect(result.current.state.favorites).toHaveLength(1);
@@ -990,11 +992,8 @@ describe('useEditorController', () => {
       throw new Error('quota nope');
     });
 
-    const { result } = renderHook(() => useEditorController());
+    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-    await waitFor(() => {
-      expect(mockCanvasPersistenceService.load).toHaveBeenCalled();
-    });
 
     let wasSaved = true;
     act(() => {

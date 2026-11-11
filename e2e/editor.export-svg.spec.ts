@@ -13,6 +13,7 @@ import {
   openFreshEditor,
   readDownloadedSvg,
   uploadProject,
+  waitForBundledFonts,
 } from './support/editor';
 
 /**
@@ -435,13 +436,9 @@ test.describe('SVG export', () => {
   // drawing path on the canvas (character by character), hence the second layer.
   test('places kerned text where the canvas draws it, with and without letter spacing', async ({ page }) => {
     await openFreshEditor(page);
-    // Wait for startup to finish, which the Properties tab shows by counting the
-    // registered fonts. Before that the bundled fonts are still loading, so the
-    // canvas would draw the layers in a fallback font, and the end of startup can
-    // replace a project loaded in the meantime with the saved canvas.
-    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
-      timeout: 30_000,
-    });
+    // The bundled fonts keep arriving after the editor appears, and a layer
+    // drawn before its font is registered keeps its fallback look.
+    await waitForBundledFonts(page);
 
     const layers = [
       { id: 'kerned', letterSpacing: 0, x: 20, y: 40, width: 980, height: 170 },
@@ -505,10 +502,8 @@ test.describe('SVG export', () => {
   // the lines of one paragraph were off by different amounts.
   test('aligns centred and right-aligned lines where the canvas draws them', async ({ page }) => {
     await openFreshEditor(page);
-    // Startup has to finish first: see the kerning test above.
-    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
-      timeout: 30_000,
-    });
+    // The bundled fonts have to be in first: see the kerning test above.
+    await waitForBundledFonts(page);
 
     const albertus = { fontFamily: 'Albertus MT Std', fontSize: 70 };
     const wrapping = { ...albertus, text: 'To AVATAR Ty Toy', lines: 2 };

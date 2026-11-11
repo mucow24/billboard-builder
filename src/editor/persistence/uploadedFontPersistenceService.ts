@@ -147,9 +147,10 @@ export class UploadedFontPersistenceService {
 
   /**
    * Delete the stored fonts that nothing references, except those saved since
-   * this page loaded. The prune runs once startup has finished, and the editor is
-   * usable before then: a font imported in the meantime is not referenced until
-   * it is applied to text, and must not be deleted from under the session.
+   * this page loaded. The prune starts when the editor appears and reads the
+   * store before it deletes from it: a font imported in the meantime is not
+   * referenced until it is applied to text, and must not be deleted from under
+   * the session.
    */
   async pruneUnreferenced(references: DocumentFontReference[]): Promise<void> {
     const retainedKeys = new Set(dedupeUploadedFontKeys(references));

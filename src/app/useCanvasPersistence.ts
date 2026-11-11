@@ -5,15 +5,15 @@ import { defaultCanvasPersistenceService } from '../editor/persistence/canvasPer
 
 interface UseCanvasPersistenceArgs {
   document: ProjectDocument;
-  persistenceReady: boolean;
 }
 
-export function useCanvasPersistence({ document, persistenceReady }: UseCanvasPersistenceArgs) {
+/**
+ * Autosaves the canvas shortly after every change, starting with the document
+ * the editor mounts with. That must already be the saved canvas (see
+ * `useEditorStartup`), or this would overwrite it.
+ */
+export function useCanvasPersistence({ document }: UseCanvasPersistenceArgs) {
   useEffect(() => {
-    if (!persistenceReady) {
-      return;
-    }
-
     const timeoutId = window.setTimeout(() => {
       void defaultCanvasPersistenceService.save(document);
     }, 150);
@@ -21,5 +21,5 @@ export function useCanvasPersistence({ document, persistenceReady }: UseCanvasPe
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [document, persistenceReady]);
+  }, [document]);
 }
