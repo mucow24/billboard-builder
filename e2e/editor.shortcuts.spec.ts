@@ -1,7 +1,10 @@
-import { expect, test } from '@playwright/test';
+import path from 'node:path';
+
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   APP_CLIPBOARD_MIME_TYPE,
+  captureDownload,
   clickItem,
   clickLayerRow,
   clickToolbarPopoverItem,
@@ -11,6 +14,7 @@ import {
   createLineFixture,
   createProjectDocument,
   createRectangleFixture,
+  createTextFixture,
   cutSelectionToClipboardPayload,
   dragEmptyCanvas,
   openFreshEditor,
@@ -20,11 +24,57 @@ import {
   pasteClipboardPayloadWithImageFile,
   pasteClipboardPayload,
   pasteImageClipboardFile,
+  readDownloadedSvg,
   saveAndReadProject,
   uploadProject,
+  waitForEditor,
+  waitForStartupToFinish,
 } from './support/editor';
+import {
+  expectPersistedCanvasFontFiles,
+  expectStoredUploadedFontFiles,
+  uploadNamedFontFromPath,
+} from './support/persistence';
 
 const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+function bundledFontPath(fileName: string) {
+  return path.join(process.cwd(), 'src/assets/fonts', fileName);
+}
+
+async function chooseFontFamily(page: Page, family: string) {
+  await page.getByTestId('font-family-picker-trigger').click();
+  await page.getByRole('option', { name: family, exact: true }).click();
+  await expect(page.getByTestId('font-family-picker-trigger')).toContainText(family);
+}
+
+/**
+ * How wide the browser draws a sample in a font family. Without the family's
+ * font file the browser falls back to another font, and the width changes.
+ */
+async function measureSampleWidth(page: Page, family: string) {
+  return page.evaluate((fontFamily) => {
+    const context = document.createElement('canvas').getContext('2d');
+    if (!context) {
+      throw new Error('2D canvas is unavailable.');
+    }
+    context.font = `400 200px ${JSON.stringify(fontFamily)}`;
+    return context.measureText('Hamburgefonstiv').width;
+  }, family);
+}
+
+/** The outline of every text layer in an SVG export, without its position on the canvas. */
+function exportedTextOutlines(svg: string): string[] {
+  return [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+}
+
+async function exportSvg(page: Page) {
+  return readDownloadedSvg(
+    await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'SVG');
+    }),
+  );
+}
 
 interface SavedNode {
   id: string;
@@ -480,5 +530,102 @@ test.describe('editor shortcuts', () => {
     await clickToolbarPopoverItem(page, 'Canvas', 'New');
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(0);
+  });
+
+  // Regression: cutting the only text set in a font takes the font off the canvas,
+  // and pasting the text back did not put it on again. The canvas was then saved
+  // without the font, the next start deleted the stored font file as unused, and
+  // the text was drawn in a fallback font with no missing-font warning.
+  test('CB-09 keeps the imported font of cut and pasted text across a reload', async ({ page }) => {
+    await openFreshEditor(page);
+    // Startup replaces the canvas with the saved one when it finishes, which
+    // would discard a project loaded before then.
+    await waitForStartupToFinish(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'pasted-font-text' })]),
+      'pasted-font-text.json',
+    );
+    const fontPicker = page.getByTestId('font-family-picker-trigger');
+
+    await clickItem(page, 'pasted-font-text');
+    // The family name of an imported font comes from its file name.
+    await uploadNamedFontFromPath(page, bundledFontPath('CalSans-Regular.ttf'), 'PasteProbe-Regular.ttf');
+    await chooseFontFamily(page, 'Paste Probe');
+    await expectPersistedCanvasFontFiles(page, ['PasteProbe-Regular.ttf']);
+    const widthBeforeCut = await measureSampleWidth(page, 'Paste Probe');
+    expect(widthBeforeCut).not.toBe(await measureSampleWidth(page, 'No Such Font Family'));
+    // A font the canvas never uses. The next start deletes it, so its absence
+    // after the reload shows that the clean-up of unused fonts has run.
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueRoman.otf'), 'Unused-Upload-Regular.otf');
+    await expectStoredUploadedFontFiles(page, ['PasteProbe-Regular.ttf', 'Unused-Upload-Regular.otf']);
+
+    const cut = await cutSelectionToClipboardPayload(page);
+    expect(cut.defaultPrevented).toBe(true);
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
+    // With its only text gone, the canvas no longer references the font.
+    await expectPersistedCanvasFontFiles(page, []);
+
+    const pasted = await pasteClipboardPayload(page, cut.payload);
+    expect(pasted.defaultPrevented).toBe(true);
+    await expect(page.locator('.layer-row')).toHaveCount(1);
+    await openPropertiesTab(page);
+    await expect(fontPicker).toContainText('Paste Probe');
+    await expectPersistedCanvasFontFiles(page, ['PasteProbe-Regular.ttf']);
+
+    await page.reload();
+    await waitForEditor(page);
+    await openLayersTab(page);
+    await page.getByRole('button', { name: 'Text', exact: true }).click();
+    await openPropertiesTab(page);
+    await expect(fontPicker).toContainText('Paste Probe');
+    await expectStoredUploadedFontFiles(page, ['PasteProbe-Regular.ttf']);
+    await expect
+      .poll(async () => measureSampleWidth(page, 'Paste Probe'), {
+        message: 'Expected the pasted text to be drawn in its imported font after the reload.',
+      })
+      .toBe(widthBeforeCut);
+    await expect(page.getByText('Missing fonts')).toHaveCount(0);
+  });
+
+  // Regression: pasted text set in a bundled font was left without a font
+  // reference in the same way. SVG export then took the font for a system font,
+  // which has no outlines to embed, and refused to export.
+  test('CB-10 exports cut and pasted text set in a bundled font as SVG outlines', async ({ page }) => {
+    await openFreshEditor(page);
+    // Startup replaces the canvas with the saved one when it finishes, which
+    // would discard a project loaded before then.
+    await waitForStartupToFinish(page);
+    await uploadProject(
+      page,
+      createProjectDocument([createTextFixture({ id: 'pasted-bundled-text', text: 'Pasted' })]),
+      'pasted-bundled-text.json',
+    );
+    const fontPicker = page.getByTestId('font-family-picker-trigger');
+
+    await clickItem(page, 'pasted-bundled-text');
+    await chooseFontFamily(page, 'Cal Sans');
+    const outlinesBeforeCut = exportedTextOutlines(await exportSvg(page));
+    expect(outlinesBeforeCut).toHaveLength(1);
+
+    const cut = await cutSelectionToClipboardPayload(page);
+    expect(cut.defaultPrevented).toBe(true);
+    await openLayersTab(page);
+    await expect(page.locator('.layer-row')).toHaveCount(0);
+
+    const pasted = await pasteClipboardPayload(page, cut.payload);
+    expect(pasted.defaultPrevented).toBe(true);
+    await expect(page.locator('.layer-row')).toHaveCount(1);
+    await openPropertiesTab(page);
+    await expect(fontPicker).toContainText('Cal Sans');
+
+    // The export downloads instead of being refused, and draws the pasted text
+    // with the outlines it had before the cut.
+    const svg = await exportSvg(page);
+    expect(svg).not.toContain('<text');
+    expect(exportedTextOutlines(svg)).toEqual(outlinesBeforeCut);
+    await expect(page.getByText(/Can't export to SVG/)).toHaveCount(0);
+    await expectPersistedCanvasFontFiles(page, ['CalSans-Regular.ttf']);
   });
 });

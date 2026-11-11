@@ -109,6 +109,41 @@ export async function expectPersistedCanvasFontFiles(page: Page, expectedSourceN
     .toEqual(expectedSourceNames);
 }
 
+/** The file names of the imported fonts kept in browser storage, sorted. */
+export async function readStoredUploadedFontFiles(page: Page): Promise<string[]> {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('billboard-builder', 2);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    try {
+      return await new Promise<string[]>((resolve, reject) => {
+        const request = database
+          .transaction('uploaded-fonts', 'readonly')
+          .objectStore('uploaded-fonts')
+          .getAllKeys();
+        request.onerror = () => reject(request.error);
+        // Each font is stored under `uploaded:<file name>`.
+        request.onsuccess = () =>
+          resolve(request.result.map((key) => String(key).replace(/^uploaded:/, '')).sort());
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
+/** Waits until browser storage holds exactly these imported font files. */
+export async function expectStoredUploadedFontFiles(page: Page, expectedSourceNames: string[]) {
+  await expect
+    .poll(async () => readStoredUploadedFontFiles(page), {
+      message: `Expected the stored imported fonts to be ${expectedSourceNames.join(', ') || 'none'}.`,
+    })
+    .toEqual([...expectedSourceNames].sort());
+}
+
 export async function uploadNamedFontFromPath(
   page: Page,
   filePath: string,
