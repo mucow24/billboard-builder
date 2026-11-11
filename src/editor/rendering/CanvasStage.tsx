@@ -149,6 +149,7 @@ export function CanvasStage({
     renderedSelectedItems,
     renderedSelectionFrame,
     selectedRenderedItem,
+    selectionLocked,
     session: session as never,
     cropSession: cropSession as never,
     zoom: viewport.zoom,

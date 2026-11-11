@@ -146,7 +146,6 @@ export function PropertiesPanel({
             data-testid="layers-tab-body"
           >
             <LayersInspectorTab
-              canReorder={selectedNodeIds.length > 0}
               collapsedGroupIds={collapsedGroupIds}
               rows={layerRows}
               onDeleteNode={onDeleteNode}

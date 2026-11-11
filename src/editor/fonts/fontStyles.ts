@@ -1,9 +1,19 @@
 import type { TextCanvasItem } from '../document/documentTypes';
+import { subscribeToFontRegistrations } from './fontRegistrations';
 
 export type CombinedFontStyle = 'normal' | 'bold' | 'italic' | 'bold italic';
 
 const fontVariantSupportCache = new WeakMap<FontFaceSet, Map<string, boolean>>();
 const subscribedFontSets = new WeakSet<FontFaceSet>();
+
+// The font set's own `loadingdone` covers faces that load while they are in the
+// set. This app adds its faces already loaded, which fires no event, so the font
+// loader's announcement is what says a cached answer may be out of date.
+subscribeToFontRegistrations(() => {
+  if (typeof document !== 'undefined' && document.fonts) {
+    fontVariantSupportCache.get(document.fonts)?.clear();
+  }
+});
 
 function quoteFontFamily(fontFamily: string): string {
   return JSON.stringify(fontFamily);

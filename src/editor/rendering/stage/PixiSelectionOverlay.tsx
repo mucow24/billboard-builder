@@ -128,12 +128,9 @@ function InteractiveHandle({
 export interface PixiSelectionOverlayProps {
   selectedRenderedItem: RenderableCanvasItem | null;
   renderedSelectedItems: RenderableCanvasItem[];
-  /**
-   * Anything selected is locked. The selection is then drawn as outlines only:
-   * no resize, rotate, endpoint or vertex handles, since none of them would act.
-   */
-  selectionLocked?: boolean;
   showGroupSelection: boolean;
+  /** The selection contains a locked item or group: draw outlines only, no handles. */
+  selectionLocked?: boolean;
   groupOverlayFrame: {
     bounds: { x: number; y: number; width: number; height: number };
     rotation: number;
@@ -179,8 +176,8 @@ export interface PixiSelectionOverlayProps {
 export function PixiSelectionOverlay({
   selectedRenderedItem,
   renderedSelectedItems,
-  selectionLocked = false,
   showGroupSelection,
+  selectionLocked = false,
   groupOverlayFrame,
   zoom,
   beginResize,
@@ -206,8 +203,8 @@ export function PixiSelectionOverlay({
         {groupOverlayFrame ? (
           <GroupSelectionOverlay
             frame={groupOverlayFrame}
-            locked={selectionLocked}
             zoom={zoom}
+            locked={selectionLocked}
             beginGroupResize={beginGroupResize}
             beginGroupRotate={beginGroupRotate}
             toCanvasPointer={toCanvasPointer}
@@ -219,6 +216,8 @@ export function PixiSelectionOverlay({
 
   if (!selectedRenderedItem) return null;
 
+  // A locked item can be selected (from Layers, or by alt-clicking it) but not
+  // transformed, so it gets its outline and nothing to grab.
   if (selectionLocked) {
     return (
       <pixiContainer label="locked-selection-overlay">
@@ -326,16 +325,16 @@ function ItemOutlineOnly({
 
 function GroupSelectionOverlay({
   frame,
-  locked = false,
   zoom,
+  locked,
   beginGroupResize,
   beginGroupRotate,
   toCanvasPointer,
 }: {
   frame: NonNullable<PixiSelectionOverlayProps['groupOverlayFrame']>;
-  /** Draw the bounding rect only, without the rotate line or any handle. */
-  locked?: boolean;
   zoom: number;
+  // Outline only: no rotation line, no handles.
+  locked: boolean;
   beginGroupResize: PixiSelectionOverlayProps['beginGroupResize'];
   beginGroupRotate: PixiSelectionOverlayProps['beginGroupRotate'];
   toCanvasPointer: (pointer: Point) => Point;

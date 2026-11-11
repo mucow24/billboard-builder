@@ -1,5 +1,14 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CanvasSource, ColorMatrixFilter, FillGradient, Graphics, Polygon, Rectangle, Texture } from 'pixi.js';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  CanvasSource,
+  CanvasTextMetrics,
+  ColorMatrixFilter,
+  FillGradient,
+  Graphics,
+  Polygon,
+  Rectangle,
+  Texture,
+} from 'pixi.js';
 import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
 
@@ -18,6 +27,7 @@ import type {
   RectangleCanvasItem,
   TextCanvasItem,
 } from '../../document/documentTypes';
+import { getFontRegistrationCount, subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
 import { computeGradientEndpoints } from '../geometry/gradientGeometry';
@@ -190,6 +200,43 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
     textX: item.padding.left,
     textY,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Text content component (redraws when the text's font arrives)
+// ---------------------------------------------------------------------------
+
+// Pixi measures the ascent and descent of a font declaration once and keeps the
+// answer. Measured before the declaration's font was registered, it describes a
+// fallback font, so it is dropped whenever a font is registered. This runs
+// before React re-renders the text layers that follow the registration.
+subscribeToFontRegistrations(() => CanvasTextMetrics.clearMetrics());
+
+function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number }) {
+  // The text is rasterised with whatever the browser has for its family at that
+  // moment: a fallback font, if the family's file has not been registered yet
+  // (bundled fonts still loading at startup, an uploaded font restored after
+  // the saved canvas is shown, a missing font imported later). Nothing about
+  // the item changes when the file arrives, so follow the family instead: a
+  // registration re-renders this layer, and every render measures, lays out
+  // and rasterises the text anew. Layers in other families are left alone.
+  useSyncExternalStore(subscribeToFontRegistrations, () => getFontRegistrationCount(item.fontFamily));
+
+  // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
+  // When zoom > 1 the texture is magnified and turns blurry, so scale
+  // resolution with zoom to keep glyphs sharp on zoom-in.
+  const requestedResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+  const { style, resolution, textX, textY } = buildTextStyleProps(item, requestedResolution);
+  return (
+    <pixiText
+      text={item.text}
+      style={style}
+      x={textX}
+      y={textY}
+      resolution={resolution}
+      eventMode="none"
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -616,15 +663,21 @@ const PixiItemView = memo(function PixiItemView({
         return;
       }
 
-      // Double-click detection
-      const now = Date.now();
-      if (now - lastClickRef.current < 400) {
+      if (nativeEvent.altKey) {
+        // Alt-clicks cycle the selection through the items under the pointer.
+        // Rapid ones must each count, never pair up into a double-click.
         lastClickRef.current = 0;
-        e.stopPropagation();
-        onItemDoubleClick(item);
-        return;
+      } else {
+        // Double-click detection
+        const now = Date.now();
+        if (now - lastClickRef.current < 400) {
+          lastClickRef.current = 0;
+          e.stopPropagation();
+          onItemDoubleClick(item);
+          return;
+        }
+        lastClickRef.current = now;
       }
-      lastClickRef.current = now;
 
       e.stopPropagation();
       onItemPointerDown(
@@ -791,26 +844,7 @@ const PixiItemView = memo(function PixiItemView({
   // All other items share the same container layout (position, rotation, hitArea).
   let children: React.ReactNode;
   if (item.kind === 'text') {
-    // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
-    // When zoom > 1 the texture is magnified and turns blurry, so scale
-    // resolution with zoom to keep glyphs sharp on zoom-in.
-    const requestedResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
-    const {
-      style: textStyle,
-      resolution: textResolution,
-      textX,
-      textY,
-    } = buildTextStyleProps(item, requestedResolution);
-    children = (
-      <pixiText
-        text={item.text}
-        style={textStyle}
-        x={textX}
-        y={textY}
-        resolution={textResolution}
-        eventMode="none"
-      />
-    );
+    children = <PixiTextContent item={item} zoom={zoom} />;
   } else if (item.kind === 'image') {
     children = <PixiImageContent item={item as ImageCanvasItem} zoom={zoom} />;
   } else {

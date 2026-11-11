@@ -1,4 +1,5 @@
 import type { UploadedFont } from '../document/documentTypes';
+import { announceFontRegistration } from './fontRegistrations';
 import {
   parseFontSourceName,
   type ParsedFontMetadata,
@@ -65,6 +66,8 @@ function registerFontFace(
     kind,
   };
   registeredFontFiles.set(fontFace, font);
+  // Text already on the canvas in this family was drawn without this face.
+  announceFontRegistration(metadata.family);
   return font;
 }
 

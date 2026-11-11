@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -38,6 +38,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     canDelete: false,
     canGroup: false,
     canRedo: false,
+    canReorder: false,
     canSaveFavorite: false,
     canUndo: false,
     canUngroup: false,
@@ -58,6 +59,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onLoad: vi.fn(),
     onNewProject: vi.fn(),
     onRedo: vi.fn(),
+    onReorder: vi.fn(),
     onSave: vi.fn(),
     onSaveFavorite: vi.fn(),
     onUndo: vi.fn(),
@@ -85,6 +87,50 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: /^Group/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /^Ungroup/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save as favorite' })).toBeDisabled();
+  });
+
+  it('places the layer order buttons after Save as favorite and routes each to its reorder mode', async () => {
+    const user = userEvent.setup();
+    const onReorder = vi.fn();
+
+    renderToolbar({ canReorder: true, onReorder });
+
+    const orderControls = screen.getByRole('group', { name: 'Layer order controls' });
+    const labels = within(orderControls)
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('title'));
+    expect(labels).toEqual([
+      'Move to top (Ctrl+Shift+Up)',
+      'Move up (Ctrl+Up)',
+      'Move down (Ctrl+Down)',
+      'Move to bottom (Ctrl+Shift+Down)',
+    ]);
+
+    const saveFavorite = screen.getByRole('button', { name: 'Save as favorite' });
+    expect(
+      saveFavorite.compareDocumentPosition(orderControls) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(orderControls.previousElementSibling).toHaveClass('top-toolbar-section-divider');
+
+    await user.click(screen.getByRole('button', { name: /^Move to top/ }));
+    await user.click(screen.getByRole('button', { name: /^Move up/ }));
+    await user.click(screen.getByRole('button', { name: /^Move down/ }));
+    await user.click(screen.getByRole('button', { name: /^Move to bottom/ }));
+    expect(onReorder.mock.calls).toEqual([['front'], ['forward'], ['backward'], ['back']]);
+  });
+
+  it('disables the layer order buttons when the selection cannot be reordered', async () => {
+    const user = userEvent.setup();
+    const onReorder = vi.fn();
+
+    renderToolbar({ canReorder: false, onReorder });
+
+    const orderControls = screen.getByRole('group', { name: 'Layer order controls' });
+    for (const button of within(orderControls).getAllByRole('button')) {
+      expect(button).toBeDisabled();
+      await user.click(button);
+    }
+    expect(onReorder).not.toHaveBeenCalled();
   });
 
   it('routes canvas popover actions through the existing callbacks', async () => {

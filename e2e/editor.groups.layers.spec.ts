@@ -474,7 +474,7 @@ test.describe('editor group layers and inspector flows', () => {
     expect(savedProject.nodes[0].id).toBe('keep-rect');
   });
 
-  test('reorders groups from the layers footer controls as whole top-level nodes', async ({
+  test('reorders groups from the toolbar layer order controls as whole top-level nodes', async ({
     page,
   }) => {
     const groupedDocument = createGroupedProjectDocument([

@@ -1,13 +1,17 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   Cross2Icon,
   Link2Icon,
   LinkBreak2Icon,
   MaskOnIcon,
+  PinBottomIcon,
+  PinTopIcon,
   StarFilledIcon,
 } from '@radix-ui/react-icons';
 
-import type { CanvasSize } from '../document/documentTypes';
+import type { CanvasSize, ReorderMode } from '../document/documentTypes';
 import type { InspectorTab } from './inspector/types';
 import { ToolbarActionButton } from './ToolbarPrimitives';
 import { CanvasNameField } from './CanvasNameField';
@@ -21,6 +25,7 @@ interface ToolbarProps {
   canUndo: boolean;
   canRedo: boolean;
   canGroup: boolean;
+  canReorder: boolean;
   canSaveFavorite: boolean;
   canUngroup: boolean;
   canvasName: string;
@@ -42,6 +47,7 @@ interface ToolbarProps {
   onLoad: () => void;
   onNewProject: () => void;
   onRedo: () => void;
+  onReorder: (mode: ReorderMode) => void;
   onSave: () => void;
   onSaveFavorite: () => void;
   onUndo: () => void;
@@ -61,6 +67,7 @@ export function Toolbar({
   canUndo,
   canRedo,
   canGroup,
+  canReorder,
   canSaveFavorite,
   canUngroup,
   canvasName,
@@ -82,6 +89,7 @@ export function Toolbar({
   onLoad,
   onNewProject,
   onRedo,
+  onReorder,
   onSave,
   onSaveFavorite,
   onUndo,
@@ -340,6 +348,39 @@ export function Toolbar({
               </div>
             ) : null}
           </div>
+        </div>
+
+        <div className="top-toolbar-section-divider" aria-hidden="true" />
+
+        <div className="top-toolbar-action-strip" role="group" aria-label="Layer order controls">
+          <ToolbarActionButton
+            label="Move to top"
+            shortcut={`${modKey}+Shift+Up`}
+            onClick={() => onReorder('front')}
+            disabled={!canReorder}
+            icon={<PinTopIcon width={16} height={16} />}
+          />
+          <ToolbarActionButton
+            label="Move up"
+            shortcut={`${modKey}+Up`}
+            onClick={() => onReorder('forward')}
+            disabled={!canReorder}
+            icon={<ArrowUpIcon width={16} height={16} />}
+          />
+          <ToolbarActionButton
+            label="Move down"
+            shortcut={`${modKey}+Down`}
+            onClick={() => onReorder('backward')}
+            disabled={!canReorder}
+            icon={<ArrowDownIcon width={16} height={16} />}
+          />
+          <ToolbarActionButton
+            label="Move to bottom"
+            shortcut={`${modKey}+Shift+Down`}
+            onClick={() => onReorder('back')}
+            disabled={!canReorder}
+            icon={<PinBottomIcon width={16} height={16} />}
+          />
         </div>
 
         <div className="top-toolbar-spacer" />
