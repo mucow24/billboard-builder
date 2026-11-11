@@ -38,6 +38,18 @@ export interface TextMeasurer {
    */
   measureWidth(item: TextCanvasItem, text: string): number;
   /**
+   * Width in px of the ink of `text`, from its leftmost to its rightmost painted
+   * point (canvas `actualBoundingBoxLeft + actualBoundingBoxRight`), EXCLUDING
+   * letterSpacing. Usually a little narrower than `measureWidth`; wider where a
+   * glyph at either end of the text reaches past its advance, as slanted and
+   * swashed glyphs do. Pixi aligns a line by the larger of the two widths, so
+   * `svgText` needs both to put centred and right-aligned lines where the canvas
+   * does.
+   *
+   * Optional: lines measured without it are aligned by their advance width.
+   */
+  measureInkWidth?(item: TextCanvasItem, text: string): number;
+  /**
    * Baseline offset in px from the line-box top for the first line, matching
    * Pixi's `CanvasTextMetrics`: the actual-ink ascent of `|ÉqÅM` plus
    * `linePositionYShift`. (Deliberately NOT the font's nominal

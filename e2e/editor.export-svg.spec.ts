@@ -300,6 +300,115 @@ test.describe('SVG export', () => {
       expect(layer.overlap).toBeGreaterThan(0.8);
     }
   });
+
+  // Regression: the exporter aligned centred and right-aligned lines by another
+  // width than the canvas does, so they ended up beside the canvas lines.
+  //  - It measured a wrapped line together with the space it wraps at, which Pixi
+  //    takes off: in Albertus at 70px the first line sat 23px too far left when
+  //    right-aligned, and 15px when centred with letter spacing 6.
+  //  - It aligned inside the box, where Pixi aligns inside the widest line once a
+  //    word overflows the box: 249px too far left.
+  //  - It used the advance width, where Pixi uses the ink width if that is wider:
+  //    "Jazz" in Instrument Serif Italic at 120px sat 22px too far right.
+  // Where Pixi puts a line is known only to the real canvas, so the reference is
+  // Export > PNG and this lives in e2e. Lines are compared one by one, because
+  // the lines of one paragraph were off by different amounts.
+  test('aligns centred and right-aligned lines where the canvas draws them', async ({ page }) => {
+    await openFreshEditor(page);
+    // Startup has to finish first: see the kerning test above.
+    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
+      timeout: 30_000,
+    });
+
+    const albertus = { fontFamily: 'Albertus MT Std', fontSize: 70 };
+    const wrapping = { ...albertus, text: 'To AVATAR Ty Toy', lines: 2 };
+    const layers = [
+      { id: 'wrapped-right', ...wrapping, align: 'right', x: 20, y: 30, width: 420 },
+      { id: 'wrapped-centred-spaced', ...wrapping, align: 'center', letterSpacing: 6, x: 520, y: 30, width: 460 },
+      // Left-aligned lines were right before and must stay where they are.
+      { id: 'wrapped-left', ...wrapping, align: 'left', x: 20, y: 220, width: 420 },
+      // "AVATARAVATAR" is 526px wide in a 300px box. The canvas draws it from the
+      // box's left edge and lines the two short lines up with its right end, 226px
+      // past the box, so these lines are compared across `reach`, not the box.
+      {
+        id: 'overflowing-right',
+        ...albertus,
+        text: 'To AVATARAVATAR Ty',
+        lines: 3,
+        align: 'right',
+        x: 300,
+        y: 420,
+        width: 300,
+        reach: 700,
+      },
+      {
+        id: 'leaning-right',
+        fontFamily: 'Instrument Serif',
+        fontStyle: 'italic',
+        fontSize: 120,
+        text: 'Jazz',
+        lines: 1,
+        align: 'right',
+        x: 20,
+        y: 700,
+        width: 980,
+      },
+    ];
+    const prepared = layers.map(({ lines, reach, ...layer }, index) => {
+      // The text fixture's line height is 1.1 x the font size.
+      const lineHeight = layer.fontSize * 1.1;
+      return {
+        fixture: createTextFixture({
+          ...layer,
+          name: layer.id,
+          height: Math.ceil(lines * lineHeight),
+          zIndex: index + 1,
+        }),
+        lineBoxes: Array.from({ length: lines }, (_, line) => ({
+          name: `${layer.id}, line ${line + 1}`,
+          x: layer.x,
+          y: layer.y + line * lineHeight,
+          width: reach ?? layer.width,
+          height: lineHeight,
+        })),
+      };
+    });
+    const doc = {
+      ...createProjectDocument(prepared.map(({ fixture }) => fixture)),
+      fonts: [
+        { family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' },
+        { family: 'Instrument Serif', sourceName: 'InstrumentSerif-Italic.ttf', kind: 'bundled' },
+      ],
+    };
+    await uploadProject(page, doc, 'aligned-text.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    const lineBoxes = prepared.flatMap((layer) => layer.lineBoxes);
+    const compared = await compareInkWithCanvas(page, svg, png, doc.canvas.width, lineBoxes);
+
+    expect(compared).toHaveLength(lineBoxes.length);
+    compared.forEach((line, index) => {
+      const { name } = lineBoxes[index];
+      // The canvas drew a line here, so the text wrapped where this test expects.
+      expect(line.canvas.pixels, name).toBeGreaterThan(300);
+      // The exported line starts and ends where the canvas line does; 2px allows
+      // for anti-aliasing differences.
+      expect(Math.abs(line.exported.left - line.canvas.left), name).toBeLessThanOrEqual(2);
+      expect(Math.abs(line.exported.right - line.canvas.right), name).toBeLessThanOrEqual(2);
+      // And its glyphs sit on the canvas ones: shared ink over ink in either.
+      // About 0.9 when aligned; under 0.4 for every line the fix moved.
+      expect(line.overlap, name).toBeGreaterThan(0.7);
+    });
+  });
 });
 
 interface InkComparison {
