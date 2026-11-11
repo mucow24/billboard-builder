@@ -71,6 +71,28 @@ describe('favorite library document helpers', () => {
     ]);
   });
 
+  it('collects every file of a font family the saved text is set in', () => {
+    const headline = createTextItem({ id: 'headline', fontFamily: 'Poster Sans' });
+    const posterFiles = [
+      { family: 'Poster Sans', sourceName: 'PosterSans-Bold.ttf', kind: 'uploaded' as const },
+      { family: 'Poster Sans', sourceName: 'PosterSans-Regular.ttf', kind: 'uploaded' as const },
+    ];
+
+    const payload = buildFavoriteSelectionPayload(
+      {
+        nodes: [headline],
+        fonts: [
+          posterFiles[0],
+          { family: 'Accent Sans', sourceName: 'AccentSans-Regular.ttf', kind: 'uploaded' },
+          posterFiles[1],
+        ],
+      },
+      [headline.id],
+    );
+
+    expect(payload.fonts).toEqual(posterFiles);
+  });
+
   it('summarizes saved favorite colors and kinds for lightweight cards', () => {
     const first = createRectangleItem({
       id: 'first',

@@ -18,15 +18,16 @@ export interface FontByteLoaders {
  *
  * `doc.fonts` decides whether a text item's family is embeddable at all: system
  * (and unknown) families have no obtainable bytes. It does not decide which file
- * to embed. A `DocumentFontReference` names one file per family and carries no
- * weight or style, so the file is chosen at export time from `registeredFonts`:
- * the one matching the item's weight and style, or the nearest the family has
- * (see `findFontForVariant`). `registeredFonts` must be in registration order
+ * to embed. A `DocumentFontReference` carries no weight or style, and a bundled
+ * family is referenced by only one of its files (an uploaded family by all of
+ * them), so the file is chosen at export time from `registeredFonts`: the one
+ * matching the item's weight and style, or the nearest the family has (see
+ * `findFontForVariant`). `registeredFonts` must be in registration order
  * (`listRegisteredFonts`) so that a family with two files for one variant exports
  * with the one the canvas renders with.
  *
  * If none of the family's files are registered in this session, the document's
- * own reference is used as before.
+ * first reference for the family is used.
  *
  * Limitation: when a family lacks the requested variant, the canvas fakes it from
  * the nearest face (synthetic bold / oblique). The export outlines that nearest

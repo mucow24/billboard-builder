@@ -123,6 +123,46 @@ describe('UploadedFontPersistenceService', () => {
     expect(store.delete).toHaveBeenCalledWith('uploaded:Drop-Regular.ttf');
   });
 
+  it('loads every referenced file of a family that was uploaded as several files', async () => {
+    const bold = createPersistedUploadedFont({
+      sourceName: 'SessionSans-Bold.ttf',
+      weight: '700',
+      bytes: createBytes(7),
+    });
+    const regular = createPersistedUploadedFont({ bytes: createBytes(4) });
+    const records: Record<string, PersistedUploadedFont> = {
+      'uploaded:SessionSans-Bold.ttf': bold,
+      'uploaded:SessionSans-Regular.ttf': regular,
+    };
+    const store = createMockStore();
+    store.read.mockImplementation(async (key: string) => records[key] ?? null);
+    const service = new UploadedFontPersistenceService(store);
+
+    const loaded = await service.loadByReferences([
+      createReference({ sourceName: 'SessionSans-Bold.ttf' }),
+      createReference(),
+    ]);
+
+    expect(loaded).toEqual([bold, regular]);
+  });
+
+  it('keeps every referenced file of a family when pruning', async () => {
+    const store = createMockStore();
+    store.keys.mockResolvedValue([
+      'uploaded:Drop-Regular.ttf',
+      'uploaded:SessionSans-Bold.ttf',
+      'uploaded:SessionSans-Regular.ttf',
+    ]);
+    const service = new UploadedFontPersistenceService(store);
+
+    await service.pruneUnreferenced([
+      createReference({ sourceName: 'SessionSans-Bold.ttf' }),
+      createReference(),
+    ]);
+
+    expect(store.delete.mock.calls).toEqual([['uploaded:Drop-Regular.ttf']]);
+  });
+
   it('clears persisted uploaded fonts on request', async () => {
     const store = createMockStore();
     const service = new UploadedFontPersistenceService(store);
