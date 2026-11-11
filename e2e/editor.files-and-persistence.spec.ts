@@ -320,6 +320,63 @@ test.describe('editor file and persistence flows', () => {
     await expectPersistProbeFamilyRestored(page, widthsBeforeReload);
   });
 
+  // Regression: unused uploaded fonts are deleted once startup has finished, but
+  // the editor can be used before then. A font imported in the meantime was
+  // deleted as unused, and was missing after the next reload.
+  test('reload keeps a font that was imported before startup had finished', async ({ page }) => {
+    const project = createProjectDocument([createTextFixture({ id: 'early-import-text' })]);
+    await openFreshEditor(page);
+    await uploadProject(page, project, 'early-import-project.json');
+    await selectTextLayerInProperties(page);
+    await importUnusedFont(page);
+    await expectUploadedFontRecordCount(page, 1);
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Arial', []);
+
+    // Startup waits for the bundled fonts, so holding them back keeps the next
+    // start unfinished for as long as this test needs.
+    let releaseBundledFonts = () => {};
+    const bundledFontsReleased = new Promise<void>((resolve) => {
+      releaseBundledFonts = resolve;
+    });
+    await page.route(/\.(?:ttf|otf|woff2?)(?:\?.*)?$/, async (route) => {
+      await bundledFontsReleased;
+      await route.continue();
+    });
+    await page.reload();
+    await waitForEditor(page);
+
+    // The saved canvas only appears once startup finishes. Load the project
+    // again to have a text layer, and with it the font picker.
+    await uploadProject(page, project, 'early-import-project.json');
+    await selectTextLayerInProperties(page);
+    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'Early-Import-Regular.otf');
+    await expectUploadedFontRecordCount(page, 2);
+
+    releaseBundledFonts();
+    await expect
+      .poll(async () => readUploadedFontKeys(page), {
+        message: 'Expected the startup clean-up to delete the unused font and keep the one just imported.',
+      })
+      .toEqual(['uploaded:Early-Import-Regular.otf']);
+
+    await selectTextLayerInProperties(page);
+    await chooseFontFamily(page, 'Early Import');
+    await expectPersistedCanvasFontFiles(page, ['Early-Import-Regular.otf']);
+    const widthsBeforeReload = await measureRegularAndBoldText(page, 'Early Import');
+
+    await page.reload();
+    await waitForEditor(page);
+    await selectTextLayerInProperties(page);
+    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Early Import');
+    await expect
+      .poll(async () => measureRegularAndBoldText(page, 'Early Import'), {
+        message: 'Expected the imported font to be restored after the reload.',
+      })
+      .toEqual(widthsBeforeReload);
+    await expect(page.getByText('Missing fonts')).toHaveCount(0);
+    expect(await readUploadedFontKeys(page)).toEqual(['uploaded:Early-Import-Regular.otf']);
+  });
+
   test('round-trips project save/open and exports a PNG with the canvas dimensions', async ({ page }) => {
     const document = createProjectDocument([
       createRectangleFixture({ id: 'roundtrip-rect', x: 120, y: 140, width: 240, height: 140 }),

@@ -163,6 +163,50 @@ describe('UploadedFontPersistenceService', () => {
     expect(store.delete.mock.calls).toEqual([['uploaded:Drop-Regular.ttf']]);
   });
 
+  it('never prunes a font saved during this session, even while nothing references it yet', async () => {
+    const store = createMockStore();
+    store.keys.mockResolvedValue([
+      'uploaded:LeftOver-Regular.ttf',
+      'uploaded:SessionSans-Regular.ttf',
+    ]);
+    const service = new UploadedFontPersistenceService(store);
+
+    // Imported while the app was still starting: the startup prune runs afterwards,
+    // before the font has been applied to any text.
+    await service.save(createUploadedFont(), createBytes(1));
+    await service.pruneUnreferenced([]);
+
+    expect(store.delete.mock.calls).toEqual([['uploaded:LeftOver-Regular.ttf']]);
+  });
+
+  it('keeps a font whose save overlaps a prune that is already reading the store', async () => {
+    const store = createMockStore();
+    let finishListingKeys: (keys: string[]) => void = () => {};
+    store.keys.mockReturnValue(
+      new Promise<string[]>((resolve) => {
+        finishListingKeys = resolve;
+      }),
+    );
+    const service = new UploadedFontPersistenceService(store);
+
+    const pruning = service.pruneUnreferenced([]);
+    await service.save(createUploadedFont(), createBytes(1));
+    finishListingKeys(['uploaded:SessionSans-Regular.ttf']);
+    await pruning;
+
+    expect(store.delete).not.toHaveBeenCalled();
+  });
+
+  it('prunes a font again in a later session once nothing references it', async () => {
+    const store = createMockStore();
+    store.keys.mockResolvedValue(['uploaded:SessionSans-Regular.ttf']);
+
+    await new UploadedFontPersistenceService(store).save(createUploadedFont(), createBytes(1));
+    await new UploadedFontPersistenceService(store).pruneUnreferenced([]);
+
+    expect(store.delete.mock.calls).toEqual([['uploaded:SessionSans-Regular.ttf']]);
+  });
+
   it('clears persisted uploaded fonts on request', async () => {
     const store = createMockStore();
     const service = new UploadedFontPersistenceService(store);
