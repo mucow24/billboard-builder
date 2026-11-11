@@ -245,10 +245,13 @@ test.describe('SVG export', () => {
   // drawing path on the canvas (character by character), hence the second layer.
   test('places kerned text where the canvas draws it, with and without letter spacing', async ({ page }) => {
     await openFreshEditor(page);
-    // The canvas must not draw the layers before their font has arrived.
-    await page.waitForFunction(() =>
-      [...document.fonts].some((face) => face.family.replace(/["']/g, '') === 'Albertus MT Std'),
-    );
+    // Wait for startup to finish, which the Properties tab shows by counting the
+    // registered fonts. Before that the bundled fonts are still loading, so the
+    // canvas would draw the layers in a fallback font, and the end of startup can
+    // replace a project loaded in the meantime with the saved canvas.
+    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
+      timeout: 30_000,
+    });
 
     const layers = [
       { id: 'kerned', letterSpacing: 0, x: 20, y: 40, width: 980, height: 170 },
