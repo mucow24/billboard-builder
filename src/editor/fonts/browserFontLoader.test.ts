@@ -35,14 +35,6 @@ class MockFontFace {
   }
 }
 
-/** Finish a deferred font load and let the loader add the face to `document.fonts`. */
-async function finishLoad(url: string) {
-  const resolve = pendingLoads.get(`url(${url})`);
-  if (!resolve) throw new Error(`No pending font load for ${url}`);
-  resolve();
-  await new Promise((settle) => setTimeout(settle, 0));
-}
-
 describe('browser font loader', () => {
   beforeEach(() => {
     vi.stubGlobal('FontFace', MockFontFace);
@@ -136,6 +128,15 @@ describe('browser font loader', () => {
   });
 
   describe('listRegisteredFonts', () => {
+    /** Finish a deferred font load and let the loader add the face to `document.fonts`. */
+    async function finishLoad(url: string) {
+      // Matched by URL alone, however the loader wrote it into the face's source.
+      const pending = [...pendingLoads].find(([source]) => source.includes(url));
+      if (!pending) throw new Error(`No pending font load for ${url}`);
+      pending[1]();
+      await new Promise((settle) => setTimeout(settle, 0));
+    }
+
     beforeEach(() => {
       pendingLoads.clear();
       // A real Set stands in for the FontFaceSet: same `add`, same insertion-order iteration.

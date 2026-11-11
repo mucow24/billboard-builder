@@ -5,18 +5,18 @@ import {
   type PersistedUploadedFont,
 } from './fontModel';
 
-const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,woff2}', {
-  query: '?url',
-  import: 'default',
-  eager: true,
-}) as Record<string, string>;
-
 /**
  * The font file behind each face this module added to `document.fonts`. A
  * `FontFace` does not expose its source, so this is the only way back from a face
  * to its file.
  */
 const registeredFontFiles = new WeakMap<FontFace, UploadedFont>();
+
+const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,woff2}', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
 
 async function registerFontSource(
   metadata: ParsedFontMetadata,
