@@ -213,13 +213,9 @@ test.describe('SVG export', () => {
   // (Export > PNG), so this lives in e2e.
   test('exports the ligatures the canvas draws, and only where it draws them', async ({ page }) => {
     await openFreshEditor(page);
-    // Wait for startup to finish, which the Properties tab shows by counting the
-    // registered fonts. Before that the bundled fonts are still loading, so the
-    // canvas would draw the layers in a fallback font, and the end of startup can
-    // replace a project loaded in the meantime with the saved canvas.
-    await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
-      timeout: 30_000,
-    });
+    // The bundled fonts keep arriving after the editor appears, and a layer
+    // drawn before its font is registered keeps its fallback look.
+    await waitForBundledFonts(page);
 
     const fontSize = 200;
     const albertus = { family: 'Albertus MT Std', file: 'Albertus MT Std Regular.otf' };

@@ -28,7 +28,7 @@ import {
   saveAndReadProject,
   uploadProject,
   waitForEditor,
-  waitForStartupToFinish,
+  waitForBundledFonts,
 } from './support/editor';
 import {
   expectPersistedCanvasFontFiles,
@@ -538,9 +538,6 @@ test.describe('editor shortcuts', () => {
   // the text was drawn in a fallback font with no missing-font warning.
   test('CB-09 keeps the imported font of cut and pasted text across a reload', async ({ page }) => {
     await openFreshEditor(page);
-    // Startup replaces the canvas with the saved one when it finishes, which
-    // would discard a project loaded before then.
-    await waitForStartupToFinish(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'pasted-font-text' })]),
@@ -594,9 +591,9 @@ test.describe('editor shortcuts', () => {
   // which has no outlines to embed, and refused to export.
   test('CB-10 exports cut and pasted text set in a bundled font as SVG outlines', async ({ page }) => {
     await openFreshEditor(page);
-    // Startup replaces the canvas with the saved one when it finishes, which
-    // would discard a project loaded before then.
-    await waitForStartupToFinish(page);
+    // The bundled fonts keep arriving after the editor appears, and text drawn
+    // before its font is registered keeps its fallback look.
+    await waitForBundledFonts(page);
     await uploadProject(
       page,
       createProjectDocument([createTextFixture({ id: 'pasted-bundled-text', text: 'Pasted' })]),
