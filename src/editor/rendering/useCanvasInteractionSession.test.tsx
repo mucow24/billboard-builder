@@ -2209,4 +2209,43 @@ describe('useCanvasInteractionSession', () => {
 
     expect(result.current.session).toBeNull();
   });
+
+  it('reports a locked selection and starts no single-item gesture on a locked item', () => {
+    const locked = createRectangleItem({ id: 'locked', x: 100, y: 100, width: 80, height: 40, locked: true });
+    const lockedLine = createLineItem({
+      id: 'locked-line',
+      startX: 20,
+      startY: 20,
+      endX: 120,
+      endY: 60,
+      locked: true,
+    });
+    const params = createHookParams({
+      document: createDocument([locked, lockedLine]),
+      selectedNodeIds: [locked.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    expect(result.current.selectionLocked).toBe(true);
+
+    act(() => {
+      result.current.beginDrag(locked, { x: 140, y: 120 });
+      result.current.beginResize(locked, 'middle-right', { x: 180, y: 120 });
+      result.current.beginRotate(locked, { x: 140, y: 60 });
+      result.current.beginLineHandle(lockedLine, 'start', { x: 20, y: 20 });
+    });
+
+    expect(result.current.session).toBeNull();
+  });
+
+  it('reports an unlocked selection as not locked', () => {
+    const free = createRectangleItem({ id: 'free', x: 100, y: 100, width: 80, height: 40 });
+    const params = createHookParams({
+      document: createDocument([free]),
+      selectedNodeIds: [free.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    expect(result.current.selectionLocked).toBe(false);
+  });
 });

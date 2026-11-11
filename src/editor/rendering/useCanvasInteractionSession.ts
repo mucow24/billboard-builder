@@ -174,6 +174,12 @@ export function useCanvasInteractionSession({
     groupBounds,
     stageBounds,
   } = useInteractionDerivedState(document, selectedNodeIds);
+  // True when anything selected is locked. Such a selection keeps its outline
+  // but takes no move, resize or rotate gesture, and shows no handles.
+  const selectionLocked = useMemo(
+    () => selectedNodes.some((node) => node.locked) || selectedItems.some((item) => item.locked),
+    [selectedItems, selectedNodes]
+  );
 
   const updateGuides = useCallback((nextGuides: GuideLine[]) => {
     guidesRef.current = nextGuides;
@@ -755,13 +761,16 @@ export function useCanvasInteractionSession({
     updateSession(createCreateSession(tool, pointer, orderedItems));
   }, [orderedItems, updateSession]);
 
+  // A locked item can stay selected (it is locked in place from the Properties
+  // panel, or picked in Layers), so every single-item gesture refuses it here,
+  // the way the group gestures below refuse a selection that holds a lock.
   const beginDrag = useCallback((item: CanvasItem, pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (item.kind === 'generator') return;
+    if (item.kind === 'generator' || item.locked) return;
     updateSession(createDragSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupDrag = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (selectedNodes.some(n => n.locked) || selectedItems.some(i => i.locked)) return;
+    if (selectionLocked) return;
     const nextSession = createGroupDragSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -770,7 +779,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
 
   const beginResize = useCallback((
     item: ShapeItem,
@@ -778,6 +787,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     updateSession(
       createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id), source)
     );
@@ -788,7 +798,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
-    if (selectedNodes.some(n => n.locked) || selectedItems.some(i => i.locked)) return;
+    if (selectionLocked) return;
     const nextSession = createGroupResizeSession(handle, pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -797,14 +807,15 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point, source: PointerGestureSource = 'stage') => {
+    if (item.locked) return;
     updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (selectedNodes.some(n => n.locked) || selectedItems.some(i => i.locked)) return;
+    if (selectionLocked) return;
     const nextSession = createGroupRotateSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -813,7 +824,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
 
   const beginLineHandle = useCallback((
     item: LineCanvasItem,
@@ -821,6 +832,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     updateSession(
       createLineHandleSession(
         item,
@@ -838,6 +850,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     const nextSession = createPolygonVertexSession(
       item,
       vertexIndex,
@@ -856,6 +869,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     const nextSession = createPolygonEdgeInsertSession(
       item,
       edgeIndex,
@@ -1189,6 +1203,7 @@ export function useCanvasInteractionSession({
     selectedNode,
     selectedRenderedItem,
     selectedItemId,
+    selectionLocked,
     session,
     subgroupOutlineFrames,
   };

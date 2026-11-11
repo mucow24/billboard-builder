@@ -174,15 +174,12 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
       if (commands.length === 0) {
         return;
       }
-      // One transaction, so a multi-node lock is a single undo step. Locking
-      // drops the selection, as the Layers lock button does: a selected item
-      // would keep its live transform handles on the canvas.
-      get().applyTransaction([
-        ...commands.map((command) => ({ family: 'document' as const, command })),
-        ...(locked
-          ? [{ family: 'selection' as const, command: { type: 'clear_selection' as const } }]
-          : []),
-      ]);
+      // One transaction, so a multi-node lock is a single undo step. The
+      // selection is kept either way, so a stray click is undone by clicking
+      // again; the canvas shows a locked selection without transform handles.
+      get().applyTransaction(
+        commands.map((command) => ({ family: 'document' as const, command }))
+      );
     },
     selectSingleNode: (nodeId) =>
       get().dispatch(nodeId ? { type: 'select_nodes', nodeIds: [nodeId] } : { type: 'clear_selection' }),

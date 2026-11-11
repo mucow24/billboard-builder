@@ -100,6 +100,7 @@ export function CanvasStage({
     lastDrilldownSource,
     selectedNode,
     selectedRenderedItem,
+    selectionLocked = false,
     session,
     subgroupOutlineFrames = [],
   } = useCanvasInteractionSession({
@@ -241,6 +242,7 @@ export function CanvasStage({
         renderedItems={renderedItems}
         renderedSelectedItems={renderedSelectedItems}
         selectedRenderedItem={selectedRenderedItem}
+        selectionLocked={selectionLocked}
         session={session as never}
         showGroupSelection={showGroupInteractionHooks}
         size={viewport.viewportSize}

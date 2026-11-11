@@ -550,7 +550,7 @@ describe('editor store history', () => {
     });
   });
 
-  it('locks a mixed multi-selection in one undo step and drops the selection', () => {
+  it('locks a mixed multi-selection in one undo step and keeps it selected', () => {
     const free = createRectangleItem({ id: 'free' });
     const pinned = createRectangleItem({ id: 'pinned', locked: true });
     const child = createRectangleItem({ id: 'child' });
@@ -578,7 +578,7 @@ describe('editor store history', () => {
       );
     // The group is pinned through its own flag; its child keeps its own state.
     expect(lockedById()).toEqual({ free: true, pinned: true, 'group-1': true, child: false });
-    expect(getEditorState().session.selectedNodeIds).toEqual([]);
+    expect(getEditorState().session.selectedNodeIds).toEqual([free.id, pinned.id, group.id]);
     expect(getEditorState().history.past).toHaveLength(1);
 
     useEditorStore.getState().undo();

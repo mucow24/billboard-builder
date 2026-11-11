@@ -128,6 +128,11 @@ function InteractiveHandle({
 export interface PixiSelectionOverlayProps {
   selectedRenderedItem: RenderableCanvasItem | null;
   renderedSelectedItems: RenderableCanvasItem[];
+  /**
+   * Anything selected is locked. The selection is then drawn as outlines only:
+   * no resize, rotate, endpoint or vertex handles, since none of them would act.
+   */
+  selectionLocked?: boolean;
   showGroupSelection: boolean;
   groupOverlayFrame: {
     bounds: { x: number; y: number; width: number; height: number };
@@ -174,6 +179,7 @@ export interface PixiSelectionOverlayProps {
 export function PixiSelectionOverlay({
   selectedRenderedItem,
   renderedSelectedItems,
+  selectionLocked = false,
   showGroupSelection,
   groupOverlayFrame,
   zoom,
@@ -200,6 +206,7 @@ export function PixiSelectionOverlay({
         {groupOverlayFrame ? (
           <GroupSelectionOverlay
             frame={groupOverlayFrame}
+            locked={selectionLocked}
             zoom={zoom}
             beginGroupResize={beginGroupResize}
             beginGroupRotate={beginGroupRotate}
@@ -211,6 +218,14 @@ export function PixiSelectionOverlay({
   }
 
   if (!selectedRenderedItem) return null;
+
+  if (selectionLocked) {
+    return (
+      <pixiContainer label="locked-selection-overlay">
+        <ItemOutlineOnly item={selectedRenderedItem} zoom={zoom} />
+      </pixiContainer>
+    );
+  }
 
   if (selectedRenderedItem.kind === 'line') {
     return (
@@ -311,12 +326,15 @@ function ItemOutlineOnly({
 
 function GroupSelectionOverlay({
   frame,
+  locked = false,
   zoom,
   beginGroupResize,
   beginGroupRotate,
   toCanvasPointer,
 }: {
   frame: NonNullable<PixiSelectionOverlayProps['groupOverlayFrame']>;
+  /** Draw the bounding rect only, without the rotate line or any handle. */
+  locked?: boolean;
   zoom: number;
   beginGroupResize: PixiSelectionOverlayProps['beginGroupResize'];
   beginGroupRotate: PixiSelectionOverlayProps['beginGroupRotate'];
@@ -417,20 +435,22 @@ function GroupSelectionOverlay({
       </pixiContainer>
 
       {/* Rotation line */}
-      <pixiGraphics draw={drawRotationLine} eventMode="none" />
+      {locked ? null : <pixiGraphics draw={drawRotationLine} eventMode="none" />}
 
       {/* Handles */}
-      {handleEntries.map(([name, point]) => (
-        <InteractiveHandle
-          key={name}
-          name={name}
-          x={point.x}
-          y={point.y}
-          radius={handleRadius}
-          strokeWidth={handleStroke}
-          onMouseDown={groupHandleMouseDownMap[name]}
-        />
-      ))}
+      {locked
+        ? null
+        : handleEntries.map(([name, point]) => (
+            <InteractiveHandle
+              key={name}
+              name={name}
+              x={point.x}
+              y={point.y}
+              radius={handleRadius}
+              strokeWidth={handleStroke}
+              onMouseDown={groupHandleMouseDownMap[name]}
+            />
+          ))}
     </pixiContainer>
   );
 }
