@@ -1109,7 +1109,7 @@ describe('glyph substitution: bundled fonts', () => {
   });
 
   it('a font without substitution rules is left alone', () => {
-    expect(shapeNames('Futura Light Condensed.otf', 'office fluff')).toBeNull();
+    expect(shapeNames('AROW.otf', 'office fluff')).toBeNull();
     expect(shapeNames('Azonix.otf', 'office fluff')).toBeNull();
   });
 
@@ -1122,10 +1122,6 @@ describe('glyph substitution: bundled fonts', () => {
     // Its `locl` gives Turkish an i of its own, which the fi ligature does not take.
     expect(shapeNames('Barlow-Regular.ttf', 'fi', 'tr')).toEqual(['f', 'i.loclTRK']);
     expect(shapeNames('Barlow-Regular.ttf', 'fi', 'en-US')).toEqual(['fi', '-']);
-  });
-
-  it('Helvetica Neue Bold: an apostrophe and an n', () => {
-    expect(shapeNames('HelveticaNeueBold.otf', "'n")).toEqual(['napostrophe', '-']);
   });
 
   it('Playfair Display SC: arrows spelled with a hyphen, from calt', () => {

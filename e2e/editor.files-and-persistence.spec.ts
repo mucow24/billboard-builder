@@ -277,8 +277,8 @@ test.describe('editor file and persistence flows', () => {
     await selectTextLayerInProperties(page);
 
     // The family name, weight and style of an imported font come from its file name.
-    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'PersistProbe-Bold.otf');
-    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueRoman.otf'), 'PersistProbe-Regular.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Bold.ttf'), 'PersistProbe-Bold.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Regular.ttf'), 'PersistProbe-Regular.otf');
     await importUnusedFont(page);
     await expectUploadedFontRecordCount(page, 3);
 
@@ -302,13 +302,13 @@ test.describe('editor file and persistence flows', () => {
     await selectTextLayerInProperties(page);
     const boldToggle = page.getByRole('button', { name: 'Bold', exact: true });
 
-    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueRoman.otf'), 'PersistProbe-Regular.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Regular.ttf'), 'PersistProbe-Regular.otf');
     await chooseFontFamily(page, 'Persist Probe');
     await expectPersistedCanvasFontFiles(page, ['PersistProbe-Regular.otf']);
     // The family has no bold file yet.
     await expect(boldToggle).toBeDisabled();
 
-    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'PersistProbe-Bold.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Bold.ttf'), 'PersistProbe-Bold.otf');
     await expect(boldToggle).toBeEnabled();
     await importUnusedFont(page);
     await expectUploadedFontRecordCount(page, 3);
@@ -339,7 +339,7 @@ test.describe('editor file and persistence flows', () => {
     await waitForEditor(page);
 
     await selectTextLayerInProperties(page);
-    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueBold.otf'), 'Early-Import-Regular.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Bold.ttf'), 'Early-Import-Regular.otf');
     await expect
       .poll(async () => readUploadedFontKeys(page), {
         message: 'Expected the startup clean-up to delete the unused font and keep the one just imported.',

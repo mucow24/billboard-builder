@@ -23,12 +23,12 @@ describe('text layers exported as glyph outlines', () => {
   // All glyphs of a layer share one <path>, and a renderer stops at the first command it
   // cannot read, so one unreadable number costs the layer the rest of its text. The fake
   // measurer puts every glyph at a whole-number x on a whole-number baseline, which is
-  // where opentype.js's own serializer wrote `NaN` for some glyphs of these fonts.
+  // where opentype.js's own serializer used to write `NaN`.
   it.each([
-    { file: 'HelveticaNeueBoldItalic.otf', fontSize: 120 },
-    { file: 'HelveticaNeueRoman.otf', fontSize: 144 },
-    { file: 'Futura Regular.ttf', fontSize: 100 },
-    { file: 'Futura Light Condensed Oblique.otf', fontSize: 42 },
+    { file: 'Albertus MT Std Regular.otf', fontSize: 120 },
+    { file: 'Barlow-Italic.ttf', fontSize: 144 },
+    { file: 'Barlow-Regular.ttf', fontSize: 100 },
+    { file: 'Modernia.otf', fontSize: 42 },
   ])('writes a path that reads to its end for $file at $fontSize px', async ({ file, fontSize }) => {
     const bytes = loadFont(file);
     const layer = createTextItem({ text: PRINTABLE_ASCII, fontFamily: 'Bundled', fontSize });

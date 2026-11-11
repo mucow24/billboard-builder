@@ -100,35 +100,35 @@ describe('runEditorStartup', () => {
     await settle();
     expect(startup.events).toEqual([]);
 
-    startup.savedCanvas.resolve(savedCanvasSetIn('Futura', 'Arial', 'Futura'));
+    startup.savedCanvas.resolve(savedCanvasSetIn('Barlow', 'Arial', 'Barlow'));
     await settle();
 
     expect(startup.events).toEqual([
-      'load bundled fonts, first: Futura, Arial',
+      'load bundled fonts, first: Barlow, Arial',
       'restore uploaded fonts: Poster Sans',
     ]);
   });
 
   it('puts the saved canvas in the editor only once its bundled and uploaded fonts are registered', async () => {
     const startup = startStartup();
-    startup.savedCanvas.resolve(savedCanvasSetIn('Futura'));
+    startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
     await settle();
     startup.events.length = 0;
 
-    startup.familyLoaded(bundledFont('Futura'));
+    startup.familyLoaded(bundledFont('Barlow'));
     startup.firstFonts.resolve();
     await settle();
     // Its uploaded font is still on the way.
-    expect(startup.events).toEqual(['register Futura']);
+    expect(startup.events).toEqual(['register Barlow']);
 
     startup.uploadedFonts.resolve();
     await settle();
-    expect(startup.events).toEqual(['register Futura', 'load document with 2 nodes', 'canvas ready']);
+    expect(startup.events).toEqual(['register Barlow', 'load document with 2 nodes', 'canvas ready']);
   });
 
   it('does not wait for the uploaded fonts while the bundled fonts of the canvas are still loading', async () => {
     const startup = startStartup();
-    startup.savedCanvas.resolve(savedCanvasSetIn('Futura'));
+    startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
     await settle();
     startup.events.length = 0;
 
@@ -143,7 +143,7 @@ describe('runEditorStartup', () => {
 
   it('reports the canvas ready without waiting for the other bundled fonts, which register as they arrive', async () => {
     const startup = startStartup();
-    startup.savedCanvas.resolve(savedCanvasSetIn('Futura'));
+    startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
     startup.firstFonts.resolve();
     startup.uploadedFonts.resolve();
     await settle();
@@ -197,12 +197,12 @@ describe('runEditorStartup', () => {
 
   it('leaves the editor alone once it has been cancelled', async () => {
     const startup = startStartup();
-    startup.savedCanvas.resolve(savedCanvasSetIn('Futura'));
+    startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
     await settle();
     startup.events.length = 0;
 
     startup.cancel();
-    startup.familyLoaded(bundledFont('Futura'));
+    startup.familyLoaded(bundledFont('Barlow'));
     startup.firstFonts.resolve();
     startup.uploadedFonts.resolve();
     startup.allFonts.resolve([]);
@@ -214,7 +214,7 @@ describe('runEditorStartup', () => {
   it('does not ask for fonts when cancelled while the saved canvas was being read', async () => {
     const startup = startStartup();
     startup.cancel();
-    startup.savedCanvas.resolve(savedCanvasSetIn('Futura'));
+    startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
     await startup.finished;
 
     expect(startup.events).toEqual([]);

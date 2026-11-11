@@ -56,17 +56,17 @@ const audiowideRef: DocumentFontReference = {
 };
 const audiowide = registered('Audiowide', 'Audiowide-Regular.ttf', '400', 'normal');
 
-// Bundled Helvetica Neue. The document's font reference names whichever file comes
+// Bundled Barlow (its regular, bold and italic variants). The document's font reference names whichever file comes
 // first by filename, which is the bold one.
-const helveticaNeue = [
-  registered('Helvetica Neue', 'HelveticaNeueBold.otf', '700', 'normal'),
-  registered('Helvetica Neue', 'HelveticaNeueBoldItalic.otf', '700', 'italic'),
-  registered('Helvetica Neue', 'HelveticaNeueItalic.ttf', '400', 'italic'),
-  registered('Helvetica Neue', 'HelveticaNeueRoman.otf', '400', 'normal'),
+const barlow = [
+  registered('Barlow', 'Barlow-Bold.ttf', '700', 'normal'),
+  registered('Barlow', 'Barlow-BoldItalic.ttf', '700', 'italic'),
+  registered('Barlow', 'Barlow-Italic.ttf', '400', 'italic'),
+  registered('Barlow', 'Barlow-Regular.ttf', '400', 'normal'),
 ];
-const helveticaNeueRef: DocumentFontReference = {
-  family: 'Helvetica Neue',
-  sourceName: 'HelveticaNeueBold.otf',
+const barlowRef: DocumentFontReference = {
+  family: 'Barlow',
+  sourceName: 'Barlow-Bold.ttf',
   kind: 'bundled',
 };
 
@@ -108,25 +108,25 @@ describe('createDocumentFontLoader', () => {
 
   it('loads a different file for the regular, bold, italic and bold-italic items of one family', async () => {
     const loaders = trackingLoaders();
-    const load = createDocumentFontLoader(docWithFonts([helveticaNeueRef]), helveticaNeue, loaders);
+    const load = createDocumentFontLoader(docWithFonts([barlowRef]), barlow, loaders);
 
-    const regular = await load(textItem('Helvetica Neue', 'normal', 'normal'));
-    const bold = await load(textItem('Helvetica Neue', 'bold', 'normal'));
-    const italic = await load(textItem('Helvetica Neue', 'normal', 'italic'));
-    const boldItalic = await load(textItem('Helvetica Neue', 'bold', 'italic'));
+    const regular = await load(textItem('Barlow', 'normal', 'normal'));
+    const bold = await load(textItem('Barlow', 'bold', 'normal'));
+    const italic = await load(textItem('Barlow', 'normal', 'italic'));
+    const boldItalic = await load(textItem('Barlow', 'bold', 'italic'));
 
     expect(loaders.loadBundledBytes.mock.calls.map(([sourceName]) => sourceName)).toEqual([
-      'HelveticaNeueRoman.otf',
-      'HelveticaNeueBold.otf',
-      'HelveticaNeueItalic.ttf',
-      'HelveticaNeueBoldItalic.otf',
+      'Barlow-Regular.ttf',
+      'Barlow-Bold.ttf',
+      'Barlow-Italic.ttf',
+      'Barlow-BoldItalic.ttf',
     ]);
-    expect(regular).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('HelveticaNeueRoman.otf') });
-    expect(bold).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('HelveticaNeueBold.otf') });
-    expect(italic).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('HelveticaNeueItalic.ttf') });
+    expect(regular).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('Barlow-Regular.ttf') });
+    expect(bold).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('Barlow-Bold.ttf') });
+    expect(italic).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('Barlow-Italic.ttf') });
     expect(boldItalic).toEqual({
       kind: 'bundled',
-      bytes: loaders.bytesFor('HelveticaNeueBoldItalic.otf'),
+      bytes: loaders.bytesFor('Barlow-BoldItalic.ttf'),
     });
     expect(new Set([regular.bytes, bold.bytes, italic.bytes, boldItalic.bytes]).size).toBe(4);
   });
@@ -179,18 +179,18 @@ describe('createDocumentFontLoader', () => {
   it('prefers the file registered last when two files share a weight and style', async () => {
     const loaders = trackingLoaders();
     const load = createDocumentFontLoader(
-      docWithFonts([{ family: 'Futura', sourceName: 'Futura Bold Italic.otf', kind: 'bundled' }]),
+      docWithFonts([{ family: 'Poster', sourceName: 'Poster Bold Italic.otf', kind: 'bundled' }]),
       [
-        registered('Futura', 'Futura Bold Italic.otf', '700', 'italic'),
-        registered('Futura', 'Futura Regular.ttf', '400', 'normal'),
-        registered('Futura', 'Futura Book.otf', '400', 'normal'),
+        registered('Poster', 'Poster Bold Italic.otf', '700', 'italic'),
+        registered('Poster', 'Poster Regular.ttf', '400', 'normal'),
+        registered('Poster', 'Poster Book.otf', '400', 'normal'),
       ],
       loaders,
     );
 
-    await load(textItem('Futura'));
+    await load(textItem('Poster'));
 
-    expect(loaders.loadBundledBytes).toHaveBeenCalledWith('Futura Book.otf');
+    expect(loaders.loadBundledBytes).toHaveBeenCalledWith('Poster Book.otf');
   });
 
   it('loads the uploaded file that matches the variant', async () => {
@@ -254,21 +254,21 @@ describe('createDocumentFontLoader', () => {
   it('loads an uploaded file that overrides a bundled one of the same family and variant', async () => {
     const loaders = trackingLoaders();
     const load = createDocumentFontLoader(
-      docWithFonts([helveticaNeueRef]),
+      docWithFonts([barlowRef]),
       [
-        ...helveticaNeue,
-        registered('Helvetica Neue', 'HelveticaNeue-Bold.ttf', '700', 'normal', 'uploaded'),
+        ...barlow,
+        registered('Barlow', 'Barlow Bold.ttf', '700', 'normal', 'uploaded'),
       ],
       loaders,
     );
 
-    expect(await load(textItem('Helvetica Neue', 'bold'))).toEqual({
+    expect(await load(textItem('Barlow', 'bold'))).toEqual({
       kind: 'uploaded',
-      bytes: loaders.bytesFor('HelveticaNeue-Bold.ttf'),
+      bytes: loaders.bytesFor('Barlow Bold.ttf'),
     });
-    expect(await load(textItem('Helvetica Neue'))).toEqual({
+    expect(await load(textItem('Barlow'))).toEqual({
       kind: 'bundled',
-      bytes: loaders.bytesFor('HelveticaNeueRoman.otf'),
+      bytes: loaders.bytesFor('Barlow-Regular.ttf'),
     });
   });
 
@@ -279,7 +279,7 @@ describe('createDocumentFontLoader', () => {
         audiowideRef,
         { family: 'Ghost Sans', sourceName: 'GhostSans-Italic.ttf', kind: 'uploaded' },
       ]),
-      helveticaNeue,
+      barlow,
       loaders,
     );
 

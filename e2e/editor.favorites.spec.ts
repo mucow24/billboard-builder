@@ -333,8 +333,8 @@ test.describe('editor favorite library flows', () => {
 
     // The family name, weight and style of an imported font come from its file name.
     const fontsDir = path.join(process.cwd(), 'src/assets/fonts');
-    await uploadNamedFontFromPath(page, path.join(fontsDir, 'HelveticaNeueRoman.otf'), 'FavoriteFamily-Regular.otf');
-    await uploadNamedFontFromPath(page, path.join(fontsDir, 'HelveticaNeueBold.otf'), 'FavoriteFamily-Bold.otf');
+    await uploadNamedFontFromPath(page, path.join(fontsDir, 'Barlow-Regular.ttf'), 'FavoriteFamily-Regular.otf');
+    await uploadNamedFontFromPath(page, path.join(fontsDir, 'Barlow-Bold.ttf'), 'FavoriteFamily-Bold.otf');
     await page.getByTestId('font-family-picker-trigger').click();
     await page.getByRole('option', { name: 'Favorite Family' }).first().click();
     await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Favorite Family');

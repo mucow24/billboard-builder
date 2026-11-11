@@ -81,7 +81,6 @@ describe('inspectorModel', () => {
       'Alpha Sans',
       'Arial',
       'Georgia',
-      'Helvetica',
       'Impact',
       'Tahoma',
       'Times New Roman',
