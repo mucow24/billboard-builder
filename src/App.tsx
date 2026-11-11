@@ -221,14 +221,12 @@ export default function App() {
                 onToggleNodeLocked={(nodeId) => {
                   const node = getNodeById(document.nodes, nodeId);
                   if (!node) return;
-                  const nowLocked = !node.locked;
+                  // The selection is left alone: a locked node may stay selected,
+                  // and the canvas draws it without transform handles.
                   if (isGroupNode(node)) {
-                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: nowLocked } });
+                    dispatch({ type: 'update_group', groupId: nodeId, changes: { locked: !node.locked } });
                   } else {
-                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: nowLocked } });
-                  }
-                  if (nowLocked && selectedNodeIds.includes(nodeId)) {
-                    selectSingleNode(undefined);
+                    dispatch({ type: 'update_node', itemId: nodeId, changes: { locked: !node.locked } });
                   }
                 }}
                 onToggleNodeHidden={(nodeId) => {
