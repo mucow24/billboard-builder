@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { expect, test } from '@playwright/test';
+import opentype from 'opentype.js';
 
 import {
   addGenerator,
@@ -44,6 +48,45 @@ function parseTextGroupBounds(svg: string): Array<{ top: number; bottom: number 
     out.push({ top: minY + ty, bottom: maxY + ty });
   }
   return out;
+}
+
+/**
+ * A path's coordinates with its top-left corner moved to the origin: the glyph's
+ * shape, independent of where the exporter placed it.
+ */
+function pathShape(d: string): { commands: string; coords: number[] } {
+  const tokens = d.match(/[MLCQZ]|-?\d+\.?\d*/g) ?? [];
+  const commands = tokens.filter((token) => /[MLCQZ]/.test(token)).join('');
+  const coords = tokens
+    .filter((token) => !/[MLCQZ]/.test(token))
+    .map((token) => Number.parseFloat(token));
+  // Every command opentype emits takes x,y pairs, so even indices are x.
+  const minX = Math.min(...coords.filter((_, index) => index % 2 === 0));
+  const minY = Math.min(...coords.filter((_, index) => index % 2 === 1));
+  return {
+    commands,
+    coords: coords.map((value, index) => value - (index % 2 === 0 ? minX : minY)),
+  };
+}
+
+function sameShape(left: string, right: string): boolean {
+  const a = pathShape(left);
+  const b = pathShape(right);
+  return (
+    a.commands === b.commands &&
+    a.coords.length === b.coords.length &&
+    // Both sides round to 2 decimals after different translations.
+    a.coords.every((value, index) => Math.abs(value - b.coords[index]) < 0.05)
+  );
+}
+
+/** The outline of `ch` in a bundled font file: what a text layer set in that file must export as. */
+function bundledGlyphOutline(fontFile: string, ch: string, fontSize: number): string {
+  const bytes = readFileSync(path.join(process.cwd(), 'src/assets/fonts', fontFile));
+  const font = opentype.parse(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  );
+  return font.charToGlyph(ch).getPath(0, 0, fontSize).toPathData(2);
 }
 
 // Real-browser validation of the parts unit tests can't exercise: a generator
@@ -134,5 +177,62 @@ test.describe('SVG export', () => {
     const gap = groups[1].top - groups[0].bottom;
     expect(gap).toBeGreaterThan(0);
     expect(gap).toBeLessThan(30);
+  });
+
+  // Regression: a family that ships several files (Regular, Bold, Italic, ...)
+  // used to export every layer with whichever file registered first, so regular
+  // text came out with bold glyphs. Which file a layer gets depends on the fonts
+  // the running app registered, so the per-variant choice is proven here.
+  test('outlines each weight and style of a multi-file family with its own font file', async ({ page }) => {
+    await openFreshEditor(page);
+
+    const fontSize = 100;
+    const variants = [
+      { id: 'regular', fontWeight: 'normal', fontStyle: 'normal', file: 'HelveticaNeueRoman.otf' },
+      { id: 'bold', fontWeight: 'bold', fontStyle: 'normal', file: 'HelveticaNeueBold.otf' },
+      { id: 'italic', fontWeight: 'normal', fontStyle: 'italic', file: 'HelveticaNeueItalic.ttf' },
+      { id: 'bold-italic', fontWeight: 'bold', fontStyle: 'italic', file: 'HelveticaNeueBoldItalic.otf' },
+    ];
+    const doc = {
+      ...createProjectDocument(
+        variants.map(({ id, fontWeight, fontStyle }, index) =>
+          createTextFixture({
+            id,
+            text: 'a',
+            fontFamily: 'Helvetica Neue',
+            fontSize,
+            fontWeight,
+            fontStyle,
+            x: 40 + index * 180,
+            y: 40,
+            width: 160,
+            height: 160,
+            zIndex: index + 1,
+          }),
+        ),
+      ),
+      // What the app saves for this family: a single reference, naming the file
+      // that registered first. For Helvetica Neue that is the bold one.
+      fonts: [{ family: 'Helvetica Neue', sourceName: 'HelveticaNeueBold.otf', kind: 'bundled' }],
+    };
+    await uploadProject(page, doc, 'font-variants.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+
+    // One <path> per text layer, in layer order. A coordinate that failed to
+    // serialize would make every shape comparison below meaningless.
+    const exportedPaths = [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+    expect(exportedPaths).toHaveLength(variants.length);
+    expect(exportedPaths.join(' ')).not.toContain('NaN');
+
+    const files = variants.map(({ file }) => file);
+    const exportedWith = exportedPaths.map((exportedPath) =>
+      files.filter((file) => sameShape(exportedPath, bundledGlyphOutline(file, 'a', fontSize))),
+    );
+    expect(exportedWith).toEqual(files.map((file) => [file]));
   });
 });

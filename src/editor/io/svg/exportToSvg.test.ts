@@ -7,7 +7,7 @@ import {
   createDefaultProjectDocument,
   createTextItem,
 } from '../../document/documentDefaults';
-import type { ProjectDocument } from '../../document/documentTypes';
+import type { ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
 import { fakeMeasurer, fakeRasterizer } from '../../../test/svgExportFakes';
 import { exportToSvg } from './exportToSvg';
 
@@ -54,5 +54,37 @@ describe('exportToSvg', () => {
     );
 
     expect(loadFontBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it('outlines each weight and style of one family from its own font bytes', async () => {
+    const roman = loadFont('HelveticaNeueRoman.otf');
+    const bold = loadFont('HelveticaNeueBold.otf');
+    const italic = loadFont('HelveticaNeueItalic.ttf');
+    const loadFontBytes = vi.fn(async (item: TextCanvasItem) => ({
+      kind: 'bundled' as const,
+      bytes: item.fontStyle === 'italic' ? italic : item.fontWeight === 'bold' ? bold : roman,
+    }));
+    const variant = (id: string, overrides: Partial<TextCanvasItem>) =>
+      createTextItem({ id, text: 'a', fontFamily: 'Helvetica Neue', x: 0, y: 0, ...overrides });
+
+    const { svg, warnings } = await exportToSvg(
+      docWith([
+        variant('regular', {}),
+        variant('bold', { fontWeight: 'bold' }),
+        variant('italic', { fontStyle: 'italic' }),
+        variant('regular-again', {}),
+      ]),
+      { loadFontBytes, measurer: fakeMeasurer, rasterizer: fakeRasterizer },
+    );
+
+    expect(warnings).toEqual([]);
+    // One lookup per family + weight + style, not one per family.
+    expect(loadFontBytes).toHaveBeenCalledTimes(3);
+    // Same glyph, same position: the outlines differ only when the font bytes do.
+    const [regularPath, boldPath, italicPath, regularAgainPath] = [
+      ...svg.matchAll(/<path d="([^"]+)"/g),
+    ].map((match) => match[1]);
+    expect(new Set([regularPath, boldPath, italicPath]).size).toBe(3);
+    expect(regularAgainPath).toBe(regularPath);
   });
 });

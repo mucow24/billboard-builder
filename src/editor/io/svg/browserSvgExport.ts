@@ -1,5 +1,5 @@
 import type { ProjectDocument } from '../../document/documentTypes';
-import { getBundledFontUrl } from '../../fonts/browserFontLoader';
+import { getBundledFontUrl, listRegisteredFonts } from '../../fonts/browserFontLoader';
 import { defaultUploadedFontPersistenceService } from '../../persistence/uploadedFontPersistenceService';
 import { createCanvasTextMeasurer } from './canvasTextMeasurer';
 import { createDocumentFontLoader } from './documentFontBytes';
@@ -8,12 +8,13 @@ import { exportToSvg } from './exportToSvg';
 import type { SvgExportResult } from './svgExportTypes';
 
 /**
- * Production SVG export entry point: assembles the real browser deps (bundled-font
- * fetch, uploaded-font IndexedDB load, canvas measurement, generator rasterization)
- * and runs the serializer. Returns the SVG and any block+warn warnings.
+ * Production SVG export entry point: assembles the real browser deps (the fonts
+ * registered with the browser, bundled-font fetch, uploaded-font IndexedDB load,
+ * canvas measurement, generator rasterization) and runs the serializer. Returns
+ * the SVG and any block+warn warnings.
  */
 export function runSvgExport(doc: ProjectDocument): Promise<SvgExportResult> {
-  const loadFontBytes = createDocumentFontLoader(doc, {
+  const loadFontBytes = createDocumentFontLoader(doc, listRegisteredFonts(), {
     loadBundledBytes: async (sourceName) => {
       const url = getBundledFontUrl(sourceName);
       if (!url) return null;
