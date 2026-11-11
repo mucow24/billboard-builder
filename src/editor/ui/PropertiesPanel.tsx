@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { getSelectionLockState } from '../core/selectionLock';
 import { LayersInspectorTab } from './inspector/LayersInspectorTab';
 import { SelectionInspector } from './inspector/SelectionInspector';
 import { FavoritesInspectorTab } from './inspector/FavoritesInspectorTab';
@@ -32,6 +33,7 @@ export function PropertiesPanel({
   onReorder,
   onSelectNode,
   onSelectGroupChildren,
+  onSelectionLockedChange,
   onToggleNode,
   onToggleNodeLocked,
   onToggleNodeHidden,
@@ -108,6 +110,10 @@ export function PropertiesPanel({
     }
   }, [activeTab]);
 
+  const selectionLockState = getSelectionLockState(
+    layerRows.filter((row) => selectedNodeIds.includes(row.node.id)).map((row) => row.node)
+  );
+
   function handleToggleGroupCollapse(groupId: string) {
     setCollapsedGroupIds((current) => {
       const next = new Set(current);
@@ -182,8 +188,10 @@ export function PropertiesPanel({
               onGroupOpacityChange={onGroupOpacityChange}
               onItemChange={onItemChange}
               onSelectGroupChildren={onSelectGroupChildren}
+              onSelectionLockedChange={onSelectionLockedChange}
               selectedGroup={selectedGroup}
               selectedItem={selectedItem}
+              selectionLockState={selectionLockState}
               selectedNodeCount={selectedNodeIds.length}
               selectedItems={selectedItems}
             />

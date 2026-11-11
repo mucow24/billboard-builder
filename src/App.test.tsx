@@ -16,6 +16,7 @@ import { collectLeafItems } from './editor/document/sceneGraph';
 import type { PersistedUploadedFont } from './editor/fonts';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
+import { settleRender } from './test/settleRender';
 
 const {
   mockCanvasPersistenceService,
@@ -131,10 +132,12 @@ function makeClipboardData({
 }
 
 async function renderApp() {
-  render(<App />);
+  const ui = <App />;
+  const view = render(ui);
 
   // The editor is rendered once startup has put the saved canvas in place.
   await screen.findByTestId('mock-stage');
+  settleRender(view, ui);
 }
 
 describe('App shell', () => {

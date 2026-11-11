@@ -10,7 +10,7 @@ import {
   createTextItem,
 } from '../document/documentDefaults';
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
-import { collectLeafItems } from '../document/sceneGraph';
+import { collectLeafItems, getNodeById } from '../document/sceneGraph';
 import { applyEditorCommand, useEditorStore } from './store';
 import { resetEditorStore } from '../../test/editorStore';
 
@@ -548,6 +548,86 @@ describe('editor store history', () => {
       endX: 115,
       endY: 42,
     });
+  });
+
+  it('locks a mixed multi-selection in one undo step and keeps it selected', () => {
+    const free = createRectangleItem({ id: 'free' });
+    const pinned = createRectangleItem({ id: 'pinned', locked: true });
+    const child = createRectangleItem({ id: 'child' });
+    const group = createGroupNode([child], 'Lock Group');
+    group.id = 'group-1';
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [free, pinned, group],
+      },
+      session: {
+        selectedNodeIds: [free.id, pinned.id, group.id],
+      },
+    });
+
+    useEditorStore.getState().setSelectionLocked(true);
+
+    const lockedById = () =>
+      Object.fromEntries(
+        [free.id, pinned.id, group.id, child.id].map((id) => [
+          id,
+          getNodeById(getEditorState().document.nodes, id)?.locked,
+        ])
+      );
+    // The group is pinned through its own flag; its child keeps its own state.
+    expect(lockedById()).toEqual({ free: true, pinned: true, 'group-1': true, child: false });
+    expect(getEditorState().session.selectedNodeIds).toEqual([free.id, pinned.id, group.id]);
+    expect(getEditorState().history.past).toHaveLength(1);
+
+    useEditorStore.getState().undo();
+
+    expect(lockedById()).toEqual({ free: false, pinned: true, 'group-1': false, child: false });
+  });
+
+  it('unlocks a selected group with the locks inside it and keeps it selected', () => {
+    const free = createRectangleItem({ id: 'free' });
+    const pinned = createRectangleItem({ id: 'pinned', locked: true });
+    const group = createGroupNode([free, pinned], 'Lock Group');
+    group.id = 'group-1';
+    group.locked = true;
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [group],
+      },
+      session: {
+        selectedNodeIds: [group.id],
+      },
+    });
+
+    useEditorStore.getState().setSelectionLocked(false);
+
+    expect(getNodeById(getEditorState().document.nodes, group.id)?.locked).toBe(false);
+    expect(getNodeById(getEditorState().document.nodes, pinned.id)?.locked).toBe(false);
+    expect(getEditorState().session.selectedNodeIds).toEqual([group.id]);
+    expect(getEditorState().history.past).toHaveLength(1);
+  });
+
+  it('leaves history and selection alone when the selection is already in the requested lock state', () => {
+    const free = createRectangleItem({ id: 'free' });
+
+    resetEditorStore({
+      document: {
+        ...createDefaultProjectDocument(),
+        nodes: [free],
+      },
+      session: {
+        selectedNodeIds: [free.id],
+      },
+    });
+
+    useEditorStore.getState().setSelectionLocked(false);
+
+    expect(getEditorState().history.past).toHaveLength(0);
+    expect(getEditorState().session.selectedNodeIds).toEqual([free.id]);
   });
 
   it('treats parent selection and structural convenience helpers as no-ops when invalid', () => {

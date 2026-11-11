@@ -110,6 +110,66 @@ describe('PropertiesPanel', () => {
     expect(screen.getByText('1 uploaded font(s) ready in this session.')).toBeInTheDocument();
   });
 
+  it('derives the properties lock button state from the selected nodes', async () => {
+    const user = userEvent.setup();
+    const onSelectionLockedChange = vi.fn();
+    const free = createRectangleItem({ id: 'free' });
+    const pinned = createRectangleItem({ id: 'pinned', locked: true });
+    const group = createGroupNode([free, pinned], 'Content Group');
+    group.id = 'group-1';
+    const other = createRectangleItem({ id: 'other' });
+    const layerRows = flattenLayerRows([group, other]);
+
+    const { rerender } = render(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="properties"
+        layerRows={layerRows}
+        onSelectionLockedChange={onSelectionLockedChange}
+        selectedItem={other}
+        selectedNodeIds={[other.id]}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Lock selection' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    // A group holding one locked and one free item is only partly locked.
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="properties"
+        layerRows={layerRows}
+        onSelectionLockedChange={onSelectionLockedChange}
+        selectedGroup={group}
+        selectedItems={[free, pinned]}
+        selectedNodeIds={[group.id]}
+      />,
+    );
+
+    const mixedButton = screen.getByRole('button', { name: 'Lock selection' });
+    expect(mixedButton).toHaveAttribute('aria-pressed', 'mixed');
+
+    await user.click(mixedButton);
+    expect(onSelectionLockedChange).toHaveBeenLastCalledWith(true);
+
+    rerender(
+      <PropertiesPanel
+        {...baseProps}
+        activeTab="properties"
+        layerRows={layerRows}
+        onSelectionLockedChange={onSelectionLockedChange}
+        selectedItem={pinned}
+        selectedNodeIds={[pinned.id]}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Unlock selection' }));
+    expect(onSelectionLockedChange).toHaveBeenLastCalledWith(false);
+  });
+
   it('preserves collapsed layer groups when switching tabs and re-expands ancestors of the selection', () => {
     const child = createRectangleItem({ id: 'child-1' });
     const group = createGroupNode([child], 'Content Group');

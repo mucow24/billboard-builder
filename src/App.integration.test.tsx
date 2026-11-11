@@ -148,6 +148,16 @@ import {
 import { collectLeafItems } from './editor/document/sceneGraph';
 import { useEditorStore } from './editor/state/store';
 import { resetEditorStore } from './test/editorStore';
+import { settleRender } from './test/settleRender';
+
+async function renderApp() {
+  const ui = <App />;
+  const view = render(ui);
+
+  // The editor is rendered once startup has put the saved canvas in place.
+  await screen.findByRole('button', { name: 'Canvas' });
+  settleRender(view, ui);
+}
 
 function clickToolbarPopoverItem(triggerName: string, itemName: string) {
   fireEvent.click(screen.getByRole('button', { name: triggerName }));
@@ -178,8 +188,7 @@ describe('App integration', () => {
   });
 
   it('renders the real app shell and applies properties changes through the store/controller path', async () => {
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     const selectedRectangle = createRectangleItem({
       id: 'selected-rectangle',
@@ -211,8 +220,7 @@ describe('App integration', () => {
   });
 
   it('mutates the real document through keyboard shortcuts and controller actions', async () => {
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     const selectedRectangle = createRectangleItem({
       id: 'shortcut-rectangle',
@@ -271,8 +279,7 @@ describe('App integration', () => {
       weight: '400',
     });
 
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     clickToolbarPopoverItem('Canvas', 'Save');
     clickToolbarPopoverItem('Export', 'PNG');
@@ -339,8 +346,7 @@ describe('App integration', () => {
       weight: '400',
     });
 
-    render(<App />);
-    await screen.findByRole('button', { name: 'Canvas' });
+    await renderApp();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add image' }));
     fireEvent.change(screen.getByTestId('image-upload-input'), {
@@ -406,7 +412,8 @@ describe('App integration', () => {
         finishLoad = resolve;
       }),
     );
-    render(<App />);
+    const ui = <App />;
+    const view = render(ui);
     expect(mockPersistenceLoad).toHaveBeenCalledOnce();
 
     // Longer than the autosave debounce.
@@ -418,6 +425,7 @@ describe('App integration', () => {
 
     finishLoad(null);
     await screen.findByRole('button', { name: 'Canvas' });
+    settleRender(view, ui);
     mockPersistenceSave.mockClear();
 
     act(() => {

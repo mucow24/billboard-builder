@@ -1,5 +1,6 @@
 import { ColorPickerControl } from '../ColorPickerControl';
 
+import type { SelectionLockState } from '../../core/selectionLock';
 import { DEFAULT_GROUP_NAME } from '../../document/sceneGraph';
 import {
   getInspectorHeadingSubtitle,
@@ -21,12 +22,53 @@ import {
   TextInput,
 } from './inspectorControls';
 
+const LOCK_BUTTON_TITLES: Record<SelectionLockState, string> = {
+  locked: 'Unlock',
+  unlocked: 'Lock',
+  mixed: 'Partly locked: click to lock everything',
+};
+
+/**
+ * Locks or unlocks the whole selection. A partly locked selection reads as
+ * mixed and locks on click, like the aspect-ratio lock.
+ */
+function SelectionLockButton({
+  state,
+  onLockedChange,
+}: {
+  state: SelectionLockState;
+  onLockedChange: (locked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`selection-lock-button${state === 'unlocked' ? '' : ` ${state}`}`}
+      aria-label={state === 'locked' ? 'Unlock selection' : 'Lock selection'}
+      aria-pressed={state === 'mixed' ? 'mixed' : state === 'locked'}
+      data-lock-state={state}
+      title={LOCK_BUTTON_TITLES[state]}
+      onClick={() => onLockedChange(state !== 'locked')}
+    >
+      <svg viewBox="0 0 12 12" aria-hidden="true">
+        <rect x="2.5" y="5.5" width="7" height="5" rx="1" />
+        {/* The shackle stays open only while nothing is locked. */}
+        <path d={state === 'unlocked' ? 'M4 5.5V4a2 2 0 0 1 4 0' : 'M4 5.5V4a2 2 0 0 1 4 0v1.5'} />
+        {state === 'mixed' ? <path d="M4.5 8h3" /> : null}
+      </svg>
+    </button>
+  );
+}
+
 function SelectionHeading({
   kind,
+  lockState,
+  onLockedChange,
   subtitle,
   title,
 }: {
   kind: string;
+  lockState?: SelectionLockState | null;
+  onLockedChange?: (locked: boolean) => void;
   subtitle?: string | null;
   title: string;
 }) {
@@ -39,6 +81,9 @@ function SelectionHeading({
         <h2>{title}</h2>
         {subtitle ? <span className="slim-item-subtitle">{subtitle}</span> : null}
       </div>
+      {lockState && onLockedChange ? (
+        <SelectionLockButton state={lockState} onLockedChange={onLockedChange} />
+      ) : null}
     </div>
   );
 }
@@ -140,8 +185,10 @@ export function SelectionInspector({
   onGroupOpacityChange,
   onItemChange,
   onSelectGroupChildren,
+  onSelectionLockedChange,
   selectedGroup,
   selectedItem,
+  selectionLockState,
   selectedNodeCount,
   selectedItems,
 }: SelectionInspectorProps) {
@@ -155,6 +202,8 @@ export function SelectionInspector({
         <div className="selection-inspector-header">
           <SelectionHeading
             kind="⊞"
+            lockState={selectionLockState}
+            onLockedChange={onSelectionLockedChange}
             subtitle={selectedGroup.name !== DEFAULT_GROUP_NAME ? 'Group' : null}
             title={selectedGroup.name}
           />
@@ -207,6 +256,8 @@ export function SelectionInspector({
         <div className="selection-inspector-header">
           <SelectionHeading
             kind="◎"
+            lockState={selectionLockState}
+            onLockedChange={onSelectionLockedChange}
             subtitle="Multi-selection"
             title={`${selectedItems.length} items selected`}
           />
@@ -215,6 +266,8 @@ export function SelectionInspector({
         <div className="selection-inspector-header">
           <SelectionHeading
             kind={getItemGlyph(primaryItem.kind)}
+            lockState={selectionLockState}
+            onLockedChange={onSelectionLockedChange}
             subtitle={getInspectorHeadingSubtitle(primaryItem)}
             title={getLayerPrimaryLabel(primaryItem)}
           />
