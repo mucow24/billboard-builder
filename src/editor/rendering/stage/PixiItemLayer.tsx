@@ -31,12 +31,14 @@ import { brightnessContrastMatrix, tintMatrix } from '../geometry/colorAdjustmen
 import { getImageNodePresentation } from '../imagePresentation';
 import type { Point } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
+import { snapPaddingToTexels } from '../textInkOverhang';
 import { measureWordWrappedTextHeight } from '../textMeasurement';
 import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
 import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
+import { measureTextRasterPadding } from './textRasterPadding';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
 const ZERO_PIVOT = { x: 0, y: 0 } as const;
@@ -75,17 +77,23 @@ type GradientCapable =
   | PolygonCanvasItem
   | TextCanvasItem;
 
+/**
+ * `origin` is where the item's box starts in the space the gradient is resolved
+ * in. Shapes draw from (0, 0). A text texture with padding starts that far above
+ * and to the left of the text, so its gradient has to be moved along with it.
+ */
 function buildPixiGradient(
   item: GradientCapable,
   width: number,
   height: number,
+  origin = 0,
 ): FillGradient | null {
   const endpoints = computeGradientEndpoints(item, width, height);
   if (!endpoints) return null;
   const grad = new FillGradient({
     type: 'linear',
-    start: { x: endpoints.x0, y: endpoints.y0 },
-    end: { x: endpoints.x1, y: endpoints.y1 },
+    start: { x: endpoints.x0 + origin, y: endpoints.y0 + origin },
+    end: { x: endpoints.x1 + origin, y: endpoints.y1 + origin },
     colorStops: [
       { offset: 0, color: item.fill },
       { offset: 1, color: item.secondaryFill },
@@ -99,17 +107,17 @@ function buildPixiGradient(
 // Text style builder
 // ---------------------------------------------------------------------------
 
-function buildTextStyleProps(item: TextCanvasItem) {
+/**
+ * The Pixi text style, position and raster resolution of a text item.
+ * `requestedResolution` is the resolution the current zoom calls for.
+ */
+function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) {
   const effectiveStyle = getRenderableCombinedFontStyle(item);
   const fontWeight = effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const);
   const fontStyle = effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const);
 
   const renderBox = getRenderBox(item);
   const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
-
-  const fill = item.gradientEnabled
-    ? buildPixiGradient(item, renderBox.width, renderBox.height) ?? item.fill
-    : item.fill;
 
   // Convert app shadow model (offsetX/Y) → PixiJS dropShadow (angle+distance).
   const s = item.shadow;
@@ -135,21 +143,48 @@ function buildTextStyleProps(item: TextCanvasItem) {
     textY += Math.max(0, contentHeight - measuredHeight);
   }
 
+  const layoutStyle = {
+    fontFamily: item.fontFamily,
+    fontSize: item.fontSize,
+    fontWeight,
+    fontStyle,
+    letterSpacing: item.letterSpacing,
+    lineHeight: item.fontSize * item.lineHeight,
+    wordWrap: true,
+    wordWrapWidth: contentWidth,
+    align: item.align as 'left' | 'center' | 'right',
+    whiteSpace: 'pre' as const,
+    ...(dropShadow ? { dropShadow } : {}),
+  };
+
+  // Pixi sizes the text texture from advance widths and the font's ascent and
+  // descent, and cuts off ink outside that box: the lean of an italic glyph at
+  // the end of a line, a tail left of the first glyph's origin, an accent or a
+  // descender beyond the font's own. `padding` adds room on all four sides and
+  // Pixi shifts the quad back by as much, so the text itself stays where it is.
+  const inkRoom = measureTextRasterPadding(item.text, layoutStyle);
+
+  // Clamp so the resulting texture, the text plus that room on both sides,
+  // stays under the GPU's MAX_TEXTURE_SIZE — past the cap, glyphs go soft
+  // instead of disappearing into a black rect.
+  const resolution = clampRasterResolution(
+    requestedResolution,
+    Math.max(item.width, item.height, 1) + inkRoom * 2,
+    getMaxTextureSize(),
+  );
+
+  // Rounded up to whole blocks of texels, so the glyphs are rasterised and
+  // mipmapped exactly as they are without padding. (The rounding adds less
+  // than a block a side, which the clamp's own margin covers.)
+  const padding = snapPaddingToTexels(inkRoom, resolution);
+
+  const fill = item.gradientEnabled
+    ? buildPixiGradient(item, renderBox.width, renderBox.height, padding) ?? item.fill
+    : item.fill;
+
   return {
-    style: {
-      fontFamily: item.fontFamily,
-      fontSize: item.fontSize,
-      fontWeight,
-      fontStyle,
-      fill,
-      letterSpacing: item.letterSpacing,
-      lineHeight: item.fontSize * item.lineHeight,
-      wordWrap: true,
-      wordWrapWidth: contentWidth,
-      align: item.align as 'left' | 'center' | 'right',
-      whiteSpace: 'pre' as const,
-      ...(dropShadow ? { dropShadow } : {}),
-    },
+    style: { ...layoutStyle, fill, padding },
+    resolution,
     textX: item.padding.left,
     textY,
   };
@@ -754,18 +789,16 @@ const PixiItemView = memo(function PixiItemView({
   // All other items share the same container layout (position, rotation, hitArea).
   let children: React.ReactNode;
   if (item.kind === 'text') {
-    const { style: textStyle, textX, textY } = buildTextStyleProps(item);
     // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
     // When zoom > 1 the texture is magnified and turns blurry, so scale
-    // resolution with zoom to keep glyphs sharp on zoom-in. Clamp so the
-    // resulting texture stays under the GPU's MAX_TEXTURE_SIZE — past the
-    // cap, glyphs go soft instead of disappearing into a black rect.
+    // resolution with zoom to keep glyphs sharp on zoom-in.
     const requestedResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
-    const textResolution = clampRasterResolution(
-      requestedResolution,
-      Math.max(item.width, item.height, 1),
-      getMaxTextureSize(),
-    );
+    const {
+      style: textStyle,
+      resolution: textResolution,
+      textX,
+      textY,
+    } = buildTextStyleProps(item, requestedResolution);
     children = (
       <pixiText
         text={item.text}
