@@ -110,46 +110,114 @@ export async function registerUploadedFontBytes(
   return registerFontFace(await loadFontFace(record, record.bytes), record, 'uploaded');
 }
 
-export async function loadFontEntries(
-  fontEntries: Array<[string, string]>
-): Promise<UploadedFont[]> {
-  // The fonts load in parallel and each is registered as soon as it is ready, so
-  // a slow font never keeps the others from being used. The loads finish in a
-  // different order on every page load, though, and where several files share a
-  // family, weight and style, text renders with the one registered last. Those
-  // files therefore wait for each other: each is registered only after the
-  // entries before it for the same variant have been registered or have failed,
-  // which makes the last such entry the one in use every time.
+export interface FontLoadOptions {
+  /**
+   * Families whose files load before any other: the rest are not requested until
+   * these have been registered or have failed. Used for the families the saved
+   * canvas draws with, so that it waits for a handful of files and not for all.
+   */
+  first?: Iterable<string>;
+  /**
+   * Called once per family, when all of its files have been registered or have
+   * failed, with the ones that loaded, in entry order.
+   */
+  onFamilyLoaded?: (fonts: UploadedFont[]) => void;
+}
+
+export interface FontLoad {
+  /**
+   * Settles once every file of the `first` families has been registered or has
+   * failed, and `onFamilyLoaded` has been called for them. Never rejects.
+   */
+  first: Promise<void>;
+  /**
+   * Every font that loaded, in entry order, once all files have been registered
+   * or have failed. Never rejects.
+   */
+  all: Promise<UploadedFont[]>;
+}
+
+export function loadFontEntriesInStages(
+  fontEntries: Array<[string, string]>,
+  options: FontLoadOptions = {}
+): FontLoad {
+  const firstFamilies = new Set(options.first ?? []);
+  const entries = fontEntries.map(([path, url], index) => {
+    const sourceName = path.split('/').at(-1) ?? 'Bundled Font';
+    return { index, url, metadata: parseFontSourceName(sourceName) };
+  });
+  const loadedFonts: Array<UploadedFont | undefined> = [];
   const registrationsByVariant = new Map<string, Array<Promise<UploadedFont>>>();
-  const loadedFonts = await Promise.allSettled(
-    fontEntries.map(([path, url]) => {
-      const sourceName = path.split('/').at(-1) ?? 'Bundled Font';
-      const metadata = parseFontSourceName(sourceName);
+
+  // The fonts of a stage load in parallel and each is registered as soon as it
+  // is ready, so a slow font never keeps the others from being used. The loads
+  // finish in a different order on every page load, though, and where several
+  // files share a family, weight and style, text renders with the one registered
+  // last. Those files therefore wait for each other: each is registered only
+  // after the entries before it for the same variant have been registered or
+  // have failed, which makes the last such entry the one in use every time.
+  const loadStage = async (stageEntries: typeof entries): Promise<void> => {
+    const registrationsByFamily = new Map<string, Array<Promise<void>>>();
+    for (const entry of stageEntries) {
+      const { metadata } = entry;
       const variant = JSON.stringify([metadata.family, metadata.weight, metadata.style]);
       const earlierRegistrations = registrationsByVariant.get(variant) ?? [];
       const registration = (async () => {
-        const fontFace = await loadFontFace(metadata, url);
+        const fontFace = await loadFontFace(metadata, entry.url);
         await Promise.allSettled(earlierRegistrations);
         return registerFontFace(fontFace, metadata, 'bundled');
       })();
       registrationsByVariant.set(variant, [...earlierRegistrations, registration]);
-      return registration;
-    })
-  );
-
-  return loadedFonts.flatMap((result) => {
-    if (result.status === 'fulfilled') {
-      return [result.value];
+      const settled = registration.then(
+        (font) => {
+          loadedFonts[entry.index] = font;
+        },
+        (reason) => {
+          console.warn('Skipping bundled font that failed to load.', reason);
+        }
+      );
+      registrationsByFamily.set(metadata.family, [
+        ...(registrationsByFamily.get(metadata.family) ?? []),
+        settled,
+      ]);
     }
-    console.warn('Skipping bundled font that failed to load.', result.reason);
-    return [];
-  });
+
+    await Promise.all(
+      [...registrationsByFamily].map(async ([family, registrations]) => {
+        await Promise.all(registrations);
+        try {
+          options.onFamilyLoaded?.(
+            stageEntries.flatMap((entry) => {
+              const font = entry.metadata.family === family ? loadedFonts[entry.index] : undefined;
+              return font ? [font] : [];
+            })
+          );
+        } catch (error) {
+          console.warn('A listener for loaded fonts failed.', error);
+        }
+      })
+    );
+  };
+
+  const firstEntries = entries.filter((entry) => firstFamilies.has(entry.metadata.family));
+  const otherEntries = entries.filter((entry) => !firstFamilies.has(entry.metadata.family));
+  // With nothing to load first, the others start at once rather than a tick later.
+  const first = firstEntries.length > 0 ? loadStage(firstEntries) : undefined;
+  const others = first ? first.then(() => loadStage(otherEntries)) : loadStage(otherEntries);
+  return {
+    first: first ?? Promise.resolve(),
+    all: others.then(() => loadedFonts.flatMap((font) => (font ? [font] : []))),
+  };
 }
 
-export async function loadBundledFonts(): Promise<UploadedFont[]> {
+export function loadFontEntries(fontEntries: Array<[string, string]>): Promise<UploadedFont[]> {
+  return loadFontEntriesInStages(fontEntries).all;
+}
+
+export function loadBundledFonts(options?: FontLoadOptions): FontLoad {
   // Vite emits the glob's files sorted by path, so entry order is filename order:
   // of several files for one family, weight and style, the last by name is used.
-  return loadFontEntries(Object.entries(bundledFontUrls));
+  return loadFontEntriesInStages(Object.entries(bundledFontUrls), options);
 }
 
 /** Resolve a bundled font file's served URL by its source filename, for re-fetching its raw bytes (e.g. SVG export). */

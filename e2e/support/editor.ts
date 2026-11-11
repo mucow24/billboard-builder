@@ -734,6 +734,12 @@ export function createLayersPanelMockParityFixture() {
   ]);
 }
 
+/**
+ * Waits for the editor to be on screen and drawable. The app shows it only once
+ * the saved canvas, if there is one, is in place with the fonts it uses, so what
+ * a test does after this is never replaced by the saved canvas, and is autosaved.
+ * The other bundled fonts may still be loading: see `waitForBundledFonts`.
+ */
 export async function waitForEditor(page: Page) {
   await expect(page.getByTestId('canvas-stage-root')).toBeVisible();
   await expect(page.getByRole('toolbar', { name: 'Tools' })).toBeVisible();
@@ -753,29 +759,81 @@ export async function waitForEditor(page: Page) {
     .toBe(true);
 }
 
+const STORAGE_PAGE_PATH = '/__bb-e2e-storage__';
+const storagePageRouted = new WeakSet<Page>();
+
+/**
+ * Leaves the app for an empty page on the app's origin, served by the test.
+ *
+ * The app autosaves on a timer, so storage that a test edits while the app is
+ * open can be overwritten a moment later. On this page no app code is running:
+ * the timers of the page before it are gone, and a write it had already started
+ * is finished or abandoned before a storage request made from here runs.
+ */
+async function gotoStoragePage(page: Page) {
+  if (!storagePageRouted.has(page)) {
+    storagePageRouted.add(page);
+    await page.route(`**${STORAGE_PAGE_PATH}`, (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>e2e storage</title>' }),
+    );
+  }
+  await page.goto(STORAGE_PAGE_PATH);
+}
+
+/** Opens the editor with nothing stored: no saved canvas, favorites or uploaded fonts. */
 export async function openFreshEditor(page: Page) {
-  await page.goto(EDITOR_TEST_URL);
-  await waitForEditor(page);
+  await gotoStoragePage(page);
   await clearPersistence(page);
-  await page.reload();
+  await page.goto(EDITOR_TEST_URL);
   await waitForEditor(page);
 }
 
 /**
- * Waits until startup has finished: the bundled fonts are registered and the
- * saved canvas, if there is one, has been loaded.
- *
- * `waitForEditor` returns earlier, while the bundled fonts are still loading.
- * When startup gets there it replaces the document with the saved canvas, so a
- * project that a test loaded in the meantime is lost. A test that depends on its
- * document surviving should wait for this before loading it.
- *
- * Needs the Properties tab open with nothing selected, as after `openFreshEditor`.
+ * Opens the editor with `payload` stored as the saved canvas: a document, or a
+ * raw string to store something the app cannot parse. Other stored data is kept.
  */
-export async function waitForStartupToFinish(page: Page) {
-  await expect(page.getByText(/\d+ uploaded font\(s\) ready in this session/)).toBeVisible({
+export async function openEditorWithSavedCanvas(page: Page, payload: string | Record<string, unknown>) {
+  await gotoStoragePage(page);
+  await writeSavedCanvas(page, payload);
+  await page.goto(EDITOR_TEST_URL);
+  await waitForEditor(page);
+}
+
+/**
+ * Waits until every bundled font has been registered or has failed to load,
+ * which is also when the missing-font check first runs.
+ *
+ * The editor appears as soon as the saved canvas and the fonts it uses are in
+ * place (`waitForEditor`); the other bundled fonts keep arriving after that. Wait
+ * for this before using a bundled font the saved canvas does not use: text drawn
+ * before its font is registered keeps its fallback look.
+ */
+export async function waitForBundledFonts(page: Page) {
+  await expect(page.locator('.app-shell')).toHaveAttribute('data-fonts-ready', 'true', {
     timeout: 30_000,
   });
+}
+
+/** Matches the request for any bundled font file. */
+export const BUNDLED_FONT_REQUEST = /\.(?:ttf|otf|woff2?)(?:\?.*)?$/;
+
+/**
+ * Holds back the requests for bundled font files matching `pattern` until the
+ * returned `release` is called, and reports which files have been asked for.
+ * Routing also disables the HTTP cache, so a reload asks for the files again.
+ */
+export async function holdBundledFonts(page: Page, pattern: RegExp = BUNDLED_FONT_REQUEST) {
+  let release = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const requested: string[] = [];
+  await page.route(pattern, async (route) => {
+    requested.push(decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-1) ?? ''));
+    await released;
+    await route.continue();
+  });
+  return { release, requested };
 }
 
 export async function gotoEditor(page: Page) {
@@ -1758,14 +1816,7 @@ export async function readDownloadedPngSize(download: Download) {
   };
 }
 
-export async function seedPersistence(page: Page, payload: string | Record<string, unknown>) {
-  // The app debounces autosave by 150ms after document/persistenceReady
-  // changes (`useCanvasPersistence`).  Right after `openFreshEditor` boots
-  // an empty document the timer is still running — if we seed IDB before it
-  // fires, the timer's save() races our write and silently overwrites it
-  // with the empty document.  Wait past the debounce so any pending
-  // autosave has completed before we write our test data.
-  await page.waitForTimeout(250);
+async function writeSavedCanvas(page: Page, payload: string | Record<string, unknown>) {
   const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
   await page.evaluate(async ({ value, version }) => {
     await new Promise<void>((resolve, reject) => {
@@ -1793,43 +1844,10 @@ export async function seedPersistence(page: Page, payload: string | Record<strin
   }, { value: serialized, version: EDITOR_DATABASE_VERSION });
 }
 
-export async function primePersistenceBeforeLoad(page: Page, payload: string | Record<string, unknown>) {
-  const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  await page.addInitScript(async ({ value, version }) => {
-    if (window.sessionStorage.getItem('bb-persist-seeded') === 'true') {
-      return;
-    }
-    window.sessionStorage.setItem('bb-persist-seeded', 'true');
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('billboard-builder', version);
-      request.onerror = () => reject(request.error);
-      request.onupgradeneeded = () => {
-        const database = request.result;
-        if (!database.objectStoreNames.contains('canvas')) {
-          database.createObjectStore('canvas');
-        }
-      };
-      request.onsuccess = () => {
-        const database = request.result;
-        const transaction = database.transaction('canvas', 'readwrite');
-        const store = transaction.objectStore('canvas');
-        store.put(value, 'current');
-        transaction.onerror = () => reject(transaction.error);
-        transaction.onabort = () => reject(transaction.error);
-        transaction.oncomplete = () => {
-          database.close();
-          resolve();
-        };
-      };
-    });
-  }, { value: serialized, version: EDITOR_DATABASE_VERSION });
-}
-
-export async function clearPersistence(page: Page) {
+async function clearPersistence(page: Page) {
   await page.evaluate(async (version) => {
     window.localStorage.removeItem('billboard-builder:favorites:v1');
     window.localStorage.removeItem('billboard-builder:templates:v1');
-    window.sessionStorage.removeItem('bb-persist-seeded');
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.open('billboard-builder', version);
       request.onerror = () => reject(request.error);

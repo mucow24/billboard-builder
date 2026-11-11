@@ -159,7 +159,7 @@ describe('App integration', () => {
     vi.useRealTimers();
     vi.clearAllMocks();
     resetEditorStore();
-    mockLoadBundledFonts.mockResolvedValue([]);
+    mockLoadBundledFonts.mockReturnValue(({ first: Promise.resolve(), all: Promise.resolve([]) }));
     mockPersistenceClear.mockResolvedValue(undefined);
     mockPersistenceLoad.mockResolvedValue(null);
     mockPersistenceSave.mockResolvedValue(undefined);
@@ -399,14 +399,25 @@ describe('App integration', () => {
     });
   });
 
-  it('persists document changes only after bootstrap is ready and the debounce elapses', async () => {
+  it('shows and saves nothing until the saved canvas has been read, then autosaves changes after the debounce', async () => {
+    let finishLoad: (document: null) => void = () => {};
+    mockPersistenceLoad.mockReturnValue(
+      new Promise((resolve) => {
+        finishLoad = resolve;
+      }),
+    );
     render(<App />);
-    expect(screen.getByRole('button', { name: 'Canvas' })).toBeInTheDocument();
-
-    await act(async () => {
-      await Promise.resolve();
-    });
     expect(mockPersistenceLoad).toHaveBeenCalledOnce();
+
+    // Longer than the autosave debounce.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    });
+    expect(screen.queryByRole('button', { name: 'Canvas' })).toBeNull();
+    expect(mockPersistenceSave).not.toHaveBeenCalled();
+
+    finishLoad(null);
+    await screen.findByRole('button', { name: 'Canvas' });
     mockPersistenceSave.mockClear();
 
     act(() => {

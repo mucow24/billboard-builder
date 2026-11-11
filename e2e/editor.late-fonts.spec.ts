@@ -9,12 +9,14 @@ import {
   createProjectDocument,
   createTextFixture,
   gotoEditor,
+  holdBundledFonts,
   openPropertiesTab,
+  readStageDebug,
   uploadProject,
   waitForEditor,
-  waitForStartupToFinish,
+  waitForBundledFonts,
 } from './support/editor';
-import { bundledFontPath, hasFontFamily, holdBundledFont, waitForFontFamily } from './support/fonts';
+import { bundledFontPath, fontRequestPattern, hasFontFamily, waitForFontFamily } from './support/fonts';
 import { expectPersistedCanvasFontFiles, uploadNamedFontFromPath } from './support/persistence';
 
 /**
@@ -35,7 +37,10 @@ interface Layer {
   item: Record<string, unknown>;
 }
 
-const CELL = { width: 440, height: 260 };
+// Large enough that the canvas never fits the window above 100%, wherever it
+// is opened from. Past 100% text is rasterised at the zoom level, and two
+// exports only compare pixel for pixel when both were rasterised at one scale.
+const CELL = { width: 640, height: 480 };
 const CANVAS = { width: CELL.width * 2, height: CELL.height * 2 };
 
 function layer(index: number, name: string, overrides: Record<string, unknown>): Layer {
@@ -60,7 +65,13 @@ function layer(index: number, name: string, overrides: Record<string, unknown>):
   };
 }
 
-function buildDocument(layers: Layer[], fonts: Array<Record<string, unknown>> = []) {
+/**
+ * `fonts` lists the font file of every family the layers use, as a saved project
+ * does. The editor adds a missing entry itself once the family is registered,
+ * and any change to the document re-renders every layer; with the entries in
+ * place, the only thing that can redraw a layer here is its font arriving.
+ */
+function buildDocument(layers: Layer[], fonts: Array<Record<string, unknown>>) {
   return {
     ...createProjectDocument(layers.map((entry) => entry.item)),
     canvas: CANVAS,
@@ -72,10 +83,12 @@ function buildDocument(layers: Layer[], fonts: Array<Record<string, unknown>> = 
 // layer must look the same throughout, and must not be drawn again.
 const CONTROL_FAMILY = 'Arizonia';
 const CONTROL_TEXT = 'Steady';
+const CONTROL_FONT = { family: CONTROL_FAMILY, sourceName: 'Arizonia-Regular.ttf', kind: 'bundled' };
 const controlLayer = (index: number) =>
   layer(index, 'Control', { text: CONTROL_TEXT, fontFamily: CONTROL_FAMILY, fontSize: 64 });
 
 async function exportPng(page: Page): Promise<Buffer> {
+  expect((await readStageDebug(page)).viewport.zoom).toBeLessThanOrEqual(1);
   const download = await captureDownload(page, async () => {
     await clickToolbarPopoverItem(page, 'Export', 'PNG');
   });
@@ -170,7 +183,7 @@ function timesDrawn(page: Page, text: string): Promise<number> {
 async function openEditorAfterStartup(page: Page) {
   await gotoEditor(page);
   await waitForEditor(page);
-  await waitForStartupToFinish(page);
+  await waitForBundledFonts(page);
 }
 
 /**
@@ -213,7 +226,10 @@ test.describe('text drawn before its font arrived', () => {
       controlLayer(2),
     ];
     const lateLayers = layers.slice(0, 2);
-    const project = buildDocument(layers);
+    const project = buildDocument(layers, [
+      { family: lateFamily, sourceName: lateFile, kind: 'bundled' },
+      CONTROL_FONT,
+    ]);
 
     const reference = await inFreshProfile(browser, async (referencePage) => {
       await openEditorAfterStartup(referencePage);
@@ -223,7 +239,7 @@ test.describe('text drawn before its font arrived', () => {
     });
 
     await recordDrawnText(page);
-    const releaseLateFont = await holdBundledFont(page, lateFile);
+    const lateFont = await holdBundledFonts(page, fontRequestPattern(lateFile));
     await gotoEditor(page);
     await waitForEditor(page);
     await waitForFontFamily(page, CONTROL_FAMILY);
@@ -241,7 +257,7 @@ test.describe('text drawn before its font arrived', () => {
     const controlDrawsBefore = await timesDrawn(page, CONTROL_TEXT);
     expect(controlDrawsBefore).toBeGreaterThan(0);
 
-    releaseLateFont();
+    lateFont.release();
     await waitForFontFamily(page, lateFamily);
 
     // Nobody touches the canvas: the layer is drawn again on its own...
@@ -282,13 +298,14 @@ test.describe('text drawn before its font arrived', () => {
     const uploadedLayers = layers.slice(0, 2);
     const project = buildDocument(layers, [
       { family: uploadedFamily, sourceName: uploadedFile, kind: 'uploaded' },
+      CONTROL_FONT,
     ]);
 
     // The font is imported first, then the project that uses it is opened.
     const reference = await inFreshProfile(browser, async (referencePage) => {
       await openEditorAfterStartup(referencePage);
       const starter = controlLayer(0);
-      await uploadProject(referencePage, buildDocument([starter]), 'starter.json');
+      await uploadProject(referencePage, buildDocument([starter], [CONTROL_FONT]), 'starter.json');
       await selectLayer(referencePage, starter);
       await uploadNamedFontFromPath(referencePage, uploadedBytes, uploadedFile);
       await waitForFontFamily(referencePage, uploadedFamily);
@@ -316,8 +333,8 @@ test.describe('text drawn before its font arrived', () => {
       );
     });
 
-    await test.step('a reload, which restores the font after the saved canvas is shown, draws it the same', async () => {
-      await expectPersistedCanvasFontFiles(page, [uploadedFile]);
+    await test.step('a reload, which restores the font from storage, draws it the same', async () => {
+      await expectPersistedCanvasFontFiles(page, [uploadedFile, CONTROL_FONT.sourceName]);
       await page.reload();
       await waitForEditor(page);
       await waitForFontFamily(page, uploadedFamily);

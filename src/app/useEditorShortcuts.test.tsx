@@ -10,8 +10,10 @@ import {
   DUPLICATE_ITEM_OFFSET,
   createLineItem,
   createRectangleItem,
+  createTextItem,
 } from '../editor/document/documentDefaults';
-import type { CanvasItem } from '../editor/document/documentTypes';
+import type { CanvasItem, UploadedFont } from '../editor/document/documentTypes';
+import { useEditorStore } from '../editor/state/store';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { resetEditorStore } from '../test/editorStore';
 
@@ -292,6 +294,85 @@ describe('useEditorShortcuts', () => {
     ]);
   });
 
+
+  describe('pasting text into the real store', () => {
+    const posterSans: UploadedFont = {
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+    };
+    const posterSansReference = {
+      family: 'Poster Sans',
+      sourceName: 'PosterSans-Regular.ttf',
+      kind: 'uploaded' as const,
+    };
+
+    /** The shortcuts wired to the store for cut and paste, as in the app. */
+    function renderShortcutsOnStore() {
+      const { applyTransaction, deleteSelectedNodes } = useEditorStore.getState();
+      renderHook(() =>
+        useEditorShortcuts({ ...createShortcutHarness().args, applyTransaction, deleteSelectedNodes }),
+      );
+    }
+
+    function currentDocument() {
+      return useEditorStore.getState().editor.document;
+    }
+
+    it('keeps the font reference of the only text in a font when it is cut and pasted back', () => {
+      const headline = createTextItem({ id: 'headline', fontFamily: 'Poster Sans' });
+      resetEditorStore({
+        document: {
+          ...createDefaultProjectDocument(),
+          nodes: [headline],
+          fonts: [posterSansReference],
+        },
+        session: { selectedNodeIds: [headline.id], availableFonts: [posterSans] },
+      });
+      renderShortcutsOnStore();
+      const clipboardData = makeClipboardData();
+
+      dispatchCut(document.body, clipboardData);
+      expect(currentDocument().nodes).toEqual([]);
+      expect(currentDocument().fonts).toEqual([]);
+
+      dispatchPaste(document.body, clipboardData);
+
+      expect(currentDocument().nodes).toEqual([
+        expect.objectContaining({ kind: 'text', fontFamily: 'Poster Sans' }),
+      ]);
+      expect(currentDocument().fonts).toEqual([posterSansReference]);
+    });
+
+    it('references the font of text copied from another canvas', () => {
+      const clipboardData = makeClipboardData();
+      writeSelectionToClipboardData(clipboardData, [
+        createTextItem({ fontFamily: 'Poster Sans' }),
+      ]);
+      resetEditorStore({ session: { availableFonts: [posterSans] } });
+      renderShortcutsOnStore();
+
+      dispatchPaste(document.body, clipboardData);
+
+      expect(currentDocument().fonts).toEqual([posterSansReference]);
+    });
+
+    it('pastes text in a font this session does not have without a reference', () => {
+      const clipboardData = makeClipboardData();
+      writeSelectionToClipboardData(clipboardData, [
+        createTextItem({ fontFamily: 'Poster Sans' }),
+      ]);
+      resetEditorStore();
+      renderShortcutsOnStore();
+
+      dispatchPaste(document.body, clipboardData);
+
+      expect(currentDocument().nodes).toHaveLength(1);
+      expect(currentDocument().fonts).toEqual([]);
+    });
+  });
 
   it('offsets repeated pastes cumulatively for the same clipboard payload', () => {
     const copiedItem = createRectangleItem({ x: 10, y: 20 });

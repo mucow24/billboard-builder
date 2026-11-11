@@ -14,24 +14,6 @@ export function fontRequestPattern(fontFile: string): RegExp {
   return new RegExp(`/${urlName}(-[\\w-]+)?\\${ext}$`);
 }
 
-/**
- * Keeps a bundled font file from arriving until the returned function is called,
- * as if its download were slow. Call this before the page is opened. The font is
- * missing from `document.fonts` in the meantime, and startup, which waits for
- * every bundled font, does not finish.
- */
-export async function holdBundledFont(page: Page, fontFile: string): Promise<() => void> {
-  let release = () => {};
-  const released = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(fontRequestPattern(fontFile), async (route) => {
-    await released;
-    await route.continue();
-  });
-  return release;
-}
-
 /** Whether the browser has a loaded face for the family, which is what canvas text needs to be drawn with it. */
 export function hasFontFamily(page: Page, family: string): Promise<boolean> {
   return page.evaluate(

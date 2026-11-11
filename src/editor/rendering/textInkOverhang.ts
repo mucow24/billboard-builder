@@ -7,10 +7,12 @@
  * position inside that box, and whatever falls outside is cut off. Glyph ink
  * regularly does fall outside: an italic glyph leans past its advance width, a
  * script "j" swings left of its origin, a cedilla hangs below the font's descent.
+ * A drop shadow falls outside too: Pixi widens the texture by the length of the
+ * shadow's offset, to the right and downwards only, and not at all for its blur.
  *
  * `measureInkOverhang` repeats Pixi's placement of each line
- * (`CanvasTextGenerator._renderTextToCanvas`) and reports how far the ink leaves
- * the texture on each side. `rasterPaddingForOverhang` turns that into the room
+ * (`CanvasTextGenerator._renderTextToCanvas`) and reports how far the ink, and
+ * its shadow when there is one, leave the texture on each side. `rasterPaddingForOverhang` turns that into the room
  * to give the text style as `padding`, and `snapPaddingToTexels` fits it to the
  * resolution the text is rasterised at. Pixi adds the padding around the texture
  * and shifts the quad back by the same amount, so the text gains room without
@@ -54,6 +56,16 @@ export interface RasterTextLayout {
   wordWrap: boolean;
   wordWrapWidth: number;
   letterSpacing: number;
+}
+
+/**
+ * A drop shadow as Pixi draws it under the text (`_setupDropShadow`): the ink
+ * again, moved by the offset and blurred. In px of the text.
+ */
+export interface RasterShadow {
+  offsetX: number;
+  offsetY: number;
+  blur: number;
 }
 
 export interface InkOverhang {
@@ -139,13 +151,39 @@ function measureLineInk(
 }
 
 /**
+ * A canvas shadow shows this many px past the ink it is cast from, per px of
+ * `shadowBlur`, and this many more whatever the blur.
+ *
+ * Measured, not taken from the Gaussian the blur stands for: the shadow of a
+ * straight edge, which no glyph's shadow reaches past, read back down to the
+ * last alpha level that is not zero. Over blurs from 0.1 to 256 texels it shows
+ * up to 1.5 texels per texel of blur in Chromium, on a GPU canvas and on a
+ * software one, and 1.2 in Firefox. Half of that distance is fainter than 3% of
+ * the shadow's opacity, but cutting it still leaves a straight edge in the
+ * falloff. An edge or an offset at a fraction of a texel adds up to 0.75 of a
+ * texel. Text is rasterised at one texel per px or finer, so a px covers that.
+ */
+const SHADOW_REACH_PER_BLUR = 1.5;
+const SHADOW_REACH_PX = 1;
+
+/** How far past the ink, in px, a shadow of this `blur` still shows. */
+export function shadowBlurReach(blur: number): number {
+  const usableBlur = Number.isFinite(blur) ? Math.max(0, blur) : 0;
+  return SHADOW_REACH_PER_BLUR * usableBlur + SHADOW_REACH_PX;
+}
+
+/**
  * How far the ink of `layout`'s lines reaches past each edge of the unpadded
- * texture, in px; 0 for a side the ink stays inside.
+ * texture, in px; 0 for a side the ink stays inside. With a `shadow`, how far
+ * the ink or its shadow reaches, whichever is further: `layout` is then Pixi's
+ * measurement of the style with its drop shadow, whose width and height
+ * include the length of the offset.
  */
 export function measureInkOverhang(
   layout: RasterTextLayout,
   measureRun: (text: string) => TextRunMetrics,
   splitGraphemes: (text: string) => string[],
+  shadow?: RasterShadow,
 ): InkOverhang {
   const textureWidth = Math.ceil(Math.max(1, layout.width));
   const textureHeight = Math.ceil(Math.max(1, layout.height));
@@ -156,6 +194,14 @@ export function measureInkOverhang(
     : layout.maxLineWidth;
   // A line box taller than the font is split evenly above and below the text.
   const lineShift = Math.max(0, (layout.lineHeight - layout.fontHeight) / 2);
+
+  // The shadow is the ink moved by the offset and grown by the blur on every
+  // side, so on each side it reaches this much further than the ink, or less far.
+  const reach = shadow ? shadowBlurReach(shadow.blur) : 0;
+  const shadowLeft = shadow ? Math.max(0, reach - shadow.offsetX) : 0;
+  const shadowRight = shadow ? Math.max(0, reach + shadow.offsetX) : 0;
+  const shadowTop = shadow ? Math.max(0, reach - shadow.offsetY) : 0;
+  const shadowBottom = shadow ? Math.max(0, reach + shadow.offsetY) : 0;
 
   const overhang: InkOverhang = { left: 0, right: 0, top: 0, bottom: 0 };
 
@@ -172,10 +218,10 @@ export function measureInkOverhang(
     }
     const baseline = index * layout.lineHeight + layout.fontAscent + lineShift;
 
-    overhang.left = Math.max(overhang.left, ink.left - penX);
-    overhang.right = Math.max(overhang.right, penX + ink.right - textureWidth);
-    overhang.top = Math.max(overhang.top, ink.ascent - baseline);
-    overhang.bottom = Math.max(overhang.bottom, baseline + ink.descent - textureHeight);
+    overhang.left = Math.max(overhang.left, ink.left - penX + shadowLeft);
+    overhang.right = Math.max(overhang.right, penX + ink.right - textureWidth + shadowRight);
+    overhang.top = Math.max(overhang.top, ink.ascent - baseline + shadowTop);
+    overhang.bottom = Math.max(overhang.bottom, baseline + ink.descent - textureHeight + shadowBottom);
   });
 
   return overhang;

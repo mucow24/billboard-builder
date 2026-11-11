@@ -33,8 +33,9 @@ const finiteOrZero = (value: number | undefined): number =>
 
 /**
  * The room, in px, to give `style` as `padding` so that Pixi's text texture
- * holds all of the ink of `text`, including what leaves the advance box the
- * texture is sized from (see `textInkOverhang`). 0 when the ink already fits,
+ * holds all of the ink of `text` and all of its drop shadow, including what
+ * leaves the box the texture is sized from (see `textInkOverhang`). 0 when
+ * both already fit,
  * which leaves the texture exactly as it is without padding. Fit the result to
  * the text's resolution with `snapPaddingToTexels` before using it.
  *
@@ -72,6 +73,7 @@ export function measureTextRasterPadding(text: string, style: TextStyleOptions):
     };
   };
 
+  const shadow = textStyle.dropShadow;
   const padding = rasterPaddingForOverhang(
     measureInkOverhang(
       {
@@ -90,6 +92,14 @@ export function measureTextRasterPadding(text: string, style: TextStyleOptions):
       },
       measureRun,
       CanvasTextMetrics.graphemeSegmenter,
+      // The offsets as Pixi derives them from the angle and the distance.
+      shadow
+        ? {
+            offsetX: Math.cos(shadow.angle) * shadow.distance,
+            offsetY: Math.sin(shadow.angle) * shadow.distance,
+            blur: shadow.blur,
+          }
+        : undefined,
     ),
     textStyle.fontSize,
   );

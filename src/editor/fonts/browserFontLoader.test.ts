@@ -6,6 +6,7 @@ import {
   listRegisteredFonts,
   loadBundledFonts,
   loadFontEntries,
+  loadFontEntriesInStages,
   registerFontFile,
   registerUploadedFontBytes,
 } from './browserFontLoader';
@@ -55,7 +56,7 @@ describe('browser font loader', () => {
   });
 
   it('loads bundled startup fonts from src/assets/fonts with bundled provenance', async () => {
-    const fonts = await loadBundledFonts();
+    const fonts = await loadBundledFonts().all;
 
     expect(fonts.length).toBeGreaterThan(0);
     expect(fonts).toEqual(
@@ -72,7 +73,7 @@ describe('browser font loader', () => {
   });
 
   it('loads the bundled fonts in filename order', async () => {
-    const sourceNames = (await loadBundledFonts()).map((font) => font.sourceName);
+    const sourceNames = (await loadBundledFonts().all).map((font) => font.sourceName);
 
     // Of two files with the same family, weight and style, the later entry is the
     // one text renders with, so the order must not change between builds.
@@ -244,6 +245,120 @@ describe('browser font loader', () => {
     ['src/assets/fonts/Poster Regular.ttf', '/deferred/poster-regular.ttf'],
     ['src/assets/fonts/Poster Bold.otf', '/fonts/poster-bold.otf'],
   ];
+
+  describe('loading in stages', () => {
+    const sourcesInDocumentFonts = () =>
+      [...document.fonts].map((fontFace) => String((fontFace as unknown as MockFontFace).source));
+
+    beforeEach(stubFontSet);
+
+    it('loads the first families alone, and the others once those have loaded or failed', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        let firstSettled = false;
+        const loading = loadFontEntriesInStages(
+          [
+            ['src/assets/fonts/Another-One.ttf', '/fonts/another-one.ttf'],
+            ['src/assets/fonts/Broken-Canvas.ttf', '/fonts/broken-canvas.ttf'],
+            ['src/assets/fonts/Canvas-One.ttf', '/deferred/canvas-one.ttf'],
+          ],
+          { first: ['Canvas One', 'Broken Canvas', 'Not Bundled'] },
+        );
+        void loading.first.then(() => {
+          firstSettled = true;
+        });
+        await new Promise((settle) => setTimeout(settle, 0));
+
+        // "Another One" would be ready at once, but has not been asked for.
+        expect(sourcesInDocumentFonts()).toEqual([]);
+        expect(firstSettled).toBe(false);
+
+        await finishLoad('/deferred/canvas-one.ttf');
+        expect(firstSettled).toBe(true);
+
+        const fonts = await loading.all;
+        expect(sourcesInDocumentFonts()).toEqual([
+          'url("/deferred/canvas-one.ttf")',
+          'url("/fonts/another-one.ttf")',
+        ]);
+        // In entry order, whichever stage a font loaded in.
+        expect(fonts.map((font) => font.sourceName)).toEqual(['Another-One.ttf', 'Canvas-One.ttf']);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('reports each family once, when all of its files have loaded or failed, in entry order', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const families: string[][] = [];
+        const loading = loadFontEntriesInStages(
+          [
+            ...posterEntries,
+            ['src/assets/fonts/Broken-One.ttf', '/fonts/broken-one.ttf'],
+            ['src/assets/fonts/Quick-One.ttf', '/fonts/quick-one.ttf'],
+          ],
+          { onFamilyLoaded: (fonts) => families.push(fonts.map((font) => font.sourceName)) },
+        );
+        await new Promise((settle) => setTimeout(settle, 0));
+        // A family whose only file failed is reported with nothing in it.
+        expect(families).toEqual([[], ['Quick-One.ttf']]);
+
+        await finishLoad('/deferred/poster-regular.ttf');
+        // "Poster Bold.otf" is registered, but its family is not complete yet.
+        expect(families).toHaveLength(2);
+
+        await finishLoad('/deferred/poster-book.otf');
+        await loading.all;
+        expect(families).toEqual([
+          [],
+          ['Quick-One.ttf'],
+          ['Poster Book.otf', 'Poster Regular.ttf', 'Poster Bold.otf'],
+        ]);
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('has reported the first families by the time the first stage settles', async () => {
+      const reported: string[] = [];
+      const loading = loadFontEntriesInStages(
+        [
+          ['src/assets/fonts/Another-One.ttf', '/fonts/another-one.ttf'],
+          ['src/assets/fonts/Canvas-One.ttf', '/fonts/canvas-one.ttf'],
+        ],
+        {
+          first: ['Canvas One'],
+          onFamilyLoaded: (fonts) => reported.push(...fonts.map((font) => font.family)),
+        },
+      );
+
+      await loading.first;
+      expect(reported).toEqual(['Canvas One']);
+
+      await loading.all;
+      expect(reported).toEqual(['Canvas One', 'Another One']);
+    });
+
+    it('keeps loading when a listener for a loaded family throws', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const loading = loadFontEntriesInStages(
+          [['src/assets/fonts/Quick-One.ttf', '/fonts/quick-one.ttf']],
+          {
+            onFamilyLoaded: () => {
+              throw new Error('listener failed');
+            },
+          },
+        );
+
+        expect((await loading.all).map((font) => font.sourceName)).toEqual(['Quick-One.ttf']);
+        expect(warnSpy).toHaveBeenCalledWith('A listener for loaded fonts failed.', expect.any(Error));
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
 
   describe('bundled font registration order', () => {
     /** The entry URL behind each face in `document.fonts`, in the order the faces were added. */
