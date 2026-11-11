@@ -100,6 +100,7 @@ interface PixiCanvasSceneProps {
   renderedItems: RenderableCanvasItem[];
   renderedSelectedItems: RenderableCanvasItem[];
   selectedRenderedItem: RenderableCanvasItem | null;
+  selectionLocked: boolean;
   session: {
     kind: string;
     tool?: string;
@@ -154,6 +155,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       renderedItems,
       renderedSelectedItems,
       selectedRenderedItem,
+      selectionLocked,
       session,
       showGroupSelection,
       size,
@@ -445,6 +447,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
                 selectedRenderedItem={selectedRenderedItem}
                 renderedSelectedItems={renderedSelectedItems}
                 showGroupSelection={showGroupSelection}
+                selectionLocked={selectionLocked}
                 groupOverlayFrame={groupOverlayFrame}
                 zoom={zoom}
                 beginResize={beginResize}

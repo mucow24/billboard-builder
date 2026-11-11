@@ -34,7 +34,10 @@ import {
 } from './interactionSession';
 import { useCropSession } from './useCropSession';
 import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInteractionDerivedState';
-import { getGroupDescendantAtPoint } from './interactionHitTesting';
+import {
+  getGroupDescendantAtPoint,
+  getSelectionCycleTargetAtPoint,
+} from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
 import {
   collectLeafItems,
@@ -123,6 +126,11 @@ function isGroupDrillDoubleClick(
       currentTimeMs - lastClick.recordedAtMs <= GROUP_DRILL_DOUBLE_CLICK_MS &&
       pointerDelta <= GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA,
   );
+}
+
+/** Alt + primary button: cycle the selection through the items under the pointer. */
+function isSelectionCycleClick(nativeEvent: MouseEvent): boolean {
+  return Boolean(nativeEvent.altKey) && !nativeEvent.button;
 }
 
 export function useCanvasInteractionSession({
@@ -755,13 +763,21 @@ export function useCanvasInteractionSession({
     updateSession(createCreateSession(tool, pointer, orderedItems));
   }, [orderedItems, updateSession]);
 
+  // A locked selection can be looked at and inspected, never transformed from
+  // the canvas: its handles are not drawn and every transform entry point
+  // below refuses to start.
+  const selectionLocked = useMemo(
+    () => selectedNodes.some((node) => node.locked) || selectedItems.some((item) => item.locked),
+    [selectedItems, selectedNodes],
+  );
+
   const beginDrag = useCallback((item: CanvasItem, pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (item.kind === 'generator') return;
+    if (item.kind === 'generator' || item.locked) return;
     updateSession(createDragSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupDrag = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (selectedNodes.some(n => n.locked) || selectedItems.some(i => i.locked)) return;
+    if (selectionLocked) return;
     const nextSession = createGroupDragSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -770,7 +786,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
 
   const beginResize = useCallback((
     item: ShapeItem,
@@ -778,6 +794,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     updateSession(
       createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id), source)
     );
@@ -788,7 +805,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
-    if (selectedNodes.some(n => n.locked) || selectedItems.some(i => i.locked)) return;
+    if (selectionLocked) return;
     const nextSession = createGroupResizeSession(handle, pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -797,14 +814,15 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point, source: PointerGestureSource = 'stage') => {
+    if (item.locked) return;
     updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (selectedNodes.some(n => n.locked) || selectedItems.some(i => i.locked)) return;
+    if (selectionLocked) return;
     const nextSession = createGroupRotateSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -813,7 +831,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectedNodes, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
 
   const beginLineHandle = useCallback((
     item: LineCanvasItem,
@@ -821,6 +839,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     updateSession(
       createLineHandleSession(
         item,
@@ -838,6 +857,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     const nextSession = createPolygonVertexSession(
       item,
       vertexIndex,
@@ -856,6 +876,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
+    if (item.locked) return;
     const nextSession = createPolygonEdgeInsertSession(
       item,
       edgeIndex,
@@ -884,6 +905,39 @@ export function useCanvasInteractionSession({
     ? getRenderBox(selectedRenderedItemForRect)
     : null;
 
+  // Alt-click: select through the stack of items under the pointer, including
+  // locked and covered ones. Purely a selection gesture: it never starts a
+  // drag or a marquee. Returns false when nothing is under the pointer.
+  const cycleSelectionAtPointer = useCallback((pointer: Point) => {
+    const targetNodeId = getSelectionCycleTargetAtPoint(renderedItems, selectedNodeIds, pointer);
+    if (!targetNodeId) {
+      return false;
+    }
+    if (cropSessionRef.current) {
+      commitCropSession();
+    }
+    clearPendingItemGesture();
+    clearPendingMarquee();
+    updateSession(null);
+    updateGuides([]);
+    setLastDrilldownSource(null);
+    lastStageDescendantClickRef.current = null;
+    onSelectPolygonVertex?.(null);
+    onSelectNode(targetNodeId);
+    return true;
+  }, [
+    clearPendingItemGesture,
+    clearPendingMarquee,
+    commitCropSession,
+    cropSessionRef,
+    onSelectNode,
+    onSelectPolygonVertex,
+    renderedItems,
+    selectedNodeIds,
+    updateGuides,
+    updateSession,
+  ]);
+
   const handleItemPointerDown = useCallback((
     item: CanvasItem,
     selectionNodeId: string,
@@ -893,12 +947,6 @@ export function useCanvasInteractionSession({
     source: PointerGestureSource = 'stage',
   ) => {
     const shiftPressed = resolveModifierKeys({ ctrlKey: false, shiftKey }).shiftKey;
-    // Pressing the polygon body (not a handle) drops any vertex sub-selection,
-    // like clicking off a vertex in massimo.
-    if (item.kind === 'polygon') {
-      onSelectPolygonVertex?.(null);
-    }
-    const selectedSession = createSelectedDragSession(item, selectionNodeId, pointer, source);
     if (nativeEvent) {
       lastHandledItemPointerEventRef.current = {
         nativeEvent,
@@ -910,6 +958,15 @@ export function useCanvasInteractionSession({
         selectionNodeId,
       };
     }
+    if (nativeEvent && isSelectionCycleClick(nativeEvent) && cycleSelectionAtPointer(pointer)) {
+      return;
+    }
+    // Pressing the polygon body (not a handle) drops any vertex sub-selection,
+    // like clicking off a vertex in massimo.
+    if (item.kind === 'polygon') {
+      onSelectPolygonVertex?.(null);
+    }
+    const selectedSession = createSelectedDragSession(item, selectionNodeId, pointer, source);
     if (cropSessionRef.current && cropSessionRef.current.itemId !== item.id) {
       commitCropSession();
     }
@@ -956,6 +1013,7 @@ export function useCanvasInteractionSession({
     cropSessionRef,
     createSelectableNodeDragSession,
     createSelectedDragSession,
+    cycleSelectionAtPointer,
     resolveModifierKeys,
     onSelectNode,
     onSelectPolygonVertex,
@@ -1009,7 +1067,16 @@ export function useCanvasInteractionSession({
     const isCanvasSurface = event.isCanvasSurface ?? false;
     const nativeEvent = event.nativeEvent as MouseEvent;
     const pointer = getCanvasPointerFromStageEvent(event);
+    // Locked items take no pointer events, so an alt-click over one arrives
+    // here as a canvas-surface press.
+    const cyclePointer =
+      pointer && isCanvasSurface && activeTool === 'select' && isSelectionCycleClick(nativeEvent)
+        ? pointer
+        : null;
     if (cropSessionRef.current) {
+      if (cyclePointer && cycleSelectionAtPointer(cyclePointer)) {
+        return;
+      }
       if (
         pointer &&
         isCanvasSurface &&
@@ -1041,6 +1108,9 @@ export function useCanvasInteractionSession({
       return;
     }
     lastHandledItemPointerEventRef.current = null;
+    if (cyclePointer && cycleSelectionAtPointer(cyclePointer)) {
+      return;
+    }
     if (
       pointer &&
       isCanvasSurface &&
@@ -1120,6 +1190,7 @@ export function useCanvasInteractionSession({
     clearPendingItemGesture,
     commitCropSession,
     cropSessionRef,
+    cycleSelectionAtPointer,
     document.nodes,
     getCanvasPointerFromStageEvent,
     updateGuides,
@@ -1189,6 +1260,7 @@ export function useCanvasInteractionSession({
     selectedNode,
     selectedRenderedItem,
     selectedItemId,
+    selectionLocked,
     session,
     subgroupOutlineFrames,
   };

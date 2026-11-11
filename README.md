@@ -153,6 +153,7 @@ docs/                   # Interaction test coverage matrix
 | Ctrl+V | Paste |
 | Ctrl+D | Duplicate |
 | Ctrl+A | Select all |
+| Alt+Click | Select through the items under the cursor: each click steps to the next one down, including locked and covered items |
 | Ctrl+G | Group |
 | Ctrl+Shift+G | Ungroup |
 | Delete / Backspace | Delete selected |

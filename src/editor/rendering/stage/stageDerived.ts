@@ -111,6 +111,8 @@ export function buildStageDerivedState(params: {
     rotation: number;
   } | null;
   selectedRenderedItem: CanvasItem | null;
+  /** The selection contains a locked item or group: it gets no transform handles. */
+  selectionLocked?: boolean;
   cropSession?: {
     previewItem: CanvasItem;
     fullImageItem: CanvasItem;
@@ -136,8 +138,10 @@ export function buildStageDerivedState(params: {
     renderedSelectionFrame: params.renderedSelectionFrame,
     session: params.session,
   });
+  const selectionLocked = params.selectionLocked ?? false;
   const selectedShapeHandleRects =
     !cropSession &&
+    !selectionLocked &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem &&
     // Polygons get the resize box in addition to their vertex handles; only
@@ -150,6 +154,7 @@ export function buildStageDerivedState(params: {
       : null;
   const selectedLineHandleRects =
     !cropSession &&
+    !selectionLocked &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem?.kind === 'line'
       ? {
@@ -186,7 +191,7 @@ export function buildStageDerivedState(params: {
     params.renderedSelectedItems.length <= 1 && params.selectedRenderedItem
       ? params.viewport.toViewportRect(getRenderBox(params.selectedRenderedItem))
       : null;
-  const groupHandleViewportPoints = groupOverlayFrame
+  const groupHandleViewportPoints = groupOverlayFrame && !selectionLocked
     ? Object.fromEntries(
         RESIZE_HANDLE_NAMES.map((handle) => {
           const width = groupOverlayFrame.bounds.width;
@@ -216,7 +221,7 @@ export function buildStageDerivedState(params: {
         }),
       )
     : null;
-  const groupRotaterViewportPoint = groupOverlayFrame
+  const groupRotaterViewportPoint = groupOverlayFrame && !selectionLocked
     ? params.viewport.toViewportPoint(
         localToStage(
           { x: 0, y: -(groupOverlayFrame.bounds.height / 2) - overlayMetrics.rotateHandleOffset },
