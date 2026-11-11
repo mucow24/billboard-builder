@@ -23,7 +23,7 @@ export const fakeMeasurer: TextMeasurer = {
 // can read placement straight out of the `d` attribute.
 export const fakeOutlineFont: OutlineFont = {
   unitsPerEm: 1000,
-  glyphPath: (ch, _size, penX, baselineY) =>
+  glyphPath: (ch: string | number, _size: number, penX: number, baselineY: number) =>
     ch === ' ' ? null : `M${penX} ${baselineY}h10v-10h-10Z`,
 };
 
