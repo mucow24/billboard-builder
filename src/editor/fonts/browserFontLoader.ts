@@ -73,13 +73,13 @@ function registerFontFace(
  * order. That is the order the browser matches faces in: among faces with the
  * same family, weight and style, the last one added is the one text renders with.
  *
- * Bundled files are listed in the order `loadFontEntries` was given them
- * (filename order), whatever order their loads finished in. So of two
- * same-variant files (e.g. "Futura Bold Italic.otf" and "Futura Bold
- * Oblique.otf") the same one comes last, and is rendered with, on every page
- * load. Uploaded files are listed where they were registered, which at startup
- * is after the bundled ones. Resolve against this list to get the file the
- * canvas is actually using.
+ * It is not filename order. Bundled fonts load in parallel and join
+ * `document.fonts` as each finishes, so the order differs from one page load to
+ * the next. The exception is files with the same family, weight and style (e.g.
+ * "Futura Bold Italic.otf" and "Futura Bold Oblique.otf"): `loadFontEntries`
+ * registers those in filename order, so the same one comes last, and is rendered
+ * with, on every page load. Resolve against this list, not a sorted one, to get
+ * the file the canvas is actually using.
  */
 export function listRegisteredFonts(): UploadedFont[] {
   if (typeof document === 'undefined' || !document.fonts) {
@@ -110,31 +110,42 @@ export async function registerUploadedFontBytes(
 export async function loadFontEntries(
   fontEntries: Array<[string, string]>
 ): Promise<UploadedFont[]> {
-  // The fonts load in parallel, and finish in a different order on every page load.
-  const loads = await Promise.allSettled(
-    fontEntries.map(async ([path, url]) => {
+  // The fonts load in parallel and each is registered as soon as it is ready, so
+  // a slow font never keeps the others from being used. The loads finish in a
+  // different order on every page load, though, and where several files share a
+  // family, weight and style, text renders with the one registered last. Those
+  // files therefore wait for each other: each is registered only after the
+  // entries before it for the same variant have been registered or have failed,
+  // which makes the last such entry the one in use every time.
+  const registrationsByVariant = new Map<string, Array<Promise<UploadedFont>>>();
+  const loadedFonts = await Promise.allSettled(
+    fontEntries.map(([path, url]) => {
       const sourceName = path.split('/').at(-1) ?? 'Bundled Font';
       const metadata = parseFontSourceName(sourceName);
-      return { metadata, fontFace: await loadFontFace(metadata, url) };
+      const variant = JSON.stringify([metadata.family, metadata.weight, metadata.style]);
+      const earlierRegistrations = registrationsByVariant.get(variant) ?? [];
+      const registration = (async () => {
+        const fontFace = await loadFontFace(metadata, url);
+        await Promise.allSettled(earlierRegistrations);
+        return registerFontFace(fontFace, metadata, 'bundled');
+      })();
+      registrationsByVariant.set(variant, [...earlierRegistrations, registration]);
+      return registration;
     })
   );
 
-  // So no face is registered until every load has settled, and then they are
-  // registered in entry order: where two files share a family, weight and style,
-  // the same one is added last, and so rendered with, every time.
-  const fonts: UploadedFont[] = [];
-  for (const load of loads) {
-    if (load.status === 'fulfilled') {
-      fonts.push(registerFontFace(load.value.fontFace, load.value.metadata, 'bundled'));
-    } else {
-      console.warn('Skipping bundled font that failed to load.', load.reason);
+  return loadedFonts.flatMap((result) => {
+    if (result.status === 'fulfilled') {
+      return [result.value];
     }
-  }
-  return fonts;
+    console.warn('Skipping bundled font that failed to load.', result.reason);
+    return [];
+  });
 }
 
 export async function loadBundledFonts(): Promise<UploadedFont[]> {
-  // Vite emits the glob's files sorted by path, so entry order is filename order.
+  // Vite emits the glob's files sorted by path, so entry order is filename order:
+  // of several files for one family, weight and style, the last by name is used.
   return loadFontEntries(Object.entries(bundledFontUrls));
 }
 

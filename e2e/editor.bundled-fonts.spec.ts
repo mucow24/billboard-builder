@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
@@ -35,6 +35,21 @@ function bundledGlyphAdvances(fontFile: string): number[] {
   );
 }
 
+/** How many faces for the family's regular variant are registered with the browser. */
+function registeredSameVariantFaces(page: Page): Promise<number> {
+  return page.evaluate(
+    (family) =>
+      [...document.fonts].filter(
+        (face) =>
+          face.family === family &&
+          face.weight === '400' &&
+          face.style === 'normal' &&
+          face.status === 'loaded',
+      ).length,
+    FAMILY,
+  );
+}
+
 /**
  * Open the editor with one of the same-variant files held back until the other
  * has arrived, so that its load is the one that finishes last.
@@ -61,21 +76,10 @@ async function openEditorWithFontLoadingLast(page: Page, lastFile: string) {
   await waitForEditor(page);
   await otherFilesArrived;
   await expect
-    .poll(
-      () =>
-        page.evaluate(
-          (family) =>
-            [...document.fonts].filter(
-              (face) =>
-                face.family === family &&
-                face.weight === '400' &&
-                face.style === 'normal' &&
-                face.status === 'loaded',
-            ).length,
-          FAMILY,
-        ),
-      { message: `waiting for both ${FAMILY} regular faces to be registered`, timeout: 30_000 },
-    )
+    .poll(() => registeredSameVariantFaces(page), {
+      message: `waiting for both ${FAMILY} regular faces to be registered`,
+      timeout: 30_000,
+    })
     .toBe(SAME_VARIANT_FILES.length);
   await page.unroute(heldRequest);
 }
@@ -111,5 +115,40 @@ test.describe('bundled fonts', () => {
     expect(renderedWith[0]).toHaveLength(1);
     // ...and it is the same one however the loads were timed.
     expect(renderedWith[1]).toEqual(renderedWith[0]);
+  });
+
+  // The editor is usable while fonts are still arriving, and text drawn before
+  // its font is registered keeps its fallback look. So only files of one variant
+  // may wait for each other: every other font must be usable as soon as it loads.
+  test('registers the other bundled fonts while one is still loading', async ({ page }) => {
+    const bundledFileCount = readdirSync(path.join(process.cwd(), 'src/assets/fonts')).filter(
+      (name) => /\.(ttf|otf|woff2?)$/.test(name),
+    ).length;
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(fontRequestPattern(SAME_VARIANT_FILES[0]), async (route) => {
+      await released;
+      await route.continue();
+    });
+
+    await gotoEditor(page);
+    await waitForEditor(page);
+    try {
+      await expect
+        .poll(() => page.evaluate(() => document.fonts.size), {
+          message: 'waiting for bundled fonts to be registered while one is held back',
+          timeout: 30_000,
+        })
+        .toBeGreaterThan(bundledFileCount / 2);
+      // The held file's own variant is the exception: its later file waits for it.
+      expect(await registeredSameVariantFaces(page)).toBe(0);
+    } finally {
+      release();
+    }
+    await expect
+      .poll(() => registeredSameVariantFaces(page), { timeout: 30_000 })
+      .toBe(SAME_VARIANT_FILES.length);
   });
 });
