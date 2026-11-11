@@ -11,12 +11,27 @@ const bundledFontUrls = import.meta.glob('../../assets/fonts/*.{ttf,otf,woff,wof
   eager: true,
 }) as Record<string, string>;
 
+/**
+ * Serialize a font URL as a quoted CSS `url("…")` for use as a `FontFace` source.
+ *
+ * The unquoted `url(…)` form cannot contain parentheses, quotes or whitespace: a file
+ * such as `Elite Hacker (Corroded).ttf` would make the whole source unparseable, and
+ * the font would be skipped. Inside the quotes only `"`, `\` and line breaks need
+ * escaping.
+ */
+function toCssUrl(url: string): string {
+  const escaped = url
+    .replace(/["\\]/g, '\\$&')
+    .replace(/[\n\r\f]/g, (lineBreak) => `\\${lineBreak.charCodeAt(0).toString(16)} `);
+  return `url("${escaped}")`;
+}
+
 async function registerFontSource(
   metadata: ParsedFontMetadata,
   source: ArrayBuffer | string,
   kind: UploadedFont['kind']
 ): Promise<UploadedFont> {
-  const fontFace = new FontFace(metadata.family, typeof source === 'string' ? `url(${source})` : source, {
+  const fontFace = new FontFace(metadata.family, typeof source === 'string' ? toCssUrl(source) : source, {
     weight: metadata.weight,
     style: metadata.style,
   });

@@ -27,6 +27,13 @@ class MockFontFace {
   }
 }
 
+/** The `source` each registered FontFace was constructed with, in registration order. */
+function registeredFontSources(): Array<string | ArrayBuffer> {
+  return vi
+    .mocked(document.fonts.add)
+    .mock.calls.map(([fontFace]) => (fontFace as unknown as MockFontFace).source);
+}
+
 describe('browser font loader', () => {
   beforeEach(() => {
     vi.stubGlobal('FontFace', MockFontFace);
@@ -78,6 +85,37 @@ describe('browser font loader', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('loads a bundled font whose file name contains parentheses', async () => {
+    const fonts = await loadFontEntries([
+      [
+        '../../assets/fonts/Elite Hacker (Corroded).ttf',
+        '/src/assets/fonts/Elite%20Hacker%20(Corroded).ttf',
+      ],
+    ]);
+
+    expect(fonts).toEqual([
+      {
+        family: 'Elite Hacker Corroded',
+        sourceName: 'Elite Hacker (Corroded).ttf',
+        weight: '400',
+        style: 'normal',
+        kind: 'bundled',
+      },
+    ]);
+    // The URL must be quoted: in an unquoted CSS url() the parentheses are a
+    // syntax error, and a real browser rejects the whole FontFace source.
+    expect(registeredFontSources()).toEqual([
+      'url("/src/assets/fonts/Elite%20Hacker%20(Corroded).ttf")',
+    ]);
+  });
+
+  it('escapes quotes, backslashes and line breaks inside the quoted font URL', async () => {
+    await loadFontEntries([['src/assets/fonts/Odd-Name.ttf', '/fonts/a"b\\c\nd.ttf']]);
+
+    // String.raw keeps the expectation readable as the literal CSS text.
+    expect(registeredFontSources()).toEqual([String.raw`url("/fonts/a\"b\\c\a d.ttf")`]);
   });
 
   it('registers uploaded font files with uploaded provenance', async () => {
