@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   measureInkOverhang,
   rasterPaddingForOverhang,
+  shadowBlurReach,
   snapPaddingToTexels,
   type RasterTextLayout,
   type TextRunMetrics,
@@ -222,6 +223,92 @@ describe('measureInkOverhang', () => {
 
       expect(measureInkOverhang(oneCluster, measure, () => [cluster]).top).toBe(12);
     });
+  });
+});
+
+describe('shadowBlurReach', () => {
+  it('is one and a half times the blur, plus a pixel', () => {
+    expect(shadowBlurReach(8)).toBe(13);
+    expect(shadowBlurReach(10)).toBe(16);
+    expect(shadowBlurReach(0)).toBe(1);
+  });
+
+  it('covers how far a canvas shadow was measured to show past a straight edge', () => {
+    // [shadowBlur, texels past the edge that still show]: the furthest of a GPU
+    // canvas and a software canvas in Chromium, and Firefox.
+    const measured: Array<[number, number]> = [
+      [0.4, 1], [1, 1], [1.1, 2], [1.75, 3], [2.5, 4], [3.75, 6], [4.5, 7], [6.5, 10], [8, 12], [8.5, 13],
+      [10, 15], [12.5, 19], [16, 24], [20, 30], [40, 60], [50, 75], [100, 149], [150, 225], [200, 298], [256, 382],
+    ];
+    for (const [blur, reach] of measured) {
+      expect(shadowBlurReach(blur)).toBeGreaterThanOrEqual(reach);
+      // and no more than three pixels over
+      expect(shadowBlurReach(blur) - reach).toBeLessThan(3.01);
+    }
+  });
+
+  it('treats an unusable blur as none', () => {
+    expect(shadowBlurReach(Number.NaN)).toBe(1);
+    expect(shadowBlurReach(-4)).toBe(1);
+  });
+});
+
+describe('measureInkOverhang with a shadow', () => {
+  // UPRIGHT ink runs from 5 to 55 across and from 10 to 80 down, in a 60 x 100 texture.
+  const measure = measureWith({ H: UPRIGHT });
+  const shadowed = (shadow: { offsetX: number; offsetY: number; blur: number }, overrides = {}) =>
+    measureInkOverhang(layout(overrides), measure, splitCharacters, shadow);
+
+  it('reports nothing while the shadow stays inside the texture', () => {
+    expect(shadowed({ offsetX: 2, offsetY: 3, blur: 0 })).toEqual(NONE);
+  });
+
+  it('adds the offset and the reach of the blur on the side the shadow falls to', () => {
+    // right: 55 + 6 + 13 - 60; bottom: 80 + 6 + 13 - 100 stays inside
+    expect(shadowed({ offsetX: 6, offsetY: 6, blur: 8 })).toEqual({ ...NONE, left: 2, right: 14 });
+  });
+
+  it('reports a shadow thrown up and to the left', () => {
+    // left: 8 + 16 - 5; top: 8 + 16 - 10; right: 55 - 8 + 16 - 60
+    expect(shadowed({ offsetX: -8, offsetY: -8, blur: 10 })).toEqual({ left: 19, right: 3, top: 14, bottom: 0 });
+  });
+
+  it('spreads a blurred shadow without an offset on every side', () => {
+    // reach 19: left 19 - 5, right 55 + 19 - 60, top 19 - 10, bottom 80 + 19 - 100
+    expect(shadowed({ offsetX: 0, offsetY: 0, blur: 12 })).toEqual({ left: 14, right: 14, top: 9, bottom: 0 });
+  });
+
+  it('measures against the texture Pixi widened by the length of the offset', () => {
+    // Pixi adds the 10 px distance to width and height: 70 x 110.
+    expect(shadowed({ offsetX: 10, offsetY: 0, blur: 0 }, { width: 70, height: 110 })).toEqual(NONE);
+    // left: 10 + 1 - 5
+    expect(shadowed({ offsetX: -10, offsetY: 0, blur: 0 }, { width: 70, height: 110 })).toEqual({ ...NONE, left: 6 });
+  });
+
+  it('never reports less than the ink itself needs', () => {
+    const leaning = measureWith({ H: run({ inkRight: 67.5 }) });
+    // The shadow falls left, away from the lean: left 20 + 1 - 5.
+    expect(
+      measureInkOverhang(layout(), leaning, splitCharacters, { offsetX: -20, offsetY: 0, blur: 0 }),
+    ).toEqual({ ...NONE, left: 16, right: 7.5 });
+  });
+
+  it('takes the shadow of every line', () => {
+    const twoLines = layout({ lines: ['a', 'b'], lineWidths: [60, 60] });
+    const lines = measureWith({ a: UPRIGHT, b: run({ inkDescent: 15 }) });
+    // second baseline at 180 in a 200 px texture: 180 + 15 + 4 + 7 - 200
+    expect(measureInkOverhang(twoLines, lines, splitCharacters, { offsetX: 0, offsetY: 4, blur: 4 }).bottom).toBe(6);
+  });
+
+  it('has no shadow where there is no ink', () => {
+    const blank = layout({ lines: [' '], lineWidths: [20] });
+    expect(
+      measureInkOverhang(blank, measureWith({ ' ': { ...NO_INK, width: 20 } }), splitCharacters, {
+        offsetX: -30,
+        offsetY: -30,
+        blur: 20,
+      }),
+    ).toEqual(NONE);
   });
 });
 

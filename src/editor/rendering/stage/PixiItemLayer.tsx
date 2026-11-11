@@ -160,7 +160,9 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
   // Pixi sizes the text texture from advance widths and the font's ascent and
   // descent, and cuts off ink outside that box: the lean of an italic glyph at
   // the end of a line, a tail left of the first glyph's origin, an accent or a
-  // descender beyond the font's own. `padding` adds room on all four sides and
+  // descender beyond the font's own, and a drop shadow wherever it falls past
+  // the text (Pixi widens the texture only by the length of the shadow's offset,
+  // to the right and downwards). `padding` adds room on all four sides and
   // Pixi shifts the quad back by as much, so the text itself stays where it is.
   const inkRoom = measureTextRasterPadding(item.text, layoutStyle);
 
