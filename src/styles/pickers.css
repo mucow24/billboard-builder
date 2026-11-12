@@ -54,8 +54,10 @@
 .font-family-picker-popover {
   position: absolute;
   top: calc(100% - 1px);
-  left: 0;
+  /* 50% wider than the picker row, growing leftward (the inspector sits on
+     the right edge of the window). */
   right: 0;
+  width: 150%;
   z-index: 14;
 }
 
