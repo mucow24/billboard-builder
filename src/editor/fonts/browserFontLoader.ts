@@ -79,7 +79,7 @@ function registerFontFace(
  * It is not filename order. Bundled fonts load in parallel and join
  * `document.fonts` as each finishes, so the order differs from one page load to
  * the next. The exception is files with the same family, weight and style (e.g.
- * "Futura Bold Italic.otf" and "Futura Bold Oblique.otf"): `loadFontEntries`
+ * "Example Bold Italic.otf" and "Example Bold Oblique.otf"): `loadFontEntries`
  * registers those in filename order, so the same one comes last, and is rendered
  * with, on every page load. Resolve against this list, not a sorted one, to get
  * the file the canvas is actually using.

@@ -42,7 +42,7 @@ describe('parseOutlineFont: substituted glyphs', () => {
   });
 
   it('returns null for every text in a font without substitution rules', () => {
-    const font = parseOutlineFont(loadBytes('Futura Light Condensed.otf'))!;
+    const font = parseOutlineFont(loadBytes('Azonix.otf'))!;
     expect(font.substitutions!('office fluff')).toBeNull();
   });
 

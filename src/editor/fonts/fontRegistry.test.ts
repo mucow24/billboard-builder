@@ -59,7 +59,7 @@ describe('findFontForVariant', () => {
   });
 
   it('prefers the file registered last when several share a weight and style', () => {
-    // Like Futura, which ships "Futura Book.otf" and "Futura Regular.ttf" as one variant.
+    // Like a family that ships "Poster Book.otf" and "Poster Regular.ttf" as one variant.
     const book = font('Poster Book.otf', '400', 'normal');
     const reupload = font('PosterSans-Regular.ttf', '400', 'normal', { kind: 'uploaded' });
 

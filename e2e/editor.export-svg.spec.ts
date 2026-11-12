@@ -219,7 +219,7 @@ test.describe('SVG export', () => {
 
     const fontSize = 200;
     const albertus = { family: 'Albertus MT Std', file: 'Albertus MT Std Regular.otf' };
-    const futura = { family: 'Futura Light Condensed', file: 'Futura Light Condensed.otf' };
+    const azonix = { family: 'Azonix', file: 'Azonix.otf' };
     // `glyphs`: the characters whose outlines the layer must export as, in order.
     // U+FB01 and U+FB02 are the fi and fl ligatures as characters of their own,
     // which Albertus maps to the glyphs it joins f + i and f + l into.
@@ -228,7 +228,7 @@ test.describe('SVG export', () => {
       { id: 'fl', font: albertus, text: 'fl', letterSpacing: 0, glyphs: ['\ufb02'] },
       { id: 'fi-spaced', font: albertus, text: 'fi', letterSpacing: 10, glyphs: ['f', 'i'] },
       // A font without ligatures: nothing to join, with or without the fix.
-      { id: 'fi-plain-font', font: futura, text: 'fi', letterSpacing: 0, glyphs: ['f', 'i'] },
+      { id: 'fi-plain-font', font: azonix, text: 'fi', letterSpacing: 0, glyphs: ['f', 'i'] },
     ].map((layer, index) => ({
       ...layer,
       x: 40 + (index % 2) * 480,
@@ -254,7 +254,7 @@ test.describe('SVG export', () => {
           }),
         ),
       ),
-      fonts: [albertus, futura].map((font) => ({ family: font.family, sourceName: font.file, kind: 'bundled' })),
+      fonts: [albertus, azonix].map((font) => ({ family: font.family, sourceName: font.file, kind: 'bundled' })),
     };
     await uploadProject(page, doc, 'ligatures.json');
 
@@ -329,7 +329,7 @@ test.describe('SVG export', () => {
     const wordmark = createTextFixture({
       id: 'wordmark',
       text: 'METRO',
-      fontFamily: 'Helvetica Neue Black',
+      fontFamily: 'Barlow Black',
       fontSize: 51,
       x: -30,
       y: 147,
@@ -343,7 +343,7 @@ test.describe('SVG export', () => {
       ...createProjectDocument([bigM, wordmark]),
       fonts: [
         { family: 'Modernia', sourceName: 'Modernia.otf', kind: 'bundled' },
-        { family: 'Helvetica Neue Black', sourceName: 'HelveticaNeueBlack.otf', kind: 'bundled' },
+        { family: 'Barlow Black', sourceName: 'Barlow-Black.ttf', kind: 'bundled' },
       ],
     };
     await uploadProject(page, doc, 'metro-baseline.json');
@@ -375,10 +375,10 @@ test.describe('SVG export', () => {
 
     const fontSize = 100;
     const variants = [
-      { id: 'regular', fontWeight: 'normal', fontStyle: 'normal', file: 'HelveticaNeueRoman.otf' },
-      { id: 'bold', fontWeight: 'bold', fontStyle: 'normal', file: 'HelveticaNeueBold.otf' },
-      { id: 'italic', fontWeight: 'normal', fontStyle: 'italic', file: 'HelveticaNeueItalic.ttf' },
-      { id: 'bold-italic', fontWeight: 'bold', fontStyle: 'italic', file: 'HelveticaNeueBoldItalic.otf' },
+      { id: 'regular', fontWeight: 'normal', fontStyle: 'normal', file: 'Barlow-Regular.ttf' },
+      { id: 'bold', fontWeight: 'bold', fontStyle: 'normal', file: 'Barlow-Bold.ttf' },
+      { id: 'italic', fontWeight: 'normal', fontStyle: 'italic', file: 'Barlow-Italic.ttf' },
+      { id: 'bold-italic', fontWeight: 'bold', fontStyle: 'italic', file: 'Barlow-BoldItalic.ttf' },
     ];
     const doc = {
       ...createProjectDocument(
@@ -386,7 +386,7 @@ test.describe('SVG export', () => {
           createTextFixture({
             id,
             text: 'a',
-            fontFamily: 'Helvetica Neue',
+            fontFamily: 'Barlow',
             fontSize,
             fontWeight,
             fontStyle,
@@ -399,8 +399,8 @@ test.describe('SVG export', () => {
         ),
       ),
       // What the app saves for this family: a single reference, naming the file
-      // that registered first. For Helvetica Neue that is the bold one.
-      fonts: [{ family: 'Helvetica Neue', sourceName: 'HelveticaNeueBold.otf', kind: 'bundled' }],
+      // that registered first. For Barlow that is the bold one.
+      fonts: [{ family: 'Barlow', sourceName: 'Barlow-Bold.ttf', kind: 'bundled' }],
     };
     await uploadProject(page, doc, 'font-variants.json');
 

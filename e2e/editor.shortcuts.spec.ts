@@ -554,7 +554,7 @@ test.describe('editor shortcuts', () => {
     expect(widthBeforeCut).not.toBe(await measureSampleWidth(page, 'No Such Font Family'));
     // A font the canvas never uses. The next start deletes it, so its absence
     // after the reload shows that the clean-up of unused fonts has run.
-    await uploadNamedFontFromPath(page, bundledFontPath('HelveticaNeueRoman.otf'), 'Unused-Upload-Regular.otf');
+    await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Regular.ttf'), 'Unused-Upload-Regular.otf');
     await expectStoredUploadedFontFiles(page, ['PasteProbe-Regular.ttf', 'Unused-Upload-Regular.otf']);
 
     const cut = await cutSelectionToClipboardPayload(page);

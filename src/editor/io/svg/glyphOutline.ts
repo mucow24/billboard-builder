@@ -47,8 +47,8 @@ export function parseOutlineFont(bytes: ArrayBuffer): OutlineFont | null {
  * for fonts that have none (TrueType outlines).
  *
  * The matrix `[a b c d tx ty]` maps glyph units to the em: x' = a·x + c·y. A plain
- * font has `[0.001 0 0 0.001 0 0]`. Some obliques (the bundled Futura "Oblique" files)
- * store upright outlines and lean them with `c` instead of drawing them slanted.
+ * font has `[0.001 0 0 0.001 0 0]`. Some obliques store upright outlines and lean
+ * them with `c` instead of drawing them slanted.
  * Browsers apply the matrix when they render text; opentype.js parses it but returns
  * the outlines as stored, so the export has to apply it to come out as slanted as the
  * canvas. Only this lean is taken from the matrix: the scale is opentype.js's, from

@@ -57,15 +57,15 @@ describe('exportToSvg', () => {
   });
 
   it('outlines each weight and style of one family from its own font bytes', async () => {
-    const roman = loadFont('HelveticaNeueRoman.otf');
-    const bold = loadFont('HelveticaNeueBold.otf');
-    const italic = loadFont('HelveticaNeueItalic.ttf');
+    const roman = loadFont('Barlow-Regular.ttf');
+    const bold = loadFont('Barlow-Bold.ttf');
+    const italic = loadFont('Barlow-Italic.ttf');
     const loadFontBytes = vi.fn(async (item: TextCanvasItem) => ({
       kind: 'bundled' as const,
       bytes: item.fontStyle === 'italic' ? italic : item.fontWeight === 'bold' ? bold : roman,
     }));
     const variant = (id: string, overrides: Partial<TextCanvasItem>) =>
-      createTextItem({ id, text: 'a', fontFamily: 'Helvetica Neue', x: 0, y: 0, ...overrides });
+      createTextItem({ id, text: 'a', fontFamily: 'Barlow', x: 0, y: 0, ...overrides });
 
     const { svg, warnings } = await exportToSvg(
       docWith([

@@ -66,18 +66,18 @@ const textCase = (
 const ITALIC = { fontStyle: 'italic' } as const;
 
 const CASES: TextCase[] = [
-  // The italic of this family is an oblique: the top right corner of the H leans
+  // The oblique of this family leans far: the top right corner of the H reaches
   // past the advance width.
-  textCase('italic H, left aligned', 'right', 'H', 'Futura Light Condensed', ITALIC),
-  textCase('italic H, centred', null, 'H', 'Futura Light Condensed', { ...ITALIC, align: 'center' }),
-  textCase('italic H, right aligned', 'right', 'H', 'Futura Light Condensed', { ...ITALIC, align: 'right' }),
-  textCase('italic word', 'right', 'HIlamburg', 'Futura Light Condensed', { ...ITALIC, fontSize: 64 }),
-  textCase('italic lines, right aligned', 'right', 'HH\nH', 'Futura Light Condensed', {
+  textCase('italic H, left aligned', 'right', 'H', 'Super16Bit', ITALIC),
+  textCase('italic H, centred', null, 'H', 'Super16Bit', { ...ITALIC, align: 'center' }),
+  textCase('italic H, right aligned', 'right', 'H', 'Super16Bit', { ...ITALIC, align: 'right' }),
+  textCase('italic word', 'right', 'HIlamburg', 'Super16Bit', { ...ITALIC, fontSize: 80 }),
+  textCase('italic lines, right aligned', 'right', 'HH\nH', 'Super16Bit', {
     ...ITALIC,
     fontSize: 80,
     align: 'right',
   }),
-  textCase('italic, letter spaced', 'right', 'HIH', 'Futura Light Condensed', { ...ITALIC, letterSpacing: 12 }),
+  textCase('italic, letter spaced', 'right', 'HIH', 'Super16Bit', { ...ITALIC, letterSpacing: 12 }),
   // The tail of this j swings far to the left of the glyph origin.
   textCase('script j', 'left', 'j', 'Pinyon Script'),
   // Taller than the accented capitals the font's ascent is taken from.
@@ -401,10 +401,10 @@ interface ShadowCase {
 
 const SHADOW_CASES: ShadowCase[] = [
   { id: 'shadow down and right', leaves: ['right'], blur: 16, offsetX: 10, offsetY: 10 },
-  { id: 'shadow up and left', leaves: ['left', 'top'], blur: 12, offsetX: -16, offsetY: -16 },
+  { id: 'shadow up and left', leaves: ['left', 'top'], blur: 12, offsetX: -16, offsetY: -24 },
   { id: 'blurred shadow, no offset', leaves: ['left', 'right'], blur: 12, offsetX: 0, offsetY: 0 },
 ];
-const SHADOW_TEXT = { text: 'H', fontFamily: 'Futura Light Condensed', fontSize: 100, color: '#ff0000' };
+const SHADOW_TEXT = { text: 'H', fontFamily: 'Barlow', fontSize: 100, color: '#ff0000' };
 const SHADOW_PLACED = SHADOW_CASES.map((entry, index) => ({
   ...entry,
   cell: { x: index * CELL.width, y: 0 },

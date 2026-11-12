@@ -3,10 +3,27 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as opentype from 'opentype.js';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parsePathData } from '../../../test/svgPathData';
 import { outlinePathData, parseOutlineFont } from './glyphOutline';
+
+// No bundled font leans its outlines with its CFF font matrix, so the tests of that
+// give a bundled font's bytes a slanted matrix as opentype.js parses them.
+const { fontMatrixOverrides } = vi.hoisted(() => ({ fontMatrixOverrides: new WeakMap<ArrayBuffer, number[]>() }));
+
+vi.mock('opentype.js', async (importOriginal) => {
+  // A CommonJS module: its exports are the properties of `default`.
+  const actual = (await importOriginal<{ default: typeof import('opentype.js') }>()).default;
+  const parse: typeof actual.parse = (bytes, ...rest) => {
+    const font = actual.parse(bytes, ...rest);
+    const matrix = bytes instanceof ArrayBuffer ? fontMatrixOverrides.get(bytes) : undefined;
+    if (matrix) font.tables.cff.topDict.fontMatrix = matrix;
+    return font;
+  };
+  const mocked = { ...actual, parse };
+  return { ...mocked, default: mocked };
+});
 
 type OutlineCommand = opentype.PathCommand;
 
@@ -101,13 +118,15 @@ describe('parseOutlineFont', () => {
     expect(font!.unitsPerEm).toBeGreaterThan(0);
   });
 
-  // Regression: opentype.js 2.0.0's own serializer (`toPathData`) wrote `NaN` into each
-  // of these outlines, placed at x = 0 on a whole-number baseline. All glyphs of a text
-  // layer share one <path>, and a renderer stops at the first command it cannot read.
+  // Regression: opentype.js 2.0.0's own serializer (`toPathData`) wrote `NaN` into
+  // outlines placed at x = 0 on a whole-number baseline. All glyphs of a text layer
+  // share one <path>, and a renderer stops at the first command it cannot read. The
+  // `outlinePathData` tests below pin the numbers it got wrong; these check whole
+  // glyphs of CFF and TrueType fonts.
   it.each([
-    { file: 'HelveticaNeueBoldItalic.otf', chars: 'a', fontSize: 120 },
-    { file: 'HelveticaNeueRoman.otf', chars: 'a', fontSize: 144 },
-    { file: 'Futura Regular.ttf', chars: '$OQmn', fontSize: 100 },
+    { file: 'Albertus MT Std Regular.otf', chars: 'a', fontSize: 120 },
+    { file: 'Barlow-Italic.ttf', chars: 'a', fontSize: 144 },
+    { file: 'Barlow-Regular.ttf', chars: '$OQmn', fontSize: 100 },
   ])('writes every number of $file "$chars" at $fontSize px', ({ file, chars, fontSize }) => {
     const bytes = loadFont(file);
     const font = parseOutlineFont(bytes)!;
@@ -128,22 +147,19 @@ describe('parseOutlineFont', () => {
     expect(font.glyphPath('A', 100, Number.POSITIVE_INFINITY, 100)).toBeNull();
   });
 
-  // These files hold upright outlines, identical to their upright sibling's, and get
+  // Some obliques hold upright outlines, identical to their upright sibling's, and get
   // their slant from the CFF font matrix: x' = a·x + c·y, so every point moves right by
   // c / a of its height above the baseline. Browsers apply the matrix when they render.
   it.each([
-    { upright: 'Futura Light Condensed.otf', oblique: 'Futura Light Condensed Oblique.otf', skew: 0.000158384 },
-    { upright: 'Futura Medium Condensed.otf', oblique: 'Futura Medium Condensed Oblique.otf', skew: 0.000158384 },
-    { upright: 'Futura Bold Condensed.otf', oblique: 'Futura Bold Condensed Oblique.otf', skew: 0.000158384 },
-    { upright: 'Futura Extra Bold Condensed.otf', oblique: 'Futura Extra Bold Condensed Oblique.otf', skew: 0.000158384 },
-    { upright: 'Futura Bold.otf', oblique: 'Futura Bold Oblique.otf', skew: 0.000158 },
-    { upright: 'Futura Medium.otf', oblique: 'Futura Medium Oblique.otf', skew: 0.000158 },
-  ])('slants $oblique by the skew in its font matrix', ({ upright, oblique, skew }) => {
-    const obliqueBytes = loadFont(oblique);
+    { file: 'Albertus MT Std Regular.otf', skew: 0.000158384, leans: 'right' },
+    { file: 'Albertus MT Std Regular.otf', skew: -0.0002, leans: 'left' },
+  ])('slants $file to the $leans by the skew in its font matrix', ({ file, skew }) => {
+    const obliqueBytes = loadFont(file);
+    fontMatrixOverrides.set(obliqueBytes, [0.001, 0, skew, 0.001, 0, 0]);
     expect(opentype.parse(obliqueBytes).tables.cff.topDict.fontMatrix).toEqual([0.001, 0, skew, 0.001, 0, 0]);
     const slant = skew / 0.001;
 
-    const uprightFont = parseOutlineFont(loadFont(upright))!;
+    const uprightFont = parseOutlineFont(loadFont(file))!;
     const obliqueFont = parseOutlineFont(obliqueBytes)!;
     const baselineY = 80;
 
@@ -158,14 +174,14 @@ describe('parseOutlineFont', () => {
       points(obliquePath).forEach(([x, y], index) => {
         const [uprightX, uprightY] = uprightPoints[index];
         expect(y).toBe(uprightY);
-        // 11 px at the top of the H. Both paths are rounded to 2 decimals.
+        // About 11 px at the top of the H. Both paths are rounded to 2 decimals.
         expect(Math.abs(x - (uprightX + slant * (baselineY - uprightY)))).toBeLessThan(0.02);
       });
     }
   });
 
   it('leaves the outlines of a font with a plain font matrix as they are', () => {
-    const bytes = loadFont('Futura Light Condensed.otf');
+    const bytes = loadFont('Albertus MT Std Regular.otf');
     const reference = opentype.parse(bytes);
     expect(reference.tables.cff.topDict.fontMatrix).toEqual([0.001, 0, 0, 0.001, 0, 0]);
 
