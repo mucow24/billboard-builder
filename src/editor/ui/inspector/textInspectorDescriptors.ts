@@ -22,7 +22,6 @@ import {
   SECTION_ORDER,
   VERTICAL_ALIGN_OPTIONS,
 } from './inspectorFieldHelpers';
-import { getTextStyleCapabilities } from './inspectorModel';
 import type { CustomFieldDescriptor, InspectorFieldDescriptor } from './selectionInspectorModel';
 
 function createFontFamilyField(): CustomFieldDescriptor {
@@ -90,12 +89,6 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
         fontWeight: nextValue ? 'bold' : 'normal',
       }),
       fieldOrder: 40,
-      getDisabled: ({ availableFonts, selectedItems }) => {
-        if (selectedItems.length !== 1 || selectedItems[0]?.kind !== 'text') {
-          return false;
-        }
-        return !getTextStyleCapabilities(selectedItems[0], availableFonts).canToggleBold;
-      },
       getValue: (item) => item.kind === 'text' && item.fontWeight === 'bold',
       label: 'Bold',
       propertyKey: 'fontWeight',
@@ -111,12 +104,6 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
         fontStyle: nextValue ? 'italic' : 'normal',
       }),
       fieldOrder: 50,
-      getDisabled: ({ availableFonts, selectedItems }) => {
-        if (selectedItems.length !== 1 || selectedItems[0]?.kind !== 'text') {
-          return false;
-        }
-        return !getTextStyleCapabilities(selectedItems[0], availableFonts).canToggleItalic;
-      },
       getValue: (item) => item.kind === 'text' && item.fontStyle === 'italic',
       label: 'Italic',
       propertyKey: 'fontStyle',

@@ -180,6 +180,42 @@ describe('parseOutlineFont', () => {
     }
   });
 
+  // Faked italic: the caller asks for a lean the font does not have.
+  it.each([
+    { file: 'Barlow-Regular.ttf', outlines: 'TrueType' },
+    { file: 'Albertus MT Std Regular.otf', outlines: 'CFF' },
+  ])('leans $outlines outlines by the slant it is asked for', ({ file }) => {
+    const font = parseOutlineFont(loadFont(file))!;
+    const baselineY = 80;
+
+    for (const ch of 'Hgo') {
+      const uprightPath = font.glyphPath(ch, 100, 12, baselineY)!;
+      const leaningPath = font.glyphPath(ch, 100, 12, baselineY, { slant: 0.25 })!;
+      expect(leaningPath.replace(/[^A-Z]/g, '')).toBe(uprightPath.replace(/[^A-Z]/g, ''));
+
+      const uprightPoints = points(uprightPath);
+      points(leaningPath).forEach(([x, y], index) => {
+        const [uprightX, uprightY] = uprightPoints[index];
+        expect(y).toBe(uprightY);
+        expect(Math.abs(x - (uprightX + 0.25 * (baselineY - uprightY)))).toBeLessThan(0.02);
+      });
+    }
+  });
+
+  it('adds the slant it is asked for to the one in the font matrix', () => {
+    const bytes = loadFont('Albertus MT Std Regular.otf');
+    fontMatrixOverrides.set(bytes, [0.001, 0, 0.0002, 0.001, 0, 0]);
+    const font = parseOutlineFont(bytes)!;
+    const upright = parseOutlineFont(loadFont('Albertus MT Std Regular.otf'))!;
+
+    const uprightPoints = points(upright.glyphPath('H', 100, 12, 80)!);
+    points(font.glyphPath('H', 100, 12, 80, { slant: 0.25 })!).forEach(([x, y], index) => {
+      const [uprightX, uprightY] = uprightPoints[index];
+      expect(y).toBe(uprightY);
+      expect(Math.abs(x - (uprightX + 0.45 * (80 - uprightY)))).toBeLessThan(0.02);
+    });
+  });
+
   it('leaves the outlines of a font with a plain font matrix as they are', () => {
     const bytes = loadFont('Albertus MT Std Regular.otf');
     const reference = opentype.parse(bytes);
@@ -285,6 +321,60 @@ describe('outlinePathData', () => {
       });
       expect(outlinePathData(commands)).toBeNull();
     }
+  });
+
+  describe('with closed contours, for outlines that are stroked', () => {
+    it('ends every contour with a Z in place of the line that closes it', () => {
+      // Two squares as opentype.js gives them: no Z, and a closing line on all but the last.
+      const d = outlinePathData(
+        [
+          { type: 'M', x: 0, y: 0 },
+          { type: 'L', x: 10, y: 0 },
+          { type: 'L', x: 10, y: 10 },
+          { type: 'L', x: 0, y: 10 },
+          { type: 'L', x: 0, y: 0 },
+          { type: 'M', x: 20, y: 0 },
+          { type: 'L', x: 30, y: 0 },
+          { type: 'L', x: 30, y: 10 },
+          { type: 'L', x: 20, y: 10 },
+        ],
+        true,
+      );
+      expect(d).toBe('M0 0L10 0L10 10L0 10ZM20 0L30 0L30 10L20 10Z');
+    });
+
+    it('closes a contour that ends in a curve, and adds no second Z to a closed one', () => {
+      const d = outlinePathData(
+        [
+          { type: 'M', x: 0, y: 0 },
+          { type: 'L', x: 10, y: 0 },
+          { type: 'Q', x1: 10, y1: 10, x: 0, y: 0 },
+          { type: 'M', x: 20, y: 0 },
+          { type: 'L', x: 30, y: 0 },
+          { type: 'L', x: 30, y: 10 },
+          { type: 'Z' },
+        ],
+        true,
+      );
+      expect(d).toBe('M0 0L10 0Q10 10 0 0ZM20 0L30 0L30 10Z');
+    });
+
+    it('closes every contour of a real glyph without moving a point', () => {
+      const font = parseOutlineFont(loadFont('Barlow-Regular.ttf'))!;
+      const count = (d: string, letter: string) => d.split(letter).length - 1;
+
+      for (const ch of 'DBi8') {
+        const open = font.glyphPath(ch, 100, 12, 80)!;
+        const closed = font.glyphPath(ch, 100, 12, 80, { closed: true })!;
+
+        expect(count(open, 'Z')).toBe(0);
+        expect(count(closed, 'M')).toBe(count(open, 'M'));
+        expect(count(closed, 'Z')).toBe(count(closed, 'M'));
+        // Every point is one the open outline has: only closing lines went.
+        const openPoints = new Set(points(open).map((point) => point.join(',')));
+        expect(points(closed).filter((point) => !openPoints.has(point.join(',')))).toEqual([]);
+      }
+    });
   });
 
   it('gives null for an outline with nothing to draw', () => {

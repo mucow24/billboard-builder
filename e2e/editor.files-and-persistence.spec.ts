@@ -143,7 +143,6 @@ async function expectPersistProbeFamilyRestored(
     })
     .toEqual(widthsBeforeReload);
   await expect(page.getByText('Missing fonts')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeEnabled();
   // Still both, now that the start-up work has long finished.
   expect(await readUploadedFontKeys(page)).toEqual(PERSIST_PROBE_FONT_KEYS);
 }
@@ -300,16 +299,17 @@ test.describe('editor file and persistence flows', () => {
       'late-font-project.json',
     );
     await selectTextLayerInProperties(page);
-    const boldToggle = page.getByRole('button', { name: 'Bold', exact: true });
 
     await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Regular.ttf'), 'PersistProbe-Regular.otf');
     await chooseFontFamily(page, 'Persist Probe');
     await expectPersistedCanvasFontFiles(page, ['PersistProbe-Regular.otf']);
-    // The family has no bold file yet.
-    await expect(boldToggle).toBeDisabled();
+    // The family has no bold file yet. Bold is offered all the same: the browser
+    // fakes it from the regular file, which leaves the text as wide as it is.
+    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeEnabled();
+    const widthsBeforeBoldFile = await measureRegularAndBoldText(page, 'Persist Probe');
+    expect(widthsBeforeBoldFile.bold).toBe(widthsBeforeBoldFile.regular);
 
     await uploadNamedFontFromPath(page, bundledFontPath('Barlow-Bold.ttf'), 'PersistProbe-Bold.otf');
-    await expect(boldToggle).toBeEnabled();
     await importUnusedFont(page);
     await expectUploadedFontRecordCount(page, 3);
     await expectPersistedCanvasFontFiles(page, ['PersistProbe-Regular.otf', 'PersistProbe-Bold.otf']);

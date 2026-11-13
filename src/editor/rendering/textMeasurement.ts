@@ -6,6 +6,36 @@ function getTextContentWidth(item: TextCanvasItem, width: number): number {
 }
 
 /**
+ * The characters Pixi may break a line after, by character code
+ * (`BREAK_AFTER_CHARS` in pixi.js `scene/text/canvas/utils/textTokenization`).
+ */
+const BREAK_AFTER_CHARS = new Set([
+  0x002d, // hyphen-minus
+  0x2010, // hyphen
+  0x2013, // en dash
+  0x2014, // em dash
+  0x00ad, // soft hyphen
+]);
+
+/**
+ * Split a word into the pieces Pixi wraps separately: after each hyphen or dash
+ * that has more of the word behind it. "Double-click" is "Double-" and "click",
+ * so a line can end at the hyphen.
+ */
+function splitAfterHyphens(token: string): string[] {
+  const pieces: string[] = [];
+  let start = 0;
+  for (let index = 0; index < token.length - 1; index += 1) {
+    if (BREAK_AFTER_CHARS.has(token.charCodeAt(index))) {
+      pieces.push(token.slice(start, index + 1));
+      start = index + 1;
+    }
+  }
+  pieces.push(token.slice(start));
+  return pieces;
+}
+
+/**
  * Word-wrap `item.text` into lines (each a list of tokens) using the same
  * tokenization and wrap rule Pixi renders with. `measure` returns a token's width
  * EXCLUDING letterSpacing; this function adds letterSpacing internally so callers
@@ -29,7 +59,7 @@ export function layoutWrappedText(
 
     // Runs of whitespace and runs of non-whitespace, so consecutive spaces are
     // preserved (matches Pixi `whiteSpace: 'pre-wrap'`).
-    const tokens = paragraph.match(/\s+|\S+/g) ?? [];
+    const tokens = (paragraph.match(/\s+|\S+/g) ?? []).flatMap(splitAfterHyphens);
     let current: string[] = [];
     let currentWidth = 0;
     let hasContent = false;

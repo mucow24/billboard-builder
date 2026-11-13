@@ -1,4 +1,4 @@
-import type { OutlineFont, SubstituteGlyph, TextSubstitutions } from './svgExportTypes';
+import type { GlyphPathStyle, OutlineFont, SubstituteGlyph, TextSubstitutions } from './svgExportTypes';
 
 /**
  * Split a text the way Pixi does before it draws character by character
@@ -44,7 +44,7 @@ export function lineSubstitutions(font: OutlineFont, line: string, letterSpacing
  * SVG path data for what is drawn at one character of a line: the character's own
  * glyph, or the glyphs substituted for it, the first at the pen position and each
  * further one moved on by the advance of the one before. Null when nothing is
- * drawn there.
+ * drawn there. `style` applies to every glyph (see `GlyphPathStyle`).
  */
 export function glyphsPath(
   font: OutlineFont,
@@ -52,12 +52,13 @@ export function glyphsPath(
   fontSizePx: number,
   penX: number,
   baselineY: number,
+  style?: GlyphPathStyle,
 ): string | null {
-  if (typeof drawn === 'string') return font.glyphPath(drawn, fontSizePx, penX, baselineY);
+  if (typeof drawn === 'string') return font.glyphPath(drawn, fontSizePx, penX, baselineY, style);
   const paths: string[] = [];
   let x = penX;
   for (const { glyph, advance } of drawn) {
-    const path = font.glyphPath(glyph, fontSizePx, x, baselineY);
+    const path = font.glyphPath(glyph, fontSizePx, x, baselineY, style);
     if (path) paths.push(path);
     x += advance * fontSizePx;
   }

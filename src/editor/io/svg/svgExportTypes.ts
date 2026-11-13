@@ -19,10 +19,13 @@ export interface OutlineFont {
    * SVG path `d` for `ch` placed with its baseline origin at (penX, baselineY), or null
    * if there is nothing to draw: the glyph has no outline, or its position or size is
    * not a finite number.
+   *
+   * `style` changes how the outline is written (see `GlyphPathStyle`). A font that
+   * cannot do that (the test fakes) ignores it.
    */
-  glyphPath(ch: string, fontSizePx: number, penX: number, baselineY: number): string | null;
+  glyphPath(ch: string, fontSizePx: number, penX: number, baselineY: number, style?: GlyphPathStyle): string | null;
   /** The same for a glyph the font puts in place of characters, given by its index in the font (see `substitutions`). */
-  glyphPath(glyphIndex: number, fontSizePx: number, penX: number, baselineY: number): string | null;
+  glyphPath(glyphIndex: number, fontSizePx: number, penX: number, baselineY: number, style?: GlyphPathStyle): string | null;
   /**
    * The glyphs the canvas draws in place of the characters' own when it draws
    * `text` in one piece: ligatures (f + i as one glyph) and the other substitutions
@@ -30,6 +33,22 @@ export interface OutlineFont {
    * tell (the test fakes) leaves this out, and is drawn one character at a time.
    */
   substitutions?(text: string): TextSubstitutions | null;
+}
+
+/** How `OutlineFont.glyphPath` writes a glyph, for the styles the export fakes (see syntheticFontStyle). */
+export interface GlyphPathStyle {
+  /**
+   * Leans the glyph to the right about its baseline, by this distance for each
+   * unit of height: how faked italic is drawn.
+   */
+  slant?: number;
+  /**
+   * Ends every contour with a closepath (`Z`). Filling does not need it: an open
+   * contour is filled as if it were closed. Stroking does: an open contour gets no
+   * stroke along the edge that would close it and no join at the corner where it
+   * starts. Asked for where the glyphs are stroked (faked bold).
+   */
+  closed?: boolean;
 }
 
 /** A glyph a font draws in place of one or more characters. */
@@ -50,9 +69,19 @@ export type TextSubstitutions = readonly (readonly SubstituteGlyph[] | null)[];
 
 export type OutlineUnavailableReason = 'system-font' | 'no-bytes' | 'parse-failed';
 
+/**
+ * What the browser fakes when it draws a text with the font file resolved for it:
+ * bold when the text is bold and the file is not, italic likewise. The export
+ * fakes the same (see syntheticFontStyle).
+ */
+export interface SyntheticFontStyle {
+  bold: boolean;
+  italic: boolean;
+}
+
 /** Either the resolved outline font, or why it could not be obtained (drives the block+warn path). */
 export type OutlineResult =
-  | { ok: true; font: OutlineFont }
+  | { ok: true; font: OutlineFont; synthetic?: SyntheticFontStyle }
   | { ok: false; reason: OutlineUnavailableReason };
 
 export interface FontOutlineProvider {
@@ -78,6 +107,16 @@ export interface TextMeasurer {
    * Optional: lines measured without it are aligned by their advance width.
    */
   measureInkWidth?(item: TextCanvasItem, text: string): number;
+  /**
+   * How much wider the browser draws `sample` (one character) in the item's bold
+   * than in the same font at regular weight, in px; 0 when it is no wider. Only
+   * meaningful for an item whose bold is faked: both weights then come from one
+   * file, and a difference means the browser fakes bold by smearing the glyph
+   * that far (Firefox) rather than by growing its outline.
+   *
+   * Optional: without it faked bold is exported as a grown outline.
+   */
+  syntheticBoldAdvance?(item: TextCanvasItem, sample: string): number;
   /**
    * Baseline offset in px from the line-box top for the first line, matching
    * Pixi's `CanvasTextMetrics`: the actual-ink ascent of `|ÉqÅM` plus

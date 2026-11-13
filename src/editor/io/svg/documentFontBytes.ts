@@ -6,7 +6,9 @@ import type {
 } from '../../document/documentTypes';
 import { toFontReference } from '../../fonts/fontModel';
 import { findFontForVariant } from '../../fonts/fontRegistry';
+import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import type { FontBytes } from './exportToSvg';
+import type { SyntheticFontStyle } from './svgExportTypes';
 
 export interface FontByteLoaders {
   loadBundledBytes: (sourceName: string) => Promise<ArrayBuffer | null>;
@@ -29,11 +31,9 @@ export interface FontByteLoaders {
  * If none of the family's files are registered in this session, the document's
  * first reference for the family is used.
  *
- * Limitation: when a family lacks the requested variant, the canvas fakes it from
- * the nearest face (synthetic bold / oblique). The export outlines that nearest
- * file as it is, so such text exports lighter or more upright than it looks on
- * screen. The inspector only offers Bold and Italic where the family has the
- * file, so this mostly arises when the font is changed while a toggle is on.
+ * When a family lacks the requested variant, the canvas fakes it from the nearest
+ * face (synthetic bold / oblique). The export outlines that nearest file, and the
+ * result says what was faked (`synthetic`) so that `svgText` fakes it too.
  *
  * Byte-load failures degrade to `bytes: null` (→ block+warn), never throw.
  */
@@ -55,14 +55,26 @@ export function createDocumentFontLoader(
       item.fontStyle,
     );
     const source = registeredFont ? toFontReference(registeredFont) : ref;
+    const synthetic = registeredFont ? syntheticStyle(item, registeredFont) : undefined;
     try {
       const bytes =
         source.kind === 'bundled'
           ? await loaders.loadBundledBytes(source.sourceName)
           : await loaders.loadUploadedBytes(source);
-      return { kind: source.kind, bytes };
+      return { kind: source.kind, bytes, ...(synthetic ? { synthetic } : {}) };
     } catch {
       return { kind: source.kind, bytes: null };
     }
   };
+}
+
+/**
+ * What the browser fakes when it draws `item` with `font`, the file resolved for
+ * it: whatever the canvas asks the browser for that the file is not.
+ */
+function syntheticStyle(item: TextCanvasItem, font: UploadedFont): SyntheticFontStyle | undefined {
+  const drawn = getRenderableCombinedFontStyle(item);
+  const bold = drawn.includes('bold') && font.weight !== '700';
+  const italic = drawn.includes('italic') && font.style !== 'italic';
+  return bold || italic ? { bold, italic } : undefined;
 }

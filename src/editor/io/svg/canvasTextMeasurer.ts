@@ -62,6 +62,13 @@ export function createCanvasTextMeasurer(): TextMeasurer {
       ctx.font = getRenderableCanvasFontDeclaration(item);
       return inkWidthOf(ctx.measureText(text));
     },
+    syntheticBoldAdvance(item: TextCanvasItem, sample: string): number {
+      if (!ctx) return 0;
+      ctx.font = getRenderableCanvasFontDeclaration(item);
+      const bold = ctx.measureText(sample).width;
+      ctx.font = getRenderableCanvasFontDeclaration({ ...item, fontWeight: 'normal' });
+      return Math.max(0, bold - ctx.measureText(sample).width);
+    },
     fontAscent(item: TextCanvasItem): number {
       if (!ctx) return item.fontSize * 0.8;
       ctx.font = getRenderableCanvasFontDeclaration(item);

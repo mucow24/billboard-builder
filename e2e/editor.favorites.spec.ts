@@ -362,8 +362,7 @@ test.describe('editor favorite library flows', () => {
     await openPropertiesTab(page);
     await expect(page.getByText('Missing fonts')).toHaveCount(0);
     await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Favorite Family');
-    // The inserted text is regular weight, and Bold is only offered for it while
-    // the family has a bold file.
-    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toBeEnabled();
+    // The inserted text is regular weight; the family's bold file is back as well.
+    await expectPersistedCanvasFontFiles(page, ['FavoriteFamily-Regular.otf', 'FavoriteFamily-Bold.otf']);
   });
 });
