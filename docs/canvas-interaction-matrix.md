@@ -209,6 +209,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | VP-08 | HUD | Any state | Click 100% | Zoom readout becomes 100% | Zoom set to 1 | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | VP-09 | HUD | Any state | Click Fit | Canvas fits viewport | Zoom/pan recomputed | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | VP-10 | Canvas/HUD | Tool changes | Change tool or modifier state | Cursor changes correctly | No document mutation | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
+| VP-11 | HUD | Any state | Click zoom readout, type a percentage, Enter (Escape cancels) | Readout shows the typed zoom (snapped) | Zoom set about the view centre, clamped 0.1-1600% | user-flow | Chromium | Covered in [e2e/editor.smoke.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.smoke.spec.ts) |
 
 ## 8. Layers Flows
 

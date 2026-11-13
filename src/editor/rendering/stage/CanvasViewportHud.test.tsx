@@ -7,18 +7,19 @@ import { parseZoomPercentInput } from './viewportMath';
 
 function renderHud(zoom = 0.5) {
   const onSetZoom = vi.fn();
-  render(
+  const hud = (nextZoom: number) => (
     <CanvasViewportHud
       canvasHeight={1080}
       canvasWidth={1920}
       guidesCount={0}
       onFitCanvas={vi.fn()}
       onSetZoom={onSetZoom}
-      zoom={zoom}
+      zoom={nextZoom}
       zoomStep={0.1}
-    />,
+    />
   );
-  return { onSetZoom };
+  const { rerender } = render(hud(zoom));
+  return { onSetZoom, rerenderWithZoom: (nextZoom: number) => rerender(hud(nextZoom)) };
 }
 
 describe('parseZoomPercentInput', () => {
@@ -92,6 +93,54 @@ describe('CanvasViewportHud zoom readout', () => {
     expect(screen.queryByTestId('viewport-zoom-input')).toBeNull();
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 50%');
     expect(screen.getByTestId('viewport-zoom')).toHaveFocus();
+  });
+
+  // 12.5% opens as "13". Applying that would move a DPR 2 zoom off its step.
+  it('keeps the zoom when Enter is pressed without editing the text', async () => {
+    const user = userEvent.setup();
+    const { onSetZoom } = renderHud(0.125);
+
+    await user.click(screen.getByTestId('viewport-zoom'));
+    expect(screen.getByTestId('viewport-zoom-input')).toHaveValue('13');
+    await user.keyboard('{Enter}');
+
+    expect(onSetZoom).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('viewport-zoom-input')).toBeNull();
+    expect(screen.getByTestId('viewport-zoom')).toHaveFocus();
+  });
+
+  it('keeps the zoom when the field loses focus without editing the text', async () => {
+    const user = userEvent.setup();
+    const { onSetZoom } = renderHud(0.125);
+
+    await user.click(screen.getByTestId('viewport-zoom'));
+    await user.click(screen.getByTestId('canvas-size'));
+
+    expect(onSetZoom).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('viewport-zoom-input')).toBeNull();
+  });
+
+  it('does not undo a zoom made elsewhere while the field was open and unedited', async () => {
+    const user = userEvent.setup();
+    const { onSetZoom, rerenderWithZoom } = renderHud(0.5);
+
+    await user.click(screen.getByTestId('viewport-zoom'));
+    // A wheel zoom while the field keeps focus.
+    rerenderWithZoom(0.75);
+    await user.click(screen.getByTestId('canvas-size'));
+
+    expect(onSetZoom).not.toHaveBeenCalled();
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 75%');
+  });
+
+  it('applies edited text even when it names the current zoom', async () => {
+    const user = userEvent.setup();
+    const { onSetZoom } = renderHud(0.5);
+
+    await user.click(screen.getByTestId('viewport-zoom'));
+    await user.keyboard('50%{Enter}');
+
+    expect(onSetZoom).toHaveBeenCalledWith(0.5);
   });
 
   it('keeps the zoom when the text is not a positive number', async () => {

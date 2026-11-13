@@ -25,6 +25,7 @@ function ZoomReadout({ onSetZoom, zoom }: { onSetZoom: (nextZoom: number) => voi
   // follows the input unmounting does not apply the draft a second time.
   const finishedRef = useRef(false);
   const refocusButtonRef = useRef(false);
+  const initialDraftRef = useRef('');
 
   useEffect(() => {
     if (editing) {
@@ -39,7 +40,8 @@ function ZoomReadout({ onSetZoom, zoom }: { onSetZoom: (nextZoom: number) => voi
 
   function beginEditing() {
     finishedRef.current = false;
-    setDraft(formatZoomPercent(zoom));
+    initialDraftRef.current = formatZoomPercent(zoom);
+    setDraft(initialDraftRef.current);
     setEditing(true);
   }
 
@@ -49,7 +51,12 @@ function ZoomReadout({ onSetZoom, zoom }: { onSetZoom: (nextZoom: number) => voi
     }
     finishedRef.current = true;
     setEditing(false);
-    if (!apply) {
+    // Leave the zoom alone when the text was not edited. The field opens with
+    // the zoom rounded to a whole percent, and applying that rounded value
+    // snaps to a different step at DPR 2 and above (12.5% becomes 13.28% at
+    // DPR 2). It also keeps a stale draft from undoing a wheel zoom made while
+    // the field was open.
+    if (!apply || draft.trim() === initialDraftRef.current) {
       return;
     }
     const nextZoom = parseZoomPercentInput(draft);
