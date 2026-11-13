@@ -11,6 +11,7 @@ import {
   openLayersTab,
   openLibrary,
   readDownloadedJson,
+  unsavedChangesPrompt,
   uploadProject,
   waitForEditor,
   waitForLibraryIdle,
@@ -66,6 +67,15 @@ async function expectAutosavedItemCount(page: Page, count: number) {
     .toBe(count);
 }
 
+/** Picks Canvas > New and leaves the unsaved-changes question, if it comes up, unanswered. */
+async function pickNewCanvas(page: Page) {
+  await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Canvas actions' })
+    .getByRole('button', { name: 'New', exact: true })
+    .click();
+}
+
 /** Leaves two saved canvases in the library, "Alpha" and "Beta", with "Beta" open. */
 async function openEditorWithAlphaAndBeta(page: Page) {
   await openFreshEditor(page);
@@ -74,6 +84,7 @@ async function openEditorWithAlphaAndBeta(page: Page) {
     namedDocument('Alpha', [createRectangleFixture({ id: 'alpha-rect' })]),
     'alpha.json',
   );
+  await clickToolbarPopoverItem(page, 'Canvas', 'Save');
   await clickToolbarPopoverItem(page, 'Canvas', 'New');
   await uploadProject(
     page,
@@ -192,11 +203,13 @@ test.describe('document library', () => {
     expect(await libraryNames(dialog)).toEqual(['Poster']);
   });
 
-  test('LIB-04 saves the open canvas when another is started or loaded, and reopens it from the library', async ({ page }) => {
+  test('LIB-04 asks before replacing a canvas with unsaved changes, and Save puts it in the library', async ({ page }) => {
     await openFreshEditor(page);
 
-    // Leaving a blank canvas puts nothing in the library.
-    await clickToolbarPopoverItem(page, 'Canvas', 'New');
+    // Leaving a blank canvas asks nothing and puts nothing in the library.
+    await pickNewCanvas(page);
+    await expect(page.locator('.app-shell')).toHaveAttribute('data-library-busy', 'false');
+    await expect(unsavedChangesPrompt(page)).toHaveCount(0);
     let dialog = await openLibrary(page);
     await expect(dialog.getByText('Nothing saved yet')).toBeVisible();
     await closeLibrary(page);
@@ -208,8 +221,8 @@ test.describe('document library', () => {
     );
     await expect(unsavedDot(page)).toBeVisible();
 
-    // New saves "Alpha" on the way out.
-    await clickToolbarPopoverItem(page, 'Canvas', 'New');
+    // New asks about "Alpha"; Save puts it in the library on the way out.
+    await clickToolbarPopoverItem(page, 'Canvas', 'New', 'Save');
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Untitled canvas');
     await expect(unsavedDot(page)).toHaveCount(0);
     await openLayersTab(page);
@@ -228,8 +241,9 @@ test.describe('document library', () => {
     dialog = await openLibrary(page);
     expect(await libraryNames(dialog)).toEqual(['Alpha']);
 
-    // Opening "Alpha" saves "Beta" first.
+    // Opening "Alpha" asks about "Beta", on top of the library.
     await dialog.getByRole('button', { name: 'Open Alpha' }).click();
+    await waitForLibraryIdle(page, 'Save');
     await expect(page.getByRole('dialog', { name: 'Library' })).toHaveCount(0);
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha');
     await expect(layerRows(page)).toHaveCount(1);
@@ -239,7 +253,9 @@ test.describe('document library', () => {
     expect(await libraryNames(dialog)).toEqual(['Beta', 'Alpha']);
     await expect(libraryCards(dialog).filter({ hasText: 'Alpha' }).getByText('Open', { exact: true })).toBeVisible();
 
+    // Nothing is unsaved now, so nothing is asked.
     await dialog.getByRole('button', { name: 'Open Beta' }).click();
+    await expect(page.getByRole('dialog', { name: 'Library' })).toHaveCount(0);
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta');
     await expect(layerRows(page)).toHaveCount(2);
     await expect(unsavedDot(page)).toHaveCount(0);
@@ -270,6 +286,11 @@ test.describe('document library', () => {
     ];
     await uploadProject(page, document, 'red.json');
     await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+
+    // Previews are not read at startup: after a reload the library fetches
+    // them from storage when it opens.
+    await page.reload();
+    await waitForEditor(page);
 
     const dialog = await openLibrary(page);
     const preview = dialog.getByRole('button', { name: 'Open Red' }).locator('img');
@@ -426,5 +447,95 @@ test.describe('document library', () => {
     // With the library closed the shortcut works again.
     await page.keyboard.press('Delete');
     await expect(layerRows(page)).toHaveCount(1);
+  });
+
+  test('LIB-10 keeps the canvas on Cancel, and drops unsaved changes on Discard without touching the saved version', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      namedDocument('Alpha', [createRectangleFixture({ id: 'alpha-rect' })]),
+      'alpha.json',
+    );
+    await openLayersTab(page);
+    const prompt = unsavedChangesPrompt(page);
+
+    // Never saved: discarding would lose the whole canvas, and the question says so.
+    await pickNewCanvas(page);
+    await expect(prompt).toContainText('"Alpha" has not been saved to the library');
+    await prompt.getByRole('button', { name: 'Cancel' }).click();
+    await expect(prompt).toHaveCount(0);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha');
+    await expect(layerRows(page)).toHaveCount(1);
+    await expect(unsavedDot(page)).toBeVisible();
+
+    await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+    await clickItem(page, 'alpha-rect');
+    await page.keyboard.press('Delete');
+    await expect(layerRows(page)).toHaveCount(0);
+
+    // Saved before: only the changes are at stake. Escape cancels too.
+    await pickNewCanvas(page);
+    await expect(prompt).toContainText('"Alpha" has changes that are not in the library');
+    await page.keyboard.press('Escape');
+    await expect(prompt).toHaveCount(0);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha');
+    await expect(unsavedDot(page)).toBeVisible();
+
+    // Discard: the change is gone, and the library still holds the saved version.
+    await uploadProject(
+      page,
+      namedDocument('Beta', [createRectangleFixture({ id: 'beta-rect' })]),
+      'beta.json',
+      'Discard',
+    );
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta');
+
+    // Asked on top of the library; Escape answers the question, not the library.
+    let dialog = await openLibrary(page);
+    expect(await libraryNames(dialog)).toEqual(['Alpha']);
+    await dialog.getByRole('button', { name: 'Open Alpha' }).click();
+    await expect(prompt).toContainText('"Beta" has not been saved to the library');
+    await page.keyboard.press('Escape');
+    await expect(prompt).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta');
+
+    // Discarding "Beta" leaves no trace of it; "Alpha" comes back as it was saved.
+    await dialog.getByRole('button', { name: 'Open Alpha' }).click();
+    await waitForLibraryIdle(page, 'Discard');
+    await expect(page.getByRole('dialog', { name: 'Library' })).toHaveCount(0);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha');
+    await expect(layerRows(page)).toHaveCount(1);
+    await expect(unsavedDot(page)).toHaveCount(0);
+    dialog = await openLibrary(page);
+    expect(await libraryNames(dialog)).toEqual(['Alpha']);
+  });
+
+  test('LIB-11 says so when part of the library cannot be read, and still lists the rest', async ({ page }) => {
+    await openEditorWithAlphaAndBeta(page);
+
+    // An entry the app cannot make sense of, as left behind by a damaged store.
+    await page.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('billboard-builder');
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction('canvas', 'readwrite');
+        transaction.objectStore('canvas').put({ id: 'broken' }, 'library-entry:broken');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+      });
+      database.close();
+    });
+    await page.reload();
+    await waitForEditor(page);
+
+    const dialog = await openLibrary(page);
+    await expect(dialog.getByRole('alert')).toHaveText(
+      'Part of the library could not be read. Some canvases may be missing from this list.',
+    );
+    expect((await libraryNames(dialog)).sort()).toEqual(['Alpha', 'Beta']);
   });
 });

@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { useDocumentLibrarySession } from './documentLibrarySession';
 import { useCanvasPersistence } from './useCanvasPersistence';
-import { useDocumentLibraryController } from './useDocumentLibraryController';
+import {
+  useDocumentLibraryController,
+  type LeaveChoice,
+  type LeaveRequest,
+} from './useDocumentLibraryController';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { useFavoritesController } from './useFavoritesController';
 import { useFileIOController } from './useFileIOController';
@@ -35,8 +38,8 @@ interface UseEditorControllerArgs {
    * font the document references may simply not have arrived yet.
    */
   fontsReady: boolean;
-  /** The renderer showing the canvas, used to draw library previews. Without one, documents are saved without a preview. */
-  getRendererHandle?: () => CanvasRendererHandle | null;
+  /** The renderer showing the canvas, used to draw library previews; null while there is none. */
+  getRendererHandle: () => CanvasRendererHandle | null;
 }
 
 /**
@@ -48,6 +51,23 @@ interface UseEditorControllerArgs {
 export function useEditorController({ fontsReady, getRendererHandle }: UseEditorControllerArgs) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  // The question put to the user before a document with unsaved changes is
+  // replaced, while it waits for an answer.
+  const [leavePrompt, setLeavePrompt] = useState<LeaveRequest | null>(null);
+  const answerLeaveRef = useRef<((choice: LeaveChoice) => void) | null>(null);
+  const confirmLeave = useCallback(
+    (request: LeaveRequest) =>
+      new Promise<LeaveChoice>((resolve) => {
+        answerLeaveRef.current = resolve;
+        setLeavePrompt(request);
+      }),
+    [],
+  );
+  const answerLeavePrompt = useCallback((choice: LeaveChoice) => {
+    answerLeaveRef.current?.(choice);
+    answerLeaveRef.current = null;
+    setLeavePrompt(null);
+  }, []);
   const [pendingCollapsedGroupIds, setPendingCollapsedGroupIds] = useState<string[]>([]);
   const [inspectorPanel, setInspectorPanel] = useState<InspectorPanelState>({
     tab: 'properties',
@@ -156,15 +176,15 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
 
   const capturePreview = useCallback(
     (previewDocument: ProjectDocument) =>
-      captureDocumentPreview(getRendererHandle?.() ?? null, previewDocument.canvas),
+      captureDocumentPreview(getRendererHandle(), previewDocument.canvas),
     [getRendererHandle],
   );
   const { actions: library, state: libraryState } = useDocumentLibraryController({
     document,
     capturePreview,
+    confirmLeave,
     setErrorMessage,
   });
-  const libraryEntriesKnown = useDocumentLibrarySession((state) => state.entriesKnown);
   const libraryFonts = useMemo(
     () => libraryState.entries.flatMap((entry) => entry.fonts),
     [libraryState.entries],
@@ -179,7 +199,10 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
   const handleNewProject = useCallback(async () => {
     await library.newDocument();
   }, [library]);
-  const openLibrary = useCallback(() => setLibraryOpen(true), []);
+  const openLibrary = useCallback(() => {
+    setLibraryOpen(true);
+    void library.loadLibraryPreviews();
+  }, [library]);
   const closeLibrary = useCallback(() => setLibraryOpen(false), []);
 
   useEffect(() => {
@@ -195,7 +218,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
     favorites,
     favoritesReady,
     libraryFonts,
-    libraryReady: libraryEntriesKnown,
+    libraryReady: libraryState.entriesKnown,
   });
 
   useEditorShortcuts({
@@ -240,6 +263,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       handleOpenProject: library.importProjectFile,
       handleRevert,
       handleSave,
+      answerLeavePrompt,
       openLibrary,
       closeLibrary,
       openLibraryDocument: library.openLibraryDocument,
@@ -277,9 +301,12 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       errorMessage,
       hasUnsavedChanges: libraryState.hasUnsavedChanges,
       inspectorPanel,
+      leavePrompt,
       libraryBusy: libraryState.busy,
       libraryEntries: libraryState.entries,
+      libraryEntriesKnown: libraryState.entriesKnown,
       libraryOpen,
+      libraryPreviews: libraryState.previews,
       layerRows,
       pendingCollapsedGroupIds,
       missingFontFamilies,

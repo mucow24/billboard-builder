@@ -10,6 +10,7 @@ import { useStatusToast } from './app/useStatusToast';
 import { removeBootShell } from './bootstrapShell';
 import { CanvasStage } from './editor/rendering/CanvasStage';
 import { DocumentLibraryDialog } from './editor/ui/DocumentLibraryDialog';
+import { UnsavedChangesDialog } from './editor/ui/UnsavedChangesDialog';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
@@ -55,6 +56,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
 
   const {
     actions: {
+      answerLeavePrompt,
       closeLibrary,
       deleteLibraryDocument,
       exportLibraryDocument,
@@ -108,9 +110,12 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       hasUnsavedChanges,
       inspectorPanel: { tab: inspectorTab, collapsed: panelCollapsed },
       layerRows,
+      leavePrompt,
       libraryBusy,
       libraryEntries,
+      libraryEntriesKnown,
       libraryOpen,
+      libraryPreviews,
       missingFontFamilies,
       pendingCollapsedGroupIds,
       selectedGroup,
@@ -322,6 +327,8 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       {libraryOpen ? (
         <DocumentLibraryDialog
           entries={libraryEntries}
+          entriesKnown={libraryEntriesKnown}
+          previews={libraryPreviews}
           currentDocumentId={documentId}
           currentDocumentHasUnsavedChanges={hasUnsavedChanges}
           onClose={closeLibrary}
@@ -342,6 +349,13 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
         />
       ) : null}
       {libraryBusy ? <div className="library-busy-overlay" aria-hidden="true" /> : null}
+      {leavePrompt ? (
+        <UnsavedChangesDialog
+          canvasName={leavePrompt.documentName}
+          neverSaved={leavePrompt.neverSaved}
+          onAnswer={answerLeavePrompt}
+        />
+      ) : null}
 
       <input
         ref={imageInputRef}

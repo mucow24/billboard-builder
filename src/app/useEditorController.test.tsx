@@ -123,13 +123,33 @@ function makeFileList(...files: File[]): FileList {
   return fileList as unknown as FileList;
 }
 
+/** No renderer in these tests: canvases are saved to the library without a preview. */
+const getRendererHandle = () => null;
+
+/** Canvas > New on a canvas with unsaved changes, answering the question with Discard. */
+async function startNewCanvasDiscardingChanges(result: {
+  current: ReturnType<typeof useEditorController>;
+}) {
+  let started: Promise<void> = Promise.resolve();
+  act(() => {
+    started = result.current.actions.handleNewProject();
+  });
+  await waitFor(() => {
+    expect(result.current.state.leavePrompt).not.toBeNull();
+  });
+  await act(async () => {
+    result.current.actions.answerLeavePrompt('discard');
+    await started;
+  });
+}
+
 /** The controller as the app mounts it: after startup has loaded the saved canvas. */
 async function renderControllerAfterStartup() {
   const startup = renderHook(() => useEditorStartup());
   await waitFor(() => {
     expect(startup.result.current.fontsReady).toBe(true);
   });
-  return renderHook(() => useEditorController({ fontsReady: true }));
+  return renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 }
 
 describe('useEditorController', () => {
@@ -171,7 +191,7 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     expect(result.current.state.selectedItem?.id).toBe(rectangleItem.id);
@@ -189,7 +209,7 @@ describe('useEditorController', () => {
       sourceName: 'poster.png',
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
     await act(async () => {
       await result.current.actions.handleImageUpload(makeFileList(file));
@@ -218,7 +238,7 @@ describe('useEditorController', () => {
     mockRegisterFontFile.mockRejectedValue(new Error('font nope'));
     mockReadProjectFile.mockRejectedValue(new Error('project nope'));
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     await act(async () => {
@@ -275,7 +295,7 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     await act(async () => {
@@ -313,9 +333,22 @@ describe('useEditorController', () => {
         kind: 'uploaded',
       });
     });
-    await act(async () => {
-      await result.current.actions.handleOpenProject(makeFileList(new File(['{}'], 'project.json')));
+    // The canvas has unsaved changes by now: opening a file over it asks first.
+    let opened: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      opened = result.current.actions.handleOpenProject(makeFileList(new File(['{}'], 'project.json')));
     });
+    await waitFor(() => {
+      expect(result.current.state.leavePrompt).toEqual({
+        documentName: 'Untitled canvas',
+        neverSaved: true,
+      });
+    });
+    await act(async () => {
+      result.current.actions.answerLeavePrompt('discard');
+      await opened;
+    });
+    expect(result.current.state.leavePrompt).toBeNull();
     mockCopyCanvasToClipboard.mockResolvedValue(undefined);
     let clipboardOk: boolean | undefined;
     let clipboardNoHandle: boolean | undefined;
@@ -377,7 +410,7 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     expect(result.current.state.document.fonts).toEqual([]);
@@ -394,7 +427,7 @@ describe('useEditorController', () => {
     });
 
     const { result, rerender } = renderHook(
-      ({ fontsReady }: { fontsReady: boolean }) => useEditorController({ fontsReady }),
+      ({ fontsReady }: { fontsReady: boolean }) => useEditorController({ fontsReady, getRendererHandle }),
       { initialProps: { fontsReady: false } },
     );
     // The font may simply not have arrived yet.
@@ -484,7 +517,7 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     let wasSaved = false;
@@ -532,7 +565,7 @@ describe('useEditorController', () => {
       },
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     act(() => {
@@ -555,10 +588,10 @@ describe('useEditorController', () => {
       useEditorStore.getState().selectSingleNode('favorite-text');
     });
 
-    await act(async () => {
+    act(() => {
       result.current.actions.saveSelectionAsFavorite();
-      await result.current.actions.handleNewProject();
     });
+    await startNewCanvasDiscardingChanges(result);
 
     const savedFavoriteId = result.current.state.favorites[0]!.id;
 
@@ -637,7 +670,7 @@ describe('useEditorController', () => {
       kind: 'uploaded',
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
     await waitFor(() => {
       expect(result.current.state.favorites).toHaveLength(1);
@@ -716,15 +749,15 @@ describe('useEditorController', () => {
         name: 'In the library',
         createdAt: 1,
         updatedAt: 1,
-        preview: null,
         fonts: [libraryFont],
       },
       { ...createDefaultProjectDocument(), fonts: [libraryFont] },
+      null,
     );
     // Startup reads the library before the editor mounts.
     await loadDocumentLibrarySession({ hasWorkingCopy: false });
 
-    renderHook(() => useEditorController({ fontsReady: true }));
+    renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
     await waitFor(() => {
       expect(mockUploadedFontPersistenceService.pruneUnreferenced).toHaveBeenCalled();
@@ -749,7 +782,7 @@ describe('useEditorController', () => {
 
   it('prunes no uploaded fonts while it is unknown what the library holds', async () => {
     // No startup has read the library: a font only a library document uses must not be deleted.
-    renderHook(() => useEditorController({ fontsReady: true }));
+    renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
     await waitFor(() => {
       expect(mockFavoriteLibraryService.load).toHaveBeenCalled();
@@ -801,7 +834,7 @@ describe('useEditorController', () => {
         document: { ...createDefaultProjectDocument(), nodes: [textItem] },
         session: { selectedNodeIds: [textItem.id] },
       });
-      const rendered = renderHook(() => useEditorController({ fontsReady: true }));
+      const rendered = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
       return rendered;
     }
 
@@ -892,12 +925,12 @@ describe('useEditorController', () => {
         document: documentSetInPersistProbe(),
         session: { selectedNodeIds: ['probe-text'] },
       });
-      const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+      const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
-      await act(async () => {
+      act(() => {
         result.current.actions.saveSelectionAsFavorite();
-        await result.current.actions.handleNewProject();
       });
+      await startNewCanvasDiscardingChanges(result);
       const favorite = result.current.state.favorites[0]!;
       expect(favorite.fonts).toEqual([boldReference, regularReference]);
       expect(result.current.state.document.fonts).toEqual([]);
@@ -927,7 +960,7 @@ describe('useEditorController', () => {
       mockFavoriteLibraryService.load.mockReturnValue([savedBeforeTheBoldUpload] as never);
       mockUploadedFontPersistenceService.loadByReferences.mockResolvedValue([storedFonts[1]]);
 
-      const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+      const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
       await waitFor(() => {
         expect(result.current.state.favorites).toHaveLength(1);
       });
@@ -943,7 +976,7 @@ describe('useEditorController', () => {
   });
 
   it('returns false when no nodes are selected', async () => {
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     expect(result.current.actions.saveSelectionAsFavorite()).toBe(false);
@@ -969,7 +1002,7 @@ describe('useEditorController', () => {
     };
     mockFavoriteLibraryService.load.mockReturnValue([favA, favB] as never);
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
     await waitFor(() => {
       expect(result.current.state.favorites).toHaveLength(2);
@@ -999,7 +1032,7 @@ describe('useEditorController', () => {
     };
     mockFavoriteLibraryService.load.mockReturnValue([favA] as never);
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
     await waitFor(() => {
       expect(result.current.state.favorites).toHaveLength(1);
@@ -1029,7 +1062,7 @@ describe('useEditorController', () => {
       throw new Error('quota nope');
     });
 
-    const { result } = renderHook(() => useEditorController({ fontsReady: true }));
+    const { result } = renderHook(() => useEditorController({ fontsReady: true, getRendererHandle }));
 
 
     let wasSaved = true;

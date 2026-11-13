@@ -11,7 +11,6 @@ function createEntry(overrides: Partial<DocumentLibraryEntry> = {}): DocumentLib
     name: 'Poster',
     createdAt: 1_700_000_000_000,
     updatedAt: 1_700_000_000_000,
-    preview: 'data:image/png;base64,AAA',
     fonts: [],
     ...overrides,
   };
@@ -19,7 +18,10 @@ function createEntry(overrides: Partial<DocumentLibraryEntry> = {}): DocumentLib
 
 function renderDialog(overrides: Partial<Parameters<typeof DocumentLibraryDialog>[0]> = {}) {
   const props = {
-    entries: [createEntry(), createEntry({ id: 'banner', name: 'Banner', preview: null })],
+    entries: [createEntry(), createEntry({ id: 'banner', name: 'Banner' })],
+    entriesKnown: true,
+    // "Banner" has no preview.
+    previews: { poster: 'data:image/png;base64,AAA' },
     currentDocumentId: 'banner',
     currentDocumentHasUnsavedChanges: false,
     onClose: vi.fn(),
@@ -70,6 +72,34 @@ describe('DocumentLibraryDialog', () => {
     expect(screen.getByText('0 canvases')).toBeVisible();
     expect(screen.getByText(/Nothing saved yet/)).toBeVisible();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // An unreadable library used to look like an empty one.
+  it('says so when the library could not be read, rather than calling it empty', () => {
+    renderDialog({ entries: [], entriesKnown: false });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('The library could not be read.');
+    expect(screen.queryByText(/Nothing saved yet/)).not.toBeInTheDocument();
+  });
+
+  it('shows what it could read, and says that canvases may be missing', () => {
+    renderDialog({ entriesKnown: false });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Part of the library could not be read.');
+    expect(screen.getAllByTestId('library-card')).toHaveLength(2);
+  });
+
+  it('shows a preview once it has been read', () => {
+    const { rerender, props } = renderDialog({ previews: {} });
+    expect(card('Poster').getByText('No preview')).toBeVisible();
+
+    rerender(<DocumentLibraryDialog {...props} previews={{ poster: 'data:image/png;base64,LATE' }} />);
+
+    expect(screen.getByRole('button', { name: 'Open Poster' }).querySelector('img')).toHaveAttribute(
+      'src',
+      'data:image/png;base64,LATE',
+    );
   });
 
   it('opens a document from its preview', async () => {

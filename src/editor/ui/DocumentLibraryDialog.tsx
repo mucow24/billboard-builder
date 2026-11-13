@@ -2,10 +2,15 @@ import { Cross2Icon, DownloadIcon, Pencil1Icon, TrashIcon } from '@radix-ui/reac
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 
 import type { DocumentLibraryEntry } from '../persistence/documentLibraryService';
+import { useModalDialog } from './useModalDialog';
 
 interface DocumentLibraryDialogProps {
   /** The documents in the library, in the order to show them. */
   entries: DocumentLibraryEntry[];
+  /** False when the library could not be read, or not all of it: `entries` may be missing documents. */
+  entriesKnown: boolean;
+  /** The preview images read so far, as data URLs, by document id. */
+  previews: Readonly<Record<string, string>>;
   /** The id of the document open in the editor. */
   currentDocumentId: string;
   /** The open document has changes that its library entry does not show yet. */
@@ -17,14 +22,14 @@ interface DocumentLibraryDialogProps {
   onExportJson: (id: string) => void;
 }
 
-const FOCUSABLE_SELECTOR = 'button:not(:disabled), input:not(:disabled), [tabindex="0"]';
-
 function formatSavedAt(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 interface LibraryCardProps {
   entry: DocumentLibraryEntry;
+  /** The preview image as a data URL; undefined when there is none, or it has not been read yet. */
+  preview: string | undefined;
   isCurrent: boolean;
   hasUnsavedChanges: boolean;
   onOpen: () => void;
@@ -35,6 +40,7 @@ interface LibraryCardProps {
 
 function LibraryCard({
   entry,
+  preview,
   isCurrent,
   hasUnsavedChanges,
   onOpen,
@@ -114,8 +120,8 @@ function LibraryCard({
         title={isCurrent ? 'This canvas is open' : `Open ${entry.name}`}
         onClick={onOpen}
       >
-        {entry.preview ? (
-          <img className="library-card-image" src={entry.preview} alt="" draggable={false} />
+        {preview ? (
+          <img className="library-card-image" src={preview} alt="" draggable={false} />
         ) : (
           <span className="library-card-no-preview">No preview</span>
         )}
@@ -207,6 +213,8 @@ function LibraryCard({
  */
 export function DocumentLibraryDialog({
   entries,
+  entriesKnown,
+  previews,
   currentDocumentId,
   currentDocumentHasUnsavedChanges,
   onClose,
@@ -218,70 +226,7 @@ export function DocumentLibraryDialog({
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    const previouslyFocused = document.activeElement;
-    dialogRef.current?.focus();
-    return () => {
-      if (previouslyFocused instanceof HTMLElement) {
-        previouslyFocused.focus();
-      }
-    };
-  }, []);
-
-  // The focus can still end up outside the dialog, on the page itself: when
-  // the focused card is deleted, say. Escape must close the dialog from there
-  // too, and any other key brings the focus back in.
-  useEffect(() => {
-    function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
-      const dialog = dialogRef.current;
-      if (!dialog || (event.target instanceof Node && dialog.contains(event.target))) {
-        return;
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      dialog.focus();
-    }
-    document.addEventListener('keydown', handleDocumentKeyDown);
-    return () => document.removeEventListener('keydown', handleDocumentKeyDown);
-  }, [onClose]);
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    // The dialog is modal: no key pressed in it may reach the editor's
-    // shortcuts. Closing on Escape would otherwise also clear the selection.
-    event.stopPropagation();
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-      // The editor's shortcut is out of reach here; do not save the page instead.
-      event.preventDefault();
-      return;
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onClose();
-      return;
-    }
-    if (event.key !== 'Tab') {
-      return;
-    }
-    // Keep the focus inside the dialog.
-    const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? [])];
-    if (focusable.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    if (event.shiftKey && (active === first || active === dialogRef.current)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
+  const handleKeyDown = useModalDialog(dialogRef, onClose);
 
   return (
     <div
@@ -320,17 +265,26 @@ export function DocumentLibraryDialog({
           </button>
         </header>
 
-        {entries.length === 0 ? (
-          <p className="library-empty">
-            Nothing saved yet. Canvas &gt; Save puts the open canvas here, and so does starting or
-            loading another one.
+        {!entriesKnown ? (
+          <p className="library-notice" role="alert">
+            {entries.length === 0
+              ? 'The library could not be read.'
+              : 'Part of the library could not be read. Some canvases may be missing from this list.'}
           </p>
+        ) : null}
+        {entries.length === 0 ? (
+          entriesKnown ? (
+            <p className="library-empty">
+              Nothing saved yet. Canvas &gt; Save puts the open canvas here.
+            </p>
+          ) : null
         ) : (
           <ul className="library-grid" aria-label="Saved canvases">
             {entries.map((entry) => (
               <LibraryCard
                 key={entry.id}
                 entry={entry}
+                preview={previews[entry.id]}
                 isCurrent={entry.id === currentDocumentId}
                 hasUnsavedChanges={currentDocumentHasUnsavedChanges}
                 onOpen={() => onOpen(entry.id)}

@@ -32,13 +32,12 @@ export function useEditorStartup(): EditorStartupState {
     };
 
     void runEditorStartup({
-      loadSavedCanvas: async () => {
-        const savedCanvas = await defaultCanvasPersistenceService.load();
-        // Which library document the saved canvas is a working copy of has to be
-        // known before the editor is shown: it decides what Save and Revert do.
-        await loadDocumentLibrarySession({ hasWorkingCopy: savedCanvas !== null });
-        return savedCanvas;
-      },
+      loadSavedCanvas: () => defaultCanvasPersistenceService.load(),
+      loadLibrarySession: (hasSavedCanvas) =>
+        loadDocumentLibrarySession({
+          hasWorkingCopy: hasSavedCanvas,
+          isCancelled: () => cancelled,
+        }),
       loadBundledFonts,
       restoreUploadedFonts: (references) =>
         restoreUploadedFontsForReferences({

@@ -244,6 +244,54 @@
   border-color: rgba(248, 113, 113, 0.9);
 }
 
+.library-notice {
+  margin: 0;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(127, 29, 29, 0.36);
+  color: #fee2e2;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.library-button-primary {
+  border-color: var(--border-active);
+  background: rgba(50, 132, 214, 0.5);
+}
+
+/* ── Unsaved-changes question ────────────────────────────────────────────── */
+
+/* Above the busy overlay: it is asked in the middle of a library operation. */
+.unsaved-changes-backdrop {
+  z-index: 80;
+}
+
+.unsaved-changes-dialog {
+  gap: 0.75rem;
+  width: min(27rem, 100%);
+  padding: 1.1rem 1.25rem 1.1rem;
+}
+
+.unsaved-changes-message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.unsaved-changes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.unsaved-changes-actions .library-button {
+  height: 1.9rem;
+  padding: 0 0.9rem;
+  font-size: 0.82rem;
+}
+
 /* Covers the app while a document is saved to or fetched from the library, so
    nothing can be changed in between. Normally gone again within a frame or two. */
 .library-busy-overlay {

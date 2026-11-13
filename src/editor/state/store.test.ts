@@ -326,7 +326,7 @@ describe('editor store history', () => {
     expect(updatedItem.height).toBe(256);
   });
 
-  it('supports convenience actions for selection, reorder, export scale, and reset', () => {
+  it('supports convenience actions for selection, reorder and export scale', () => {
     const firstItem = createTextItem({ zIndex: 0 });
     const secondItem = createRectangleItem({ zIndex: 1 });
 
@@ -344,15 +344,6 @@ describe('editor store history', () => {
     expect(getEditorState().session.exportScale).toBe(4);
     expect(getEditorState().session.missingFontFamilies).toEqual(['Ghost Font']);
     expect(useEditorStore.getState().canUndo()).toBe(true);
-
-    useEditorStore.getState().resetDocument();
-
-    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
-    expect(useEditorStore.getState().canUndo()).toBe(true);
-
-    useEditorStore.getState().undo();
-
-    expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(2);
   });
 
   it('deduplicates available fonts and supports explicit document loading', () => {

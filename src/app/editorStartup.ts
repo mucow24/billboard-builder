@@ -12,6 +12,11 @@ export interface EditorStartupDeps {
   loadBundledFonts: (options: FontLoadOptions) => FontLoad;
   /** Registers the stored uploaded fonts behind these references. */
   restoreUploadedFonts: (references: DocumentFontReference[]) => Promise<unknown>;
+  /**
+   * Reads the document library, and which of its documents the saved canvas is
+   * a working copy of. `hasSavedCanvas` says whether there is a saved canvas.
+   */
+  loadLibrarySession: (hasSavedCanvas: boolean) => Promise<unknown>;
   registerAvailableFont: (font: UploadedFont) => void;
   loadDocument: (document: ProjectDocument) => void;
   /** The saved canvas, if any, is in the editor: it can be shown, edited and autosaved. */
@@ -37,10 +42,14 @@ function collectTextFontFamilies(document: ProjectDocument): string[] {
  * Brings the editor up, in an order that never puts the user's work at risk.
  *
  * 1. Read the saved canvas.
- * 2. Register the fonts it is drawn with: the bundled files of its text's
- *    families, loaded before any other bundled font, and its uploaded fonts from
- *    storage. Text drawn before its font is registered keeps its fallback look,
- *    so the canvas waits for these, and only for these.
+ * 2. At the same time:
+ *    - Register the fonts it is drawn with: the bundled files of its text's
+ *      families, loaded before any other bundled font, and its uploaded fonts
+ *      from storage. Text drawn before its font is registered keeps its fallback
+ *      look, so the canvas waits for these fonts, and only for these.
+ *    - Read the document library and which of its documents the saved canvas
+ *      is a working copy of. The editor needs this from its first render: it
+ *      decides what Save and Revert do, and which stored fonts are still in use.
  * 3. Put the saved canvas in the editor and report `onCanvasReady`. The editor
  *    must not be usable before this: the saved canvas would replace whatever had
  *    been done, and autosaving any earlier would overwrite the saved canvas.
@@ -79,7 +88,10 @@ export async function runEditorStartup(deps: EditorStartupDeps): Promise<void> {
         console.warn('Uploaded fonts of the saved canvas could not be restored.', error);
       })
     : undefined;
-  await Promise.all([bundledFonts.first, uploadedFonts]);
+  const librarySession = deps.loadLibrarySession(savedCanvas !== null).catch((error: unknown) => {
+    console.warn('Starting without the document library, which could not be read.', error);
+  });
+  await Promise.all([bundledFonts.first, uploadedFonts, librarySession]);
   if (deps.isCancelled()) {
     return;
   }

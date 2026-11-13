@@ -9,6 +9,7 @@ import {
   defaultDocumentLibraryService,
   sortLibraryEntries,
   type DocumentLibraryEntry,
+  type DocumentLibraryPreviews,
   type DocumentLibraryService,
 } from '../editor/persistence/documentLibraryService';
 
@@ -25,10 +26,18 @@ export interface DocumentLibrarySessionState {
   currentId: string;
   /** The saved version of the document in the editor, or null if it was never saved. */
   savedDocument: ProjectDocument | null;
-  /** The entries of the documents in the library, newest save first. */
+  /** The entries of the documents in the library that could be read, newest save first. */
   entries: DocumentLibraryEntry[];
-  /** False when the library could not be listed at startup, so what it holds is unknown. */
+  /**
+   * False when the library could not be listed at startup, or not all of it:
+   * it may then hold documents, and need fonts, that `entries` does not show.
+   */
   entriesKnown: boolean;
+  /**
+   * The preview images read or made so far, by document id. They are not read
+   * at startup: the library dialog asks for them when it opens.
+   */
+  previews: DocumentLibraryPreviews;
   /**
    * True while another document is being put in the editor. In between, the
    * document in the editor and `currentId` may not belong together.
@@ -42,6 +51,7 @@ function createInitialState(): DocumentLibrarySessionState {
     savedDocument: null,
     entries: [],
     entriesKnown: false,
+    previews: {},
     switching: false,
   };
 }
@@ -64,6 +74,8 @@ export function upsertLibraryEntry(
 interface LoadDocumentLibrarySessionArgs {
   /** Whether a saved canvas was read, which startup then puts in the editor as the working copy. */
   hasWorkingCopy: boolean;
+  /** True once the startup this belongs to has been abandoned: the session is then left alone. */
+  isCancelled?: () => boolean;
   library?: DocumentLibraryService;
   canvas?: CanvasPersistenceService;
 }
@@ -77,14 +89,16 @@ interface LoadDocumentLibrarySessionArgs {
  */
 export async function loadDocumentLibrarySession({
   hasWorkingCopy,
+  isCancelled = () => false,
   library = defaultDocumentLibraryService,
   canvas = defaultCanvasPersistenceService,
 }: LoadDocumentLibrarySessionArgs): Promise<void> {
   const state = createInitialState();
 
   try {
-    state.entries = await library.listEntries();
-    state.entriesKnown = true;
+    const listing = await library.listEntries();
+    state.entries = listing.entries;
+    state.entriesKnown = listing.complete;
   } catch (error) {
     console.warn('The document library could not be read.', error);
   }
@@ -104,5 +118,7 @@ export async function loadDocumentLibrarySession({
     }
   }
 
-  useDocumentLibrarySession.setState(state);
+  if (!isCancelled()) {
+    useDocumentLibrarySession.setState(state);
+  }
 }

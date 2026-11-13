@@ -16,7 +16,7 @@ import {
 import { InMemoryDocumentLibraryStore } from '../editor/persistence/documentLibraryStore';
 
 function createEntry(overrides: Partial<DocumentLibraryEntry> = {}): DocumentLibraryEntry {
-  return { id: 'doc-1', name: 'Poster', createdAt: 100, updatedAt: 100, preview: null, fonts: [], ...overrides };
+  return { id: 'doc-1', name: 'Poster', createdAt: 100, updatedAt: 100, fonts: [], ...overrides };
 }
 
 function createCanvasService(documentId: string | null | Error): CanvasPersistenceService {
@@ -38,7 +38,7 @@ const savedDocument = normalizeProjectDocument({
 
 async function createLibraryWithPoster() {
   const library = new DocumentLibraryService(new InMemoryDocumentLibraryStore());
-  await library.save(createEntry(), savedDocument);
+  await library.save(createEntry(), savedDocument, 'data:image/png;base64,AAA');
   return library;
 }
 
@@ -66,6 +66,41 @@ describe('loadDocumentLibrarySession', () => {
     expect(session.savedDocument).toEqual(savedDocument);
     expect(session.entries).toEqual([createEntry()]);
     expect(session.entriesKnown).toBe(true);
+    // Previews are not read at startup: the library dialog asks for them.
+    expect(session.previews).toEqual({});
+  });
+
+  // A font that only the unreadable document uses must not be pruned.
+  it('does not claim to know the library when one of its entries cannot be read', async () => {
+    const store = new InMemoryDocumentLibraryStore();
+    const library = new DocumentLibraryService(store);
+    await library.save(createEntry(), savedDocument, null);
+    await store.writeEntry('broken', { id: 'broken' });
+
+    await loadDocumentLibrarySession({
+      hasWorkingCopy: true,
+      library,
+      canvas: createCanvasService('doc-1'),
+    });
+
+    const session = useDocumentLibrarySession.getState();
+    expect(session.entries).toEqual([createEntry()]);
+    expect(session.entriesKnown).toBe(false);
+    expect(session.savedDocument).toEqual(savedDocument);
+  });
+
+  it('leaves the session alone when the startup it belongs to was abandoned', async () => {
+    const library = await createLibraryWithPoster();
+    const before = useDocumentLibrarySession.getState();
+
+    await loadDocumentLibrarySession({
+      hasWorkingCopy: true,
+      isCancelled: () => true,
+      library,
+      canvas: createCanvasService('doc-1'),
+    });
+
+    expect(useDocumentLibrarySession.getState()).toBe(before);
   });
 
   it('keeps the id of a working copy that was never saved to the library', async () => {

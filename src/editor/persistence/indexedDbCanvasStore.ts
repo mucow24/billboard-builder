@@ -12,9 +12,10 @@ import {
  */
 export interface RawCanvasStore {
   read(): Promise<string | null>;
-  /** Stores the working copy and, when given, the id of its library document, together. */
-  write(serializedDocument: string, documentId?: string): Promise<void>;
+  /** Stores the working copy and the id of its library document together: both or neither. */
+  write(serializedDocument: string, documentId: string): Promise<void>;
   readDocumentId(): Promise<string | null>;
+  /** Removes the working copy and the id of its library document together. */
   clear(): Promise<void>;
 }
 
@@ -31,12 +32,10 @@ export class IndexedDbCanvasStore implements RawCanvasStore {
     return typeof result === 'string' ? result : null;
   }
 
-  async write(serializedDocument: string, documentId?: string): Promise<void> {
+  async write(serializedDocument: string, documentId: string): Promise<void> {
     await withEditorStoreTransaction(CANVAS_STORE_NAME, (store) => {
       store.put(serializedDocument, CURRENT_DOCUMENT_KEY);
-      if (documentId !== undefined) {
-        store.put(documentId, CURRENT_DOCUMENT_ID_KEY);
-      }
+      store.put(documentId, CURRENT_DOCUMENT_ID_KEY);
     });
   }
 
@@ -48,9 +47,10 @@ export class IndexedDbCanvasStore implements RawCanvasStore {
   }
 
   async clear(): Promise<void> {
-    await withEditorObjectStore(CANVAS_STORE_NAME, 'readwrite', (store) =>
-      store.delete(CURRENT_DOCUMENT_KEY),
-    );
+    await withEditorStoreTransaction(CANVAS_STORE_NAME, (store) => {
+      store.delete(CURRENT_DOCUMENT_KEY);
+      store.delete(CURRENT_DOCUMENT_ID_KEY);
+    });
   }
 }
 
@@ -59,7 +59,7 @@ export class NoopCanvasStore implements RawCanvasStore {
     return null;
   }
 
-  async write(serializedDocument: string, documentId?: string): Promise<void> {
+  async write(serializedDocument: string, documentId: string): Promise<void> {
     void serializedDocument;
     void documentId;
   }

@@ -1390,21 +1390,47 @@ export async function openToolbarPopover(page: Page, triggerName: string) {
   await page.getByRole('button', { name: triggerName, exact: true }).click();
 }
 
-/**
- * Waits until no document is being saved to or fetched from the library.
- *
- * Starting or loading a canvas first saves the open one to the library, and
- * the editor takes no input until that is done. Wait for this before acting on
- * the canvas that was started or loaded.
- */
-export async function waitForLibraryIdle(page: Page) {
-  await expect(page.locator('.app-shell')).toHaveAttribute('data-library-busy', 'false');
+/** A button of the question asked before a canvas with unsaved changes is replaced. */
+export type UnsavedChangesAnswer = 'Save' | 'Discard' | 'Cancel';
+
+/** The question asked before a canvas with unsaved changes is replaced. */
+export function unsavedChangesPrompt(page: Page) {
+  return page.getByRole('alertdialog', { name: 'Unsaved changes' });
 }
 
-export async function clickToolbarPopoverItem(page: Page, triggerName: string, itemName: string) {
+/**
+ * Waits until no library operation is under way: nothing is being saved,
+ * fetched or switched, and the editor takes input again.
+ *
+ * Starting or loading a canvas over one with unsaved changes first asks what
+ * to do with them. If that question comes up it is answered with
+ * `unsavedChanges`. The default is Discard: most tests replace a fixture they
+ * are done with, and have no use for it in the library.
+ */
+export async function waitForLibraryIdle(page: Page, unsavedChanges: UnsavedChangesAnswer = 'Discard') {
+  const idle = page.locator('.app-shell[data-library-busy="false"]');
+  const prompt = unsavedChangesPrompt(page);
+  await expect(idle.or(prompt)).toBeVisible();
+  if (await prompt.isVisible()) {
+    await prompt.getByRole('button', { name: unsavedChanges, exact: true }).click();
+    await expect(prompt).toHaveCount(0);
+  }
+  await expect(idle).toBeVisible();
+}
+
+/**
+ * Picks an item from a toolbar menu and waits for what it starts to be over.
+ * `unsavedChanges` answers the unsaved-changes question, if it is asked.
+ */
+export async function clickToolbarPopoverItem(
+  page: Page,
+  triggerName: string,
+  itemName: string,
+  unsavedChanges: UnsavedChangesAnswer = 'Discard',
+) {
   await openToolbarPopover(page, triggerName);
   await page.getByRole('button', { name: itemName, exact: true }).click();
-  await waitForLibraryIdle(page);
+  await waitForLibraryIdle(page, unsavedChanges);
 }
 
 /** Clicks an item of the Canvas > Load submenu: 'From library...' or 'From JSON...'. */
@@ -1497,14 +1523,23 @@ function countVisibleLeafNodes(nodes: unknown[]): number {
   return count;
 }
 
-export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
+/**
+ * Opens `document` through Canvas > Load > From JSON. If the open canvas has
+ * unsaved changes, the question about them is answered with `unsavedChanges`.
+ */
+export async function uploadProject(
+  page: Page,
+  document: Record<string, unknown>,
+  fileName = 'fixture.json',
+  unsavedChanges: UnsavedChangesAnswer = 'Discard',
+) {
   const chooser = await startProjectFileChooser(page);
   await chooser.setFiles({
     name: fileName,
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(document), 'utf8'),
   });
-  await waitForLibraryIdle(page);
+  await waitForLibraryIdle(page, unsavedChanges);
 
   // Wait for the canvas to finish rendering the uploaded nodes.
   // Without this, fast canvas interactions right after upload can race

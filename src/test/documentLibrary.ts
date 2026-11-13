@@ -7,7 +7,8 @@ import { defaultDocumentLibraryService } from '../editor/persistence/documentLib
  * lives in memory for the whole test file, so call this before each test.
  */
 export async function clearDocumentLibrary() {
-  for (const entry of await defaultDocumentLibraryService.listEntries()) {
+  const { entries } = await defaultDocumentLibraryService.listEntries();
+  for (const entry of entries) {
     await defaultDocumentLibraryService.remove(entry.id);
   }
   resetDocumentLibrarySession();

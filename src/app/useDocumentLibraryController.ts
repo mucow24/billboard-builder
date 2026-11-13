@@ -21,10 +21,25 @@ import {
 } from '../editor/persistence/documentLibraryService';
 import { useEditorStore } from '../editor/state/store';
 
+/** What is about to be left behind, for the question put to the user. */
+export interface LeaveRequest {
+  documentName: string;
+  /** The document is not in the library at all, so discarding it loses all of it. */
+  neverSaved: boolean;
+}
+
+/** What to do with unsaved changes before another document takes their place. */
+export type LeaveChoice = 'save' | 'discard' | 'cancel';
+
 interface UseDocumentLibraryControllerArgs {
   document: ProjectDocument;
   /** Draws a small image of the canvas as it is shown now; null when it cannot be drawn. */
   capturePreview: (document: ProjectDocument) => Promise<string | null>;
+  /**
+   * Asks the user what to do with the unsaved changes of the document that is
+   * about to be replaced. Only asked when there are any.
+   */
+  confirmLeave: (request: LeaveRequest) => Promise<LeaveChoice>;
   setErrorMessage: (message: string | null) => void;
 }
 
@@ -73,23 +88,28 @@ async function putDocumentInEditor(document: ProjectDocument, id: string, isSave
  * editor, reverting it, starting or opening another, and managing the saved
  * ones.
  *
- * A document with unsaved changes is saved to the library before another
- * takes its place, and the switch is called off if that save fails, so leaving
- * a document never loses work. Each of these operations runs alone: while one
- * is under way (`busy`) the others do nothing, and the editor should take no
- * input.
+ * Unsaved changes are never dropped, or saved over the saved version, without
+ * the user saying so: before another document takes the place of one that has
+ * them, the user is asked whether to save them, discard them, or stay. If that
+ * save fails the switch is called off. Each of these operations runs alone:
+ * while one is under way (`busy`) the others do nothing, and the editor should
+ * take no input other than the answer to that question.
  */
 export function useDocumentLibraryController({
   document,
   capturePreview,
+  confirmLeave,
   setErrorMessage,
 }: UseDocumentLibraryControllerArgs) {
-  const { currentId, savedDocument, entries, switching } = useDocumentLibrarySession();
+  const { currentId, savedDocument, entries, entriesKnown, previews, switching } =
+    useDocumentLibrarySession();
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const capturePreviewRef = useRef(capturePreview);
+  const confirmLeaveRef = useRef(confirmLeave);
   useEffect(() => {
     capturePreviewRef.current = capturePreview;
+    confirmLeaveRef.current = confirmLeave;
   });
 
   const unsavedChanges = useMemo(
@@ -141,9 +161,10 @@ export function useDocumentLibraryController({
       }
 
       const existingEntry = session.entries.find((entry) => entry.id === session.currentId);
-      let preview = existingEntry?.preview ?? null;
+      // Without a new preview the library keeps the one it has.
+      let preview: string | null = null;
       try {
-        preview = (await capturePreviewRef.current(editorDocument)) ?? preview;
+        preview = await capturePreviewRef.current(editorDocument);
       } catch (error) {
         console.warn('No preview could be drawn for the library.', error);
       }
@@ -154,11 +175,10 @@ export function useDocumentLibraryController({
         name: editorDocument.name,
         createdAt: existingEntry?.createdAt ?? now,
         updatedAt: now,
-        preview,
         fonts: editorDocument.fonts,
       };
       try {
-        await defaultDocumentLibraryService.save(entry, editorDocument);
+        await defaultDocumentLibraryService.save(entry, editorDocument, preview);
       } catch (error) {
         setErrorMessage(
           `Failed to save "${editorDocument.name}" to the library: ${getErrorMessage(error, 'Unknown error.')}`,
@@ -169,8 +189,30 @@ export function useDocumentLibraryController({
       useDocumentLibrarySession.setState((state) => ({
         savedDocument: editorDocument,
         entries: upsertLibraryEntry(state.entries, entry),
+        previews: preview === null ? state.previews : { ...state.previews, [entry.id]: preview },
       }));
       return true;
+    }
+
+    /**
+     * Settles what happens to the unsaved changes of the document in the
+     * editor before another takes its place. True when it may be replaced:
+     * nothing was unsaved, the user had it saved, or chose to discard it.
+     */
+    async function leaveCurrentDocument(): Promise<boolean> {
+      const editorDocument = useEditorStore.getState().editor.document;
+      const { savedDocument: saved } = useDocumentLibrarySession.getState();
+      if (!hasUnsavedChanges(editorDocument, saved)) {
+        return true;
+      }
+      const choice = await confirmLeaveRef.current({
+        documentName: editorDocument.name,
+        neverSaved: saved === null,
+      });
+      if (choice === 'cancel') {
+        return false;
+      }
+      return choice === 'discard' || commitCurrentDocument();
     }
 
     /** Canvas > Save: stores the unsaved changes in the library. */
@@ -209,10 +251,10 @@ export function useDocumentLibraryController({
       });
     }
 
-    /** Canvas > New: saves the open document, then starts a blank one. */
+    /** Canvas > New: starts a blank document, once the open one may be left. */
     function newDocument(): Promise<boolean> {
       return runExclusive(false, async () => {
-        if (!(await commitCurrentDocument())) {
+        if (!(await leaveCurrentDocument())) {
           return false;
         }
         await putDocumentInEditor(createDefaultProjectDocument(), crypto.randomUUID(), false);
@@ -221,7 +263,7 @@ export function useDocumentLibraryController({
       });
     }
 
-    /** Saves the open document, then opens a document from the library. */
+    /** Opens a document from the library, once the open one may be left. */
     function openLibraryDocument(id: string): Promise<boolean> {
       return runExclusive(false, async () => {
         const session = useDocumentLibrarySession.getState();
@@ -247,10 +289,14 @@ export function useDocumentLibraryController({
           useDocumentLibrarySession.setState((state) => ({
             entries: state.entries.filter((candidate) => candidate.id !== id),
           }));
+          // Take the entry out of storage too, or it is back after a reload.
+          defaultDocumentLibraryService.remove(id).catch((error: unknown) => {
+            console.warn('The entry of a missing library document could not be removed.', error);
+          });
           return false;
         }
 
-        if (!(await commitCurrentDocument())) {
+        if (!(await leaveCurrentDocument())) {
           return false;
         }
         await restoreUploadedFonts(libraryDocument.fonts);
@@ -260,7 +306,7 @@ export function useDocumentLibraryController({
       });
     }
 
-    /** Canvas > Load > From JSON: saves the open document, then opens the file as a new one. */
+    /** Canvas > Load > From JSON: opens the file as a new document, once the open one may be left. */
     function importProjectFile(files: FileList | null): Promise<boolean> {
       const file = files?.[0];
       if (!file) {
@@ -275,7 +321,7 @@ export function useDocumentLibraryController({
           return false;
         }
 
-        if (!(await commitCurrentDocument())) {
+        if (!(await leaveCurrentDocument())) {
           return false;
         }
         await restoreUploadedFonts(fileDocument.fonts);
@@ -328,9 +374,14 @@ export function useDocumentLibraryController({
           );
           return false;
         }
-        useDocumentLibrarySession.setState((state) => ({
-          entries: state.entries.filter((candidate) => candidate.id !== id),
-        }));
+        useDocumentLibrarySession.setState((state) => {
+          const remainingPreviews = { ...state.previews };
+          delete remainingPreviews[id];
+          return {
+            entries: state.entries.filter((candidate) => candidate.id !== id),
+            previews: remainingPreviews,
+          };
+        });
         if (id === useDocumentLibrarySession.getState().currentId) {
           await putDocumentInEditor(createDefaultProjectDocument(), crypto.randomUUID(), false);
         }
@@ -365,6 +416,21 @@ export function useDocumentLibraryController({
       }
     }
 
+    /**
+     * Reads the preview images from storage, for the library dialog. They are
+     * left out of startup, which would otherwise wait for every one of them.
+     */
+    async function loadLibraryPreviews(): Promise<void> {
+      try {
+        const storedPreviews = await defaultDocumentLibraryService.loadPreviews();
+        useDocumentLibrarySession.setState((state) => ({
+          previews: { ...state.previews, ...storedPreviews },
+        }));
+      } catch (error) {
+        console.warn('The library previews could not be read.', error);
+      }
+    }
+
     return {
       saveDocument,
       revertDocument,
@@ -374,6 +440,7 @@ export function useDocumentLibraryController({
       renameLibraryDocument,
       deleteLibraryDocument,
       exportLibraryDocument,
+      loadLibraryPreviews,
     };
   }, [setErrorMessage]);
 
@@ -383,6 +450,10 @@ export function useDocumentLibraryController({
       /** The id of the document in the editor. */
       documentId: currentId,
       entries,
+      /** False when the library could not be read, or not all of it: `entries` may be missing documents. */
+      entriesKnown,
+      /** The preview images read or made so far, by document id. */
+      previews,
       /** The document in the editor differs from its saved version, or was never saved and is not blank. */
       hasUnsavedChanges: unsavedChanges,
       /** There are unsaved changes and a saved version to go back to. */

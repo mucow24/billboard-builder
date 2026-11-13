@@ -68,6 +68,8 @@ function startStartup(overrides: Partial<EditorStartupDeps> = {}) {
       events.push(`restore uploaded fonts: ${references.map((font) => font.family).join(', ')}`);
       return uploadedFonts.promise;
     },
+    // The library is in place at once unless a test says otherwise.
+    loadLibrarySession: () => Promise.resolve(),
     registerAvailableFont: (font) => events.push(`register ${font.family}`),
     loadDocument: (document) => events.push(`load document with ${document.nodes.length} nodes`),
     onCanvasReady: () => events.push('canvas ready'),
@@ -218,5 +220,70 @@ describe('runEditorStartup', () => {
     await startup.finished;
 
     expect(startup.events).toEqual([]);
+  });
+
+  describe('the document library', () => {
+    /** A startup whose library is read only when the test says so. */
+    function startStartupWithLibrary() {
+      const library = deferred<void>();
+      const startup = startStartup({
+        loadLibrarySession: (hasSavedCanvas) => {
+          startup.events.push(`read library, saved canvas: ${hasSavedCanvas ? 'yes' : 'no'}`);
+          return library.promise;
+        },
+      });
+      return { startup, library };
+    }
+
+    it('is read once the saved canvas is, at the same time as its fonts', async () => {
+      const { startup } = startStartupWithLibrary();
+      await settle();
+      expect(startup.events).toEqual([]);
+
+      startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
+      await settle();
+
+      // Asked for with the fonts still on the way: neither waits for the other.
+      expect(startup.events).toEqual([
+        'load bundled fonts, first: Barlow',
+        'restore uploaded fonts: Poster Sans',
+        'read library, saved canvas: yes',
+      ]);
+    });
+
+    it('is told when there is no saved canvas', async () => {
+      const { startup } = startStartupWithLibrary();
+      startup.savedCanvas.resolve(null);
+      await settle();
+
+      expect(startup.events).toContain('read library, saved canvas: no');
+    });
+
+    // The editor autosaves, and prunes stored fonts, from its first render.
+    it('holds the editor back until it has been read', async () => {
+      const { startup, library } = startStartupWithLibrary();
+      startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
+      startup.firstFonts.resolve();
+      startup.uploadedFonts.resolve();
+      await settle();
+      expect(startup.events).not.toContain('canvas ready');
+
+      library.resolve();
+      await settle();
+      expect(startup.events.slice(-2)).toEqual(['load document with 2 nodes', 'canvas ready']);
+    });
+
+    it('does not keep the editor from starting when it cannot be read', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { startup, library } = startStartupWithLibrary();
+      startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));
+      startup.firstFonts.resolve();
+      startup.uploadedFonts.resolve();
+      library.reject(new Error('database gone'));
+      await settle();
+
+      expect(startup.events.slice(-2)).toEqual(['load document with 2 nodes', 'canvas ready']);
+      expect(warn).toHaveBeenCalled();
+    });
   });
 });

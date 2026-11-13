@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDocumentLibrarySession } from './documentLibrarySession';
-import { useDocumentLibraryController } from './useDocumentLibraryController';
+import { useDocumentLibraryController, type LeaveChoice } from './useDocumentLibraryController';
 import {
   createDefaultProjectDocument,
   createRectangleItem,
@@ -26,12 +26,14 @@ vi.mock('../editor/io/projectFile', () => ({
 }));
 
 const setErrorMessage = vi.fn();
-const capturePreview = vi.fn(async () => 'data:image/png;base64,PREVIEW');
+const capturePreview = vi.fn(async (): Promise<string | null> => 'data:image/png;base64,PREVIEW');
+/** The user's answer when asked what to do with unsaved changes. "Save" unless a test says otherwise. */
+const confirmLeave = vi.fn(async (): Promise<LeaveChoice> => 'save');
 
 function renderController() {
   return renderHook(() => {
     const document = useEditorStore((state) => state.editor.document);
-    return useDocumentLibraryController({ document, capturePreview, setErrorMessage });
+    return useDocumentLibraryController({ document, capturePreview, confirmLeave, setErrorMessage });
   });
 }
 
@@ -76,6 +78,8 @@ describe('useDocumentLibraryController', () => {
     setErrorMessage.mockReset();
     capturePreview.mockClear();
     capturePreview.mockResolvedValue('data:image/png;base64,PREVIEW');
+    confirmLeave.mockReset();
+    confirmLeave.mockResolvedValue('save');
     mockDownloadProject.mockReset();
     mockReadProjectFile.mockReset();
   });
@@ -143,8 +147,11 @@ describe('useDocumentLibraryController', () => {
       expect(entry).toMatchObject({
         id: result.current.state.documentId,
         name: 'Poster',
-        preview: 'data:image/png;base64,PREVIEW',
         fonts: [],
+      });
+      expect(result.current.state.previews).toEqual({ [entry.id]: 'data:image/png;base64,PREVIEW' });
+      await expect(defaultDocumentLibraryService.loadPreviews()).resolves.toEqual({
+        [entry.id]: 'data:image/png;base64,PREVIEW',
       });
       expect(capturePreview).toHaveBeenCalledWith(editorDocument());
       const stored = await defaultDocumentLibraryService.loadDocument(entry);
@@ -180,18 +187,23 @@ describe('useDocumentLibraryController', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const { result } = renderController();
       addRectangle('first');
-      capturePreview.mockResolvedValueOnce(null as unknown as string);
+      const id = result.current.state.documentId;
+      capturePreview.mockResolvedValueOnce(null);
       await save(result);
-      expect(result.current.state.entries[0].preview).toBeNull();
+      expect(result.current.state.entries).toHaveLength(1);
+      expect(result.current.state.previews).toEqual({});
 
       addRectangle('second');
       await save(result);
-      expect(result.current.state.entries[0].preview).toBe('data:image/png;base64,PREVIEW');
+      expect(result.current.state.previews[id]).toBe('data:image/png;base64,PREVIEW');
 
       addRectangle('third');
       capturePreview.mockRejectedValueOnce(new Error('context lost'));
       expect(await save(result)).toBe(true);
-      expect(result.current.state.entries[0].preview).toBe('data:image/png;base64,PREVIEW');
+      expect(result.current.state.previews[id]).toBe('data:image/png;base64,PREVIEW');
+      await expect(defaultDocumentLibraryService.loadPreviews()).resolves.toEqual({
+        [id]: 'data:image/png;base64,PREVIEW',
+      });
     });
 
     it('keeps the changes unsaved and says why when the library cannot be written', async () => {
@@ -214,7 +226,7 @@ describe('useDocumentLibraryController', () => {
       addRectangle('first');
       let finishPreview: (preview: string) => void = () => {};
       capturePreview.mockReturnValueOnce(
-        new Promise<string>((resolve) => {
+        new Promise<string | null>((resolve) => {
           finishPreview = resolve;
         }),
       );
@@ -236,7 +248,7 @@ describe('useDocumentLibraryController', () => {
 
       expect(result.current.state.busy).toBe(false);
       expect(itemIds()).toEqual(['first']);
-      expect(result.current.state.entries[0].preview).toBe('data:image/png;base64,LATE');
+      expect(Object.values(result.current.state.previews)).toEqual(['data:image/png;base64,LATE']);
     });
   });
 
@@ -253,7 +265,7 @@ describe('useDocumentLibraryController', () => {
         expect(result.current.state.entries[0].name).toBe('After');
       });
       expect(result.current.state.hasUnsavedChanges).toBe(false);
-      const [storedEntry] = await defaultDocumentLibraryService.listEntries();
+      const [storedEntry] = (await defaultDocumentLibraryService.listEntries()).entries;
       expect(storedEntry.name).toBe('After');
     });
 
@@ -288,7 +300,7 @@ describe('useDocumentLibraryController', () => {
 
       expect(result.current.state.entries[0].name).toBe('Renamed');
       expect(editorDocument().name).toBe(DEFAULT_CANVAS_NAME);
-      const [storedEntry] = await defaultDocumentLibraryService.listEntries();
+      const [storedEntry] = (await defaultDocumentLibraryService.listEntries()).entries;
       expect(storedEntry.name).toBe('Renamed');
     });
   });
@@ -336,7 +348,7 @@ describe('useDocumentLibraryController', () => {
   });
 
   describe('starting a new document', () => {
-    it('saves the open document to the library first', async () => {
+    it('saves the open document to the library first when the user chooses to', async () => {
       const { result } = renderController();
       renameCanvas('Poster');
       addRectangle('first');
@@ -401,6 +413,183 @@ describe('useDocumentLibraryController', () => {
     });
   });
 
+  describe('leaving a document with unsaved changes', () => {
+    it('asks what to do with them, naming the document and saying whether it was ever saved', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+
+      await act(async () => {
+        await result.current.actions.newDocument();
+      });
+      expect(confirmLeave).toHaveBeenLastCalledWith({ documentName: 'Poster', neverSaved: true });
+
+      await act(async () => {
+        await result.current.actions.openLibraryDocument(result.current.state.entries[0].id);
+      });
+      addRectangle('second');
+      await act(async () => {
+        await result.current.actions.newDocument();
+      });
+      expect(confirmLeave).toHaveBeenLastCalledWith({ documentName: 'Poster', neverSaved: false });
+      expect(confirmLeave).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not ask when nothing is unsaved', async () => {
+      const { result } = renderController();
+      await act(async () => {
+        await result.current.actions.newDocument();
+      });
+      addRectangle('first');
+      await save(result);
+      await act(async () => {
+        await result.current.actions.newDocument();
+      });
+
+      expect(confirmLeave).not.toHaveBeenCalled();
+      expect(itemIds()).toEqual([]);
+    });
+
+    it('drops the changes on Discard and leaves the saved version as it was', async () => {
+      const { result } = renderController();
+      addRectangle('first');
+      await save(result);
+      const [savedEntry] = result.current.state.entries;
+      addRectangle('unsaved');
+      confirmLeave.mockResolvedValue('discard');
+      const saveToLibrary = vi.spyOn(defaultDocumentLibraryService, 'save');
+
+      let started = false;
+      await act(async () => {
+        started = await result.current.actions.newDocument();
+      });
+
+      expect(started).toBe(true);
+      expect(itemIds()).toEqual([]);
+      expect(saveToLibrary).not.toHaveBeenCalled();
+      expect(result.current.state.entries).toEqual([savedEntry]);
+      const stored = await defaultDocumentLibraryService.loadDocument(savedEntry);
+      expect(stored?.nodes.flatMap(collectLeafItems).map((item) => item.id)).toEqual(['first']);
+    });
+
+    it('adds nothing to the library when a document that was never saved is discarded', async () => {
+      const { result } = renderController();
+      addRectangle('scratch');
+      confirmLeave.mockResolvedValue('discard');
+
+      await act(async () => {
+        await result.current.actions.newDocument();
+      });
+
+      expect(itemIds()).toEqual([]);
+      expect(result.current.state.entries).toEqual([]);
+    });
+
+    it('stays on the document on Cancel, with its changes still unsaved', async () => {
+      const { result } = renderController();
+      addRectangle('first');
+      const openId = result.current.state.documentId;
+      confirmLeave.mockResolvedValue('cancel');
+      mockReadProjectFile.mockResolvedValue(createDefaultProjectDocument());
+
+      let started = true;
+      let imported = true;
+      await act(async () => {
+        started = await result.current.actions.newDocument();
+        imported = await result.current.actions.importProjectFile(makeFileList(new File(['{}'], 'file.json')));
+      });
+
+      expect(started).toBe(false);
+      expect(imported).toBe(false);
+      expect(itemIds()).toEqual(['first']);
+      expect(result.current.state.documentId).toBe(openId);
+      expect(result.current.state.hasUnsavedChanges).toBe(true);
+      expect(result.current.state.entries).toEqual([]);
+      expect(setErrorMessage).not.toHaveBeenCalled();
+    });
+
+    // A library that cannot be written used to block New and Load for good.
+    it('can still be left by discarding after a save has failed', async () => {
+      const { result } = renderController();
+      addRectangle('first');
+      vi.spyOn(defaultDocumentLibraryService, 'save').mockRejectedValue(new Error('disk full'));
+
+      let started = true;
+      await act(async () => {
+        started = await result.current.actions.newDocument();
+      });
+      expect(started).toBe(false);
+      expect(itemIds()).toEqual(['first']);
+
+      confirmLeave.mockResolvedValue('discard');
+      await act(async () => {
+        started = await result.current.actions.newDocument();
+      });
+
+      expect(started).toBe(true);
+      expect(itemIds()).toEqual([]);
+      expect(result.current.state.busy).toBe(false);
+    });
+
+    it('is busy while it waits for the answer', async () => {
+      const { result } = renderController();
+      addRectangle('first');
+      let answer: (choice: LeaveChoice) => void = () => {};
+      confirmLeave.mockReturnValueOnce(
+        new Promise<LeaveChoice>((resolve) => {
+          answer = resolve;
+        }),
+      );
+
+      let started: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        started = result.current.actions.newDocument();
+      });
+      expect(result.current.state.busy).toBe(true);
+      expect(itemIds()).toEqual(['first']);
+
+      await act(async () => {
+        answer('discard');
+        await started;
+      });
+      expect(result.current.state.busy).toBe(false);
+      expect(itemIds()).toEqual([]);
+    });
+  });
+
+  describe('previews', () => {
+    it('are read from storage on request, as after a reload', async () => {
+      const { result } = renderController();
+      addRectangle('first');
+      await save(result);
+      const id = result.current.state.documentId;
+      act(() => {
+        useDocumentLibrarySession.setState({ previews: {} });
+      });
+      expect(result.current.state.previews).toEqual({});
+
+      await act(async () => {
+        await result.current.actions.loadLibraryPreviews();
+      });
+
+      expect(result.current.state.previews).toEqual({ [id]: 'data:image/png;base64,PREVIEW' });
+    });
+
+    it('stay as they are when storage cannot be read', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { result } = renderController();
+      addRectangle('first');
+      await save(result);
+      vi.spyOn(defaultDocumentLibraryService, 'loadPreviews').mockRejectedValueOnce(new Error('gone'));
+
+      await act(async () => {
+        await result.current.actions.loadLibraryPreviews();
+      });
+
+      expect(Object.values(result.current.state.previews)).toEqual(['data:image/png;base64,PREVIEW']);
+    });
+  });
+
   describe('opening from the library', () => {
     async function createTwoDocuments(result: Controller) {
       renameCanvas('First');
@@ -452,7 +641,7 @@ describe('useDocumentLibraryController', () => {
       });
 
       const names = Object.fromEntries(
-        (await defaultDocumentLibraryService.listEntries()).map((entry) => [entry.id, entry.name]),
+        (await defaultDocumentLibraryService.listEntries()).entries.map((entry) => [entry.id, entry.name]),
       );
       expect(names).toEqual({ [firstId]: 'First', [secondId]: 'Second' });
     });
@@ -476,7 +665,8 @@ describe('useDocumentLibraryController', () => {
     it('stays on the open document and drops the entry when the document is gone from the library', async () => {
       const { result } = renderController();
       const { firstId } = await createTwoDocuments(result);
-      await defaultDocumentLibraryService.remove(firstId);
+      // Its entry is still stored, but the document behind it is not.
+      vi.spyOn(defaultDocumentLibraryService, 'loadDocument').mockResolvedValueOnce(null);
 
       let opened = true;
       await act(async () => {
@@ -487,6 +677,8 @@ describe('useDocumentLibraryController', () => {
       expect(itemIds()).toEqual(['second']);
       expect(result.current.state.entries).toEqual([]);
       expect(setErrorMessage).toHaveBeenLastCalledWith('"First" is no longer in the library.');
+      // The entry is taken out of storage too, or it would be back after a reload.
+      expect((await defaultDocumentLibraryService.listEntries()).entries).toEqual([]);
     });
 
     it('stays on the open document when the other one cannot be read', async () => {
@@ -573,7 +765,8 @@ describe('useDocumentLibraryController', () => {
 
       expect(result.current.state.entries).toEqual([]);
       expect(itemIds()).toEqual(['second']);
-      await expect(defaultDocumentLibraryService.listEntries()).resolves.toEqual([]);
+      expect((await defaultDocumentLibraryService.listEntries()).entries).toEqual([]);
+      expect(result.current.state.previews).toEqual({});
     });
 
     it('starts a blank document when the open one is deleted, without saving it back', async () => {

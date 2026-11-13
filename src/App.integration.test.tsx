@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React, { type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -391,9 +391,16 @@ describe('App integration', () => {
         files: [new File(['ok'], 'fixed.json', { type: 'application/json' })],
       },
     });
+    // The canvas holds an image that is not in the library: the app asks before replacing it.
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog', { name: 'Unsaved changes' })).getByRole('button', {
+        name: 'Discard',
+      }),
+    );
     await waitFor(() => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
+    expect(screen.queryByRole('alertdialog')).toBeNull();
 
     // Font upload UI path covered by e2e tests; verify processing pipeline directly.
     fireEvent.change(screen.getByTestId('font-upload-input'), {

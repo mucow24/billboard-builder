@@ -18,7 +18,7 @@ A canvas-based design editor for creating billboards, digital signage, and graph
 
 **Undo/redo** — Transaction-based history with unlimited undo/redo.
 
-**Library** — Canvases are kept in a local library in the browser, each with a preview. Canvas > Save stores the open canvas, and starting or loading another one saves it first. A dot beside the name marks unsaved changes, and Canvas > Revert goes back to the last saved version. Rename, delete, or export any saved canvas from Canvas > Load > From library.
+**Library** — Canvases are kept in a local library in the browser, each with a preview. Canvas > Save stores the open canvas. Starting or loading another canvas over unsaved changes asks first whether to save or discard them. A dot beside the name marks unsaved changes, and Canvas > Revert goes back to the last saved version. Rename, delete, or export any saved canvas from Canvas > Load > From library.
 
 **File I/O** — Export to PNG with configurable resolution, to SVG, or to a JSON project file, and open JSON project files. Upload images and custom fonts.
 

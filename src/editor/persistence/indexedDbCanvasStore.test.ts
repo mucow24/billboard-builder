@@ -211,12 +211,15 @@ describe('indexedDbCanvasStore', () => {
     );
 
     await expect(store.read()).resolves.toBe('saved');
-    await expect(store.write('next')).resolves.toBeUndefined();
+    await expect(store.write('next', 'document-7')).resolves.toBeUndefined();
     await expect(store.clear()).resolves.toBeUndefined();
 
     expect(harness.get).toHaveBeenCalledWith('current');
     expect(harness.put).toHaveBeenCalledWith('next', 'current');
+    // Clearing takes the id of the library document with the working copy, so
+    // a canvas stored later is never tied to the previous one's document.
     expect(harness.remove).toHaveBeenCalledWith('current');
+    expect(harness.remove).toHaveBeenCalledWith('current-library-id');
   });
 
   it('stores the working copy and the id of its library document in one transaction', async () => {
@@ -299,6 +302,6 @@ describe('indexedDbCanvasStore', () => {
       })
     );
 
-    await expect(store.write('next')).rejects.toThrow('transaction aborted');
+    await expect(store.write('next', 'document-7')).rejects.toThrow('transaction aborted');
   });
 });

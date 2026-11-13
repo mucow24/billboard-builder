@@ -22,12 +22,47 @@ This editor is organized around a small set of ownership boundaries.
   - May depend on lower layers but should keep domain logic out of JSX-heavy modules.
 - `src/app`
   - Owns top-level composition, bootstrap, persistence wiring, and app-shell concerns.
+  - Hosts the document-library session store (see "Document library").
 
 ## Invariant rules
 
 - Document normalization has one source of truth in `src/editor/document/documentNormalizer.ts`.
 - Schema validation and normalization are separate responsibilities.
 - Reducer updates, persistence loads, and file imports must pass through the same canonical document normalization path.
+
+## Document library
+
+The editor edits one document at a time; the library holds the others.
+
+- **Working copy and saved version.** The document in the editor is the *working copy*. It is autosaved shortly after every change and survives a reload, unsaved changes included. A *saved version* is what the library holds for a document; it is written only by Canvas > Save, or when the user answers "Save" on leaving a document. A working copy that differs from its saved version has unsaved changes (`hasUnsavedChanges` in `src/editor/document/documentComparison.ts`).
+- **`documentLibrarySession`** (`src/app/documentLibrarySession.ts`) is a second Zustand store, next to the editor store. It holds what ties the two together:
+  - `currentId`: the id of the document in the editor. The library has an entry for it only once it was saved.
+  - `savedDocument`: the saved version of that document, or `null` if it was never saved. A never-saved document has unsaved changes as soon as it is not blank.
+  - `entries`, `entriesKnown`, `previews`: what the library lists, whether that list is complete, and the preview images read so far.
+- **`useDocumentLibraryController`** (`src/app`) is the only writer of the library and of that store after startup. The editor store knows nothing about the library.
+
+### Storage layout
+
+Everything lives in the `canvas` object store of the `billboard-builder` IndexedDB database:
+
+| Key | Value |
+| --- | --- |
+| `current` | The working copy, serialized. |
+| `current-library-id` | `currentId` for that working copy. |
+| `library-entry:<id>` | Name, dates and fonts of a library document. Small, read at startup. |
+| `library-document:<id>` | The saved version, serialized. Read when the document is opened or exported. |
+| `library-preview:<id>` | The preview image. Read when the library dialog opens. |
+
+The library shares the store with the working copy on purpose. A store of its own would need a new database version, and a build that still opens the old version cannot open the database at all.
+
+### Invariants
+
+- `current` and `current-library-id` are written, and cleared, in one transaction. A working copy is never stored beside another document's id.
+- Unsaved changes are never dropped, and never saved over the saved version, without the user saying so. Before another document replaces one that has them, the user is asked: Save, Discard or Cancel. A failed save calls the switch off.
+- Library operations are exclusive. While one runs (`busy`), the others do nothing and the editor takes no input other than the answer to that question.
+- The entry's name is authoritative. Renaming is immediate, is written straight to the entry, and is not an unsaved change; the name inside a stored document is ignored.
+- Stored uploaded fonts are pruned only when the library is fully known (`entriesKnown`). An entry that cannot be read is left out of the list, but its document may be the only user of a font.
+- Startup reads the library before the editor is shown (`runEditorStartup`), because the editor autosaves and prunes fonts from its first render.
 
 ## Shell rules
 
