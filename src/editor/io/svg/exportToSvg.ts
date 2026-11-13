@@ -7,12 +7,15 @@ import type {
   NodeRasterizer,
   OutlineResult,
   SvgExportResult,
+  SyntheticFontStyle,
   TextMeasurer,
 } from './svgExportTypes';
 
 export interface FontBytes {
   kind: FontKind;
   bytes: ArrayBuffer | null;
+  /** What the browser fakes when it draws the item with these bytes; nothing when left out. */
+  synthetic?: SyntheticFontStyle;
 }
 
 export interface ExportToSvgDeps {
@@ -32,8 +35,9 @@ export async function exportToSvg(doc: ProjectDocument, deps: ExportToSvgDeps): 
   for (const item of collectTextItems(doc)) {
     const key = fontVariantKey(item);
     if (resolved.has(key)) continue;
-    const { kind, bytes } = await deps.loadFontBytes(item);
-    resolved.set(key, resolveOutline(kind, bytes));
+    const { kind, bytes, synthetic } = await deps.loadFontBytes(item);
+    const outline = resolveOutline(kind, bytes);
+    resolved.set(key, outline.ok && synthetic ? { ...outline, synthetic } : outline);
   }
 
   const fontOutlines: FontOutlineProvider = {

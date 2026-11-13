@@ -47,7 +47,7 @@ describe('SelectionInspector', () => {
     expect(screen.getByText('1 uploaded font(s) ready in this session.')).toBeInTheDocument();
   });
 
-  it('renders text fields from descriptors and preserves font capability disabling', async () => {
+  it('renders text fields from descriptors and offers bold and italic whatever files the family has', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
     const textItem = createTextItem({
@@ -100,7 +100,8 @@ describe('SelectionInspector', () => {
     expect(screen.getByRole('button', { name: 'Font' })).toHaveTextContent('Custom Family');
     expect(screen.getByRole('button', { name: 'Previous font' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next font' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Bold')).toBeDisabled();
+    // The family has no bold italic file: the browser fakes the bold.
+    expect(screen.getByLabelText('Bold')).toBeEnabled();
     expect(screen.getByLabelText('Italic')).toBeEnabled();
     expect(screen.getByLabelText('Size').closest('.inspector-field-inline')).not.toBeNull();
     expect(screen.getByLabelText('Text content').closest('.inspector-field-stacked')).not.toBeNull();

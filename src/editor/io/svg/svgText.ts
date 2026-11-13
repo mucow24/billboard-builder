@@ -1,6 +1,8 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { layoutWrappedText } from '../../rendering/textMeasurement';
+import { toSvgPaint } from './svgColor';
+import { fmt } from './svgEscape';
 import { glyphsPath, lineSubstitutions } from './svgTextGlyphs';
 import {
   TEXT_SHADOW_BLUR_TO_STDDEV,
@@ -9,6 +11,7 @@ import {
   wrapItem,
 } from './svgPrimitives';
 import type { SvgExportDeps, SvgExportWarning, TextMeasurer } from './svgExportTypes';
+import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor } from './syntheticFontStyle';
 
 /**
  * Serialize a text item as glyph outlines (`<path>`). Layout — wrap, glyph
@@ -16,6 +19,10 @@ import type { SvgExportDeps, SvgExportWarning, TextMeasurer } from './svgExportT
  * `measureText`, the source Pixi renders with); opentype supplies only glyph
  * shapes. When no outline font is available the item is omitted and a warning is
  * recorded (the controller then blocks the export).
+ *
+ * Bold and italic that the font file lacks, and the browser therefore fakes on
+ * the canvas, are faked here the same way (see syntheticFontStyle): italic by
+ * leaning the outlines, bold by a stroke or by smeared copies of them.
  */
 export function textSvg(
   item: TextCanvasItem,
@@ -36,6 +43,12 @@ export function textSvg(
     return '';
   }
   const font = lookup.font;
+  const slant = lookup.synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0;
+  const bold = lookup.synthetic?.bold ? syntheticBoldFor(item, item.text, deps.measurer) : null;
+  // A smeared glyph is drawn once at each of these distances right of its pen position.
+  const penOffsets = bold?.kind === 'smear' ? bold.offsets : [0];
+  // Stroked outlines need their contours closed, or the stroke has gaps.
+  const glyphStyle = { slant, closed: bold?.kind === 'stroke' };
 
   const box = getRenderBox(item);
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
@@ -62,6 +75,9 @@ export function textSvg(
   // fit the box (`alignWidth` in `CanvasTextGenerator._renderTextToCanvas`): the
   // widest line then starts at the box's left edge whatever the alignment.
   const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
+  // The lines' left and right ends, with the box's own included.
+  let inkLeft = 0;
+  let inkRight = box.width;
 
   lines.forEach((line, lineIndex) => {
     if (line.text.length === 0) return;
@@ -75,21 +91,89 @@ export function textSvg(
       lineLeft += alignWidth - line.width;
     }
 
+    inkLeft = Math.min(inkLeft, lineLeft);
+    inkRight = Math.max(inkRight, lineLeft + line.width);
+
     // Ligatures and other glyphs the font puts in place of characters; see svgTextGlyphs.
     const substitutions = lineSubstitutions(font, line.text, item.letterSpacing);
     kernedOffsets(line.text, line.advance, measure).forEach(({ ch, offset }, index) => {
       const penX = lineLeft + offset + index * item.letterSpacing;
-      const path = glyphsPath(font, substitutions?.[index] ?? ch, item.fontSize, penX, baselineY);
-      if (path) glyphPaths.push(path);
+      for (const penOffset of penOffsets) {
+        const path = glyphsPath(
+          font,
+          substitutions?.[index] ?? ch,
+          item.fontSize,
+          penX + penOffset,
+          baselineY,
+          glyphStyle,
+        );
+        if (path) glyphPaths.push(path);
+      }
     });
   });
 
   if (glyphPaths.length === 0) return '';
 
   const fillAttr = gradientOrSolidFill(item, defs, box.width, box.height);
-  const pathEl = `<path d="${glyphPaths.join(' ')}" ${fillAttr}/>`;
+  const d = glyphPaths.join(' ');
+  let pathEl = `<path d="${d}" ${fillAttr}/>`;
+  if (bold?.kind === 'stroke') {
+    // Room around the lines for ink that leaves them, the stroke included.
+    const room = item.fontSize;
+    const top = Math.min(0, textTop) - room;
+    const bottom = Math.max(box.height, textTop + measuredHeight) + room;
+    const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
+    pathEl = strokedBoldPath(item, d, fillAttr, bold.width, area, defs);
+  }
   const filterAttr = pushTextFilter(item, defs);
   return wrapItem(item, effectiveOpacity, pathEl, filterAttr);
+}
+
+/**
+ * The glyph outlines `d` grown into faked bold: filled, and stroked `strokeWidth`
+ * wide in the same paint. Mitered joins (limit 4) are what the browser's own
+ * faked bold has.
+ *
+ * Where the paint is see-through, stroke and fill must not both show in the band
+ * where they overlap, or that band comes out darker than the rest. A solid colour
+ * is therefore painted opaque and the element made see-through as a whole. A
+ * gradient with a see-through stop cannot be: it is painted through a mask of the
+ * grown outlines instead, over `area`, which has to contain all of the text's ink.
+ *
+ * Known limit: the stroke is a live attribute. A program that shows the SVG as a
+ * picture scales it with everything else, but one that converts the SVG into
+ * shapes of its own (Illustrator, Figma) may keep the stroke's width when the
+ * shapes are resized, which thins or thickens the bold. Baking the stroke into
+ * the outlines would avoid that, at the cost of a path-offsetting dependency.
+ */
+function strokedBoldPath(
+  item: TextCanvasItem,
+  d: string,
+  fillAttr: string,
+  strokeWidth: number,
+  area: { x: number; y: number; width: number; height: number },
+  defs: string[],
+): string {
+  const outline = ` stroke-width="${fmt(strokeWidth)}" stroke-linejoin="miter" stroke-miterlimit="4"`;
+
+  if (!fillAttr.startsWith('fill="url(')) {
+    const { hex, alpha } = toSvgPaint(item.fill);
+    const opacity = alpha < 1 ? ` opacity="${fmt(alpha)}"` : '';
+    return `<path d="${d}" fill="${hex}" stroke="${hex}"${outline}${opacity}/>`;
+  }
+
+  const opaque = toSvgPaint(item.fill).alpha >= 1 && toSvgPaint(item.secondaryFill).alpha >= 1;
+  if (opaque) {
+    return `<path d="${d}" ${fillAttr} ${fillAttr.replace('fill=', 'stroke=')}${outline}/>`;
+  }
+
+  const id = `bold-${item.id}`;
+  const rect = `x="${fmt(area.x)}" y="${fmt(area.y)}" width="${fmt(area.width)}" height="${fmt(area.height)}"`;
+  defs.push(
+    `<mask id="${id}" maskUnits="userSpaceOnUse" ${rect}>` +
+      `<path d="${d}" fill="#fff" stroke="#fff"${outline}/></mask>`,
+  );
+  return `<rect ${rect} ${fillAttr} mask="url(#${id})"/>`;
 }
 
 /** One line of a text item, as the canvas draws it. */

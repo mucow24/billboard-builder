@@ -176,6 +176,42 @@ describe('createDocumentFontLoader', () => {
     ]);
   });
 
+  it('says what the browser fakes when the file it draws with lacks the weight or style', async () => {
+    const load = createDocumentFontLoader(
+      docWithFonts([
+        { family: 'Instrument Serif', sourceName: 'InstrumentSerif-Italic.ttf', kind: 'bundled' },
+        { family: 'Sulphur Point', sourceName: 'SulphurPoint-Bold.ttf', kind: 'bundled' },
+        { family: 'Super16Bit', sourceName: 'Super16Bit-Bold.ttf', kind: 'bundled' },
+        audiowideRef,
+      ]),
+      [
+        registered('Instrument Serif', 'InstrumentSerif-Italic.ttf', '400', 'italic'),
+        registered('Instrument Serif', 'InstrumentSerif-Regular.ttf', '400', 'normal'),
+        registered('Sulphur Point', 'SulphurPoint-Bold.ttf', '700', 'normal'),
+        registered('Sulphur Point', 'SulphurPoint-Regular.ttf', '400', 'normal'),
+        registered('Super16Bit', 'Super16Bit-Bold.ttf', '700', 'normal'),
+        audiowide,
+      ],
+      trackingLoaders(),
+    );
+    const faked = async (item: TextCanvasItem) => (await load(item)).synthetic;
+
+    // Regular and italic files only: bold is faked, on top of either.
+    expect(await faked(textItem('Instrument Serif', 'bold', 'normal'))).toEqual({ bold: true, italic: false });
+    expect(await faked(textItem('Instrument Serif', 'bold', 'italic'))).toEqual({ bold: true, italic: false });
+    // Regular and bold files only: italic is faked, on top of either.
+    expect(await faked(textItem('Sulphur Point', 'normal', 'italic'))).toEqual({ bold: false, italic: true });
+    expect(await faked(textItem('Sulphur Point', 'bold', 'italic'))).toEqual({ bold: false, italic: true });
+    // A single regular file: both are faked.
+    expect(await faked(textItem('Audiowide', 'bold', 'italic'))).toEqual({ bold: true, italic: true });
+
+    // Nothing is faked when the file is what the text asks for...
+    expect(await faked(textItem('Instrument Serif', 'normal', 'italic'))).toBeUndefined();
+    expect(await faked(textItem('Audiowide'))).toBeUndefined();
+    // ...or when it is bolder than asked for: the browser does not fake regular weight.
+    expect(await faked(textItem('Super16Bit', 'normal', 'normal'))).toBeUndefined();
+  });
+
   it('prefers the file registered last when two files share a weight and style', async () => {
     const loaders = trackingLoaders();
     const load = createDocumentFontLoader(

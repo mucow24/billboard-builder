@@ -19,7 +19,6 @@ import {
   getLayerSecondaryLabel,
   getSelectionSummary,
   getSortedLayerItems,
-  getTextStyleCapabilities,
 } from './inspectorModel';
 
 describe('inspectorModel', () => {
@@ -124,53 +123,6 @@ describe('inspectorModel', () => {
     expect(options.filter((font) => font.family === 'Ghost Font')).toEqual([
       { family: 'Ghost Font', sourceName: 'GhostFont-Bold.ttf', kind: 'uploaded' },
     ]);
-  });
-
-  it('computes text style capability rules for system and uploaded fonts', () => {
-    const uploadedText = createTextItem({
-      fontFamily: 'Custom Family',
-      fontStyle: 'italic',
-      fontWeight: 'normal',
-    });
-    const systemText = createTextItem({
-      fontFamily: 'Arial',
-      fontStyle: 'normal',
-      fontWeight: 'normal',
-    });
-
-    expect(
-      getTextStyleCapabilities(uploadedText, [
-        {
-          family: 'Custom Family',
-          sourceName: 'CustomFamily-Regular.ttf',
-          weight: '400',
-          style: 'normal',
-          kind: 'uploaded',
-        },
-        {
-          family: 'Custom Family',
-          sourceName: 'CustomFamily-Italic.ttf',
-          weight: '400',
-          style: 'italic',
-          kind: 'uploaded',
-        },
-        {
-          family: 'Custom Family',
-          sourceName: 'CustomFamily-Bold.ttf',
-          weight: '700',
-          style: 'normal',
-          kind: 'uploaded',
-        },
-      ]),
-    ).toEqual({
-      canToggleBold: false,
-      canToggleItalic: true,
-    });
-
-    expect(getTextStyleCapabilities(systemText, [])).toEqual({
-      canToggleBold: true,
-      canToggleItalic: true,
-    });
   });
 
   it('derives layer metadata and sorted ordering from canvas items', () => {

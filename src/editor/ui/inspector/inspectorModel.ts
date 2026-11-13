@@ -7,18 +7,12 @@ import type {
   TextCanvasItem,
   UploadedFont,
 } from '../../document/documentTypes';
-import { familySupportsVariant } from '../../fonts';
 import type { FontOption } from '../FontFamilyPicker';
 
 export interface SelectionSummary {
   allSelectedOpacityEqual: boolean;
   isMultiSelection: boolean;
   opacityValue: number;
-}
-
-export interface TextStyleCapabilities {
-  canToggleBold: boolean;
-  canToggleItalic: boolean;
 }
 
 export function formatDisplayedNumber(value: number, digits = 1): string {
@@ -58,55 +52,6 @@ export function buildFontOptions(
 
 export function getDefaultFontFamily(textItem?: TextCanvasItem): string {
   return textItem?.fontFamily || DEFAULT_FONT_FAMILY;
-}
-
-export function getTextStyleCapabilities(
-  selectedTextItem: TextCanvasItem | undefined,
-  availableFonts: UploadedFont[],
-): TextStyleCapabilities {
-  if (!selectedTextItem) {
-    return {
-      canToggleBold: false,
-      canToggleItalic: false,
-    };
-  }
-
-  const selectedFontIsSystem = WEB_SAFE_FONTS.includes(
-    selectedTextItem.fontFamily as (typeof WEB_SAFE_FONTS)[number],
-  );
-  const familyHasBold = familySupportsVariant(
-    availableFonts,
-    selectedTextItem.fontFamily,
-    '700',
-    'normal',
-  );
-  const familyHasItalic = familySupportsVariant(
-    availableFonts,
-    selectedTextItem.fontFamily,
-    '400',
-    'italic',
-  );
-  const familyHasBoldItalic = familySupportsVariant(
-    availableFonts,
-    selectedTextItem.fontFamily,
-    '700',
-    'italic',
-  );
-  const canTurnBoldOn =
-    selectedTextItem.fontStyle === 'italic' ? familyHasBoldItalic : familyHasBold;
-  const canTurnItalicOn =
-    selectedTextItem.fontWeight === 'bold' ? familyHasBoldItalic : familyHasItalic;
-
-  return {
-    canToggleBold:
-      selectedTextItem.fontWeight === 'bold' ||
-      selectedFontIsSystem ||
-      canTurnBoldOn,
-    canToggleItalic:
-      selectedTextItem.fontStyle === 'italic' ||
-      selectedFontIsSystem ||
-      canTurnItalicOn,
-  };
 }
 
 export function getSelectionSummary(selectedItems: CanvasItem[]): SelectionSummary {

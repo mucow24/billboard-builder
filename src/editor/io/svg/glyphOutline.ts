@@ -1,7 +1,7 @@
 import * as opentype from 'opentype.js';
 
 import { createTextSubstitutions } from './glyphSubstitution';
-import type { OutlineFont } from './svgExportTypes';
+import type { GlyphPathStyle, OutlineFont } from './svgExportTypes';
 
 type OutlineCommand = opentype.PathCommand;
 type DrawCommand = Exclude<OutlineCommand, { type: 'Z' }>;
@@ -31,12 +31,15 @@ export function parseOutlineFont(bytes: ArrayBuffer): OutlineFont | null {
     unitsPerEm: font.unitsPerEm,
     substitutions: createTextSubstitutions(font),
     // `ch` is a character, or the index of a glyph `substitutions` named.
-    glyphPath(ch: string | number, fontSizePx: number, penX: number, baselineY: number) {
+    // `style.slant` is the lean of faked italic. Both leans are about the baseline,
+    // so together they are their sum.
+    glyphPath(ch: string | number, fontSizePx: number, penX: number, baselineY: number, style: GlyphPathStyle = {}) {
       const glyph = typeof ch === 'string' ? font.charToGlyph(ch) : ch < font.numGlyphs ? font.glyphs.get(ch) : null;
       if (!glyph) return null;
       // opentype places glyphs by baseline origin (x, y) = (penX, baselineY).
       const outline = glyph.getPath(penX, baselineY, fontSizePx).commands;
-      return outlinePathData(slant === 0 ? outline : slantOutline(outline, slant, baselineY));
+      const lean = slant + (style.slant ?? 0);
+      return outlinePathData(lean === 0 ? outline : slantOutline(outline, lean, baselineY), style.closed);
     },
   };
 }
@@ -104,14 +107,21 @@ function slantOutline(
  * drawing a <path> at the first command it cannot read, which costs a text layer every
  * glyph after the bad one. Apart from that the output is what `toPathData(2)` gives:
  * the same commands and the same number format.
+ *
+ * `closed` ends every contour with a Z, for outlines that are stroked (see
+ * `GlyphPathStyle.closed`). opentype.js leaves contours open: it ends each with a
+ * line back to its start, or with nothing where the last point is the start. A
+ * closing line is then left out for every contour, since its Z draws it.
  */
-export function outlinePathData(outline: readonly OutlineCommand[]): string | null {
+export function outlinePathData(outline: readonly OutlineCommand[], closed = false): string | null {
   let d = '';
   // Where the current contour started, and where the last command written left the pen.
   let startX = 0;
   let startY = 0;
   let penX = Number.NaN;
   let penY = Number.NaN;
+  // Whether a contour has been started and not ended with a Z yet.
+  let open = false;
 
   for (let index = 0; index < outline.length; index += 1) {
     const command = outline[index];
@@ -119,10 +129,13 @@ export function outlinePathData(outline: readonly OutlineCommand[]): string | nu
       d += 'Z';
       penX = Number.NaN;
       penY = Number.NaN;
+      open = false;
       continue;
     }
 
     if (command.type === 'M') {
+      if (closed && open) d += 'Z';
+      open = true;
       startX = command.x;
       startY = command.y;
     } else if (command.type === 'L') {
@@ -131,7 +144,7 @@ export function outlinePathData(outline: readonly OutlineCommand[]): string | nu
       // last line (of the outline, or before a Z) that ends within a pixel of where its
       // contour started, since filling or closing the contour draws that line anyway.
       const next = outline[index + 1];
-      const endsContour = next === undefined || next.type === 'Z';
+      const endsContour = next === undefined || next.type === 'Z' || (closed && next.type === 'M');
       const redundant = endsContour
         ? Math.abs(command.x - startX) <= 1 && Math.abs(command.y - startY) <= 1
         : command.x === penX && command.y === penY;
@@ -149,6 +162,7 @@ export function outlinePathData(outline: readonly OutlineCommand[]): string | nu
     penY = command.y;
   }
 
+  if (closed && open) d += 'Z';
   return d.length > 0 ? d : null;
 }
 

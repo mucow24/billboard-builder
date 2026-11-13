@@ -491,6 +491,144 @@ test.describe('SVG export', () => {
     }
   });
 
+  // A family with a single regular file has no bold or italic of its own, so the
+  // browser fakes them on the canvas: it leans the glyphs, and grows their
+  // outlines. The export outlines the regular file and has to fake the same.
+  // How the browser fakes is known only to the browser, so the reference is the
+  // canvas itself (Export > PNG). Letter spacing takes the character-by-character
+  // drawing path, hence the spaced layer. The last layer fakes nothing: it shows
+  // how closely plain outlines match the canvas, which the faked ones are held to.
+  test('fakes bold and italic the way the canvas does for a family without those files', async ({ page, browserName }) => {
+    await openFreshEditor(page);
+    // The bundled fonts have to be in first: see the kerning test above.
+    await waitForBundledFonts(page);
+
+    const row = { x: 20, width: 980, height: 170 };
+    const layers = [
+      { id: 'faked-bold', fontWeight: 'bold', fontStyle: 'normal', letterSpacing: 0, y: 40, ...row },
+      { id: 'faked-italic', fontWeight: 'normal', fontStyle: 'italic', letterSpacing: 0, y: 240, ...row },
+      { id: 'faked-bold-italic', fontWeight: 'bold', fontStyle: 'italic', letterSpacing: 0, y: 440, ...row },
+      { id: 'faked-bold-italic-spaced', fontWeight: 'bold', fontStyle: 'italic', letterSpacing: 10, y: 640, ...row },
+      { id: 'regular', fontWeight: 'normal', fontStyle: 'normal', letterSpacing: 0, y: 840, ...row },
+    ];
+    const doc = {
+      ...createProjectDocument(
+        layers.map((layer, index) =>
+          createTextFixture({
+            ...layer,
+            name: layer.id,
+            text: 'AVATAR Toy',
+            fontFamily: 'Albertus MT Std',
+            fontSize: 120,
+            zIndex: index + 1,
+          }),
+        ),
+      ),
+      fonts: [{ family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' }],
+    };
+    await uploadProject(page, doc, 'faked-bold-italic.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    // Bold is a stroke on the glyphs, except in Firefox, which smears them and
+    // gets copies of the outlines instead; italic adds no stroke.
+    const strokes = [...svg.matchAll(/<path d="[^"]+"([^>]*)>/g)].map((match) => / stroke-width="/.test(match[1]));
+    const stroked = browserName !== 'firefox';
+    expect(strokes).toEqual([stroked, false, stroked, stroked, false]);
+    // A stroke follows the contours as written, so each has to be closed (as many
+    // Zs as Ms): an open one has no stroke on its closing edge and a notch at the
+    // corner it starts from.
+    for (const [, d, attributes] of svg.matchAll(/<path d="([^"]+)"([^>]*)>/g)) {
+      if (/ stroke-width="/.test(attributes)) {
+        expect(d.split('Z').length).toBe(d.split('M').length);
+      }
+    }
+
+    const compared = await compareInkWithCanvas(page, svg, png, doc.canvas.width, layers);
+
+    expect(compared).toHaveLength(layers.length);
+    // The canvas draws all text a little heavier than its outlines, so the share
+    // of the canvas ink that the export has is taken from the unfaked layer.
+    const inkShare = (layer: InkComparison) => layer.exported.pixels / layer.canvas.pixels;
+    const regular = compared[compared.length - 1];
+    expect(regular.overlap).toBeGreaterThan(0.9);
+
+    compared.slice(0, -1).forEach((layer, index) => {
+      const { id } = layers[index];
+      expect(layer.canvas.pixels, id).toBeGreaterThan(10_000);
+      // The exported line starts and ends where the canvas line does. Unfaked,
+      // an italic line ends about 20px early and a bold one 2px.
+      expect(Math.abs(layer.exported.left - layer.canvas.left), id).toBeLessThanOrEqual(2);
+      expect(Math.abs(layer.exported.right - layer.canvas.right), id).toBeLessThanOrEqual(2);
+      // The glyphs sit on the canvas ones: shared ink over ink in either. About
+      // 0.92 faked, against 0.94 for the unfaked layer; 0.72 for bold left unfaked.
+      expect(layer.overlap, id).toBeGreaterThan(regular.overlap - 0.05);
+      // And the export has the share of the canvas ink that unfaked text has:
+      // within 0.02 faked, 0.22 short for bold left unfaked.
+      expect(Math.abs(inkShare(layer) - inkShare(regular)), id).toBeLessThan(0.04);
+    });
+  });
+
+  // Regression: the exporter kept a hyphenated word on one line, where the canvas
+  // (Pixi) ends a line after a hyphen. "Double-click to edit" was exported as two
+  // lines, the first running far past the box, against three on the canvas.
+  test('ends a line after a hyphen where the canvas does', async ({ page }) => {
+    await openFreshEditor(page);
+    // The bundled fonts have to be in first: see the kerning test above.
+    await waitForBundledFonts(page);
+
+    const box = { x: 20, y: 30, width: 300, height: 330 };
+    const doc = {
+      ...createProjectDocument([
+        createTextFixture({
+          ...box,
+          id: 'hyphenated',
+          name: 'hyphenated',
+          text: 'Double-click to edit',
+          fontFamily: 'Albertus MT Std',
+          fontSize: 70,
+          zIndex: 1,
+        }),
+      ]),
+      fonts: [{ family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' }],
+    };
+    await uploadProject(page, doc, 'hyphenated-text.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    // Compared across more than the box, where an unwrapped "Double-click" ends up.
+    const [inBox, across] = await compareInkWithCanvas(page, svg, png, doc.canvas.width, [
+      box,
+      { ...box, width: 700 },
+    ]);
+
+    expect(across.canvas.pixels).toBeGreaterThan(3000);
+    // "Double-click" is wider than the box, and the canvas kept inside it: it
+    // ended the line at the hyphen.
+    expect(across.canvas.right).toBeLessThan(inBox.boxRight);
+    // So did the export: its lines start and end where the canvas ones do, and
+    // its glyphs sit on the canvas ones. About 0.9; under 0.3 before the fix.
+    expect(Math.abs(across.exported.left - across.canvas.left)).toBeLessThanOrEqual(2);
+    expect(Math.abs(across.exported.right - across.canvas.right)).toBeLessThanOrEqual(2);
+    expect(across.overlap).toBeGreaterThan(0.7);
+  });
+
   // Regression: the exporter aligned centred and right-aligned lines by another
   // width than the canvas does, so they ended up beside the canvas lines.
   //  - It measured a wrapped line together with the space it wraps at, which Pixi
