@@ -79,13 +79,12 @@ export interface TextMeasurer {
    */
   measureInkWidth?(item: TextCanvasItem, text: string): number;
   /**
-   * Baseline offset in px from the line-box top for the first line, matching
-   * Pixi's `CanvasTextMetrics`: the actual-ink ascent of `|ÉqÅM` plus
-   * `linePositionYShift`. (Deliberately NOT the font's nominal
-   * `fontBoundingBoxAscent`, which diverges from the on-screen baseline on
-   * decorative faces.) `svgText` adds `lineIndex * lineHeight` for later lines.
+   * Distance in px from the top of the item's first line box to its baseline,
+   * where the canvas draws it: the font's capitals centred in the line box (see
+   * `rendering/textBaseline`). `svgText` adds `lineIndex * lineHeight` for later
+   * lines.
    */
-  fontAscent(item: TextCanvasItem): number;
+  firstBaseline(item: TextCanvasItem): number;
 }
 
 export interface NodeRasterizer {

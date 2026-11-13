@@ -55,7 +55,7 @@ export function textSvg(
     textTop += Math.max(0, contentHeight - measuredHeight);
   }
 
-  const ascent = deps.measurer.fontAscent(item);
+  const firstBaseline = deps.measurer.firstBaseline(item);
   const glyphPaths: string[] = [];
 
   // Pixi aligns lines inside the box, or inside the widest line when one does not
@@ -66,7 +66,7 @@ export function textSvg(
   lines.forEach((line, lineIndex) => {
     if (line.text.length === 0) return;
 
-    const baselineY = textTop + lineIndex * lineHeight + ascent;
+    const baselineY = textTop + lineIndex * lineHeight + firstBaseline;
 
     let lineLeft = item.padding.left;
     if (item.align === 'center') {

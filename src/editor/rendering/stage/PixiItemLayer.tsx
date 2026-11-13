@@ -41,6 +41,7 @@ import { brightnessContrastMatrix, tintMatrix } from '../geometry/colorAdjustmen
 import { getImageNodePresentation } from '../imagePresentation';
 import type { Point } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
+import { snapOffsetToTexels } from '../textBaseline';
 import { snapPaddingToTexels } from '../textInkOverhang';
 import { measureWordWrappedTextHeight } from '../textMeasurement';
 import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
@@ -48,6 +49,7 @@ import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
+import { measureTextBaselineShift } from './textBaselineShift';
 import { measureTextRasterPadding } from './textRasterPadding';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
@@ -89,21 +91,22 @@ type GradientCapable =
 
 /**
  * `origin` is where the item's box starts in the space the gradient is resolved
- * in. Shapes draw from (0, 0). A text texture with padding starts that far above
- * and to the left of the text, so its gradient has to be moved along with it.
+ * in. Shapes draw from (0, 0). A text texture starts above and to the left of
+ * the text by its padding, and the text itself is placed inside the item's box,
+ * so its gradient has to be moved back by both to stay on the box.
  */
 function buildPixiGradient(
   item: GradientCapable,
   width: number,
   height: number,
-  origin = 0,
+  origin: Point = { x: 0, y: 0 },
 ): FillGradient | null {
   const endpoints = computeGradientEndpoints(item, width, height);
   if (!endpoints) return null;
   const grad = new FillGradient({
     type: 'linear',
-    start: { x: endpoints.x0 + origin, y: endpoints.y0 + origin },
-    end: { x: endpoints.x1 + origin, y: endpoints.y1 + origin },
+    start: { x: endpoints.x0 + origin.x, y: endpoints.y0 + origin.y },
+    end: { x: endpoints.x1 + origin.x, y: endpoints.y1 + origin.y },
     colorStops: [
       { offset: 0, color: item.fill },
       { offset: 1, color: item.secondaryFill },
@@ -190,14 +193,26 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
   // than a block a side, which the clamp's own margin covers.)
   const padding = snapPaddingToTexels(inkRoom, resolution);
 
+  // Pixi draws the first baseline where the ink of accented capitals puts it;
+  // the layer wants its capitals centred in the line box (see `textBaseline`).
+  // The whole text is moved by the difference, in whole texels so that the
+  // texture is still shown texel for texel.
+  const textX = item.padding.left;
+  textY += snapOffsetToTexels(measureTextBaselineShift(item, layoutStyle), resolution);
+
+  // The gradient runs across the item's box, which starts this far into the
+  // texture: the padding, less where the text sits inside the box.
   const fill = item.gradientEnabled
-    ? buildPixiGradient(item, renderBox.width, renderBox.height, padding) ?? item.fill
+    ? buildPixiGradient(item, renderBox.width, renderBox.height, {
+        x: padding - textX,
+        y: padding - textY,
+      }) ?? item.fill
     : item.fill;
 
   return {
     style: { ...layoutStyle, fill, padding },
     resolution,
-    textX: item.padding.left,
+    textX,
     textY,
   };
 }
