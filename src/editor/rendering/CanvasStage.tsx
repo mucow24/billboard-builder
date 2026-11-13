@@ -325,10 +325,8 @@ export function CanvasStage({
   );
 }
 
-// The cue is one veil over the whole stage with the canvas cut out of it (see
-// .canvas-export-bounds-cue). It used to be four panels around the canvas, but
-// each panel blurred only what lay under itself, so anything straddling a seam
-// between two panels showed a hard edge there.
+// The canvas, clamped to the stage, as the hole that .canvas-export-bounds-cue
+// cuts out of its veil.
 function toExportCueHoleStyle(
   canvasRect: { left: number; top: number; width: number; height: number },
   viewportSize: { width: number; height: number },

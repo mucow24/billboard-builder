@@ -87,24 +87,49 @@ test.describe('editor toolbar flows', () => {
     const exportButton = page.getByRole('button', { name: 'Export', exact: true });
     const canvasButton = page.getByRole('button', { name: 'Canvas', exact: true });
     const exportCue = page.getByTestId('export-bounds-cue');
-    const [canvasTopLeft, canvasBottomRight] = await canvasPointsToPage(page, [
+    const [canvasTopLeft, canvasBottomRight, canvasCenter, offCanvasRectCenter] = await canvasPointsToPage(page, [
       { x: 0, y: 0 },
       { x: 1024, y: 1024 },
+      { x: 512, y: 512 },
+      { x: -90, y: 250 },
     ]);
+    // A small patch of the rendered page around a point; 'disabled' finishes
+    // the cue's fade so the patch shows its settled state.
+    const patchAt = (point: { x: number; y: number }) =>
+      page.screenshot({ clip: { x: point.x - 8, y: point.y - 8, width: 16, height: 16 }, animations: 'disabled' });
 
     await expect(exportCue).not.toHaveClass(/active/);
+    const canvasPatchWithoutCue = await patchAt(canvasCenter);
+    const offCanvasPatchWithoutCue = await patchAt(offCanvasRectCenter);
 
     await exportButton.hover();
     await expect(exportCue).toHaveClass(/active/);
 
-    // The cue is one veil with the canvas cut out of it: the hole must be
+    // The veil darkens what lies outside the canvas and leaves the canvas
+    // itself untouched.
+    expect((await patchAt(canvasCenter)).equals(canvasPatchWithoutCue)).toBe(true);
+    expect((await patchAt(offCanvasRectCenter)).equals(offCanvasPatchWithoutCue)).toBe(false);
+
+    // The cue is one veil with the canvas cut out of it by its computed
+    // clip-path (an invalid polygon would compute to 'none'): the hole must be
     // exactly the canvas, clamped to the stage.
     const cueBounds = await exportCue.boundingBox();
     expect(cueBounds).not.toBeNull();
-    const hole = await exportCue.evaluate((el: HTMLElement) => {
-      const read = (side: string) => parseFloat(el.style.getPropertyValue(`--cue-hole-${side}`));
-      return { left: read('left'), top: read('top'), right: read('right'), bottom: read('bottom') };
-    });
+    const clipPath = await exportCue.evaluate((el) => getComputedStyle(el).clipPath);
+    expect(clipPath).toMatch(/^polygon\(evenodd,/);
+    // The polygon ends with the hole, traced from its top-left corner:
+    // top-left, top-right, bottom-right, bottom-left, top-left.
+    const holePoints = clipPath
+      .slice(clipPath.indexOf('(') + 1, clipPath.lastIndexOf(')'))
+      .split(',')
+      .slice(-5)
+      .map((point) => point.trim().split(/\s+/).map((value) => parseFloat(value)));
+    const hole = {
+      left: holePoints[0]![0]!,
+      top: holePoints[0]![1]!,
+      right: holePoints[2]![0]!,
+      bottom: holePoints[2]![1]!,
+    };
     const clampX = (x: number) => Math.min(cueBounds!.width, Math.max(0, x - cueBounds!.x));
     const clampY = (y: number) => Math.min(cueBounds!.height, Math.max(0, y - cueBounds!.y));
     expect(hole.left).toBeCloseTo(clampX(canvasTopLeft.x), 0);
@@ -298,14 +323,24 @@ test.describe('editor toolbar flows', () => {
     await expect(focusButton).toBeVisible();
     await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
     await expect(exportCue).not.toHaveClass(/active/);
+    await expect(exportCue).toHaveCSS('opacity', '0');
+    await expect(exportCue).toHaveCSS('backdrop-filter', 'blur(0px)');
+
+    // The blur has to ease in with the fade on the veil itself; a fade on an
+    // ancestor would hide the blur until the fade ended.
+    const transitionProperty = await exportCue.evaluate((el) => getComputedStyle(el).transitionProperty);
+    expect(transitionProperty.split(/,\s*/)).toEqual(expect.arrayContaining(['opacity', 'backdrop-filter']));
 
     await focusButton.click();
     await expect(focusButton).toHaveAttribute('aria-pressed', 'true');
     await expect(exportCue).toHaveClass(/active/);
+    await expect(exportCue).toHaveCSS('opacity', '1');
+    await expect(exportCue).toHaveCSS('backdrop-filter', 'blur(18px)');
 
     await focusButton.click();
     await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
     await expect(exportCue).not.toHaveClass(/active/);
+    await expect(exportCue).toHaveCSS('backdrop-filter', 'blur(0px)');
   });
 
   test('keeps UI text unselectable while text fields stay selectable', async ({ page }) => {
