@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type CSSProperties } from 'react';
 
 import type {
   CanvasItem,
@@ -172,7 +172,7 @@ export function CanvasStage({
     zoomInFromWheel: viewport.zoomInFromWheel,
   });
 
-  const exportCuePanels = buildExportCuePanels(
+  const exportCueHoleStyle = toExportCueHoleStyle(
     viewport.toViewportRect({
       x: 0,
       y: 0,
@@ -193,16 +193,8 @@ export function CanvasStage({
         className={showExportBoundsCue ? 'canvas-export-bounds-cue active' : 'canvas-export-bounds-cue'}
         data-testid="export-bounds-cue"
         aria-hidden="true"
-      >
-        {exportCuePanels.map((panel) => (
-          <div
-            key={panel.side}
-            className={`canvas-export-bounds-panel canvas-export-bounds-panel-${panel.side}`}
-            data-testid={`export-bounds-cue-${panel.side}`}
-            style={toBoundsCueStyle(panel.rect)}
-          />
-        ))}
-      </div>
+        style={exportCueHoleStyle}
+      />
       <CanvasViewportHud
         canvasHeight={document.canvas.height}
         canvasWidth={document.canvas.width}
@@ -333,77 +325,29 @@ export function CanvasStage({
   );
 }
 
-type ExportCuePanel = {
-  side: 'top' | 'right' | 'bottom' | 'left';
-  rect: { left: number; top: number; width: number; height: number };
-};
-
-function buildExportCuePanels(
+// The canvas, clamped to the stage, as the hole that .canvas-export-bounds-cue
+// cuts out of its veil.
+function toExportCueHoleStyle(
   canvasRect: { left: number; top: number; width: number; height: number },
   viewportSize: { width: number; height: number },
-): ExportCuePanel[] {
+): CSSProperties {
   const viewportWidth = Math.max(0, viewportSize.width);
   const viewportHeight = Math.max(0, viewportSize.height);
-  const canvasLeft = clampNumber(canvasRect.left, 0, viewportWidth);
-  const canvasTop = clampNumber(canvasRect.top, 0, viewportHeight);
-  const canvasRight = clampNumber(canvasRect.left + canvasRect.width, 0, viewportWidth);
-  const canvasBottom = clampNumber(canvasRect.top + canvasRect.height, 0, viewportHeight);
-  const visibleCanvasWidth = canvasRight - canvasLeft;
-  const visibleCanvasHeight = canvasBottom - canvasTop;
+  const left = clampNumber(canvasRect.left, 0, viewportWidth);
+  const top = clampNumber(canvasRect.top, 0, viewportHeight);
+  const right = Math.max(left, clampNumber(canvasRect.left + canvasRect.width, 0, viewportWidth));
+  const bottom = Math.max(top, clampNumber(canvasRect.top + canvasRect.height, 0, viewportHeight));
 
-  if (visibleCanvasWidth <= 0 || visibleCanvasHeight <= 0) {
-    return [
-      {
-        side: 'top',
-        rect: { left: 0, top: 0, width: viewportWidth, height: viewportHeight },
-      },
-      { side: 'right', rect: { left: viewportWidth, top: 0, width: 0, height: 0 } },
-      { side: 'bottom', rect: { left: 0, top: viewportHeight, width: 0, height: 0 } },
-      { side: 'left', rect: { left: 0, top: 0, width: 0, height: 0 } },
-    ];
-  }
-
-  return [
-    {
-      side: 'top',
-      rect: { left: 0, top: 0, width: viewportWidth, height: canvasTop },
-    },
-    {
-      side: 'right',
-      rect: {
-        left: canvasRight,
-        top: canvasTop,
-        width: viewportWidth - canvasRight,
-        height: visibleCanvasHeight,
-      },
-    },
-    {
-      side: 'bottom',
-      rect: {
-        left: 0,
-        top: canvasBottom,
-        width: viewportWidth,
-        height: viewportHeight - canvasBottom,
-      },
-    },
-    {
-      side: 'left',
-      rect: { left: 0, top: canvasTop, width: canvasLeft, height: visibleCanvasHeight },
-    },
-  ];
+  return {
+    '--cue-hole-left': `${left}px`,
+    '--cue-hole-top': `${top}px`,
+    '--cue-hole-right': `${right}px`,
+    '--cue-hole-bottom': `${bottom}px`,
+  } as CSSProperties;
 }
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function toBoundsCueStyle(rect: { left: number; top: number; width: number; height: number }) {
-  return {
-    left: `${Math.max(0, rect.left)}px`,
-    top: `${Math.max(0, rect.top)}px`,
-    width: `${Math.max(0, rect.width)}px`,
-    height: `${Math.max(0, rect.height)}px`,
-  };
 }
 
 function CanvasStageDebug({
