@@ -299,6 +299,43 @@ test.describe('editor toolbar flows', () => {
     await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
     await expect(exportCue).not.toHaveClass(/active/);
   });
+
+  test('keeps UI text unselectable while text fields stay selectable', async ({ page }) => {
+    await openFreshEditor(page);
+    const selectedText = () => page.evaluate(() => document.getSelection()?.toString() ?? '');
+
+    // Drag across the Properties panel's empty-state text and double-click a word in it.
+    const emptyState = page.locator('.empty-panel-inner');
+    const box = await emptyState.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + 4, box!.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width - 4, box!.y + box!.height - 4, { steps: 8 });
+    await page.mouse.up();
+    expect(await selectedText()).toBe('');
+
+    await emptyState.getByText('Nothing selected').dblclick();
+    expect(await selectedText()).toBe('');
+
+    // Double-clicking button text selects nothing either.
+    await page.getByRole('button', { name: 'Canvas', exact: true }).dblclick();
+    expect(await selectedText()).toBe('');
+    await page.keyboard.press('Escape');
+
+    // A text field still lets the mouse select inside it.
+    await page.getByTestId('canvas-name-display').dblclick();
+    const nameInput = page.getByTestId('canvas-name-input');
+    await nameInput.fill('alpha beta');
+    const inputBox = await nameInput.boundingBox();
+    expect(inputBox).not.toBeNull();
+    await page.mouse.click(inputBox!.x + inputBox!.width - 4, inputBox!.y + inputBox!.height / 2);
+    await page.mouse.move(inputBox!.x + 6, inputBox!.y + inputBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(inputBox!.x + inputBox!.width - 4, inputBox!.y + inputBox!.height / 2, { steps: 8 });
+    await page.mouse.up();
+    const range = await nameInput.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd]);
+    expect(range[1]! - range[0]!).toBeGreaterThan(0);
+  });
 });
 
 function isPointInsideRect(

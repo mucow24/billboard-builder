@@ -23,10 +23,22 @@ html {
   min-height: 100%;
 }
 
+/* UI chrome (headers, labels, button text) is not selectable, so drags and
+   double-clicks on the panels never highlight text. Fields the user types in
+   opt back in below. */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable]:not([contenteditable='false']) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 body::before {
