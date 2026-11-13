@@ -5,7 +5,7 @@ import {
   readSelectionFromClipboardData,
   writeSelectionToClipboardData,
 } from './clipboard';
-import { isEditableTarget } from './domUtils';
+import { isEditableTarget } from '../editor/rendering/domUtils';
 import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import { cloneCanvasNode } from '../editor/document/sceneGraph';
 import type { CanvasTool } from '../editor/document/documentTypes';

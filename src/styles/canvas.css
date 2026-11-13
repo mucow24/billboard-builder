@@ -148,22 +148,42 @@
   overflow: hidden;
 }
 
+/* One veil over the whole stage, with the canvas cut out by an even-odd
+   clip-path (the hole comes in as --cue-hole-* from CanvasStage). A single
+   element blurs one continuous backdrop, so nothing tears where separate
+   panels used to meet.
+   The fade must sit on this element itself, never on an ancestor: an ancestor
+   with opacity below 1 becomes the backdrop root, the blur then sees only that
+   fading layer and snaps onto the canvas when the fade ends. The blur radius
+   eases in step with the opacity. */
 .canvas-export-bounds-cue {
   position: absolute;
   inset: 0;
   z-index: 1;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  background: rgba(6, 10, 20, 0.82);
+  clip-path: polygon(
+    evenodd,
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 0,
+    var(--cue-hole-left) var(--cue-hole-top),
+    var(--cue-hole-right) var(--cue-hole-top),
+    var(--cue-hole-right) var(--cue-hole-bottom),
+    var(--cue-hole-left) var(--cue-hole-bottom),
+    var(--cue-hole-left) var(--cue-hole-top)
+  );
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  transition:
+    opacity 160ms ease,
+    backdrop-filter 160ms ease;
 }
 
 .canvas-export-bounds-cue.active {
   opacity: 1;
-}
-
-.canvas-export-bounds-panel {
-  position: absolute;
-  background: rgba(6, 10, 20, 0.82);
   backdrop-filter: blur(18px);
 }
 
@@ -204,6 +224,56 @@
 .canvas-hud-readout {
   min-width: 6.2rem;
   text-align: center;
+}
+
+.canvas-hud-readout-button {
+  font: inherit;
+  cursor: text;
+}
+
+.canvas-hud-readout-button:hover {
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.canvas-hud-readout-button:focus-visible,
+.canvas-hud-readout-editing:focus-within {
+  outline: 2px solid rgba(96, 165, 250, 0.9);
+  outline-offset: 2px;
+}
+
+.canvas-hud-readout-editing {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  cursor: text;
+}
+
+/* Stands in for the space in "Zoom: 50%" (flex drops whitespace text). */
+.canvas-hud-readout-editing label {
+  margin-right: 0.27em;
+  cursor: inherit;
+}
+
+/* Sized to its text where field-sizing is supported, so the readout keeps
+   its width while edited; elsewhere four digits wide. */
+.canvas-hud-zoom-input {
+  width: 4ch;
+  min-width: 1ch;
+  max-width: 5ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  outline: none;
+}
+
+@supports (field-sizing: content) {
+  .canvas-hud-zoom-input {
+    width: auto;
+    field-sizing: content;
+  }
 }
 
 .canvas-hud-button {

@@ -1872,6 +1872,55 @@ describe('useCanvasInteractionSession', () => {
     expect(params.onUpdateItem).not.toHaveBeenCalled();
   });
 
+  it('leaves Escape from a text field to that field during crop mode', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+    });
+    image.id = 'selected-image';
+    const params = createHookParams({
+      document: createDocument([image]),
+      selectedNodeIds: [image.id],
+    });
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+    expect(result.current.cropSession).not.toBeNull();
+
+    const input = window.document.createElement('input');
+    const plainTarget = window.document.createElement('div');
+    window.document.body.append(input, plainTarget);
+    try {
+      const fromInput = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        input.dispatchEvent(fromInput);
+      });
+
+      expect(result.current.cropSession).not.toBeNull();
+      expect(fromInput.defaultPrevented).toBe(false);
+
+      act(() => {
+        plainTarget.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        );
+      });
+
+      expect(result.current.cropSession).toBeNull();
+      expect(params.onUpdateItem).not.toHaveBeenCalled();
+    } finally {
+      input.remove();
+      plainTarget.remove();
+    }
+  });
+
   it('keeps the crop frame fixed while crop-mode rotation changes only the source transform', () => {
     const image = createImageItem({
       src: 'data:image/png;base64,AAA',

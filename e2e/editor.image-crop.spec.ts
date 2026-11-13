@@ -15,6 +15,7 @@ import {
   movePointerToCanvasPoint,
   openFreshEditor,
   openLayersTab,
+  openPropertiesTab,
   readStageDebug,
   releasePointer,
   saveAndReadProject,
@@ -438,6 +439,46 @@ test.describe('editor image crop', () => {
         height: 60,
       },
     });
+  });
+
+  test('Escape in an inspector field stays with the field and keeps crop mode active', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'crop-escape-field-image',
+      name: 'Escape Field Image',
+      x: 520,
+      y: 320,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createGroupedProjectDocument([image]),
+      'crop-escape-field.json',
+    );
+    await setCanvasTestHooksEnabled(page, false);
+
+    await doubleClickItem(page, 'crop-escape-field-image');
+    await expectCropMode(page);
+
+    await openPropertiesTab(page);
+    const opacityInput = page.getByRole('spinbutton', { name: 'Opacity value' });
+    await opacityInput.click();
+    await expect(opacityInput).toBeFocused();
+    await expectCropMode(page);
+
+    await opacityInput.press('Escape');
+    // Give a stray cancel a frame to land before checking it didn't.
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+    await expectCropMode(page);
+
+    // With focus off the field, Escape cancels the crop as before.
+    await opacityInput.blur();
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
   });
 
   test('keeps the crop frame fixed while crop-mode rotation commits a source-only transform', async ({

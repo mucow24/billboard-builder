@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { isEditableTarget } from './domUtils';
+import { isEditableTarget } from '../editor/rendering/domUtils';
 
 export function useKeyHeld(key: string): boolean {
   const [held, setHeld] = useState(false);

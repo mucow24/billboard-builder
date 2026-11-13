@@ -178,6 +178,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | IC-11 | Canvas | Crop mode active | Double-click anywhere on the image, inside or outside the crop | Crop affordance disappears while the image remains selected | Crop session commits and exits without clearing selection | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 | IC-12 | Canvas | Crop mode active, snap candidate visible | Drag a crop boundary near a guide, then repeat with Ctrl held | Guides appear for the snapped drag and stay absent for the Ctrl drag | Crop boundary snapping matches normal guide behavior and Ctrl disables it | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 | IC-13 | Canvas | Crop mode active | Change zoom with the HUD | Crop hooks keep the same visible size and full-image rotater offset | Crop overlay geometry stays viewport-invariant across zoom changes | support/debug | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-14 | Keyboard | Crop mode active, focus in a text field (inspector input, HUD zoom field) | Press Escape | The field handles Escape; crop affordance stays visible | Crop session stays active with no document mutation; Escape outside a text field still cancels it (IC-08) | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 
 ## 6. Group and Multi-Selection Transform Flows
 
@@ -209,6 +210,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | VP-08 | HUD | Any state | Click 100% | Zoom readout becomes 100% | Zoom set to 1 | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | VP-09 | HUD | Any state | Click Fit | Canvas fits viewport | Zoom/pan recomputed | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
 | VP-10 | Canvas/HUD | Tool changes | Change tool or modifier state | Cursor changes correctly | No document mutation | user-flow | Chromium | Covered in [e2e/editor.entrypoints.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.entrypoints.spec.ts) |
+| VP-11 | HUD | Any state | Click zoom readout, type a percentage, Enter (Escape cancels) | Readout shows the typed zoom (snapped) | Zoom set about the view centre, clamped 0.1-1600% | user-flow | Chromium | Covered in [e2e/editor.smoke.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.smoke.spec.ts) |
 
 ## 8. Layers Flows
 

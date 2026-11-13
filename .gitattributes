@@ -1,2 +1,7 @@
 src/assets/fonts/**/*.ttf filter=lfs diff=lfs merge=lfs -text
 src/assets/fonts/**/*.otf filter=lfs diff=lfs merge=lfs -text
+
+# Vitest writes snapshot files with LF line endings. Keep them LF in the
+# working tree too, or core.autocrlf=true checkouts show them as modified
+# after every test run (and the preflight clean-tree check fails).
+*.snap text eol=lf
