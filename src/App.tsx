@@ -9,6 +9,8 @@ import { useKeyHeld } from './app/useKeyHeld';
 import { useStatusToast } from './app/useStatusToast';
 import { removeBootShell } from './bootstrapShell';
 import { CanvasStage } from './editor/rendering/CanvasStage';
+import { DocumentLibraryDialog } from './editor/ui/DocumentLibraryDialog';
+import { UnsavedChangesDialog } from './editor/ui/UnsavedChangesDialog';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
@@ -50,9 +52,19 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
   const clipboardStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
+  const getRendererHandle = useCallback(() => stageRef.current, []);
 
   const {
     actions: {
+      answerLeavePrompt,
+      closeLibrary,
+      deleteLibraryDocument,
+      exportLibraryDocument,
+      handleExportJson,
+      handleRevert,
+      openLibrary,
+      openLibraryDocument,
+      renameLibraryDocument,
       deleteFavorite,
       deleteNode,
       deleteSelectedNodes,
@@ -90,11 +102,20 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       activeTool,
       availableFonts,
       canRedo,
+      canRevert,
       canUndo,
       document,
+      documentId,
       errorMessage,
+      hasUnsavedChanges,
       inspectorPanel: { tab: inspectorTab, collapsed: panelCollapsed },
       layerRows,
+      leavePrompt,
+      libraryBusy,
+      libraryEntries,
+      libraryEntriesKnown,
+      libraryOpen,
+      libraryPreviews,
       missingFontFamilies,
       pendingCollapsedGroupIds,
       selectedGroup,
@@ -104,7 +125,14 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       selectedNodeIds,
       favorites,
     },
-  } = useEditorController({ fontsReady });
+  } = useEditorController({ fontsReady, getRendererHandle });
+
+  // Guides belong to the document they were dragged out for.
+  const [guidesDocumentId, setGuidesDocumentId] = useState(documentId);
+  if (guidesDocumentId !== documentId) {
+    setGuidesDocumentId(documentId);
+    setGuides([]);
+  }
 
   useLayoutEffect(() => {
     const element = topbarRef.current;
@@ -135,7 +163,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
   }, []);
 
   return (
-    <div className="app-shell" data-fonts-ready={fontsReady}>
+    <div className="app-shell" data-fonts-ready={fontsReady} data-library-busy={libraryBusy}>
       <FontImportProvider onImportFont={() => fontInputRef.current?.click()}>
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
@@ -161,6 +189,8 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             canUngroup={Boolean(selectedNode && selectedNode.kind === 'group' && canUngroupNode(document.nodes, selectedNode.id))}
             canUndo={canUndo}
             canRedo={canRedo}
+            canRevert={canRevert}
+            hasUnsavedChanges={hasUnsavedChanges}
             canSaveFavorite={selectedNodeIds.length > 0}
             canvasName={document.name}
             onCanvasNameChange={(name) => dispatch({ type: 'set_canvas_name', name })}
@@ -174,6 +204,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             onCanvasSizeChange={setCanvasSize}
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
+            onExportJson={handleExportJson}
             onExportSvg={() => {
               void handleExportSvg();
             }}
@@ -185,14 +216,14 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             }}
             onExportIntentChange={handleExportIntentChange}
             onGroup={groupSelectedNodes}
-            onLoad={() => openInputRef.current?.click()}
+            onLoadFromJson={() => openInputRef.current?.click()}
+            onLoadFromLibrary={openLibrary}
             onNewProject={() => {
-              handleNewProject(() => {
-                setGuides([]);
-              });
+              void handleNewProject();
             }}
             onRedo={redo}
             onReorder={reorderSelectedNode}
+            onRevert={handleRevert}
             onSave={handleSave}
             onSaveFavorite={() => {
               if (saveSelectionAsFavorite()) {
@@ -292,6 +323,39 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
         </div>
       </main>
       </FontImportProvider>
+
+      {libraryOpen ? (
+        <DocumentLibraryDialog
+          entries={libraryEntries}
+          entriesKnown={libraryEntriesKnown}
+          previews={libraryPreviews}
+          currentDocumentId={documentId}
+          currentDocumentHasUnsavedChanges={hasUnsavedChanges}
+          onClose={closeLibrary}
+          onOpen={(id) => {
+            void openLibraryDocument(id).then((opened) => {
+              if (opened) {
+                closeLibrary();
+              }
+            });
+          }}
+          onRename={renameLibraryDocument}
+          onDelete={(id) => {
+            void deleteLibraryDocument(id);
+          }}
+          onExportJson={(id) => {
+            void exportLibraryDocument(id);
+          }}
+        />
+      ) : null}
+      {libraryBusy ? <div className="library-busy-overlay" aria-hidden="true" /> : null}
+      {leavePrompt ? (
+        <UnsavedChangesDialog
+          canvasName={leavePrompt.documentName}
+          neverSaved={leavePrompt.neverSaved}
+          onAnswer={answerLeavePrompt}
+        />
+      ) : null}
 
       <input
         ref={imageInputRef}

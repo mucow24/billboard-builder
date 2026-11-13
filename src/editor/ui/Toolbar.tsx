@@ -26,8 +26,12 @@ interface ToolbarProps {
   canRedo: boolean;
   canGroup: boolean;
   canReorder: boolean;
+  /** The document has unsaved changes and a saved version to go back to. */
+  canRevert: boolean;
   canSaveFavorite: boolean;
   canUngroup: boolean;
+  /** The document has changes that are not in the library yet. */
+  hasUnsavedChanges: boolean;
   canvasName: string;
   onCanvasNameChange: (name: string) => void;
   canvasFocusActive: boolean;
@@ -40,14 +44,17 @@ interface ToolbarProps {
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
+  onExportJson: () => void;
   onExportSvg: () => void;
   onExportToClipboard: () => void;
   onExportIntentChange?: (active: boolean) => void;
   onGroup: () => void;
-  onLoad: () => void;
+  onLoadFromJson: () => void;
+  onLoadFromLibrary: () => void;
   onNewProject: () => void;
   onRedo: () => void;
   onReorder: (mode: ReorderMode) => void;
+  onRevert: () => void;
   onSave: () => void;
   onSaveFavorite: () => void;
   onUndo: () => void;
@@ -68,8 +75,10 @@ export function Toolbar({
   canRedo,
   canGroup,
   canReorder,
+  canRevert,
   canSaveFavorite,
   canUngroup,
+  hasUnsavedChanges,
   canvasName,
   onCanvasNameChange,
   canvasFocusActive,
@@ -82,14 +91,17 @@ export function Toolbar({
   onCanvasSizeChange,
   onDelete,
   onExport,
+  onExportJson,
   onExportSvg,
   onExportToClipboard,
   onExportIntentChange,
   onGroup,
-  onLoad,
+  onLoadFromJson,
+  onLoadFromLibrary,
   onNewProject,
   onRedo,
   onReorder,
+  onRevert,
   onSave,
   onSaveFavorite,
   onUndo,
@@ -228,6 +240,7 @@ export function Toolbar({
             {exportMenuOpen ? (
               <ExportMenu
                 menuId={exportMenuId}
+                onExportJson={onExportJson}
                 onExportPng={onExport}
                 onExportSvg={onExportSvg}
                 onExportToClipboard={onExportToClipboard}
@@ -266,10 +279,14 @@ export function Toolbar({
             <CanvasMenu
               background={background}
               canvas={canvas}
+              canRevert={canRevert}
+              canSave={hasUnsavedChanges}
               menuId={canvasMenuId}
               onBackgroundChange={onBackgroundChange}
               onCanvasSizeChange={onCanvasSizeChange}
-              onLoad={onLoad}
+              onLoadFromJson={onLoadFromJson}
+              onLoadFromLibrary={onLoadFromLibrary}
+              onRevert={onRevert}
               onSave={onSave}
               onNewProject={onNewProject}
               createMenuActionHandler={createMenuActionHandler}
@@ -278,6 +295,15 @@ export function Toolbar({
         </div>
 
         <CanvasNameField name={canvasName} onChange={onCanvasNameChange} />
+        {hasUnsavedChanges ? (
+          <span
+            className="top-toolbar-dirty-dot"
+            data-testid="canvas-unsaved-indicator"
+            role="img"
+            aria-label="Unsaved changes"
+            title="Unsaved changes"
+          />
+        ) : null}
 
         <div className="top-toolbar-section-divider" aria-hidden="true" />
 

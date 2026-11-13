@@ -9,6 +9,7 @@ function createMockStore(overrides: Partial<RawCanvasStore> = {}): RawCanvasStor
   return {
     read: vi.fn().mockResolvedValue(null),
     write: vi.fn().mockResolvedValue(undefined),
+    readDocumentId: vi.fn().mockResolvedValue(null),
     clear: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -28,9 +29,10 @@ describe('CanvasPersistenceService', () => {
 
     const expectedDocument = normalizeProjectDocument(projectDocument);
 
-    await service.save(projectDocument);
+    await service.save(projectDocument, 'document-1');
 
     await expect(service.load()).resolves.toEqual(expectedDocument);
+    expect(store.write).toHaveBeenCalledWith(expect.any(String), 'document-1');
   });
 
 
@@ -62,10 +64,13 @@ describe('CanvasPersistenceService', () => {
       height: 12,
     };
 
-    await service.save({
-      ...createDefaultProjectDocument(),
-      nodes: [image],
-    });
+    await service.save(
+      {
+        ...createDefaultProjectDocument(),
+        nodes: [image],
+      },
+      'document-1',
+    );
 
     await expect(service.load()).resolves.toMatchObject({
       nodes: [

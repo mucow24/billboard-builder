@@ -13,7 +13,6 @@ import {
 import { buildSelectionLockCommands } from '../core/selectionLock';
 import {
   createItemForKind,
-  createResetDocumentTransaction,
   reduceEditorState,
 } from '../core/editorReducer';
 import { createTransactionAction, toEditorAction, type EditorAction } from '../core/editorActions';
@@ -90,7 +89,6 @@ export interface EditorStoreState {
   addImageItem: (item: CanvasItem) => void;
   setCanvasSize: (canvas: CanvasSize) => void;
   setExportScale: (scale: number) => void;
-  resetDocument: () => void;
 }
 
 function applyStoreAction(state: EditorStoreState, action: EditorAction) {
@@ -375,6 +373,5 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
     addImageItem: (item) => get().dispatch({ type: 'add_node', item }),
     setCanvasSize: (canvas) => get().dispatch({ type: 'set_canvas_size', canvas }),
     setExportScale: (scale) => set((state) => applyStoreAction(state, { family: 'session', type: 'set_export_scale', scale })),
-    resetDocument: () => set((state) => applyStoreAction(state, createResetDocumentTransaction())),
   };
 });

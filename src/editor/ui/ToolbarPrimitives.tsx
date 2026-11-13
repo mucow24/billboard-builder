@@ -18,6 +18,9 @@ export function ToolbarIcon({ children }: ToolbarIconProps) {
 
 interface ToolbarMenuActionProps {
   children?: ReactNode;
+  disabled?: boolean;
+  /** The action's keyboard shortcut, shown after the label. It is not part of the button's name. */
+  hint?: string;
   label: string;
   onSelect: () => void;
   pressed?: boolean;
@@ -26,6 +29,8 @@ interface ToolbarMenuActionProps {
 
 export function ToolbarMenuAction({
   children,
+  disabled,
+  hint,
   label,
   onSelect,
   pressed,
@@ -35,11 +40,18 @@ export function ToolbarMenuAction({
     <button
       type="button"
       className={joinClassNames('top-toolbar-menu-item', selected && 'selected')}
+      aria-keyshortcuts={hint}
       aria-pressed={pressed}
+      disabled={disabled}
       onClick={onSelect}
     >
       {children ? <ToolbarIcon>{children}</ToolbarIcon> : null}
       <span>{label}</span>
+      {hint ? (
+        <span className="top-toolbar-menu-item-hint" aria-hidden="true">
+          {hint}
+        </span>
+      ) : null}
     </button>
   );
 }

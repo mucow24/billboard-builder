@@ -1390,9 +1390,72 @@ export async function openToolbarPopover(page: Page, triggerName: string) {
   await page.getByRole('button', { name: triggerName, exact: true }).click();
 }
 
-export async function clickToolbarPopoverItem(page: Page, triggerName: string, itemName: string) {
+/** A button of the question asked before a canvas with unsaved changes is replaced. */
+export type UnsavedChangesAnswer = 'Save' | 'Discard' | 'Cancel';
+
+/** The question asked before a canvas with unsaved changes is replaced. */
+export function unsavedChangesPrompt(page: Page) {
+  return page.getByRole('alertdialog', { name: 'Unsaved changes' });
+}
+
+/**
+ * Waits until no library operation is under way: nothing is being saved,
+ * fetched or switched, and the editor takes input again.
+ *
+ * Starting or loading a canvas over one with unsaved changes first asks what
+ * to do with them. If that question comes up it is answered with
+ * `unsavedChanges`. The default is Discard: most tests replace a fixture they
+ * are done with, and have no use for it in the library.
+ */
+export async function waitForLibraryIdle(page: Page, unsavedChanges: UnsavedChangesAnswer = 'Discard') {
+  const idle = page.locator('.app-shell[data-library-busy="false"]');
+  const prompt = unsavedChangesPrompt(page);
+  await expect(idle.or(prompt)).toBeVisible();
+  if (await prompt.isVisible()) {
+    await prompt.getByRole('button', { name: unsavedChanges, exact: true }).click();
+    await expect(prompt).toHaveCount(0);
+  }
+  await expect(idle).toBeVisible();
+}
+
+/**
+ * Picks an item from a toolbar menu and waits for what it starts to be over.
+ * `unsavedChanges` answers the unsaved-changes question, if it is asked.
+ */
+export async function clickToolbarPopoverItem(
+  page: Page,
+  triggerName: string,
+  itemName: string,
+  unsavedChanges: UnsavedChangesAnswer = 'Discard',
+) {
   await openToolbarPopover(page, triggerName);
   await page.getByRole('button', { name: itemName, exact: true }).click();
+  await waitForLibraryIdle(page, unsavedChanges);
+}
+
+/** Clicks an item of the Canvas > Load submenu: 'From library...' or 'From JSON...'. */
+export async function clickCanvasLoadItem(page: Page, itemName: string) {
+  await openToolbarPopover(page, 'Canvas');
+  const canvasMenu = page.getByRole('group', { name: 'Canvas actions' });
+  await canvasMenu.getByRole('button', { name: 'Load', exact: true }).click();
+  await canvasMenu.getByRole('button', { name: itemName, exact: true }).click();
+}
+
+/** Starts Canvas > Load > From JSON and returns its file chooser. */
+export async function startProjectFileChooser(page: Page): Promise<FileChooser> {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    clickCanvasLoadItem(page, 'From JSON...'),
+  ]);
+  return chooser;
+}
+
+/** Opens the library dialog from Canvas > Load > From library. */
+export async function openLibrary(page: Page) {
+  await clickCanvasLoadItem(page, 'From library...');
+  const dialog = page.getByRole('dialog', { name: 'Library' });
+  await expect(dialog).toBeVisible();
+  return dialog;
 }
 
 export async function addGenerator(page: Page, generatorName: string) {
@@ -1435,14 +1498,6 @@ export async function chooseCanvasPreset(page: Page, presetName: string) {
   await canvasMenu.getByRole('button', { name: presetName, exact: true }).click();
 }
 
-export async function startToolbarFileChooser(page: Page, triggerName: string, itemName: string): Promise<FileChooser> {
-  const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser'),
-    clickToolbarPopoverItem(page, triggerName, itemName),
-  ]);
-  return chooser;
-}
-
 export function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
   return nodes.flatMap((node) => {
     if (node.kind === 'group' && Array.isArray(node.children)) {
@@ -1468,13 +1523,23 @@ function countVisibleLeafNodes(nodes: unknown[]): number {
   return count;
 }
 
-export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
-  const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+/**
+ * Opens `document` through Canvas > Load > From JSON. If the open canvas has
+ * unsaved changes, the question about them is answered with `unsavedChanges`.
+ */
+export async function uploadProject(
+  page: Page,
+  document: Record<string, unknown>,
+  fileName = 'fixture.json',
+  unsavedChanges: UnsavedChangesAnswer = 'Discard',
+) {
+  const chooser = await startProjectFileChooser(page);
   await chooser.setFiles({
     name: fileName,
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(document), 'utf8'),
   });
+  await waitForLibraryIdle(page, unsavedChanges);
 
   // Wait for the canvas to finish rendering the uploaded nodes.
   // Without this, fast canvas interactions right after upload can race
@@ -1615,10 +1680,11 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
   return download;
 }
 
+/** Downloads the canvas as it is in the editor (Export > JSON) and reads the file. */
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+      await clickToolbarPopoverItem(page, 'Export', 'JSON');
     }),
   );
 }
@@ -1863,7 +1929,8 @@ async function clearPersistence(page: Page) {
       request.onsuccess = () => {
         const database = request.result;
         const transaction = database.transaction(['canvas', 'uploaded-fonts'], 'readwrite');
-        transaction.objectStore('canvas').delete('current');
+        // The saved canvas and the document library.
+        transaction.objectStore('canvas').clear();
         transaction.objectStore('uploaded-fonts').clear();
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error);

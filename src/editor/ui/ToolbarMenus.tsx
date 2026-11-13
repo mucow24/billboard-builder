@@ -5,6 +5,7 @@ import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
 import { ColorPickerControl } from './ColorPickerControl';
 import { ToolbarIcon, ToolbarMenuAction } from './ToolbarPrimitives';
+import { joinClassNames, modKey } from './toolbarUtils';
 
 export const GENERATOR_ICONS: Record<string, ReactNode> = {
   bands: (
@@ -74,12 +75,19 @@ export const GENERATOR_ICONS: Record<string, ReactNode> = {
   ),
 };
 
-interface SizeSubmenuProps {
-  canvas: CanvasSize;
-  onCanvasSizeChange: (canvas: CanvasSize) => void;
+interface ToolbarSubmenuProps {
+  /** The submenu's items, shown beside the trigger while it is open. */
+  children: ReactNode;
+  /** The paths of the trigger's icon. */
+  icon: ReactNode;
+  label: string;
+  /** Accessible name of the group of items. */
+  panelLabel: string;
+  panelClassName?: string;
 }
 
-function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
+/** A menu item that opens a further menu beside it, on hover or click. */
+function ToolbarSubmenu({ children, icon, label, panelLabel, panelClassName }: ToolbarSubmenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -89,6 +97,46 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
     };
   }, []);
 
+  return (
+    <div
+      className="top-toolbar-submenu"
+      onMouseEnter={() => {
+        if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+        setIsOpen(true);
+      }}
+      onMouseLeave={() => {
+        closeTimerRef.current = setTimeout(() => setIsOpen(false), 250);
+      }}
+    >
+      <button
+        type="button"
+        className="top-toolbar-menu-item top-toolbar-submenu-trigger"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen(true)}
+      >
+        <ToolbarIcon>{icon}</ToolbarIcon>
+        <span>{label}</span>
+        <span className="color-picker-submenu-arrow" aria-hidden="true" />
+      </button>
+      {isOpen ? (
+        <div
+          className={joinClassNames('top-toolbar-popover-panel top-toolbar-submenu-panel', panelClassName)}
+          role="group"
+          aria-label={panelLabel}
+        >
+          {children}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface SizeSubmenuProps {
+  canvas: CanvasSize;
+  onCanvasSizeChange: (canvas: CanvasSize) => void;
+}
+
+function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
   const selectedPresetId = canvas.presetId ?? 'custom';
 
   function handlePresetSelect(presetId: string) {
@@ -106,93 +154,79 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
   }
 
   return (
-    <div
-      className="size-submenu"
-      onMouseEnter={() => {
-        if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
-        setIsOpen(true);
-      }}
-      onMouseLeave={() => {
-        closeTimerRef.current = setTimeout(() => setIsOpen(false), 250);
-      }}
-    >
-      <button
-        type="button"
-        className="top-toolbar-menu-item size-submenu-trigger"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen(true)}
-      >
-        <ToolbarIcon>
+    <ToolbarSubmenu
+      label="Size"
+      panelLabel="Canvas size"
+      panelClassName="top-toolbar-size-panel"
+      icon={
+        <>
           <path d="M3.5 10h13" />
           <path d="M5.5 8l-2 2 2 2" />
           <path d="M14.5 8l2 2-2 2" />
           <path d="M10 3.5v13" />
           <path d="M8 5.5l2-2 2 2" />
           <path d="M8 14.5l2 2 2-2" />
-        </ToolbarIcon>
-        <span>Size</span>
-        <span className="color-picker-submenu-arrow" aria-hidden="true" />
-      </button>
-      {isOpen ? (
-        <div
-          className="top-toolbar-popover-panel size-submenu-panel top-toolbar-size-panel"
-          role="group"
-          aria-label="Canvas size"
-        >
-          {CANVAS_PRESETS.map((preset) => {
-            const maxDim = Math.max(preset.width, preset.height);
-            const w = (preset.width / maxDim) * 12;
-            const h = (preset.height / maxDim) * 12;
-            const x = 10 - w / 2;
-            const y = 10 - h / 2;
-            return (
-              <ToolbarMenuAction
-                key={preset.id}
-                label={preset.label}
-                selected={selectedPresetId === preset.id}
-                pressed={selectedPresetId === preset.id}
-                onSelect={() => handlePresetSelect(preset.id)}
-              >
-                <rect x={x} y={y} width={w} height={h} rx="1" />
-              </ToolbarMenuAction>
-            );
-          })}
-          <div className="top-toolbar-menu-divider" aria-hidden="true" />
-          <div className="top-toolbar-size-menu-row">
-            <span className="top-toolbar-size-menu-label">Custom:</span>
-            <div className="top-toolbar-size-menu-fields">
-              <input
-                className="top-toolbar-field top-toolbar-size-menu-input"
-                aria-label="Canvas width"
-                type="number"
-                min={1}
-                value={canvas.width}
-                onChange={handleCustomWidthChange}
-              />
-              <span className="top-toolbar-size-menu-separator" aria-hidden="true">x</span>
-              <input
-                className="top-toolbar-field top-toolbar-size-menu-input"
-                aria-label="Canvas height"
-                type="number"
-                min={1}
-                value={canvas.height}
-                onChange={handleCustomHeightChange}
-              />
-            </div>
-          </div>
+        </>
+      }
+    >
+      {CANVAS_PRESETS.map((preset) => {
+        const maxDim = Math.max(preset.width, preset.height);
+        const w = (preset.width / maxDim) * 12;
+        const h = (preset.height / maxDim) * 12;
+        const x = 10 - w / 2;
+        const y = 10 - h / 2;
+        return (
+          <ToolbarMenuAction
+            key={preset.id}
+            label={preset.label}
+            selected={selectedPresetId === preset.id}
+            pressed={selectedPresetId === preset.id}
+            onSelect={() => handlePresetSelect(preset.id)}
+          >
+            <rect x={x} y={y} width={w} height={h} rx="1" />
+          </ToolbarMenuAction>
+        );
+      })}
+      <div className="top-toolbar-menu-divider" aria-hidden="true" />
+      <div className="top-toolbar-size-menu-row">
+        <span className="top-toolbar-size-menu-label">Custom:</span>
+        <div className="top-toolbar-size-menu-fields">
+          <input
+            className="top-toolbar-field top-toolbar-size-menu-input"
+            aria-label="Canvas width"
+            type="number"
+            min={1}
+            value={canvas.width}
+            onChange={handleCustomWidthChange}
+          />
+          <span className="top-toolbar-size-menu-separator" aria-hidden="true">x</span>
+          <input
+            className="top-toolbar-field top-toolbar-size-menu-input"
+            aria-label="Canvas height"
+            type="number"
+            min={1}
+            value={canvas.height}
+            onChange={handleCustomHeightChange}
+          />
         </div>
-      ) : null}
-    </div>
+      </div>
+    </ToolbarSubmenu>
   );
 }
 
 interface CanvasMenuProps {
   background: string;
   canvas: CanvasSize;
+  /** The document has unsaved changes and a saved version to go back to. */
+  canRevert: boolean;
+  /** The document has changes that are not in the library yet. */
+  canSave: boolean;
   menuId: string;
   onBackgroundChange: (background: string) => void;
   onCanvasSizeChange: (canvas: CanvasSize) => void;
-  onLoad: () => void;
+  onLoadFromJson: () => void;
+  onLoadFromLibrary: () => void;
+  onRevert: () => void;
   onSave: () => void;
   onNewProject: () => void;
   createMenuActionHandler: (action: () => void) => () => void;
@@ -201,10 +235,14 @@ interface CanvasMenuProps {
 export function CanvasMenu({
   background,
   canvas,
+  canRevert,
+  canSave,
   menuId,
   onBackgroundChange,
   onCanvasSizeChange,
-  onLoad,
+  onLoadFromJson,
+  onLoadFromLibrary,
+  onRevert,
   onSave,
   onNewProject,
   createMenuActionHandler,
@@ -216,14 +254,40 @@ export function CanvasMenu({
         <path d="M8 7v4" />
         <path d="M6 9h4" />
       </ToolbarMenuAction>
-      <ToolbarMenuAction label="Load..." onSelect={createMenuActionHandler(onLoad)}>
-        <path d="M3.5 7h4.2l1.4-2h7.4v9.5H3.5z" />
-        <path d="M3.5 7h13" />
-      </ToolbarMenuAction>
-      <ToolbarMenuAction label="Save" onSelect={createMenuActionHandler(onSave)}>
+      <ToolbarSubmenu
+        label="Load"
+        panelLabel="Load a canvas"
+        icon={
+          <>
+            <path d="M3.5 7h4.2l1.4-2h7.4v9.5H3.5z" />
+            <path d="M3.5 7h13" />
+          </>
+        }
+      >
+        <ToolbarMenuAction label="From library..." onSelect={createMenuActionHandler(onLoadFromLibrary)}>
+          <rect x="3.5" y="4" width="5.5" height="5.5" rx="1" />
+          <rect x="11" y="4" width="5.5" height="5.5" rx="1" />
+          <rect x="3.5" y="11.5" width="5.5" height="5.5" rx="1" />
+          <rect x="11" y="11.5" width="5.5" height="5.5" rx="1" />
+        </ToolbarMenuAction>
+        <ToolbarMenuAction label="From JSON..." onSelect={createMenuActionHandler(onLoadFromJson)}>
+          <path d="M6 3.5h6l3 3v10H6z" />
+          <path d="M12 3.5v3h3" />
+        </ToolbarMenuAction>
+      </ToolbarSubmenu>
+      <ToolbarMenuAction
+        label="Save"
+        hint={`${modKey}+S`}
+        disabled={!canSave}
+        onSelect={createMenuActionHandler(onSave)}
+      >
         <path d="M4 4.5h12v11H4z" />
         <path d="M7 4.5v4h6v-4" />
         <path d="M7 15.5h6" />
+      </ToolbarMenuAction>
+      <ToolbarMenuAction label="Revert" disabled={!canRevert} onSelect={createMenuActionHandler(onRevert)}>
+        <path d="M7.5 5 4 8.5 7.5 12" />
+        <path d="M4.5 8.5h7a4 4 0 1 1 0 8H9" />
       </ToolbarMenuAction>
       <div className="top-toolbar-menu-divider" aria-hidden="true" />
       <ColorPickerControl
@@ -241,6 +305,7 @@ export function CanvasMenu({
 
 interface ExportMenuProps {
   menuId: string;
+  onExportJson: () => void;
   onExportPng: () => void;
   onExportSvg: () => void;
   onExportToClipboard: () => void;
@@ -249,6 +314,7 @@ interface ExportMenuProps {
 
 export function ExportMenu({
   menuId,
+  onExportJson,
   onExportPng,
   onExportSvg,
   onExportToClipboard,
@@ -264,6 +330,10 @@ export function ExportMenu({
       <ToolbarMenuAction label="SVG" onSelect={createMenuActionHandler(onExportSvg)}>
         <path d="M4 4.5h12v11H4z" />
         <path d="M6.5 8l2 4 1.5-3 1.5 3 2-4" />
+      </ToolbarMenuAction>
+      <ToolbarMenuAction label="JSON" onSelect={createMenuActionHandler(onExportJson)}>
+        <path d="M8 4.5c-2 0-2 1.5-2 2.75S5.5 10 4.5 10c1 0 1.5 1.5 1.5 2.75s0 2.75 2 2.75" />
+        <path d="M12 4.5c2 0 2 1.5 2 2.75S14.5 10 15.5 10c-1 0-1.5 1.5-1.5 2.75s0 2.75-2 2.75" />
       </ToolbarMenuAction>
       <ToolbarMenuAction label="To clipboard" onSelect={createMenuActionHandler(onExportToClipboard)}>
         <rect x="5" y="4.5" width="10" height="12" rx="1" />

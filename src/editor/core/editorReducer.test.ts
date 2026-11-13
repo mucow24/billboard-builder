@@ -11,7 +11,7 @@ import { parseProjectDocument, serializeProjectDocument } from '../document/docu
 import type { CanvasNode, DocumentFontReference, UploadedFont } from '../document/documentTypes';
 import { cloneCanvasNode, collectLeafItems } from '../document/sceneGraph';
 import { createDefaultEditorState, type EditorState } from './editorState';
-import { applyEditorCommand, createResetDocumentTransaction, reduceEditorState } from './editorReducer';
+import { applyEditorCommand, reduceEditorState } from './editorReducer';
 import { createTransactionAction, toEditorAction } from './editorActions';
 
 describe('editor reducer', () => {
@@ -101,18 +101,24 @@ describe('editor reducer', () => {
     expect(nextState.session.activeTool).toBe('text');
   });
 
-  it('uses reset-document transaction as one undoable clear step', () => {
+  // Canvas > Revert replaces the document this way, so it can be undone.
+  it('replaces the document inside a transaction as one undoable step', () => {
     const seeded = reduceEditorState(createDefaultEditorState(), {
       ...toEditorAction({ type: 'add_node', item: createRectangleItem() }),
     });
 
-    const cleared = reduceEditorState(seeded, createResetDocumentTransaction());
-    expect(cleared.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
-    expect(cleared.history.past).toHaveLength(2);
+    const replaced = reduceEditorState(
+      seeded,
+      createTransactionAction([
+        { family: 'document', command: { type: 'load_document', document: createDefaultProjectDocument() } },
+        { family: 'selection', command: { type: 'clear_selection' } },
+      ])
+    );
+    expect(replaced.document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
+    expect(replaced.history.past).toHaveLength(2);
 
-    const undone = reduceEditorState(cleared, { family: 'history', type: 'undo' });
+    const undone = reduceEditorState(replaced, { family: 'history', type: 'undo' });
     expect(undone.document.nodes.flatMap(collectLeafItems)).toHaveLength(1);
-    expect(undone.session.activeTool).toBe('select');
   });
 
   it('undoes and redoes document mutations', () => {

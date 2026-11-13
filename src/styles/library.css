@@ -1,0 +1,302 @@
+/* ── Library dialog ──────────────────────────────────────────────────────── */
+
+.library-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  background: rgba(2, 6, 23, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.library-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1040px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+  color: var(--text-primary);
+  box-shadow: 0 32px 64px rgba(2, 6, 23, 0.55);
+}
+
+.library-dialog:focus {
+  outline: none;
+}
+
+.library-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem 0.8rem 1.25rem;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.library-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+
+.library-count {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.library-close {
+  align-self: center;
+  margin-left: auto;
+}
+
+.library-empty {
+  max-width: 34rem;
+  margin: 0;
+  padding: 2.5rem 1.25rem 3rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 1.25rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.library-card-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  /* A checkerboard, so a transparent canvas shows as one. */
+  background-color: #1b2538;
+  background-image:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.1) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.1) 75%),
+    linear-gradient(45deg, rgba(148, 163, 184, 0.1) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.1) 75%);
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.library-card-preview:hover,
+.library-card-preview:focus-visible {
+  border-color: var(--border-active);
+  outline: none;
+}
+
+.library-card[data-current] .library-card-preview {
+  border-color: var(--border-strong);
+}
+
+.library-card-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.library-card-no-preview {
+  color: var(--text-disabled);
+  font-size: 0.78rem;
+}
+
+.library-card-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: rgba(15, 23, 42, 0.88);
+  color: var(--text-primary);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.library-card-footer,
+.library-card-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.8rem;
+}
+
+.library-card-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-card-name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.7rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-base);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.library-card-name-input:focus {
+  outline: none;
+}
+
+.library-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.library-card-date {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.library-card-confirm-text {
+  flex: 1 1 auto;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.library-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.library-icon-button:hover,
+.library-icon-button:focus-visible {
+  border-color: var(--border-default);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.library-icon-button-danger:hover,
+.library-icon-button-danger:focus-visible {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+.library-button {
+  height: 1.7rem;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-base);
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.library-button:hover,
+.library-button:focus-visible {
+  border-color: var(--border-active);
+  outline: none;
+}
+
+.library-button-danger {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.5);
+  color: #fee2e2;
+}
+
+.library-button-danger:hover,
+.library-button-danger:focus-visible {
+  border-color: rgba(248, 113, 113, 0.9);
+}
+
+.library-notice {
+  margin: 0;
+  padding: 0.6rem 1.25rem;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(127, 29, 29, 0.36);
+  color: #fee2e2;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.library-button-primary {
+  border-color: var(--border-active);
+  background: rgba(50, 132, 214, 0.5);
+}
+
+/* ── Unsaved-changes question ────────────────────────────────────────────── */
+
+/* Above the busy overlay: it is asked in the middle of a library operation. */
+.unsaved-changes-backdrop {
+  z-index: 80;
+}
+
+.unsaved-changes-dialog {
+  gap: 0.75rem;
+  width: min(27rem, 100%);
+  padding: 1.1rem 1.25rem 1.1rem;
+}
+
+.unsaved-changes-message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.unsaved-changes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.unsaved-changes-actions .library-button {
+  height: 1.9rem;
+  padding: 0 0.9rem;
+  font-size: 0.82rem;
+}
+
+/* Covers the app while a document is saved to or fetched from the library, so
+   nothing can be changed in between. Normally gone again within a frame or two. */
+.library-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  cursor: progress;
+}

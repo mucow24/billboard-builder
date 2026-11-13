@@ -40,7 +40,6 @@ import {
 } from './editorState';
 import { normalizeSelectionForNodes } from './selectionOps';
 import {
-  createTransactionAction,
   toEditorAction,
   type DocumentAction,
   type DocumentCommand,
@@ -642,15 +641,3 @@ export function applyEditorCommand(document: ProjectDocument, command: EditorCom
   return reduceEditorState(createDefaultEditorState(document), toEditorAction(command)).document;
 }
 
-export function createResetDocumentTransaction(): TransactionAction {
-  return createTransactionAction(
-    [
-      { family: 'document', command: { type: 'load_document', document: createDefaultProjectDocument() } },
-      { family: 'selection', command: { type: 'clear_selection' } },
-      { family: 'session', type: 'set_active_tool', tool: 'select' },
-      { family: 'session', type: 'set_export_scale', scale: 1 },
-      { family: 'session', type: 'set_missing_font_families', families: [] },
-    ],
-    'single'
-  );
-}

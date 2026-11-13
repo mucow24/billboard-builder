@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { loadDocumentLibrarySession } from './documentLibrarySession';
 import { runEditorStartup } from './editorStartup';
 import { restoreUploadedFontsForReferences } from './uploadedFontPersistence';
 import type { UploadedFont } from '../editor/document/documentTypes';
@@ -32,6 +33,11 @@ export function useEditorStartup(): EditorStartupState {
 
     void runEditorStartup({
       loadSavedCanvas: () => defaultCanvasPersistenceService.load(),
+      loadLibrarySession: (hasSavedCanvas) =>
+        loadDocumentLibrarySession({
+          hasWorkingCopy: hasSavedCanvas,
+          isCancelled: () => cancelled,
+        }),
       loadBundledFonts,
       restoreUploadedFonts: (references) =>
         restoreUploadedFontsForReferences({

@@ -6,7 +6,7 @@ import { downloadSvg } from '../editor/io/svg/downloadSvg';
 import type { SvgExportWarning } from '../editor/io/svg/svgExportTypes';
 import { sanitizeBasename } from '../editor/io/filename';
 import { importImageFile } from '../editor/io/images';
-import { downloadProject, readProjectFile } from '../editor/io/projectFile';
+import { downloadProject } from '../editor/io/projectFile';
 import { createImageItem, DEFAULT_CANVAS_NAME } from '../editor/document/documentDefaults';
 import type { ProjectDocument } from '../editor/document/documentTypes';
 
@@ -27,17 +27,17 @@ import { getErrorMessage } from './errorUtils';
 interface UseFileIOControllerParams {
   document: ProjectDocument;
   addImageItem: (item: ReturnType<typeof createImageItem>) => void;
-  loadDocument: (document: ProjectDocument) => void;
-  resetDocument: () => void;
   setActiveTool: (tool: 'select') => void;
   setErrorMessage: (message: string | null) => void;
 }
 
+/**
+ * Bringing images in and getting the canvas out as a file. Opening, starting
+ * and saving documents is the library's business: `useDocumentLibraryController`.
+ */
 export function useFileIOController({
   document,
   addImageItem,
-  loadDocument,
-  resetDocument,
   setActiveTool,
   setErrorMessage,
 }: UseFileIOControllerParams) {
@@ -66,26 +66,6 @@ export function useFileIOController({
       return;
     }
     await handleImageFile(file);
-  }
-
-  async function handleOpenProject(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) {
-      return;
-    }
-    try {
-      const projectDocument = await readProjectFile(file);
-      loadDocument(projectDocument);
-      setErrorMessage(null);
-    } catch (error) {
-      setErrorMessage(`Failed to open project: ${getErrorMessage(error, 'Unknown error.')}`);
-    }
-  }
-
-  function handleNewProject(onAfterReset?: () => void) {
-    onAfterReset?.();
-    setErrorMessage(null);
-    resetDocument();
   }
 
   function handleExport(handle: CanvasRendererHandle | null) {
@@ -130,7 +110,8 @@ export function useFileIOController({
     }
   }
 
-  function handleSave() {
+  /** Export > JSON: downloads the document as it is in the editor, unsaved changes included. */
+  function handleExportJson() {
     const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
     downloadProject(document, `${basename}.json`);
   }
@@ -138,11 +119,9 @@ export function useFileIOController({
   return {
     handleImageFile,
     handleImageUpload,
-    handleOpenProject,
-    handleNewProject,
     handleExport,
     handleExportToClipboard,
     handleExportSvg,
-    handleSave,
+    handleExportJson,
   };
 }

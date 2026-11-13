@@ -15,6 +15,7 @@ import {
 import { collectLeafItems } from './editor/document/sceneGraph';
 import type { PersistedUploadedFont } from './editor/fonts';
 import { useEditorStore } from './editor/state/store';
+import { clearDocumentLibrary } from './test/documentLibrary';
 import { resetEditorStore } from './test/editorStore';
 import { settleRender } from './test/settleRender';
 
@@ -29,6 +30,7 @@ const {
     load: vi.fn().mockResolvedValue(null),
     save: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn().mockResolvedValue(undefined),
+    loadDocumentId: vi.fn().mockResolvedValue(null),
   },
   mockImportImageFile: vi.fn(),
   mockRegisterUploadedFontBytes: vi.fn(),
@@ -141,7 +143,8 @@ async function renderApp() {
 }
 
 describe('App shell', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearDocumentLibrary();
     mockCanvasPersistenceService.load.mockResolvedValue(null);
     mockCanvasPersistenceService.save.mockResolvedValue(undefined);
     mockCanvasPersistenceService.clear.mockResolvedValue(undefined);
@@ -694,7 +697,8 @@ describe('App shell', () => {
     await renderApp();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    await user.click(screen.getByRole('button', { name: 'Load...' }));
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    await user.click(screen.getByRole('button', { name: 'From JSON...' }));
 
     const openInput = screen.getByTestId('project-open-input');
     const invalidFile = new File(['not valid json'], 'broken-project.json', {

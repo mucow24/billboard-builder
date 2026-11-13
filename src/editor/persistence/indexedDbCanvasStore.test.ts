@@ -211,12 +211,52 @@ describe('indexedDbCanvasStore', () => {
     );
 
     await expect(store.read()).resolves.toBe('saved');
-    await expect(store.write('next')).resolves.toBeUndefined();
+    await expect(store.write('next', 'document-7')).resolves.toBeUndefined();
     await expect(store.clear()).resolves.toBeUndefined();
 
     expect(harness.get).toHaveBeenCalledWith('current');
     expect(harness.put).toHaveBeenCalledWith('next', 'current');
+    // Clearing takes the id of the library document with the working copy, so
+    // a canvas stored later is never tied to the previous one's document.
     expect(harness.remove).toHaveBeenCalledWith('current');
+    expect(harness.remove).toHaveBeenCalledWith('current-library-id');
+  });
+
+  it('stores the working copy and the id of its library document in one transaction', async () => {
+    const harness = createDatabaseHarness();
+    harness.contains.mockReturnValue(true);
+    const open = vi.fn(() => {
+      const request = createDbRequest<IDBDatabase>((pendingRequest) => {
+        succeedRequest(pendingRequest, harness.database);
+      }, harness.database);
+      return request as unknown as IDBOpenDBRequest;
+    });
+    vi.stubGlobal('indexedDB', { open });
+
+    const store = new IndexedDbCanvasStore();
+    harness.put.mockImplementation((_value: unknown, key: string) =>
+      createDbRequest((request) => {
+        succeedRequest(request, undefined);
+        // The transaction completes once its last request has.
+        if (key === 'current-library-id') {
+          completeTransaction(harness.transaction);
+        }
+      })
+    );
+    harness.get.mockImplementation(() =>
+      createDbRequest((request) => {
+        succeedRequest(request, 'document-7');
+        completeTransaction(harness.transaction);
+      })
+    );
+
+    await expect(store.write('next', 'document-7')).resolves.toBeUndefined();
+    await expect(store.readDocumentId()).resolves.toBe('document-7');
+
+    expect(harness.database.transaction).toHaveBeenCalledTimes(2);
+    expect(harness.put).toHaveBeenNthCalledWith(1, 'next', 'current');
+    expect(harness.put).toHaveBeenNthCalledWith(2, 'document-7', 'current-library-id');
+    expect(harness.get).toHaveBeenCalledWith('current-library-id');
   });
 
   it('rejects when opening the database fails', async () => {
@@ -262,6 +302,6 @@ describe('indexedDbCanvasStore', () => {
       })
     );
 
-    await expect(store.write('next')).rejects.toThrow('transaction aborted');
+    await expect(store.write('next', 'document-7')).rejects.toThrow('transaction aborted');
   });
 });

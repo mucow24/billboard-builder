@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useCanvasPersistence } from './useCanvasPersistence';
+import {
+  useDocumentLibraryController,
+  type LeaveChoice,
+  type LeaveRequest,
+} from './useDocumentLibraryController';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { useFavoritesController } from './useFavoritesController';
 import { useFileIOController } from './useFileIOController';
@@ -15,7 +20,10 @@ import {
   selectSelectedItems,
   selectSelectedNode,
 } from '../editor/core/selectors';
+import type { ProjectDocument } from '../editor/document/documentTypes';
 import { flattenLayerRows } from '../editor/document/sceneGraph';
+import { captureDocumentPreview } from '../editor/io/documentPreview';
+import type { CanvasRendererHandle } from '../editor/rendering/renderer/canvasRendererTypes';
 import { useEditorStore } from '../editor/state/store';
 import type { InspectorTab } from '../editor/ui/inspector/types';
 
@@ -30,15 +38,36 @@ interface UseEditorControllerArgs {
    * font the document references may simply not have arrived yet.
    */
   fontsReady: boolean;
+  /** The renderer showing the canvas, used to draw library previews; null while there is none. */
+  getRendererHandle: () => CanvasRendererHandle | null;
 }
 
 /**
  * The editor's state and actions. Mount it only once startup has put the saved
- * canvas in the store (`useEditorStartup`): from its first render the document
- * is autosaved, and stored fonts that nothing references are deleted.
+ * canvas in the store and read the library (`useEditorStartup`): from its first
+ * render the document is autosaved, and stored fonts that nothing references
+ * are deleted.
  */
-export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
+export function useEditorController({ fontsReady, getRendererHandle }: UseEditorControllerArgs) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  // The question put to the user before a document with unsaved changes is
+  // replaced, while it waits for an answer.
+  const [leavePrompt, setLeavePrompt] = useState<LeaveRequest | null>(null);
+  const answerLeaveRef = useRef<((choice: LeaveChoice) => void) | null>(null);
+  const confirmLeave = useCallback(
+    (request: LeaveRequest) =>
+      new Promise<LeaveChoice>((resolve) => {
+        answerLeaveRef.current = resolve;
+        setLeavePrompt(request);
+      }),
+    [],
+  );
+  const answerLeavePrompt = useCallback((choice: LeaveChoice) => {
+    answerLeaveRef.current?.(choice);
+    answerLeaveRef.current = null;
+    setLeavePrompt(null);
+  }, []);
   const [pendingCollapsedGroupIds, setPendingCollapsedGroupIds] = useState<string[]>([]);
   const [inspectorPanel, setInspectorPanel] = useState<InspectorPanelState>({
     tab: 'properties',
@@ -62,13 +91,11 @@ export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
     dispatch,
     duplicateSelectedNodes,
     groupSelectedNodes,
-    loadDocument,
     moveNode,
     nudgeSelectedNodes,
     redo,
     registerAvailableFont,
     reorderSelectedNode,
-    resetDocument,
     selectAllNodes,
     selectParentNode,
     selectSingleNode,
@@ -136,20 +163,47 @@ export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
   const {
     handleImageFile,
     handleImageUpload,
-    handleOpenProject,
-    handleNewProject,
     handleExport,
+    handleExportJson,
     handleExportSvg,
     handleExportToClipboard,
-    handleSave,
   } = useFileIOController({
     document,
     addImageItem,
-    loadDocument,
-    resetDocument,
     setActiveTool,
     setErrorMessage,
   });
+
+  const capturePreview = useCallback(
+    (previewDocument: ProjectDocument) =>
+      captureDocumentPreview(getRendererHandle(), previewDocument.canvas),
+    [getRendererHandle],
+  );
+  const { actions: library, state: libraryState } = useDocumentLibraryController({
+    document,
+    capturePreview,
+    confirmLeave,
+    setErrorMessage,
+  });
+  const libraryFonts = useMemo(
+    () => libraryState.entries.flatMap((entry) => entry.fonts),
+    [libraryState.entries],
+  );
+
+  const handleSave = useCallback(() => {
+    void library.saveDocument();
+  }, [library]);
+  const handleRevert = useCallback(() => {
+    void library.revertDocument();
+  }, [library]);
+  const handleNewProject = useCallback(async () => {
+    await library.newDocument();
+  }, [library]);
+  const openLibrary = useCallback(() => {
+    setLibraryOpen(true);
+    void library.loadLibraryPreviews();
+  }, [library]);
+  const closeLibrary = useCallback(() => setLibraryOpen(false), []);
 
   useEffect(() => {
     if (!fontsReady) {
@@ -158,11 +212,13 @@ export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
     setMissingFontFamilies(findMissingFonts(document.fonts, availableFonts));
   }, [availableFonts, document.fonts, fontsReady, setMissingFontFamilies]);
 
-  useCanvasPersistence({ document });
+  useCanvasPersistence({ document, documentId: libraryState.documentId });
   useUploadedFontPersistence({
     documentFonts: document.fonts,
     favorites,
     favoritesReady,
+    libraryFonts,
+    libraryReady: libraryState.entriesKnown,
   });
 
   useEditorShortcuts({
@@ -172,6 +228,8 @@ export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
     groupSelectedNodes,
     nudgeSelectedNodes,
     onPasteImageFile: handleImageFile,
+    onSave: handleSave,
+    suspended: libraryOpen || libraryState.busy,
     redo,
     reorderSelectedNode,
     selectParentNode,
@@ -196,13 +254,22 @@ export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
       duplicateSelectedNodes: wrappedDuplicateSelectedNodes,
       groupSelectedNodes,
       handleExport,
+      handleExportJson,
       handleExportSvg,
       handleExportToClipboard,
       handleFontUpload,
       handleImageUpload,
       handleNewProject,
-      handleOpenProject,
+      handleOpenProject: library.importProjectFile,
+      handleRevert,
       handleSave,
+      answerLeavePrompt,
+      openLibrary,
+      closeLibrary,
+      openLibraryDocument: library.openLibraryDocument,
+      renameLibraryDocument: library.renameLibraryDocument,
+      deleteLibraryDocument: library.deleteLibraryDocument,
+      exportLibraryDocument: library.exportLibraryDocument,
       moveNode,
       nudgeSelectedNodes,
       redo,
@@ -227,10 +294,19 @@ export function useEditorController({ fontsReady }: UseEditorControllerArgs) {
       activeTool,
       availableFonts,
       canRedo,
+      canRevert: libraryState.canRevert,
       canUndo,
       document,
+      documentId: libraryState.documentId,
       errorMessage,
+      hasUnsavedChanges: libraryState.hasUnsavedChanges,
       inspectorPanel,
+      leavePrompt,
+      libraryBusy: libraryState.busy,
+      libraryEntries: libraryState.entries,
+      libraryEntriesKnown: libraryState.entriesKnown,
+      libraryOpen,
+      libraryPreviews: libraryState.previews,
       layerRows,
       pendingCollapsedGroupIds,
       missingFontFamilies,
