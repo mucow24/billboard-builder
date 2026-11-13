@@ -206,6 +206,56 @@
   text-align: center;
 }
 
+.canvas-hud-readout-button {
+  font: inherit;
+  cursor: text;
+}
+
+.canvas-hud-readout-button:hover {
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.canvas-hud-readout-button:focus-visible,
+.canvas-hud-readout-editing:focus-within {
+  outline: 2px solid rgba(96, 165, 250, 0.9);
+  outline-offset: 2px;
+}
+
+.canvas-hud-readout-editing {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  cursor: text;
+}
+
+/* Stands in for the space in "Zoom: 50%" (flex drops whitespace text). */
+.canvas-hud-readout-editing label {
+  margin-right: 0.27em;
+  cursor: inherit;
+}
+
+/* Sized to its text where field-sizing is supported, so the readout keeps
+   its width while edited; elsewhere four digits wide. */
+.canvas-hud-zoom-input {
+  width: 4ch;
+  min-width: 1ch;
+  max-width: 5ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  outline: none;
+}
+
+@supports (field-sizing: content) {
+  .canvas-hud-zoom-input {
+    width: auto;
+    field-sizing: content;
+  }
+}
+
 .canvas-hud-button {
   border: 0;
   border-radius: var(--radius-full);

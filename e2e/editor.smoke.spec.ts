@@ -97,6 +97,25 @@ test.describe('editor smoke flows', () => {
     expect(nextDebug.viewport.panY).not.toBe(initialPan.y);
   });
 
+  test('zooms to a percentage typed into the zoom readout', async ({ page }) => {
+    await openFreshEditor(page);
+
+    await page.getByTestId('viewport-zoom').click();
+    const input = page.getByTestId('viewport-zoom-input');
+    await expect(input).toBeFocused();
+    await input.fill('250');
+    await input.press('Enter');
+
+    await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 250%');
+    await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBe(2.5);
+    await expectVisibleAlignedZoom(page);
+
+    await page.getByTestId('viewport-zoom').click();
+    await input.fill('40');
+    await input.press('Escape');
+    await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 250%');
+  });
+
   test('loads a grouped project and shows the group hierarchy in the layers panel', async ({ page }) => {
     const groupedDocument = createGroupedProjectDocument([
       createGroupNodeFixture(

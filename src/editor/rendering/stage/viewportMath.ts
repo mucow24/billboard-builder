@@ -8,6 +8,21 @@ export function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
 
+// Reads what the user typed into the HUD zoom readout as a percentage ("150",
+// "150%", " 37.5 % "). Returns the zoom factor, or null when the text is not a
+// positive number. Clamping and snapping happen when the zoom is applied.
+export function parseZoomPercentInput(text: string): number | null {
+  const match = /^\s*(\d+(?:\.\d*)?|\.\d+)\s*%?\s*$/.exec(text);
+  if (!match) {
+    return null;
+  }
+  const percent = Number(match[1]);
+  if (!Number.isFinite(percent) || percent <= 0) {
+    return null;
+  }
+  return percent / 100;
+}
+
 export function alignToDevicePixels(value: number, devicePixelRatio: number): number {
   const safeDevicePixelRatio =
     Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
