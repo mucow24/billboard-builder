@@ -264,6 +264,19 @@ describe('CanvasStage viewport controls', () => {
     expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 31%');
   });
 
+  it('zooms to a percentage typed into the readout, within the zoom limits', async () => {
+    const user = userEvent.setup();
+    renderStage();
+
+    await user.click(screen.getByTestId('viewport-zoom'));
+    await user.keyboard('150{Enter}');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 150%');
+
+    await user.click(screen.getByTestId('viewport-zoom'));
+    await user.keyboard('99999{Enter}');
+    expect(screen.getByTestId('viewport-zoom')).toHaveTextContent('Zoom: 1600%');
+  });
+
   it('starts a pan drag instead of group drag when middle-clicking the group overlay hook', () => {
     const document = createDefaultProjectDocument();
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
