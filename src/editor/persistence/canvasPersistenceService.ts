@@ -26,8 +26,13 @@ export class CanvasPersistenceService {
     }
   }
 
-  async save(document: ProjectDocument): Promise<void> {
-    await this.store.write(serializeProjectDocument(document));
+  /** The id of the library document the saved canvas is a working copy of, if recorded. */
+  async loadDocumentId(): Promise<string | null> {
+    return this.store.readDocumentId();
+  }
+
+  async save(document: ProjectDocument, documentId?: string): Promise<void> {
+    await this.store.write(serializeProjectDocument(document), documentId);
   }
 
   async clear(): Promise<void> {

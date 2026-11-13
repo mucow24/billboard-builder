@@ -38,6 +38,42 @@ function openEditorDatabase(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * Runs several requests against one object store in a single transaction, so
+ * they are all stored or none is. Resolves once the transaction has completed.
+ */
+export function withEditorStoreTransaction(
+  storeName: EditorObjectStoreName,
+  operations: (store: IDBObjectStore) => void,
+): Promise<void> {
+  return openEditorDatabase().then(
+    (database) =>
+      new Promise<void>((resolve, reject) => {
+        const fail = (error: unknown) => {
+          database.close();
+          reject(error);
+        };
+        let transaction: IDBTransaction;
+        try {
+          transaction = database.transaction(storeName, 'readwrite');
+          transaction.oncomplete = () => {
+            database.close();
+            resolve();
+          };
+          transaction.onerror = () => {
+            fail(transaction.error ?? new Error('IndexedDB transaction failed.'));
+          };
+          transaction.onabort = () => {
+            fail(transaction.error ?? new Error('IndexedDB transaction aborted.'));
+          };
+          operations(transaction.objectStore(storeName));
+        } catch (error) {
+          fail(error);
+        }
+      }),
+  );
+}
+
 export function withEditorObjectStore<T>(
   storeName: EditorObjectStoreName,
   mode: IDBTransactionMode,

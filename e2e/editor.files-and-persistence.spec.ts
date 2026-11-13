@@ -21,12 +21,13 @@ import {
   readDownloadedPngSize,
   readStageDebug,
   setCanvasTestHooksEnabled,
-  startToolbarFileChooser,
+  startProjectFileChooser,
   uploadFont,
   uploadProject,
   uploadSvgImage,
   waitForBundledFonts,
   waitForEditor,
+  waitForLibraryIdle,
 } from './support/editor';
 import {
   expectPersistedCanvasFontFiles,
@@ -378,7 +379,7 @@ test.describe('editor file and persistence flows', () => {
     await uploadProject(page, document, 'roundtrip.json');
 
     const projectDownload = await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+      await clickToolbarPopoverItem(page, 'Export', 'JSON');
     });
     const savedDocument = await readDownloadedJson(projectDownload);
 
@@ -394,8 +395,9 @@ test.describe('editor file and persistence flows', () => {
     if (!savedPath) {
       throw new Error('Saved project download did not produce a local file.');
     }
-    const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+    const chooser = await startProjectFileChooser(page);
     await chooser.setFiles(savedPath);
+    await waitForLibraryIdle(page);
     await openLayersTab(page);
     await expect(page.locator('.layer-row')).toHaveCount(2);
 
@@ -484,7 +486,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+        await clickToolbarPopoverItem(page, 'Export', 'JSON');
       }),
     );
     expect(savedProject.nodes).toEqual([]);
@@ -527,7 +529,7 @@ test.describe('editor file and persistence flows', () => {
     await expect(display).toHaveText('My Banner');
 
     const projectDownload = await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+      await clickToolbarPopoverItem(page, 'Export', 'JSON');
     });
     expect(projectDownload.suggestedFilename()).toBe('My Banner.json');
 
@@ -595,7 +597,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedGroupedDocument = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+        await clickToolbarPopoverItem(page, 'Export', 'JSON');
       }),
     );
 

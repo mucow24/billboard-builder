@@ -16,6 +16,7 @@ import './styles/inspector-rail.css';
 import './styles/inspector-list.css';
 import './styles/pickers.css';
 import './styles/layers.css';
+import './styles/library.css';
 
 const runtimeFlags = readEditorRuntimeFlags();
 const app = <App />;

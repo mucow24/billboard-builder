@@ -20,6 +20,10 @@ interface UseEditorShortcutsArgs {
   groupSelectedNodes: EditorStoreState['groupSelectedNodes'];
   nudgeSelectedNodes: EditorStoreState['nudgeSelectedNodes'];
   onPasteImageFile: (file: File) => void | Promise<void>;
+  /** Saves the document to the library (Ctrl/Cmd+S). */
+  onSave: () => void;
+  /** While true no shortcut does anything: a dialog is open, or the document is being switched. */
+  suspended: boolean;
   redo: EditorStoreState['redo'];
   reorderSelectedNode: EditorStoreState['reorderSelectedNode'];
   selectParentNode: EditorStoreState['selectParentNode'];
@@ -37,6 +41,8 @@ export function useEditorShortcuts({
   groupSelectedNodes,
   nudgeSelectedNodes,
   onPasteImageFile,
+  onSave,
+  suspended,
   redo,
   reorderSelectedNode,
   selectParentNode,
@@ -62,6 +68,18 @@ export function useEditorShortcuts({
       const hasModifier = event.ctrlKey || event.metaKey;
       const isEditable = isEditableTarget(event.target);
       const pressedKey = event.key.toLowerCase();
+
+      // Taken even while suspended, so the browser never offers to save the page instead.
+      if (hasModifier && pressedKey === 's') {
+        event.preventDefault();
+        if (!suspended && !event.repeat) {
+          onSave();
+        }
+        return;
+      }
+      if (suspended) {
+        return;
+      }
 
       if (hasModifier && pressedKey === 'z') {
         event.preventDefault();
@@ -169,7 +187,7 @@ export function useEditorShortcuts({
 
     function handleCopy(event: ClipboardEvent) {
       const nodes = getSelectedNodes();
-      if (isEditableTarget(event.target) || nodes.length === 0) {
+      if (suspended || isEditableTarget(event.target) || nodes.length === 0) {
         return;
       }
       if (!writeSelectionToClipboardData(event.clipboardData, nodes)) {
@@ -181,7 +199,7 @@ export function useEditorShortcuts({
 
     function handleCut(event: ClipboardEvent) {
       const nodes = getSelectedNodes();
-      if (isEditableTarget(event.target) || nodes.length === 0) {
+      if (suspended || isEditableTarget(event.target) || nodes.length === 0) {
         return;
       }
       if (!writeSelectionToClipboardData(event.clipboardData, nodes)) {
@@ -193,7 +211,7 @@ export function useEditorShortcuts({
     }
 
     function handlePaste(event: ClipboardEvent) {
-      if (isEditableTarget(event.target)) {
+      if (suspended || isEditableTarget(event.target)) {
         return;
       }
 
@@ -242,6 +260,8 @@ export function useEditorShortcuts({
     groupSelectedNodes,
     nudgeSelectedNodes,
     onPasteImageFile,
+    onSave,
+    suspended,
     redo,
     reorderSelectedNode,
     selectParentNode,

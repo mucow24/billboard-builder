@@ -56,7 +56,12 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onExportToClipboard: vi.fn(),
     onGroup: vi.fn(),
     onInspectorTabChange: vi.fn(),
-    onLoad: vi.fn(),
+    onLoadFromJson: vi.fn(),
+    onLoadFromLibrary: vi.fn(),
+    onRevert: vi.fn(),
+    onExportJson: vi.fn(),
+    canRevert: false,
+    hasUnsavedChanges: false,
     onNewProject: vi.fn(),
     onRedo: vi.fn(),
     onReorder: vi.fn(),
@@ -135,23 +140,87 @@ describe('Toolbar', () => {
 
   it('routes canvas popover actions through the existing callbacks', async () => {
     const user = userEvent.setup();
-    const onLoad = vi.fn();
+    const onLoadFromJson = vi.fn();
+    const onLoadFromLibrary = vi.fn();
+    const onRevert = vi.fn();
     const onSave = vi.fn();
     const onNewProject = vi.fn();
 
-    renderToolbar({ onLoad, onNewProject, onSave });
+    renderToolbar({
+      canRevert: true,
+      hasUnsavedChanges: true,
+      onLoadFromJson,
+      onLoadFromLibrary,
+      onNewProject,
+      onRevert,
+      onSave,
+    });
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    await user.click(screen.getByRole('button', { name: 'Load...' }));
-    expect(onLoad).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    await user.click(screen.getByRole('button', { name: 'From library...' }));
+    expect(onLoadFromLibrary).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('group', { name: 'Canvas actions' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Load' }));
+    await user.click(screen.getByRole('button', { name: 'From JSON...' }));
+    expect(onLoadFromJson).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSave).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Revert' }));
+    expect(onRevert).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'New' }));
     expect(onNewProject).toHaveBeenCalledOnce();
+  });
+
+  it('greys out Save and Revert and hides the unsaved-changes dot when nothing is unsaved', async () => {
+    const user = userEvent.setup();
+    const onRevert = vi.fn();
+    const onSave = vi.fn();
+
+    renderToolbar({ canRevert: false, hasUnsavedChanges: false, onRevert, onSave });
+
+    expect(screen.queryByRole('img', { name: 'Unsaved changes' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    const save = screen.getByRole('button', { name: 'Save' });
+    const revert = screen.getByRole('button', { name: 'Revert' });
+    expect(save).toBeDisabled();
+    expect(revert).toBeDisabled();
+    await user.click(save);
+    await user.click(revert);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onRevert).not.toHaveBeenCalled();
+  });
+
+  it('shows the unsaved-changes dot beside the name, and keeps Revert greyed out for a canvas that was never saved', async () => {
+    const user = userEvent.setup();
+
+    renderToolbar({ canRevert: false, hasUnsavedChanges: true });
+
+    expect(screen.getByRole('img', { name: 'Unsaved changes' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Revert' })).toBeDisabled();
+  });
+
+  it('exports the canvas as JSON from the Export menu', async () => {
+    const user = userEvent.setup();
+    const onExportJson = vi.fn();
+
+    renderToolbar({ onExportJson });
+
+    await user.click(screen.getByRole('button', { name: /^Export/ }));
+    await user.click(screen.getByRole('button', { name: 'JSON' }));
+    expect(onExportJson).toHaveBeenCalledOnce();
   });
 
   it('publishes export-intent activity on hover and focus for the export trigger', async () => {
@@ -387,23 +456,23 @@ describe('Toolbar', () => {
     const canvasTrigger = screen.getByRole('button', { name: 'Canvas' });
 
     await user.click(canvasTrigger);
-    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Load' })).toBeVisible();
 
     fireEvent.pointerDown(document.body);
-    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load' })).not.toBeInTheDocument();
 
     await user.click(canvasTrigger);
-    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Load' })).toBeVisible();
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load' })).not.toBeInTheDocument();
     expect(canvasTrigger).toHaveFocus();
 
     await user.click(canvasTrigger);
-    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Load' })).toBeVisible();
 
     await user.tab();
-    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load' })).not.toBeInTheDocument();
   });
 
   it('keeps the canvas menu open while tabbing between size fields and closes it once focus leaves', async () => {
@@ -416,10 +485,10 @@ describe('Toolbar', () => {
     await user.click(screen.getByLabelText('Canvas width'));
     await user.tab();
     expect(screen.getByLabelText('Canvas height')).toHaveFocus();
-    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Load' })).toBeVisible();
 
     await user.tab();
-    expect(screen.queryByRole('button', { name: 'Load...' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load' })).not.toBeInTheDocument();
   });
 
   it('shows a background color picker in the canvas menu and fires onBackgroundChange', async () => {
@@ -433,7 +502,7 @@ describe('Toolbar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Canvas background' }));
     expect(screen.getByLabelText('Canvas background hex')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Load...' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Load' })).toBeVisible();
 
     await user.clear(screen.getByLabelText('Canvas background hex'));
     await user.type(screen.getByLabelText('Canvas background hex'), '#11223344{Enter}');

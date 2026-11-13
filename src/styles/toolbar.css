@@ -279,25 +279,55 @@
   color: #f7fbff;
 }
 
-.size-submenu {
+.top-toolbar .top-toolbar-menu-item:disabled {
+  background: transparent;
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+.top-toolbar-menu-item-hint {
+  margin-left: auto;
+  padding-left: 14px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.top-toolbar-menu-item:disabled .top-toolbar-menu-item-hint {
+  color: inherit;
+}
+
+.top-toolbar-submenu {
   position: relative;
 }
 
-.size-submenu-trigger {
+.top-toolbar-submenu-trigger {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.size-submenu-trigger[aria-expanded='true'] {
+.top-toolbar-submenu-trigger[aria-expanded='true'] {
   background: rgba(68, 143, 224, 0.24);
 }
 
-.size-submenu-panel {
+.top-toolbar-submenu-panel {
   position: absolute;
   top: 0;
   left: calc(100% + 3px);
   border: 1px solid var(--border-active);
+}
+
+/* Marks a document whose changes are not in the library yet. */
+.top-toolbar-dirty-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin: 0 0.35rem 0 -0.1rem;
+  border-radius: var(--radius-full);
+  background: #fbbf24;
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.22);
 }
 
 .top-toolbar-menu-divider {

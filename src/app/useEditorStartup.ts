@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { loadDocumentLibrarySession } from './documentLibrarySession';
 import { runEditorStartup } from './editorStartup';
 import { restoreUploadedFontsForReferences } from './uploadedFontPersistence';
 import type { UploadedFont } from '../editor/document/documentTypes';
@@ -31,7 +32,13 @@ export function useEditorStartup(): EditorStartupState {
     };
 
     void runEditorStartup({
-      loadSavedCanvas: () => defaultCanvasPersistenceService.load(),
+      loadSavedCanvas: async () => {
+        const savedCanvas = await defaultCanvasPersistenceService.load();
+        // Which library document the saved canvas is a working copy of has to be
+        // known before the editor is shown: it decides what Save and Revert do.
+        await loadDocumentLibrarySession({ hasWorkingCopy: savedCanvas !== null });
+        return savedCanvas;
+      },
       loadBundledFonts,
       restoreUploadedFonts: (references) =>
         restoreUploadedFontsForReferences({

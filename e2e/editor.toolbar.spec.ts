@@ -17,7 +17,7 @@ import {
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
-  startToolbarFileChooser,
+  startProjectFileChooser,
   uploadProject,
 } from './support/editor';
 
@@ -35,12 +35,13 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByRole('button', { name: 'Save as favorite' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Canvas', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Load...', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Load', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Revert', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New', exact: true })).toBeVisible();
 
     await page.mouse.click(24, 220);
-    await expect(page.getByRole('button', { name: 'Load...' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Load', exact: true })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Canvas', exact: true }).click();
     await page.getByRole('button', { name: 'Size', exact: true }).hover();
@@ -177,7 +178,7 @@ test.describe('editor toolbar flows', () => {
   test('starts load, image upload, and font upload from real toolbar menu items and filechooser events', async ({ page }) => {
     await openFreshEditor(page);
 
-    const loadChooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+    const loadChooser = await startProjectFileChooser(page);
     await loadChooser.setFiles({
       name: 'toolbar-load.json',
       mimeType: 'application/json',

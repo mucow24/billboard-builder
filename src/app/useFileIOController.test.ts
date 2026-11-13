@@ -21,8 +21,6 @@ function makeController(document: ProjectDocument) {
   const controller = useFileIOController({
     document,
     addImageItem: vi.fn(),
-    loadDocument: vi.fn(),
-    resetDocument: vi.fn(),
     setActiveTool: vi.fn(),
     setErrorMessage,
   });

@@ -1390,9 +1390,46 @@ export async function openToolbarPopover(page: Page, triggerName: string) {
   await page.getByRole('button', { name: triggerName, exact: true }).click();
 }
 
+/**
+ * Waits until no document is being saved to or fetched from the library.
+ *
+ * Starting or loading a canvas first saves the open one to the library, and
+ * the editor takes no input until that is done. Wait for this before acting on
+ * the canvas that was started or loaded.
+ */
+export async function waitForLibraryIdle(page: Page) {
+  await expect(page.locator('.app-shell')).toHaveAttribute('data-library-busy', 'false');
+}
+
 export async function clickToolbarPopoverItem(page: Page, triggerName: string, itemName: string) {
   await openToolbarPopover(page, triggerName);
   await page.getByRole('button', { name: itemName, exact: true }).click();
+  await waitForLibraryIdle(page);
+}
+
+/** Clicks an item of the Canvas > Load submenu: 'From library...' or 'From JSON...'. */
+export async function clickCanvasLoadItem(page: Page, itemName: string) {
+  await openToolbarPopover(page, 'Canvas');
+  const canvasMenu = page.getByRole('group', { name: 'Canvas actions' });
+  await canvasMenu.getByRole('button', { name: 'Load', exact: true }).click();
+  await canvasMenu.getByRole('button', { name: itemName, exact: true }).click();
+}
+
+/** Starts Canvas > Load > From JSON and returns its file chooser. */
+export async function startProjectFileChooser(page: Page): Promise<FileChooser> {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    clickCanvasLoadItem(page, 'From JSON...'),
+  ]);
+  return chooser;
+}
+
+/** Opens the library dialog from Canvas > Load > From library. */
+export async function openLibrary(page: Page) {
+  await clickCanvasLoadItem(page, 'From library...');
+  const dialog = page.getByRole('dialog', { name: 'Library' });
+  await expect(dialog).toBeVisible();
+  return dialog;
 }
 
 export async function addGenerator(page: Page, generatorName: string) {
@@ -1435,14 +1472,6 @@ export async function chooseCanvasPreset(page: Page, presetName: string) {
   await canvasMenu.getByRole('button', { name: presetName, exact: true }).click();
 }
 
-export async function startToolbarFileChooser(page: Page, triggerName: string, itemName: string): Promise<FileChooser> {
-  const [chooser] = await Promise.all([
-    page.waitForEvent('filechooser'),
-    clickToolbarPopoverItem(page, triggerName, itemName),
-  ]);
-  return chooser;
-}
-
 export function collectLeafNodes(nodes: Array<Record<string, unknown>>) {
   return nodes.flatMap((node) => {
     if (node.kind === 'group' && Array.isArray(node.children)) {
@@ -1469,12 +1498,13 @@ function countVisibleLeafNodes(nodes: unknown[]): number {
 }
 
 export async function uploadProject(page: Page, document: Record<string, unknown>, fileName = 'fixture.json') {
-  const chooser = await startToolbarFileChooser(page, 'Canvas', 'Load...');
+  const chooser = await startProjectFileChooser(page);
   await chooser.setFiles({
     name: fileName,
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(document), 'utf8'),
   });
+  await waitForLibraryIdle(page);
 
   // Wait for the canvas to finish rendering the uploaded nodes.
   // Without this, fast canvas interactions right after upload can race
@@ -1615,10 +1645,11 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
   return download;
 }
 
+/** Downloads the canvas as it is in the editor (Export > JSON) and reads the file. */
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+      await clickToolbarPopoverItem(page, 'Export', 'JSON');
     }),
   );
 }
@@ -1863,7 +1894,8 @@ async function clearPersistence(page: Page) {
       request.onsuccess = () => {
         const database = request.result;
         const transaction = database.transaction(['canvas', 'uploaded-fonts'], 'readwrite');
-        transaction.objectStore('canvas').delete('current');
+        // The saved canvas and the document library.
+        transaction.objectStore('canvas').clear();
         transaction.objectStore('uploaded-fonts').clear();
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error);

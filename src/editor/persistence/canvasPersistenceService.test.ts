@@ -9,6 +9,7 @@ function createMockStore(overrides: Partial<RawCanvasStore> = {}): RawCanvasStor
   return {
     read: vi.fn().mockResolvedValue(null),
     write: vi.fn().mockResolvedValue(undefined),
+    readDocumentId: vi.fn().mockResolvedValue(null),
     clear: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };

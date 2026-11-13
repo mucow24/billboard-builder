@@ -100,6 +100,7 @@ vi.mock('./editor/persistence/canvasPersistenceService', () => ({
   defaultCanvasPersistenceService: {
     clear: (...args: unknown[]) => mockPersistenceClear(...args),
     load: (...args: unknown[]) => mockPersistenceLoad(...args),
+    loadDocumentId: async () => null,
     save: (...args: unknown[]) => mockPersistenceSave(...args),
   },
 }));
@@ -147,6 +148,7 @@ import {
 } from './editor/document/documentDefaults';
 import { collectLeafItems } from './editor/document/sceneGraph';
 import { useEditorStore } from './editor/state/store';
+import { clearDocumentLibrary } from './test/documentLibrary';
 import { resetEditorStore } from './test/editorStore';
 import { settleRender } from './test/settleRender';
 
@@ -164,10 +166,17 @@ function clickToolbarPopoverItem(triggerName: string, itemName: string) {
   fireEvent.click(screen.getByRole('button', { name: itemName }));
 }
 
+function clickLoadFromJson() {
+  fireEvent.click(screen.getByRole('button', { name: 'Canvas' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+  fireEvent.click(screen.getByRole('button', { name: 'From JSON...' }));
+}
+
 describe('App integration', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    await clearDocumentLibrary();
     resetEditorStore();
     mockLoadBundledFonts.mockReturnValue(({ first: Promise.resolve(), all: Promise.resolve([]) }));
     mockPersistenceClear.mockResolvedValue(undefined);
@@ -281,13 +290,13 @@ describe('App integration', () => {
 
     await renderApp();
 
-    clickToolbarPopoverItem('Canvas', 'Save');
+    clickToolbarPopoverItem('Export', 'JSON');
     clickToolbarPopoverItem('Export', 'PNG');
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();
     expect(mockDownloadCanvasAsPng).toHaveBeenCalledWith(expect.anything(), 2048, 2048, 1, 'Untitled canvas.png');
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickLoadFromJson();
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['{}'], 'project.json', { type: 'application/json' })],
@@ -367,7 +376,7 @@ describe('App integration', () => {
       expect(screen.queryByRole('alert')).toBeNull();
     });
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickLoadFromJson();
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['bad'], 'broken.json', { type: 'application/json' })],
@@ -376,7 +385,7 @@ describe('App integration', () => {
     await screen.findByRole('alert');
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to open project: Broken project');
 
-    clickToolbarPopoverItem('Canvas', 'Load...');
+    clickLoadFromJson();
     fireEvent.change(screen.getByTestId('project-open-input'), {
       target: {
         files: [new File(['ok'], 'fixed.json', { type: 'application/json' })],

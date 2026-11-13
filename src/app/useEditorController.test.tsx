@@ -12,6 +12,9 @@ import {
 import { collectLeafItems } from '../editor/document/sceneGraph';
 import { parseFontSourceName, type PersistedUploadedFont } from '../editor/fonts';
 import { useEditorStore } from '../editor/state/store';
+import { loadDocumentLibrarySession } from './documentLibrarySession';
+import { defaultDocumentLibraryService } from '../editor/persistence/documentLibraryService';
+import { clearDocumentLibrary } from '../test/documentLibrary';
 import { resetEditorStore } from '../test/editorStore';
 
 const {
@@ -30,6 +33,7 @@ const {
     load: vi.fn().mockResolvedValue(null),
     save: vi.fn().mockResolvedValue(undefined),
     clear: vi.fn().mockResolvedValue(undefined),
+    loadDocumentId: vi.fn().mockResolvedValue(null),
   },
   mockDownloadProject: vi.fn(),
   mockDownloadCanvasAsPng: vi.fn(),
@@ -129,7 +133,8 @@ async function renderControllerAfterStartup() {
 }
 
 describe('useEditorController', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearDocumentLibrary();
     mockCanvasPersistenceService.load.mockResolvedValue(null);
     mockCanvasPersistenceService.save.mockResolvedValue(undefined);
     mockDownloadProject.mockReset();
@@ -317,7 +322,7 @@ describe('useEditorController', () => {
     await act(async () => {
       result.current.actions.handleExport(null);
       result.current.actions.handleExport(stage);
-      result.current.actions.handleSave();
+      result.current.actions.handleExportJson();
       clipboardNoHandle = await result.current.actions.handleExportToClipboard(null);
       clipboardOk = await result.current.actions.handleExportToClipboard(stage);
     });
@@ -550,9 +555,9 @@ describe('useEditorController', () => {
       useEditorStore.getState().selectSingleNode('favorite-text');
     });
 
-    act(() => {
+    await act(async () => {
       result.current.actions.saveSelectionAsFavorite();
-      result.current.actions.handleNewProject();
+      await result.current.actions.handleNewProject();
     });
 
     const savedFavoriteId = result.current.state.favorites[0]!.id;
@@ -664,7 +669,7 @@ describe('useEditorController', () => {
     ).toBe(true);
   });
 
-  it('prunes persisted uploaded fonts using canvas and favorite references as the retention set', async () => {
+  it('prunes persisted uploaded fonts using canvas, library and favorite references as the retention set', async () => {
     resetEditorStore({
       document: {
         ...createDefaultProjectDocument(),
@@ -700,6 +705,24 @@ describe('useEditorController', () => {
       },
     ];
     mockFavoriteLibraryService.load.mockReturnValue(retainedFavorites as never);
+    const libraryFont = {
+      family: 'Library Font',
+      sourceName: 'LibraryFont-Regular.ttf',
+      kind: 'uploaded' as const,
+    };
+    await defaultDocumentLibraryService.save(
+      {
+        id: 'library-document',
+        name: 'In the library',
+        createdAt: 1,
+        updatedAt: 1,
+        preview: null,
+        fonts: [libraryFont],
+      },
+      { ...createDefaultProjectDocument(), fonts: [libraryFont] },
+    );
+    // Startup reads the library before the editor mounts.
+    await loadDocumentLibrarySession({ hasWorkingCopy: false });
 
     renderHook(() => useEditorController({ fontsReady: true }));
 
@@ -719,8 +742,22 @@ describe('useEditorController', () => {
           sourceName: 'FavoriteFont-Regular.ttf',
           kind: 'uploaded',
         },
+        libraryFont,
       ]),
     );
+  });
+
+  it('prunes no uploaded fonts while it is unknown what the library holds', async () => {
+    // No startup has read the library: a font only a library document uses must not be deleted.
+    renderHook(() => useEditorController({ fontsReady: true }));
+
+    await waitFor(() => {
+      expect(mockFavoriteLibraryService.load).toHaveBeenCalled();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(mockUploadedFontPersistenceService.pruneUnreferenced).not.toHaveBeenCalled();
   });
 
   describe('an uploaded font family with several files', () => {
@@ -857,9 +894,9 @@ describe('useEditorController', () => {
       });
       const { result } = renderHook(() => useEditorController({ fontsReady: true }));
 
-      act(() => {
+      await act(async () => {
         result.current.actions.saveSelectionAsFavorite();
-        result.current.actions.handleNewProject();
+        await result.current.actions.handleNewProject();
       });
       const favorite = result.current.state.favorites[0]!;
       expect(favorite.fonts).toEqual([boldReference, regularReference]);

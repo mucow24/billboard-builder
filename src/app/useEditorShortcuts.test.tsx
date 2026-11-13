@@ -85,6 +85,7 @@ function createShortcutHarness() {
   const groupSelectedNodes = vi.fn();
   const nudgeSelectedNodes = vi.fn();
   const onPasteImageFile = vi.fn();
+  const onSave = vi.fn();
   const redo = vi.fn();
   const reorderSelectedNode = vi.fn();
   const selectAllNodes = vi.fn();
@@ -101,6 +102,8 @@ function createShortcutHarness() {
     groupSelectedNodes,
     nudgeSelectedNodes,
     onPasteImageFile,
+    onSave,
+    suspended: false,
     redo,
     reorderSelectedNode,
     selectAllNodes,
@@ -119,6 +122,8 @@ function createShortcutHarness() {
     groupSelectedNodes,
     nudgeSelectedNodes,
     onPasteImageFile,
+    onSave,
+    suspended: false,
     redo,
     reorderSelectedNode,
     selectAllNodes,
@@ -563,5 +568,58 @@ describe('useEditorShortcuts', () => {
     expect(harness.toggleInspectorTab).not.toHaveBeenCalled();
 
     input.remove();
+  });
+
+  it('saves on Ctrl+S and Cmd+S, also from a text field, and keeps the browser from saving the page', () => {
+    const harness = createShortcutHarness();
+    renderHook(() => useEditorShortcuts(harness.args));
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    const ctrlUnhandled = dispatchKeyDown(document.body, { key: 's', ctrlKey: true });
+    const cmdUnhandled = dispatchKeyDown(input, { key: 'S', metaKey: true });
+    dispatchKeyDown(document.body, { key: 's' });
+
+    expect(ctrlUnhandled).toBe(false);
+    expect(cmdUnhandled).toBe(false);
+    expect(harness.onSave).toHaveBeenCalledTimes(2);
+
+    input.remove();
+  });
+
+  it('saves once while Ctrl+S is held down', () => {
+    const harness = createShortcutHarness();
+    renderHook(() => useEditorShortcuts(harness.args));
+
+    dispatchKeyDown(document.body, { key: 's', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 's', ctrlKey: true, repeat: true });
+
+    expect(harness.onSave).toHaveBeenCalledOnce();
+  });
+
+  it('does nothing while suspended, but still keeps the browser from saving the page', () => {
+    const selectedItem = createRectangleItem({ x: 40, y: 60 });
+    const harness = createShortcutHarness();
+    const clipboardData = makeClipboardData();
+    selectItemsInStore([selectedItem]);
+    renderHook(() => useEditorShortcuts({ ...harness.args, suspended: true }));
+
+    const saveUnhandled = dispatchKeyDown(document.body, { key: 's', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 'z', ctrlKey: true });
+    dispatchKeyDown(document.body, { key: 'Delete' });
+    dispatchKeyDown(document.body, { key: 'ArrowLeft' });
+    dispatchKeyDown(document.body, { key: 't' });
+    dispatchKeyDown(document.body, { key: 'Escape' });
+    const copyUnhandled = dispatchCopy(document.body, clipboardData);
+
+    expect(saveUnhandled).toBe(false);
+    expect(harness.onSave).not.toHaveBeenCalled();
+    expect(harness.undo).not.toHaveBeenCalled();
+    expect(harness.deleteSelectedNodes).not.toHaveBeenCalled();
+    expect(harness.nudgeSelectedNodes).not.toHaveBeenCalled();
+    expect(harness.setActiveTool).not.toHaveBeenCalled();
+    expect(harness.applyTransaction).not.toHaveBeenCalled();
+    expect(copyUnhandled).toBe(true);
+    expect(clipboardData.getData(APP_CLIPBOARD_MIME_TYPE)).toBe('');
   });
 });

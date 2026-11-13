@@ -18,9 +18,11 @@ A canvas-based design editor for creating billboards, digital signage, and graph
 
 **Undo/redo** — Transaction-based history with unlimited undo/redo.
 
-**File I/O** — Save and open projects as JSON. Export to PNG with configurable resolution. Upload images and custom fonts.
+**Library** — Canvases are kept in a local library in the browser, each with a preview. Canvas > Save stores the open canvas, and starting or loading another one saves it first. A dot beside the name marks unsaved changes, and Canvas > Revert goes back to the last saved version. Rename, delete, or export any saved canvas from Canvas > Load > From library.
 
-**Persistence** — Auto-saves canvas state, favorites, and uploaded fonts to local storage.
+**File I/O** — Export to PNG with configurable resolution, to SVG, or to a JSON project file, and open JSON project files. Upload images and custom fonts.
+
+**Persistence** — Auto-saves the canvas being edited, the library, favorites, and uploaded fonts to local storage.
 
 ## Tech Stack
 
@@ -117,7 +119,7 @@ src/
     generators/         # 9 procedural pattern generators
     fonts/              # Font loading and management
     color/              # Color utilities
-    io/                 # PNG export, project file save/load
+    io/                 # PNG/SVG/JSON export, project file reading
     persistence/        # LocalStorage/IndexedDB services
     state/              # Zustand store setup
   styles/               # CSS modules
@@ -153,6 +155,7 @@ docs/                   # Interaction test coverage matrix
 | Ctrl+V | Paste |
 | Ctrl+D | Duplicate |
 | Ctrl+A | Select all |
+| Ctrl+S | Save to the library |
 | Alt+Click | Select through the items under the cursor: each click steps to the next one down, including locked and covered items |
 | Ctrl+G | Group |
 | Ctrl+Shift+G | Ungroup |
