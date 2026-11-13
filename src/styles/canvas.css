@@ -148,22 +148,42 @@
   overflow: hidden;
 }
 
+/* One veil over the whole stage, with the canvas cut out by an even-odd
+   clip-path (the hole comes in as --cue-hole-* from CanvasStage). A single
+   element blurs one continuous backdrop, so nothing tears where separate
+   panels used to meet.
+   The fade must sit on this element itself, never on an ancestor: an ancestor
+   with opacity below 1 becomes the backdrop root, the blur then sees only that
+   fading layer and snaps onto the canvas when the fade ends. The blur radius
+   eases in step with the opacity. */
 .canvas-export-bounds-cue {
   position: absolute;
   inset: 0;
   z-index: 1;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 160ms ease;
+  background: rgba(6, 10, 20, 0.82);
+  clip-path: polygon(
+    evenodd,
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 0,
+    var(--cue-hole-left) var(--cue-hole-top),
+    var(--cue-hole-right) var(--cue-hole-top),
+    var(--cue-hole-right) var(--cue-hole-bottom),
+    var(--cue-hole-left) var(--cue-hole-bottom),
+    var(--cue-hole-left) var(--cue-hole-top)
+  );
+  opacity: 0;
+  backdrop-filter: blur(0px);
+  transition:
+    opacity 160ms ease,
+    backdrop-filter 160ms ease;
 }
 
 .canvas-export-bounds-cue.active {
   opacity: 1;
-}
-
-.canvas-export-bounds-panel {
-  position: absolute;
-  background: rgba(6, 10, 20, 0.82);
   backdrop-filter: blur(18px);
 }
 

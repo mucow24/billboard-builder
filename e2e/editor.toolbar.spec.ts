@@ -3,7 +3,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import {
-  canvasPointToPage,
+  canvasPointsToPage,
   chooseCanvasPreset,
   clickEmptyCanvas,
   clickItem,
@@ -87,24 +87,32 @@ test.describe('editor toolbar flows', () => {
     const exportButton = page.getByRole('button', { name: 'Export', exact: true });
     const canvasButton = page.getByRole('button', { name: 'Canvas', exact: true });
     const exportCue = page.getByTestId('export-bounds-cue');
-    const cuePanels = [
-      page.getByTestId('export-bounds-cue-top'),
-      page.getByTestId('export-bounds-cue-right'),
-      page.getByTestId('export-bounds-cue-bottom'),
-      page.getByTestId('export-bounds-cue-left'),
-    ];
-    const canvasCenter = await canvasPointToPage(page, { x: 512, y: 512 });
+    const [canvasTopLeft, canvasBottomRight] = await canvasPointsToPage(page, [
+      { x: 0, y: 0 },
+      { x: 1024, y: 1024 },
+    ]);
 
     await expect(exportCue).not.toHaveClass(/active/);
 
     await exportButton.hover();
     await expect(exportCue).toHaveClass(/active/);
 
-    for (const panel of cuePanels) {
-      const bounds = await panel.boundingBox();
-      expect(bounds).not.toBeNull();
-      expect(isPointInsideRect(canvasCenter, bounds!)).toBe(false);
-    }
+    // The cue is one veil with the canvas cut out of it: the hole must be
+    // exactly the canvas, clamped to the stage.
+    const cueBounds = await exportCue.boundingBox();
+    expect(cueBounds).not.toBeNull();
+    const hole = await exportCue.evaluate((el: HTMLElement) => {
+      const read = (side: string) => parseFloat(el.style.getPropertyValue(`--cue-hole-${side}`));
+      return { left: read('left'), top: read('top'), right: read('right'), bottom: read('bottom') };
+    });
+    const clampX = (x: number) => Math.min(cueBounds!.width, Math.max(0, x - cueBounds!.x));
+    const clampY = (y: number) => Math.min(cueBounds!.height, Math.max(0, y - cueBounds!.y));
+    expect(hole.left).toBeCloseTo(clampX(canvasTopLeft.x), 0);
+    expect(hole.top).toBeCloseTo(clampY(canvasTopLeft.y), 0);
+    expect(hole.right).toBeCloseTo(clampX(canvasBottomRight.x), 0);
+    expect(hole.bottom).toBeCloseTo(clampY(canvasBottomRight.y), 0);
+    expect(hole.right - hole.left).toBeGreaterThan(0);
+    expect(hole.bottom - hole.top).toBeGreaterThan(0);
 
     await canvasButton.hover();
     await expect(exportCue).not.toHaveClass(/active/);
@@ -337,15 +345,3 @@ test.describe('editor toolbar flows', () => {
     expect(range[1]! - range[0]!).toBeGreaterThan(0);
   });
 });
-
-function isPointInsideRect(
-  point: { x: number; y: number },
-  rect: { x: number; y: number; width: number; height: number },
-) {
-  return (
-    point.x >= rect.x &&
-    point.x <= rect.x + rect.width &&
-    point.y >= rect.y &&
-    point.y <= rect.y + rect.height
-  );
-}
