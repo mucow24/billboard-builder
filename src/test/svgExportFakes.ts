@@ -16,7 +16,7 @@ import type {
 // 10px per char advance, 8px ascent => every glyph position is exactly predictable.
 export const fakeMeasurer: TextMeasurer = {
   measureWidth: (_item, text) => text.length * 10,
-  fontAscent: () => 8,
+  firstBaseline: () => 8,
 };
 
 // Each non-space glyph is a 10x10 box whose path encodes the pen position so tests

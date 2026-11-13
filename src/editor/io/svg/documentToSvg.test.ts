@@ -295,9 +295,9 @@ describe('documentToSvg — text outlines (font available)', () => {
     expect(positions.map((p) => p.penX)).toEqual([0, 10]);
   });
 
-  it('places the baseline at the font ascent below the line top', () => {
+  it('places the first baseline where the measurer puts it below the line top', () => {
     const positions = glyphPositions(svgOf([createTextItem({ text: 'A' })]));
-    expect(positions[0].baselineY).toBeCloseTo(8); // fake fontAscent
+    expect(positions[0].baselineY).toBeCloseTo(8); // fake firstBaseline
   });
 
   it('adds letterSpacing to the glyph advance', () => {
@@ -336,7 +336,7 @@ describe('documentToSvg — text kerning', () => {
   // narrower per occurrence, which is how canvas `measureText` reports kerning.
   const kernedMeasurer: TextMeasurer = {
     measureWidth: (_item, text) => text.length * 10 - 3 * (text.split('AV').length - 1),
-    fontAscent: () => 8,
+    firstBaseline: () => 8,
   };
 
   function kernedPositions(overrides: Partial<TextCanvasItem>) {
@@ -576,7 +576,7 @@ describe('documentToSvg — text line alignment', () => {
     const leaningMeasurer: TextMeasurer = {
       measureWidth: (_item, text) => text.length * 10,
       measureInkWidth: (_item, text) => text.length * 10 + (text.endsWith('f') ? 4 : -2),
-      fontAscent: () => 8,
+      firstBaseline: () => 8,
     };
 
     it('aligns a line by its ink width where that is wider than its advance', () => {
