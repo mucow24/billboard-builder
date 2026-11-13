@@ -10,19 +10,45 @@ import { settleRender } from './settleRender';
 // timer. This file makes it the timer every time, by turning the scheduler's
 // immediates into timers that are due much later. The scheduler picks up
 // `setImmediate` when it is first loaded, which is after this hoisted block.
-const { restoreSetImmediate } = vi.hoisted(() => {
+//
+// Those timers can outlive the tests. A render outside `act` (the startup's
+// `setReady`) queues a scheduler task that runs its passive effects. When
+// `settleRender`'s `rerender`, inside `act`, runs those effects first, the
+// queued task is not withdrawn: it still runs when its timer is due, finds
+// nothing to do, but reads `window.event` before that. After the last test
+// that timer can be due after Vitest has torn jsdom down, and the read throws
+// "window is not defined" as an unhandled error. So the file waits, before it
+// ends, until the scheduler has no timer left.
+const { restoreSetImmediate, schedulerTimersDone } = vi.hoisted(() => {
   const original = globalThis.setImmediate;
-  const afterPendingTimers = (callback: (...args: unknown[]) => void, ...args: unknown[]) =>
-    setTimeout(callback, 50, ...args);
+  const pending = new Set<ReturnType<typeof setTimeout>>();
+  const afterPendingTimers = (callback: (...args: unknown[]) => void, ...args: unknown[]) => {
+    const timer = setTimeout(() => {
+      pending.delete(timer);
+      callback(...args);
+    }, 50);
+    pending.add(timer);
+    return timer;
+  };
   globalThis.setImmediate = afterPendingTimers as unknown as typeof setImmediate;
   return {
     restoreSetImmediate: () => {
       globalThis.setImmediate = original;
     },
+    // A scheduler task can queue another, so this waits until none is left
+    // rather than for the ones pending when it is called.
+    schedulerTimersDone: async () => {
+      while (pending.size > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    },
   };
 });
 
-afterAll(restoreSetImmediate);
+afterAll(async () => {
+  await schedulerTimersDone();
+  restoreSetImmediate();
+});
 
 let editorListening = false;
 
