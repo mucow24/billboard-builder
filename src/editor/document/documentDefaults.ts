@@ -117,7 +117,7 @@ export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasIt
     ...createBaseItem('text', 'Text'),
     width: 320,
     height: 96,
-    text: 'Double-click to edit',
+    text: 'Your text here',
     fontFamily: DEFAULT_FONT_FAMILY,
     fontSize: 42,
     fontStyle: 'normal',

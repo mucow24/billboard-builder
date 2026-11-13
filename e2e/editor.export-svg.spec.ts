@@ -304,35 +304,37 @@ test.describe('SVG export', () => {
     });
   });
 
-  // Regression for the Metro.json bug: text baselines must be placed by Pixi's
-  // actual-ink ascent (measureText('|ÉqÅM').actualBoundingBoxAscent), NOT the
-  // font's nominal fontBoundingBoxAscent. Modernia's accented caps tower above
-  // the nominal ascent, so the old exporter put the big "M" ~43px too high and
-  // the gap to "METRO" ballooned (~53px vs the ~13px shown on the canvas). Only
-  // a real browser measures these metrics, so this lives in e2e.
-  test('places text baselines by ink ascent so a decorative-font cap tucks tight to the line below', async ({ page }) => {
+  // The export places a line where the canvas does: the font's capitals centred
+  // in the line box, whatever the font's own metrics say. Modernia is the font
+  // that shows it. Its accented capitals tower over the plain ones, and its
+  // nominal ascent sits well above them: a baseline taken from the first put
+  // these capitals 41px below the middle of the first box here, one taken from
+  // the second 13px above it. The cap height comes from the browser's
+  // `measureText`, so this lives in e2e.
+  test('places text baselines so that the capitals are centred in the line box', async ({ page }) => {
     await openFreshEditor(page);
 
-    const bigM = createTextFixture({
-      id: 'big-m',
-      text: 'M',
+    // One line in a box of its own height, and one centred in a taller box.
+    const oneLine = createTextFixture({
+      id: 'one-line',
+      text: 'H',
       fontFamily: 'Modernia',
       fontSize: 142,
-      x: 0,
-      y: -68,
+      x: 40,
+      y: 60,
       width: 300,
-      height: 300,
+      height: 142,
       align: 'center',
-      verticalAlign: 'middle',
+      verticalAlign: 'top',
       lineHeight: 1,
     });
-    const wordmark = createTextFixture({
-      id: 'wordmark',
-      text: 'METRO',
+    const inTallBox = createTextFixture({
+      id: 'in-tall-box',
+      text: 'H',
       fontFamily: 'Barlow Black',
       fontSize: 51,
-      x: -30,
-      y: 147,
+      x: 400,
+      y: 40,
       width: 360,
       height: 127,
       align: 'center',
@@ -340,13 +342,13 @@ test.describe('SVG export', () => {
       lineHeight: 1.1,
     });
     const doc = {
-      ...createProjectDocument([bigM, wordmark]),
+      ...createProjectDocument([oneLine, inTallBox]),
       fonts: [
         { family: 'Modernia', sourceName: 'Modernia.otf', kind: 'bundled' },
         { family: 'Barlow Black', sourceName: 'Barlow-Black.ttf', kind: 'bundled' },
       ],
     };
-    await uploadProject(page, doc, 'metro-baseline.json');
+    await uploadProject(page, doc, 'cap-centred-baseline.json');
 
     const svg = await readDownloadedSvg(
       await captureDownload(page, async () => {
@@ -359,11 +361,16 @@ test.describe('SVG export', () => {
     const groups = parseTextGroupBounds(svg);
     expect(groups).toHaveLength(2);
 
-    // groups[0] = M (drawn first), groups[1] = METRO. Gap from the M's baseline
-    // (it has no descender) to the top of METRO. Pre-fix this was ~53px.
-    const gap = groups[1].top - groups[0].bottom;
-    expect(gap).toBeGreaterThan(0);
-    expect(gap).toBeLessThan(30);
+    // groups[0] = Modernia (drawn first), groups[1] = Barlow Black. An "H" is as
+    // tall as the font's capitals and stands on the baseline, so the middle of
+    // its outline is the middle of its line box, which here is the middle of
+    // the layer's box in both cases.
+    [oneLine, inTallBox].forEach((layer, index) => {
+      const { top, bottom } = groups[index];
+      // A real outline, not a dot: Modernia's capitals are 0.8 of the font size, Barlow's 0.7.
+      expect(bottom - top, `height of the H of ${layer.id}`).toBeGreaterThan(layer.fontSize * 0.6);
+      expect(Math.abs((top + bottom) / 2 - (layer.y + layer.height / 2)), `${layer.id}: off centre`).toBeLessThan(1);
+    });
   });
 
   // Regression: a family that ships several files (Regular, Bold, Italic, ...)

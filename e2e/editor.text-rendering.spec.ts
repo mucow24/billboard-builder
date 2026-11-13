@@ -141,12 +141,15 @@ function buildDocument() {
  * The bundled fonts keep arriving after the editor appears, and a layer drawn
  * before its font is registered keeps its fallback look.
  */
-async function waitForStartupAndFonts(page: Page) {
+async function waitForStartupAndFonts(
+  page: Page,
+  faces: Array<{ fontFamily: string; fontStyle: 'normal' | 'italic' }> = CASES,
+) {
   await waitForBundledFonts(page);
 
   // The faces these layers need, by name: a font file that failed to load
   // should fail the test here rather than as a wrong-looking glyph.
-  const wanted = [...new Map(CASES.map((entry) => [`${entry.fontFamily}/${entry.fontStyle}`, entry])).values()].map(
+  const wanted = [...new Map(faces.map((entry) => [`${entry.fontFamily}/${entry.fontStyle}`, entry])).values()].map(
     (entry) => ({ family: entry.fontFamily, style: entry.fontStyle }),
   );
   const missing = await page.evaluate(
@@ -165,6 +168,15 @@ async function waitForStartupAndFonts(page: Page) {
     wanted,
   );
   expect(missing, 'bundled font faces these layers use that are not loaded').toEqual([]);
+}
+
+/**
+ * Texels per px the canvas rasterises text at: one per device pixel, and as many
+ * more as the editor is zoomed in.
+ */
+async function textTexelsPerPx(page: Page): Promise<number> {
+  const { zoom } = (await readStageDebug(page)).viewport;
+  return Math.max(1, zoom) * (await page.evaluate(() => window.devicePixelRatio || 1));
 }
 
 interface CaseReport {
@@ -194,9 +206,10 @@ async function compareCanvasWithRoomyRender(page: Page): Promise<CaseReport[]> {
     await clickToolbarPopoverItem(page, 'Export', 'PNG');
   });
   const png = await fs.readFile(await download.path());
+  const texelsPerPx = await textTexelsPerPx(page);
 
   return page.evaluate(
-    async ({ pngBase64, placed, cell, boxOffset, boxWidth, lineHeightFactor, gradient }) => {
+    async ({ pngBase64, placed, cell, boxOffset, boxWidth, lineHeightFactor, gradient, texelsPerPx }) => {
       const image = new Image();
       image.src = `data:image/png;base64,${pngBase64}`;
       await image.decode();
@@ -224,14 +237,20 @@ async function compareCanvasWithRoomyRender(page: Page): Promise<CaseReport[]> {
           context.fillStyle = '#ffffff';
         }
 
-        // Where the canvas puts a line. The line box runs from the layer's top
-        // edge; the font's ascent and descent are the ink of these glyphs, and a
-        // line box taller than that is split evenly above and below.
+        // Where the canvas puts a line. Inside the texture the first baseline is
+        // where Pixi draws it: the font's ascent and descent are the ink of these
+        // glyphs, and a line box taller than that is split evenly above and below.
         const fontInk = context.measureText('|ÉqÅM');
         const ascent = fontInk.actualBoundingBoxAscent;
         const descent = fontInk.actualBoundingBoxDescent;
         const lineHeight = entry.fontSize * lineHeightFactor;
-        const firstBaseline = ascent + Math.max(0, (lineHeight - (ascent + descent)) / 2);
+        const baselineInTexture = ascent + Math.max(0, (lineHeight - (ascent + descent)) / 2);
+        // The texture is then moved, by whole texels, so that the font's capitals
+        // are centred in the line box, which runs from the layer's top edge.
+        const capHeight = context.measureText('H').actualBoundingBoxAscent;
+        const textureTop =
+          Math.round(((lineHeight + capHeight) / 2 - baselineInTexture) * texelsPerPx) / texelsPerPx;
+        const firstBaseline = textureTop + baselineInTexture;
         const lines = entry.text.split('\n');
         const lineWidth = (line: string) => {
           const metrics = context.measureText(line);
@@ -264,10 +283,10 @@ async function compareCanvasWithRoomyRender(page: Page): Promise<CaseReport[]> {
             const fromLineStart = position - penX;
             reach.left = Math.max(reach.left, ink.actualBoundingBoxLeft - fromLineStart);
             reach.right = Math.max(reach.right, fromLineStart + ink.actualBoundingBoxRight - width);
-            reach.top = Math.max(reach.top, ink.actualBoundingBoxAscent - (lineIndex * lineHeight + firstBaseline));
+            reach.top = Math.max(reach.top, ink.actualBoundingBoxAscent - (lineIndex * lineHeight + baselineInTexture));
             reach.bottom = Math.max(
               reach.bottom,
-              lineIndex * lineHeight + firstBaseline + ink.actualBoundingBoxDescent - advanceBox.height,
+              lineIndex * lineHeight + baselineInTexture + ink.actualBoundingBoxDescent - advanceBox.height,
             );
             const widthAfter = context.measureText(parts.slice(partIndex + 1).join('')).width;
             position += remainingWidth - widthAfter + entry.letterSpacing;
@@ -342,6 +361,7 @@ async function compareCanvasWithRoomyRender(page: Page): Promise<CaseReport[]> {
       boxWidth: BOX.width,
       lineHeightFactor: LINE_HEIGHT,
       gradient: GRADIENT,
+      texelsPerPx,
     },
   );
 }
@@ -466,9 +486,10 @@ async function compareShadowsWithRoomyRender(page: Page): Promise<ShadowReport[]
     await clickToolbarPopoverItem(page, 'Export', 'PNG');
   });
   const png = await fs.readFile(await download.path());
+  const texelsPerPx = await textTexelsPerPx(page);
 
   return page.evaluate(
-    async ({ pngBase64, placed, cell, boxOffset, text, lineHeightFactor }) => {
+    async ({ pngBase64, placed, cell, boxOffset, text, lineHeightFactor, texelsPerPx }) => {
       const image = new Image();
       image.src = `data:image/png;base64,${pngBase64}`;
       await image.decode();
@@ -485,12 +506,18 @@ async function compareShadowsWithRoomyRender(page: Page): Promise<ShadowReport[]
         const context = roomy.getContext('2d', { willReadFrequently: true })!;
         context.font = `${text.fontSize}px ${JSON.stringify(text.fontFamily)}`;
 
-        // Where the canvas puts the line, as in the comparison above.
+        // Where the canvas puts the line, as in the comparison above: Pixi's
+        // baseline inside the texture, and the texture moved by whole texels so
+        // that the capitals are centred in the line box.
         const fontInk = context.measureText('|ÉqÅM');
         const ascent = fontInk.actualBoundingBoxAscent;
         const descent = fontInk.actualBoundingBoxDescent;
         const lineHeight = text.fontSize * lineHeightFactor;
-        const baseline = boxOffset.y + ascent + Math.max(0, (lineHeight - (ascent + descent)) / 2);
+        const baselineInTexture = ascent + Math.max(0, (lineHeight - (ascent + descent)) / 2);
+        const capHeight = context.measureText('H').actualBoundingBoxAscent;
+        const textureTop =
+          Math.round(((lineHeight + capHeight) / 2 - baselineInTexture) * texelsPerPx) / texelsPerPx;
+        const baseline = boxOffset.y + textureTop + baselineInTexture;
 
         // The shadow alone first, then the text over it: the canvas draws the
         // text far above the texture for the first pass, so that only its
@@ -562,11 +589,13 @@ async function compareShadowsWithRoomyRender(page: Page): Promise<ShadowReport[]
         const any = list(expectedAny) ?? [0, 0, 0, 0];
         return {
           id: entry.id,
+          // The bounds are measured from the layer's corner; the texture starts
+          // `textureTop` below it.
           reach: {
             left: -any[0],
-            top: -any[1],
+            top: textureTop - any[1],
             right: any[2] - texture.width,
-            bottom: any[3] - texture.height,
+            bottom: any[3] - textureTop - texture.height,
           },
           missing: missing.count,
           missingAt: JSON.stringify(list(missing)),
@@ -584,11 +613,141 @@ async function compareShadowsWithRoomyRender(page: Page): Promise<ShadowReport[]
       boxOffset: { x: BOX.dx, y: BOX.dy },
       text: SHADOW_TEXT,
       lineHeightFactor: LINE_HEIGHT,
+      texelsPerPx,
+    },
+  );
+}
+
+/**
+ * A line of text has a line box of its font size times its line height, and its
+ * capitals belong in the middle of it, whatever the font. Pixi places a line by
+ * the ink of the font's accented capitals instead, which says little about where
+ * the plain ones are: these fonts ended up between a quarter of the font size
+ * too low (Modernia, whose capitals then hung out of the bottom of the box) and
+ * a quarter too high (Kosmos).
+ *
+ * Each layer is one "H" in a box exactly one line tall.
+ */
+const CENTRED_FAMILIES = ['Modernia', 'Michroma', 'Barlow', 'Morena', 'Kosmos'];
+const CENTRED_TEXT = { text: 'H', fontSize: 100, lineHeight: LINE_HEIGHT };
+const CENTRED_LINE_BOX = 110;
+const CENTRED_PLACED = CENTRED_FAMILIES.map((fontFamily, index) => ({
+  fontFamily,
+  cell: { x: index * CELL.width, y: 0 },
+}));
+const CENTRED_CANVAS = { width: CENTRED_FAMILIES.length * CELL.width, height: CELL.height };
+
+function buildCentredDocument() {
+  return {
+    ...createProjectDocument(
+      CENTRED_PLACED.map((entry, index) =>
+        createTextFixture({
+          id: `centred-${index}`,
+          name: entry.fontFamily,
+          zIndex: index + 1,
+          text: CENTRED_TEXT.text,
+          fontFamily: entry.fontFamily,
+          fontSize: CENTRED_TEXT.fontSize,
+          lineHeight: CENTRED_TEXT.lineHeight,
+          x: entry.cell.x + BOX.dx,
+          y: entry.cell.y + BOX.dy,
+          width: BOX.width,
+          height: CENTRED_LINE_BOX,
+        }),
+      ),
+    ),
+    canvas: CENTRED_CANVAS,
+  };
+}
+
+interface CentredReport {
+  fontFamily: string;
+  inkPixels: number;
+  /** Empty rows between the top of the box and the ink, and between the ink and the bottom of the box. */
+  above: number;
+  below: number;
+}
+
+/** Where the ink of each layer of the exported canvas sits between the top and the bottom of its box. */
+async function measureRoomAroundInk(page: Page): Promise<CentredReport[]> {
+  const download = await captureDownload(page, async () => {
+    await clickToolbarPopoverItem(page, 'Export', 'PNG');
+  });
+  const png = await fs.readFile(await download.path());
+
+  return page.evaluate(
+    async ({ pngBase64, placed, cell, boxTop, boxHeight }) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${pngBase64}`;
+      await image.decode();
+      const exported = document.createElement('canvas');
+      exported.width = image.naturalWidth;
+      exported.height = image.naturalHeight;
+      const context = exported.getContext('2d', { willReadFrequently: true })!;
+      context.drawImage(image, 0, 0);
+
+      return placed.map((entry) => {
+        const pixels = context.getImageData(entry.cell.x, entry.cell.y, cell.width, cell.height).data;
+        let inkPixels = 0;
+        let top = Infinity;
+        let bottom = -Infinity;
+        for (let y = 0; y < cell.height; y += 1) {
+          for (let x = 0; x < cell.width; x += 1) {
+            if (pixels[(y * cell.width + x) * 4 + 3] > 127) {
+              inkPixels += 1;
+              top = Math.min(top, y);
+              bottom = Math.max(bottom, y + 1);
+            }
+          }
+        }
+        return {
+          fontFamily: entry.fontFamily,
+          inkPixels,
+          above: top - boxTop,
+          below: boxTop + boxHeight - bottom,
+        };
+      });
+    },
+    {
+      pngBase64: png.toString('base64'),
+      placed: CENTRED_PLACED,
+      cell: CELL,
+      boxTop: BOX.dy,
+      boxHeight: CENTRED_LINE_BOX,
     },
   );
 }
 
 test.describe('text rendering on the canvas', () => {
+  test('geometry: centres the capitals of a line in its line box, whatever the font', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForStartupAndFonts(
+      page,
+      CENTRED_FAMILIES.map((fontFamily) => ({ fontFamily, fontStyle: 'normal' })),
+    );
+    await uploadProject(page, buildCentredDocument(), 'text-centred.json');
+
+    for (const report of await measureRoomAroundInk(page)) {
+      const room = `${report.above}px above the ink, ${report.below}px below, in a box ${CENTRED_LINE_BOX}px tall`;
+
+      // The layer drew its "H": even the hairlines of Morena, the thinnest of
+      // these faces, are some 700 pixels at 100px, and capitals are more than
+      // half the font size tall.
+      expect.soft(report.inkPixels, `${report.fontFamily}: the canvas has ink`).toBeGreaterThan(300);
+      expect
+        .soft(CENTRED_LINE_BOX - report.above - report.below, `${report.fontFamily}: height of the ink; ${room}`)
+        .toBeGreaterThan(CENTRED_TEXT.fontSize / 2);
+      // Capitals shorter than the line box stay inside it.
+      expect.soft(report.above, `${report.fontFamily}: the ink starts below the top of the box; ${room}`).toBeGreaterThan(0);
+      expect.soft(report.below, `${report.fontFamily}: the ink ends above the bottom of the box; ${room}`).toBeGreaterThan(0);
+      // As much room above as below. The text is placed on whole pixels and its
+      // edges are anti-aliased, which is worth a pixel at each end.
+      expect
+        .soft(Math.abs(report.above - report.below), `${report.fontFamily}: off centre; ${room}`)
+        .toBeLessThanOrEqual(2);
+    }
+  });
+
   test('geometry: shows the whole drop shadow where it falls outside the text', async ({ page }) => {
     await openFreshEditor(page);
     await waitForStartupAndFonts(page);
