@@ -21,6 +21,7 @@ import {
   resizeImageCrop,
 } from './imageCropGeometry';
 import { SNAP_THRESHOLD } from './snapping';
+import { isEditableTarget } from './domUtils';
 import type {
   CanvasItem,
   GuideLine,
@@ -148,6 +149,11 @@ export function useCropSession({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') {
+        return;
+      }
+      // Escape in a text field (an inspector input, the HUD zoom field)
+      // belongs to that field, not to the crop session.
+      if (isEditableTarget(event.target)) {
         return;
       }
       event.preventDefault();
