@@ -626,7 +626,7 @@ describe('SelectionInspector', () => {
     });
   });
 
-  it('keeps the swap fill colors button enabled even when gradient is off', () => {
+  it('disables the swap and secondary fill controls while the fill is solid', () => {
     const rectangleItem = createRectangleItem({
       fill: '#ff0000ff',
       secondaryFill: '#0000ffff',
@@ -645,7 +645,70 @@ describe('SelectionInspector', () => {
       />
     );
 
+    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Secondary fill' })).toBeDisabled();
+    // The section heading and the main color swatch are both named Fill.
+    for (const fillButton of screen.getAllByRole('button', { name: 'Fill' })) {
+      expect(fillButton).toBeEnabled();
+    }
+    expect(screen.getByRole('button', { name: 'Toggle gradient' })).toBeEnabled();
+  });
+
+  it('keeps the swap and secondary fill controls usable for a gradient and for a mixed selection', () => {
+    const gradientItem = createRectangleItem({ gradientEnabled: true });
+    const solidItem = createRectangleItem({ gradientEnabled: false });
+
+    const { rerender } = render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={gradientItem}
+        selectedNodeCount={1}
+        selectedItems={[gradientItem]}
+      />
+    );
+
     expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Secondary fill' })).toBeEnabled();
+
+    rerender(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedNodeCount={2}
+        selectedItems={[gradientItem, solidItem]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Swap fill colors' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Secondary fill' })).toBeEnabled();
+  });
+
+  it('explains a property when the pointer rests on its label', () => {
+    const textItem = createTextItem();
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={vi.fn()}
+        selectedItem={textItem}
+        selectedNodeCount={1}
+        selectedItems={[textItem]}
+      />
+    );
+
+    expect(screen.getByText('Size:')).toHaveAttribute('title', 'Font size in pixels.');
+    expect(screen.getByText('Gradient angle:')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Direction of the gradient'),
+    );
+    expect(screen.getByText('W:')).toHaveAttribute('title', 'Width in pixels.');
   });
 
   it('swaps fill colors for text items', async () => {

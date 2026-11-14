@@ -40,6 +40,7 @@ interface NumberInputProps extends BareNumberInputProps {
   slider?: boolean;
   sliderDetentThreshold?: number;
   sliderDetentValue?: number;
+  tooltip?: string;
 }
 
 function useDraftNumber(
@@ -145,6 +146,7 @@ export function NumberInput({
   sliderDetentThreshold,
   sliderDetentValue,
   step = 1,
+  tooltip,
   value,
 }: NumberInputProps) {
   const displayedValue =
@@ -164,7 +166,7 @@ export function NumberInput({
 
   if (slider) {
     return (
-      <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+      <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
         <div className="number-input-field number-input-field-with-slider">
           <div className="number-input-slider-row">
             <input
@@ -224,7 +226,7 @@ export function NumberInput({
   }
 
   return (
-    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
       <BareNumberInput
         disabled={disabled}
         digits={digits}

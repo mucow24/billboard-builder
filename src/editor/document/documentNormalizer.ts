@@ -1,3 +1,4 @@
+import { splitColorAlpha } from '../generators/colorUtils';
 import { clampFinite } from './clampFinite';
 import {
   createDefaultProjectDocument,
@@ -14,6 +15,7 @@ import type {
   CanvasShadow,
   EllipseCanvasItem,
   GeneratorCanvasItem,
+  GeneratorParams,
   GroupNode,
   ImageCanvasItem,
   LineCanvasItem,
@@ -141,6 +143,22 @@ function normalizeGradientFill<T extends { fill: string; secondaryFill?: string;
     gradientEnabled: Boolean(item.gradientEnabled),
     gradientAngle: clampFinite(item.gradientAngle ?? 0, 0),
   };
+}
+
+/**
+ * Scanlines used to carry their transparency in the color's alpha digits.
+ * Opacity is now a setting of its own, so a layer saved without one takes its
+ * opacity from that alpha and keeps the color opaque: it looks the same.
+ */
+function normalizeGeneratorParams(params: GeneratorParams): GeneratorParams {
+  if (params.generatorType !== 'scanlines') {
+    return params;
+  }
+  if (typeof params.opacity === 'number' && Number.isFinite(params.opacity)) {
+    return { ...params, opacity: Math.max(0, Math.min(1, params.opacity)) };
+  }
+  const { alpha, color } = splitColorAlpha(params.scanlineColor);
+  return { ...params, scanlineColor: color, opacity: alpha };
 }
 
 export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
@@ -367,6 +385,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         seed: clampFinite(item.seed, 0),
+        generatorParams: normalizeGeneratorParams(item.generatorParams),
       };
       return normalizedGeneratorItem;
     }

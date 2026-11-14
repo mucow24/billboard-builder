@@ -251,6 +251,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
               <PropertiesPanel
                 activeTab={inspectorTab}
                 availableFonts={availableFonts}
+                canvasSize={document.canvas}
                 fonts={document.fonts}
                 layerRows={layerRows}
                 missingFontFamilies={missingFontFamilies}

@@ -45,7 +45,7 @@ test.describe('generator layers', () => {
     await openLayersTab(page);
     await clickLayerRow(page, 'Diagonal Bands');
     await openPropertiesTab(page);
-    await expectRangeFieldBounds(page, 'Spacing Jitter', { min: '0', max: '5', step: '0.01' });
+    await expectRangeFieldBounds(page, 'Band Width Jitter', { min: '0', max: '5', step: '0.01' });
     await expectRangeFieldBounds(page, 'Skew Intensity', { min: '0', max: '3', step: '0.01' });
 
     await addGenerator(page, 'Burst Rays');
@@ -53,8 +53,9 @@ test.describe('generator layers', () => {
     await clickLayerRow(page, 'Burst Rays');
     await openPropertiesTab(page);
     await expectRangeFieldBounds(page, 'Ray Count', { min: '1', max: '48', step: '1' });
-    await expectRangeFieldBounds(page, 'Offset X', { min: '-512', max: '512', step: '1' });
-    await expectRangeFieldBounds(page, 'Offset Y', { min: '-512', max: '512', step: '1' });
+    // Three quarters of the 2048 x 2048 default canvas, either way.
+    await expectRangeFieldBounds(page, 'Offset X', { min: '-1536', max: '1536', step: '1' });
+    await expectRangeFieldBounds(page, 'Offset Y', { min: '-1536', max: '1536', step: '1' });
 
     await addGenerator(page, 'Zigzags');
     await openLayersTab(page);
@@ -68,6 +69,14 @@ test.describe('generator layers', () => {
     await clickLayerRow(page, 'Flat Grid');
     await openPropertiesTab(page);
     await expectRangeFieldBounds(page, 'Thickness', { min: '1', max: '64', step: '1' });
+    // The grid repeats, so the offset sliders span one grid spacing and follow it.
+    const offsetXSlider = page.getByRole('slider', { name: 'Offset X', exact: true });
+    await expect(offsetXSlider).toHaveAttribute('min', '0');
+    await expect(offsetXSlider).toHaveAttribute('max', '40');
+    await page.getByLabel('Spacing X value').fill('10');
+    await page.getByLabel('Spacing X value').blur();
+    await expect(offsetXSlider).toHaveAttribute('max', '10');
+    await expect(page.getByRole('slider', { name: 'Offset Y', exact: true })).toHaveAttribute('max', '40');
 
     await addGenerator(page, 'Noise');
     await openLayersTab(page);
@@ -95,6 +104,8 @@ test.describe('generator layers', () => {
     await openPropertiesTab(page);
 
     await expect(page.getByText('Scanline Color')).toBeVisible();
+    // Opacity is a setting of its own, starting at the alpha the default color used to carry.
+    await expect(page.getByLabel('Opacity value')).toHaveValue('0.09');
     await expect(page.getByText('Height:')).toBeVisible();
 
     const spacingInput = page.getByLabel('Spacing value');

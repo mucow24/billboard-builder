@@ -24,6 +24,7 @@ export const SECTION_ORDER = {
   image: 5,
   fill: 10,
   stroke: 15,
+  ngon: 17,
   text: 20,
   geometry: 50,
   advancedText: 60,
@@ -123,6 +124,22 @@ export function createGeometryField(
   });
 }
 
+export function createPositionXField(): NumberFieldDescriptor {
+  return createGeometryField('x', 'X', 10, (item) => item.x, (_context, nextValue) => ({ x: nextValue }), {
+    digits: 1,
+    step: 0.1,
+    tooltip: "Horizontal position of the item's top-left corner, in pixels from the left edge of the canvas.",
+  });
+}
+
+export function createPositionYField(): NumberFieldDescriptor {
+  return createGeometryField('y', 'Y', 20, (item) => item.y, (_context, nextValue) => ({ y: nextValue }), {
+    digits: 1,
+    step: 0.1,
+    tooltip: "Vertical position of the item's top-left corner, in pixels from the top edge of the canvas.",
+  });
+}
+
 export { createDimensionsField, type DimensionAction } from './dimensionsField';
 
 export const ROTATION_FIELD_EXTRA: Partial<NumberFieldDescriptor> = {
@@ -155,7 +172,11 @@ export function createRotationField(): NumberFieldDescriptor {
         rotation: nextValue,
       };
     },
-    ROTATION_FIELD_EXTRA,
+    {
+      ...ROTATION_FIELD_EXTRA,
+      tooltip:
+        'Angle of the item in degrees, turning around its center. Positive values turn clockwise.',
+    },
   );
 }
 
@@ -240,7 +261,7 @@ export function createGradientAngleDescriptor(): NumberFieldDescriptor {
       ),
     getValue: (item) =>
       'gradientAngle' in item ? (item as GradientFillItem).gradientAngle : 0,
-    label: 'Angle',
+    label: 'Gradient angle',
     max: 180,
     min: -180,
     propertyKey: 'gradientAngle',
@@ -253,6 +274,8 @@ export function createGradientAngleDescriptor(): NumberFieldDescriptor {
     step: 1,
     textMax: Infinity,
     textMin: -Infinity,
+    tooltip:
+      'Direction of the gradient in degrees. 0 runs left to right. Only available while the gradient is on.',
     valueType: 'number',
   });
 }
@@ -273,6 +296,7 @@ export const COMMON_BLUR_DESCRIPTORS: InspectorFieldDescriptor[] = [
     slider: true,
     step: 1,
     textMax: Infinity,
+    tooltip: 'How much the item is blurred, in pixels. 0 is sharp.',
 
     valueType: 'number',
   }),
@@ -293,6 +317,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     sectionKey: 'shadow',
     sectionLabel: 'Shadow',
     sectionOrder: SECTION_ORDER.shadow,
+    tooltip: 'Color of the drop shadow.',
 
     valueType: 'color',
   }),
@@ -305,11 +330,12 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     slider: true,
     step: 1,
     textMax: Infinity,
+    tooltip: "How soft the shadow's edge is, in pixels. 0 gives a hard edge.",
   }),
   createShadowNumberField(
     'opacity',
     'Opacity',
-    30,
+    5,
     (item) => item.shadow.opacity,
     (nextValue) => ({ opacity: nextValue }),
     {
@@ -318,6 +344,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
       min: 0,
       slider: true,
       step: 0.1,
+      tooltip: 'Transparency of the shadow, from 0 (no shadow) to 1 (solid).',
     }
   ),
   createShadowNumberField(
@@ -327,6 +354,8 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     (item) => item.shadow.offsetX,
     (nextValue) => ({ offsetX: nextValue }),
     {
+      tooltip:
+        'How far the shadow sits to the right of the item, in pixels. Negative values move it left.',
       digits: 1,
       max: 100,
       min: -100,
@@ -345,6 +374,7 @@ export const COMMON_SHADOW_DESCRIPTORS: InspectorFieldDescriptor[] = [
     (item) => item.shadow.offsetY,
     (nextValue) => ({ offsetY: nextValue }),
     {
+      tooltip: 'How far the shadow sits below the item, in pixels. Negative values move it up.',
       digits: 1,
       max: 100,
       min: -100,

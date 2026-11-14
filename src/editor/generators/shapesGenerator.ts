@@ -40,11 +40,12 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
   type: 'shapes',
   label: 'Shapes',
   fields: [
-    { key: 'accentColor', label: 'Accent Color', type: 'color' },
-    { key: 'bandColorA', label: 'Color A', type: 'color' },
-    { key: 'bandColorB', label: 'Color B', type: 'color' },
+    { key: 'accentColor', label: 'Accent Color', tooltip: 'Color used for a little under half of the shapes.', type: 'color' },
+    { key: 'bandColorA', label: 'Color A', tooltip: 'One of two colors shared by the remaining shapes.', type: 'color' },
+    { key: 'bandColorB', label: 'Color B', tooltip: 'The other color shared by the remaining shapes.', type: 'color' },
     {
       key: 'shapeTypes', label: 'Shape Types', type: 'toggleGroup',
+      tooltip: 'Which kinds of shape are scattered. Turn at least one on.',
       options: [
         { key: 'rect', icon: '▭', label: 'Rect' },
         { key: 'diamond', icon: '◇', label: 'Diamond' },
@@ -53,14 +54,14 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
         { key: 'bar', icon: '▬', label: 'Bar' },
       ],
     },
-    { key: 'count', label: 'Count', type: 'range', min: 1, max: 256, step: 1, textMin: 1, textMax: 256 },
-    { key: 'shapeMinSize', label: 'Min Size', type: 'range', min: 1, max: 384, step: 1, textMin: 1, textMax: 384 },
-    { key: 'shapeMaxSize', label: 'Max Size', type: 'range', min: 1, max: 384, step: 1, textMin: 1, textMax: 384 },
-    { key: 'rotation', label: 'Rotation', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'shapeOutline', label: 'Outline Width', type: 'range', min: 0, max: 24, step: 1, textMin: 0, textMax: Infinity },
-    { key: 'shapeMix', label: 'Fill Mix', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
+    { key: 'count', label: 'Count', tooltip: 'Number of shapes drawn.', type: 'range', min: 1, max: 256, step: 1, textMin: 1, textMax: 256 },
+    { key: 'shapeMinSize', label: 'Min Size', tooltip: 'Smallest size a shape can be, in pixels.', type: 'range', min: 1, max: 384, step: 1, textMin: 1, textMax: 384 },
+    { key: 'shapeMaxSize', label: 'Max Size', tooltip: 'Largest size a shape can be, in pixels.', type: 'range', min: 1, max: 384, step: 1, textMin: 1, textMax: 384 },
+    { key: 'rotation', label: 'Rotation', tooltip: 'How far shapes are turned at random. 0 keeps them upright, 1 allows any angle.', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'opacity', label: 'Opacity', tooltip: 'Transparency of the shapes, from 0 (invisible) to 1 (solid).', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'shapeOutline', label: 'Outline Width', tooltip: 'Line thickness of the shapes drawn as outlines, in pixels.', type: 'range', min: 0, max: 24, step: 1, textMin: 0, textMax: Infinity },
+    { key: 'shapeMix', label: 'Fill Mix', tooltip: 'Share of shapes drawn solid rather than as outlines. 0 is all outlines, 1 is all solid.', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'seedOverride', label: 'Seed Override', tooltip: "Fix the random pattern to a number of your choice. Leave at 0 to use the item's own random pattern.", type: 'optionalNumber', min: 0, max: 999999999 },
   ],
   createDefaultParams(): ShapesGeneratorParams {
     return {

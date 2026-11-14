@@ -24,6 +24,7 @@ export function renderFontFamilyField({ field, onCommit }: CustomFieldRenderProp
       disabled={field.disabled}
       fonts={toFontOptions(field.options)}
       label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
       mixed={field.state.isMixed}
       value={String(field.state.firstValue ?? '')}
       onChange={(nextValue) => onCommit(nextValue)}
@@ -37,6 +38,7 @@ export function renderBoldField({ field, onCommit }: CustomFieldRenderProps) {
       active={typeof field.state.value === 'boolean' ? field.state.value : null}
       disabled={field.disabled}
       label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
       mixed={field.state.isMixed}
       onChange={(nextValue) => onCommit(nextValue)}
     >
@@ -53,6 +55,7 @@ export function renderItalicField({ field, onCommit }: CustomFieldRenderProps) {
       active={typeof field.state.value === 'boolean' ? field.state.value : null}
       disabled={field.disabled}
       label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
       mixed={field.state.isMixed}
       onChange={(nextValue) => onCommit(nextValue)}
     >
@@ -69,6 +72,7 @@ export function renderMirrorField({ field, onCommit }: CustomFieldRenderProps) {
       active={typeof field.state.value === 'boolean' ? field.state.value : null}
       disabled={field.disabled}
       label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
       mixed={field.state.isMixed}
       onChange={(nextValue) => onCommit(nextValue)}
     >
@@ -84,6 +88,7 @@ export function renderAlignField({ field, onCommit }: CustomFieldRenderProps) {
     <SegmentedSelectInput
       disabled={field.disabled}
       label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
       mixed={field.state.isMixed}
       options={[
         {
@@ -134,6 +139,7 @@ export function renderVerticalAlignField({
     <SegmentedSelectInput
       disabled={field.disabled}
       label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
       mixed={field.state.isMixed}
       options={[
         {

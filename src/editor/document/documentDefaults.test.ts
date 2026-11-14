@@ -147,7 +147,8 @@ describe('document defaults', () => {
 
     expect(scanlines.generatorParams).toEqual({
       generatorType: 'scanlines',
-      scanlineColor: '#00000017',
+      scanlineColor: '#000000',
+      opacity: 0.09,
       scanlineHeight: 1,
       scanlineSpacing: 4,
     });

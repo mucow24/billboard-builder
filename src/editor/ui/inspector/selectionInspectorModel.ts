@@ -46,6 +46,8 @@ interface BaseInspectorFieldDescriptor<TValue> {
   sectionKey: string;
   sectionLabel: string;
   sectionOrder: number;
+  /** One or two sentences explaining the property, shown when the pointer rests on its label. */
+  tooltip?: string;
 
   valueType: InspectorValueType;
   getDisabled?: (context: InspectorDescriptorContext) => boolean;
@@ -105,6 +107,8 @@ export type InspectorFieldDescriptor =
 
 export interface InspectorDescriptorEnvironment {
   availableFonts: UploadedFont[];
+  /** Size of the document canvas. Generators draw across all of it, whatever the layer's own box. */
+  canvasSize?: { height: number; width: number };
   fontOptions: FontOption[];
 }
 
@@ -139,7 +143,10 @@ function getDescriptorKey(descriptor: InspectorFieldDescriptor): string {
 }
 
 
-function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
+function getItemFieldDescriptors(
+  item: CanvasItem,
+  environment: InspectorDescriptorEnvironment,
+): InspectorFieldDescriptor[] {
   switch (item.kind) {
     case 'text':
       return [...createTextDescriptors(), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
@@ -156,7 +163,7 @@ function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
     case 'line':
       return [...createShapeDescriptors('line'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'generator':
-      return [...createGeneratorDescriptors(item), ...COMMON_BLUR_DESCRIPTORS];
+      return [...createGeneratorDescriptors(item, environment.canvasSize), ...COMMON_BLUR_DESCRIPTORS];
     default:
       return [];
   }
@@ -164,10 +171,12 @@ function getItemFieldDescriptors(item: CanvasItem): InspectorFieldDescriptor[] {
 
 export function buildInspectorEnvironment(
   availableFonts: UploadedFont[],
-  fonts: DocumentFontReference[]
+  fonts: DocumentFontReference[],
+  canvasSize?: { height: number; width: number },
 ): InspectorDescriptorEnvironment {
   return {
     availableFonts,
+    canvasSize,
     fontOptions: buildFontOptions(availableFonts, fonts),
   };
 }
@@ -184,7 +193,7 @@ export function buildSelectionInspectorSections(
     ...environment,
     selectedItems,
   };
-  const descriptorLists = selectedItems.map((item) => getItemFieldDescriptors(item));
+  const descriptorLists = selectedItems.map((item) => getItemFieldDescriptors(item, environment));
   const descriptorMaps = descriptorLists.map((descriptors) =>
     new Map(descriptors.map((descriptor) => [getDescriptorKey(descriptor), descriptor]))
   );

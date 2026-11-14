@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createGeneratorItem,
   createGroupNode,
   createImageItem,
   createLineItem,
@@ -11,7 +12,8 @@ import {
 import {
   normalizeProjectDocument,
 } from './documentNormalizer';
-import type { ImageCanvasItem } from './documentTypes';
+import type { GeneratorCanvasItem, ImageCanvasItem } from './documentTypes';
+import { rgba } from '../generators/colorUtils';
 
 describe('document normalizer', () => {
   it('derives a canonical image source transform from legacy crop data', () => {
@@ -335,4 +337,74 @@ describe('document normalizer', () => {
     expect(fromCustom.name).toBe('My Canvas');
   });
 
+  it('moves the alpha of an older scanlines color into its own opacity setting', () => {
+    const scanlines = createGeneratorItem('scanlines', 1024, 1024);
+    const legacyScanlines = {
+      ...scanlines,
+      generatorParams: {
+        generatorType: 'scanlines',
+        scanlineColor: '#11223380',
+        scanlineHeight: 2,
+        scanlineSpacing: 3,
+      },
+    } as unknown as GeneratorCanvasItem;
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [legacyScanlines],
+      fonts: [],
+    });
+
+    expect((normalized.nodes[0] as GeneratorCanvasItem).generatorParams).toEqual({
+      generatorType: 'scanlines',
+      scanlineColor: '#112233',
+      opacity: 128 / 255,
+      scanlineHeight: 2,
+      scanlineSpacing: 3,
+    });
+  });
+
+  it('draws an older scanlines layer exactly as before once its opacity is split out', () => {
+    const legacyColor = '#00000017';
+    const scanlines = createGeneratorItem('scanlines', 1024, 1024);
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [
+        {
+          ...scanlines,
+          generatorParams: {
+            generatorType: 'scanlines',
+            scanlineColor: legacyColor,
+            scanlineHeight: 1,
+            scanlineSpacing: 4,
+          },
+        } as unknown as GeneratorCanvasItem,
+      ],
+      fonts: [],
+    });
+    const params = (normalized.nodes[0] as GeneratorCanvasItem).generatorParams;
+    if (params.generatorType !== 'scanlines') {
+      throw new Error('Expected scanlines params.');
+    }
+
+    expect(rgba(params.scanlineColor, params.opacity)).toBe(rgba(legacyColor, 1));
+  });
+
+  it('leaves a scanlines layer that already has an opacity as it is', () => {
+    const scanlines = createGeneratorItem('scanlines', 1024, 1024);
+    scanlines.generatorParams = {
+      generatorType: 'scanlines',
+      scanlineColor: '#11223380',
+      opacity: 0.4,
+      scanlineHeight: 2,
+      scanlineSpacing: 3,
+    };
+
+    const normalized = normalizeProjectDocument({ version: 2, nodes: [scanlines], fonts: [] });
+
+    expect((normalized.nodes[0] as GeneratorCanvasItem).generatorParams).toMatchObject({
+      scanlineColor: '#11223380',
+      opacity: 0.4,
+    });
+  });
 });

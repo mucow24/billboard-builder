@@ -47,6 +47,16 @@ function formatAlpha(alpha: number): string {
   return Number(alpha.toFixed(3)).toString();
 }
 
+/**
+ * Splits a stored hex color into its opaque `#rrggbb` part and its alpha
+ * (0 to 1). A color with no alpha digits has alpha 1.
+ */
+export function splitColorAlpha(hex: string): { alpha: number; color: string } {
+  const { a, r, g, b } = parseColorChannels(hex);
+  const channel = (value: number) => value.toString(16).padStart(2, '0');
+  return { alpha: a, color: `#${channel(r)}${channel(g)}${channel(b)}` };
+}
+
 export function rgba(hex: string, alpha = 1): string {
   const { a, r, g, b } = parseColorChannels(hex);
   const effectiveAlpha = clampUnit(a * alpha);

@@ -8,6 +8,7 @@ interface TextInputProps {
   mixed?: boolean;
   multiline?: boolean;
   onChange: (value: string) => void;
+  tooltip?: string;
   value: string | null;
 }
 
@@ -17,6 +18,7 @@ export function TextInput({
   mixed = false,
   multiline = false,
   onChange,
+  tooltip,
   value,
 }: TextInputProps) {
   const inputId = useId();
@@ -27,6 +29,7 @@ export function TextInput({
       hint={mixed ? 'Mixed' : undefined}
       label={label}
       layout={multiline ? 'stacked' : 'inline'}
+      tooltip={tooltip}
     >
       {multiline ? (
         <textarea

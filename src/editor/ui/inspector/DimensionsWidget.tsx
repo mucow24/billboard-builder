@@ -37,7 +37,7 @@ export function DimensionsWidget({
 
   return (
     <div className="dimensions-widget">
-      <span className="dimensions-widget-label">W:</span>
+      <span className="dimensions-widget-label" title="Width in pixels.">W:</span>
       <BareNumberInput
         disabled={disabled}
         digits={1}
@@ -47,7 +47,10 @@ export function DimensionsWidget({
         value={widthMixed ? null : width}
         onChange={(value) => onCommit({ kind: 'absWidth', value, locked })}
       />
-      <div className="dimensions-widget-pct-cell">
+      <div
+        className="dimensions-widget-pct-cell"
+        title="Width as a percentage scale. 100 is the unscaled width."
+      >
         <BareNumberInput
           disabled={disabled}
           digits={0}
@@ -66,6 +69,7 @@ export function DimensionsWidget({
       <button
         type="button"
         aria-label="Lock aspect ratio"
+        title="When locked, changing the width or height here changes the other to keep the same proportions."
         aria-pressed={lockedMixed ? 'mixed' : locked}
         className={[
           'dimensions-widget-lock',
@@ -80,7 +84,7 @@ export function DimensionsWidget({
         <span aria-hidden="true">{locked && !lockedMixed ? '🔒' : '🔓'}</span>
       </button>
 
-      <span className="dimensions-widget-label">H:</span>
+      <span className="dimensions-widget-label" title="Height in pixels.">H:</span>
       <BareNumberInput
         disabled={disabled}
         digits={1}
@@ -90,7 +94,10 @@ export function DimensionsWidget({
         value={heightMixed ? null : height}
         onChange={(value) => onCommit({ kind: 'absHeight', value, locked })}
       />
-      <div className="dimensions-widget-pct-cell">
+      <div
+        className="dimensions-widget-pct-cell"
+        title="Height as a percentage scale. 100 is the unscaled height."
+      >
         <BareNumberInput
           disabled={disabled}
           digits={0}
@@ -108,6 +115,7 @@ export function DimensionsWidget({
         <button
           type="button"
           className="dimensions-widget-reset"
+          title="Return the image to its original pixel size and undo any cropping."
           disabled={disabled}
           onClick={() => onCommit({ kind: 'resetOriginal' })}
         >

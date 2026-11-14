@@ -8,6 +8,7 @@ interface SelectInputProps {
   mixed?: boolean;
   onChange: (value: string) => void;
   options: Array<{ label: string; value: string }>;
+  tooltip?: string;
   value: string | null;
 }
 
@@ -17,10 +18,11 @@ export function SelectInput({
   mixed = false,
   onChange,
   options,
+  tooltip,
   value,
 }: SelectInputProps) {
   return (
-    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
       <select
         aria-label={label}
         className="inspector-field-control"
@@ -56,6 +58,7 @@ interface SegmentedSelectInputProps {
   mixed?: boolean;
   onChange: (value: string) => void;
   options: readonly SegmentedOption[];
+  tooltip?: string;
   value: string | null;
 }
 
@@ -65,10 +68,11 @@ export function SegmentedSelectInput({
   mixed = false,
   onChange,
   options,
+  tooltip,
   value,
 }: SegmentedSelectInputProps) {
   return (
-    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
       <div className="segmented-control inspector-segmented-control" role="group" aria-label={label}>
         {options.map((option) => (
           <SegmentedIconButton
