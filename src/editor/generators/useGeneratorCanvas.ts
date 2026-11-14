@@ -4,6 +4,16 @@ import type { GeneratorCanvasItem } from '../document/documentTypes';
 
 import { getGenerator } from './index';
 
+/**
+ * Rasterizes a generator into an offscreen canvas and keeps it up to date.
+ *
+ * The returned canvas keeps its identity while only the pattern changes
+ * (params, seed), so callers can re-upload the same texture. Whenever its
+ * pixel dimensions change (canvas resize, pixel scale) a NEW canvas is
+ * returned: a Pixi sprite derives its scale from its texture's size only when
+ * the texture object changes, so resizing a canvas behind a texture that is
+ * still in use leaves the sprite drawing at the old size.
+ */
 export function useGeneratorCanvas(
   item: GeneratorCanvasItem,
   canvasWidth: number,
@@ -38,16 +48,19 @@ export function useGeneratorCanvas(
     const spec = getGenerator(item.generatorParams.generatorType);
     if (!spec) return;
 
-    if (!canvasRef.current) {
-      canvasRef.current = document.createElement('canvas');
-    }
-
-    const canvas = canvasRef.current;
     // Render at higher physical resolution so the bitmap stays sharp when
     // the editor zooms past 100%. Generators draw in logical units (canvasW
-    // × canvasH); ctx.scale lifts that into physical pixels.
-    canvas.width = Math.max(1, Math.round(canvasWidth * pixelScale));
-    canvas.height = Math.max(1, Math.round(canvasHeight * pixelScale));
+    // × canvasH); the transform lifts that into physical pixels.
+    const pixelWidth = Math.max(1, Math.round(canvasWidth * pixelScale));
+    const pixelHeight = Math.max(1, Math.round(canvasHeight * pixelScale));
+
+    let canvas = canvasRef.current;
+    if (!canvas || canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+      canvas = document.createElement('canvas');
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      canvasRef.current = canvas;
+    }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;

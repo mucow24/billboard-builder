@@ -8,6 +8,7 @@ import { getSelectionFrameForRotation } from './transformGeometry';
 import {
   createGroupNode,
   createDefaultProjectDocument,
+  createGeneratorItem,
   createImageItem,
   createLineItem,
   createPolygonItem,
@@ -2694,6 +2695,76 @@ describe('useCanvasInteractionSession', () => {
       });
 
       expect(result.current.session?.kind).toBe('resize');
+    });
+  });
+
+  describe('generator selections', () => {
+    it('refuses to resize, rotate or drag a selected generator', () => {
+      const generator = { ...createGeneratorItem('noise', 1024, 1024), id: 'generator' };
+      const params = createHookParams({
+        document: createDocument([generator]),
+        selectedNodeIds: [generator.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      expect(result.current.selectionHasGenerator).toBe(true);
+      expect(result.current.selectionLocked).toBe(false);
+
+      // The handle callbacks are typed for shapes; the overlay reaches them
+      // with whatever item is selected.
+      const asShape = generator as unknown as Parameters<typeof result.current.beginResize>[0];
+      act(() => {
+        result.current.beginResize(asShape, 'bottom-right', { x: 1024, y: 1024 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginRotate(asShape, { x: 512, y: -20 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginDrag(generator, { x: 512, y: 512 });
+      });
+      expect(result.current.session).toBeNull();
+    });
+
+    it('refuses group drag, resize and rotate when the selection includes a generator', () => {
+      const generator = { ...createGeneratorItem('noise', 1024, 1024), id: 'generator' };
+      const rectangle = createRectangleItem({ id: 'rectangle', x: 100, y: 100, width: 80, height: 40 });
+      const params = createHookParams({
+        document: createDocument([generator, rectangle]),
+        selectedNodeIds: [generator.id, rectangle.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      expect(result.current.selectionHasGenerator).toBe(true);
+
+      act(() => {
+        result.current.beginGroupDrag({ x: 500, y: 500 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginGroupResize('bottom-right', { x: 1024, y: 1024 });
+      });
+      expect(result.current.session).toBeNull();
+
+      act(() => {
+        result.current.beginGroupRotate({ x: 512, y: -20 });
+      });
+      expect(result.current.session).toBeNull();
+    });
+
+    it('reports no generator for an ordinary selection', () => {
+      const rectangle = createRectangleItem({ id: 'rectangle', x: 100, y: 100, width: 80, height: 40 });
+      const params = createHookParams({
+        document: createDocument([rectangle]),
+        selectedNodeIds: [rectangle.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      expect(result.current.selectionHasGenerator).toBe(false);
     });
   });
 });
