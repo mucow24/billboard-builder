@@ -1,6 +1,8 @@
+import { mirrorPolygonVerticesHorizontally } from '../../document/polygonVertices';
 import {
   createBooleanField,
   createColorField,
+  createCustomField,
   createDimensionsField,
   createGeometryField,
   createGradientAngleDescriptor,
@@ -12,6 +14,10 @@ import {
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
+import { renderMirrorField } from './selectionInspectorRenderers';
+
+/** Largest Curve radius the inspector offers, in pixels. */
+const POLYGON_CURVE_RADIUS_MAX = 100;
 
 /**
  * Freeform polygon fields. Fill (with gradient) applies only while the polygon
@@ -66,22 +72,54 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
 
       valueType: 'boolean',
     }),
-    createGeometryField(
-      'curveRadius',
-      'Curve radius',
-      50,
-      (item) => (item.kind === 'polygon' ? item.curveRadius : 0),
-      (_context, nextValue) => ({ curveRadius: Math.max(0, nextValue) }),
-      {
-        digits: 1,
-        max: 250,
-        min: 0,
-        slider: true,
-        step: 1,
-        textMax: Infinity,
-        tooltip: 'How rounded each corner is, in pixels. 0 gives sharp corners.',
-      }
-    ),
+    // What shapes this polygon in particular gets a section of its own that
+    // starts open, like N-gon's Sides, rather than rows in Geometry, which
+    // starts closed.
+    createNumberField({
+      buildChange: (_context, nextValue) => ({
+        curveRadius: Math.min(POLYGON_CURVE_RADIUS_MAX, Math.max(0, nextValue)),
+      }),
+      digits: 1,
+      fieldOrder: 10,
+      getValue: (item) => (item.kind === 'polygon' ? item.curveRadius : 0),
+      label: 'Curve radius',
+      max: POLYGON_CURVE_RADIUS_MAX,
+      min: 0,
+      propertyKey: 'curveRadius',
+      sectionKey: 'polygon',
+      sectionLabel: 'Polygon',
+      sectionOrder: SECTION_ORDER.polygon,
+      slider: true,
+      step: 1,
+      tooltip:
+        'Rounds every corner by this many pixels, from 0 (sharp corners) to 100. Corners next to a short side round less, as a curve never reaches past the middle of a side.',
+      valueType: 'number',
+    }),
+    createCustomField({
+      // The flip is baked into the vertices, so turning Mirror on or off flips
+      // them; a polygon already in the asked-for state (part of a mixed
+      // selection) is left alone.
+      buildChange: ({ item }, nextValue) => {
+        const mirrorHorizontal = Boolean(nextValue);
+        if (item.kind !== 'polygon' || item.mirrorHorizontal === mirrorHorizontal) {
+          return {};
+        }
+        return {
+          mirrorHorizontal,
+          vertices: mirrorPolygonVerticesHorizontally(item.vertices),
+        };
+      },
+      fieldOrder: 20,
+      getValue: (item) => item.kind === 'polygon' && item.mirrorHorizontal,
+      label: 'Mirror',
+      propertyKey: 'mirrorHorizontal',
+      render: renderMirrorField,
+      sectionKey: 'polygon',
+      sectionLabel: 'Polygon',
+      sectionOrder: SECTION_ORDER.polygon,
+      tooltip: 'Flip the polygon left to right, in place. Click again to flip it back.',
+      valueType: 'boolean',
+    }),
   ];
 
   if (closed) {

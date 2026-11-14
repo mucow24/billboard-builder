@@ -259,6 +259,7 @@ const PolygonCanvasItemSchema = BaseCanvasItemSchema.extend({
   vertices: z.array(PolygonVertexSchema).min(3),
   closed: z.boolean().optional(),
   curveRadius: z.number().nonnegative().optional(),
+  mirrorHorizontal: z.boolean().optional(),
 });
 
 const LineCanvasItemSchema = BaseCanvasItemSchema.extend({

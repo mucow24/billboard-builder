@@ -6,6 +6,7 @@ import {
   createGroupNode,
   createImageItem,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -709,6 +710,43 @@ describe('SelectionInspector', () => {
       expect.stringContaining('Direction of the gradient'),
     );
     expect(screen.getByText('W:')).toHaveAttribute('title', 'Width in pixels.');
+  });
+
+  it('opens the Polygon section from the start, with a pressed Mirror button for a mirrored polygon', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const polygonItem = createPolygonItem({ mirrorHorizontal: true });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={polygonItem}
+        selectedNodeCount={1}
+        selectedItems={[polygonItem]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Polygon' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('slider', { name: 'Curve radius' })).toBeVisible();
+    expect(screen.getByText('Curve radius:')).toHaveAttribute(
+      'title',
+      expect.stringContaining('pixels'),
+    );
+    expect(screen.getByText('Mirror:')).toHaveAttribute(
+      'title',
+      expect.stringContaining('left to right'),
+    );
+
+    const mirrorButton = screen.getByRole('button', { name: 'Mirror' });
+    expect(mirrorButton).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(mirrorButton);
+    expect(expectLatestChange(onItemChange, polygonItem)).toMatchObject({
+      mirrorHorizontal: false,
+    });
   });
 
   it('swaps fill colors for text items', async () => {

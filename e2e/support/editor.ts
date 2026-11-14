@@ -372,6 +372,7 @@ export function createPolygonFixture(overrides: Record<string, unknown> = {}) {
     ],
     closed: true,
     curveRadius: 0,
+    mirrorHorizontal: false,
     ...overrides,
   };
 }

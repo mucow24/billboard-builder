@@ -1,7 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { promises as fs } from 'node:fs';
+
+import { expect, test, type Page } from '@playwright/test';
 
 import {
+  captureDownload,
   clickItem,
+  clickToolbarPopoverItem,
   createPolygonFixture,
   createProjectDocument,
   dragEmptyCanvas,
@@ -10,6 +14,7 @@ import {
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
+  readStageDebug,
   saveAndReadProject,
   selectTool,
   uploadProject,
@@ -226,9 +231,11 @@ test.describe('polygon tool flows', () => {
 
     await clickItem(page, 'polygon-item');
     await openPropertiesTab(page);
-    await page.getByRole('button', { name: 'Geometry' }).click();
 
-    await test.step('sets the curve radius', async () => {
+    await test.step('sets the curve radius from the Polygon section, open from the start', async () => {
+      await expect(
+        page.getByTestId('properties-tab-body').getByRole('button', { name: 'Polygon', exact: true }),
+      ).toHaveAttribute('aria-expanded', 'true');
       await page.getByRole('spinbutton', { name: 'Curve radius' }).fill('24');
 
       const saved = await saveAndReadProject(page);
@@ -236,6 +243,24 @@ test.describe('polygon tool flows', () => {
         expect.objectContaining({ curveRadius: 24 }),
       ]);
     });
+
+    await test.step('caps a typed curve radius at 100', async () => {
+      const radius = page.getByRole('spinbutton', { name: 'Curve radius' });
+      await radius.fill('150');
+      await radius.press('Enter');
+      await expect(radius).toHaveValue('100');
+      await expect(page.getByRole('slider', { name: 'Curve radius' })).toHaveAttribute('max', '100');
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ curveRadius: 100 }),
+      ]);
+
+      await radius.fill('24');
+      await radius.press('Enter');
+    });
+
+    await page.getByRole('button', { name: 'Geometry' }).click();
 
     await test.step('unchecks Closed to open the chain and hides the fill section', async () => {
       await expect(page.getByRole('button', { name: 'Toggle gradient' })).toBeVisible();
@@ -249,4 +274,119 @@ test.describe('polygon tool flows', () => {
       ]);
     });
   });
+
+  test('Mirror flips the polygon left to right, and back on a second click', async ({ page }) => {
+    // A right trapezoid in the fixture box: square corners on the left, the
+    // slanted side on the right. The box centre, where clickItem clicks, is
+    // inside it either way round.
+    const trapezoid = [
+      { x: 200, y: 200 },
+      { x: 320, y: 200 },
+      { x: 440, y: 440 },
+      { x: 200, y: 440 },
+    ];
+    const mirroredTrapezoid = [
+      { x: 440, y: 200 },
+      { x: 320, y: 200 },
+      { x: 200, y: 440 },
+      { x: 440, y: 440 },
+    ];
+    // Just below the top edge: near the left side, and the same distance in
+    // from the right. Only the square corner's side is filled.
+    const points = [
+      { x: 220, y: 230 },
+      { x: 420, y: 230 },
+    ];
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument([createPolygonFixture({ vertices: trapezoid })]),
+        background: '#ffffffff',
+      },
+      'polygon-mirror.json',
+    );
+    await expect.poll(async () => (await readStageDebug(page)).renderedItemCount).toBe(1);
+    expect(await exportAndSample(page, points)).toEqual(['orange', 'other']);
+
+    await clickItem(page, 'polygon-item');
+    await openPropertiesTab(page);
+    const mirrorButton = page.getByRole('button', { name: 'Mirror' });
+    await expect(mirrorButton).toHaveAttribute('aria-pressed', 'false');
+
+    await test.step('first click flips it in place', async () => {
+      await mirrorButton.click();
+      await expect(mirrorButton).toHaveAttribute('aria-pressed', 'true');
+      expect(await exportAndSample(page, points)).toEqual(['other', 'orange']);
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({
+          mirrorHorizontal: true,
+          vertices: mirroredTrapezoid,
+          x: 200,
+          y: 200,
+          width: 240,
+          height: 240,
+        }),
+      ]);
+    });
+
+    await test.step('second click flips it back', async () => {
+      await mirrorButton.click();
+      await expect(mirrorButton).toHaveAttribute('aria-pressed', 'false');
+      expect(await exportAndSample(page, points)).toEqual(['orange', 'other']);
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ mirrorHorizontal: false, vertices: trapezoid }),
+      ]);
+    });
+
+    await test.step('undo brings the flip back', async () => {
+      await page.keyboard.press('ControlOrMeta+z');
+      await expect(mirrorButton).toHaveAttribute('aria-pressed', 'true');
+      expect(await exportAndSample(page, points)).toEqual(['other', 'orange']);
+    });
+  });
 });
+
+/**
+ * Export > PNG and name the colour at each canvas point: the fixture's orange
+ * fill, or anything else. The export is the only pixel-accurate readback of
+ * what Pixi drew.
+ */
+async function exportAndSample(
+  page: Page,
+  points: Array<{ x: number; y: number }>,
+): Promise<Array<'orange' | 'other'>> {
+  const download = await captureDownload(page, async () => {
+    await clickToolbarPopoverItem(page, 'Export', 'PNG');
+  });
+  const buffer = await fs.readFile(await download.path());
+  const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+
+  return page.evaluate(
+    async ({ url, samplePoints }) => {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('failed to decode exported png'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+
+      return samplePoints.map(({ x, y }) => {
+        const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
+        // #f97316
+        return r > 200 && g > 70 && g < 160 && b < 80 ? ('orange' as const) : ('other' as const);
+      });
+    },
+    { url: dataUrl, samplePoints: points },
+  );
+}

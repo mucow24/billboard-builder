@@ -649,4 +649,89 @@ describe('polygon descriptors', () => {
     expect(radiusField?.state.value).toBe(12);
     expect(radiusField?.descriptor.buildChange({ item: polygon }, -5 as never)).toEqual({ curveRadius: 0 });
   });
+
+  it('gives Curve radius and Mirror a Polygon section of their own, placed right after Stroke', () => {
+    const sections = buildSelectionInspectorSections([createPolygonItem()], environment);
+    const sectionKeys = sections.map((section) => section.key);
+    const polygonSection = sections.find((section) => section.key === 'polygon');
+    const geometrySection = sections.find((section) => section.key === 'geometry');
+
+    expect(sectionKeys.indexOf('polygon')).toBe(sectionKeys.indexOf('stroke') + 1);
+    expect(polygonSection?.label).toBe('Polygon');
+    expect(polygonSection?.fields.map((field) => field.descriptor.label)).toEqual([
+      'Curve radius',
+      'Mirror',
+    ]);
+    expect(geometrySection?.fields.map((field) => field.descriptor.propertyKey)).not.toContain(
+      'curveRadius',
+    );
+  });
+
+  it('keeps the Polygon section, without the Fill section, for an open polygon', () => {
+    const sections = buildSelectionInspectorSections([createPolygonItem({ closed: false })], environment);
+    const sectionKeys = sections.map((section) => section.key);
+
+    expect(sectionKeys).not.toContain('fill');
+    expect(sectionKeys.indexOf('polygon')).toBe(sectionKeys.indexOf('stroke') + 1);
+  });
+
+  it('limits Curve radius to 0 through 100 pixels, typed or dragged', () => {
+    const polygon = createPolygonItem();
+    const radiusField = buildSelectionInspectorSections([polygon], environment)
+      .flatMap((section) => section.fields)
+      .find((field) => field.descriptor.propertyKey === 'curveRadius');
+    const descriptor = radiusField?.descriptor;
+
+    expect(descriptor).toMatchObject({ controlKind: 'number', min: 0, max: 100, slider: true });
+    // No wider bound for the typed value: the text box clamps to the slider's range.
+    expect(descriptor).not.toHaveProperty('textMax');
+    expect(descriptor).not.toHaveProperty('textMin');
+    expect(descriptor?.buildChange({ item: polygon }, 150 as never)).toEqual({ curveRadius: 100 });
+    expect(descriptor?.buildChange({ item: polygon }, 37 as never)).toEqual({ curveRadius: 37 });
+  });
+
+  it('mirrors the polygon by flipping its vertices left to right, and flips them back', () => {
+    const vertices = [
+      { x: 20, y: 10 },
+      { x: 120, y: 110 },
+      { x: 20, y: 110 },
+    ];
+    const flipped = [
+      { x: 120, y: 10 },
+      { x: 20, y: 110 },
+      { x: 120, y: 110 },
+    ];
+    const polygon = createPolygonItem({ vertices });
+    const mirrorField = buildSelectionInspectorSections([polygon], environment)
+      .flatMap((section) => section.fields)
+      .find((field) => field.descriptor.propertyKey === 'mirrorHorizontal');
+
+    expect(mirrorField?.descriptor.controlKind).toBe('custom');
+    expect(mirrorField?.state.value).toBe(false);
+    expect(mirrorField?.descriptor.buildChange({ item: polygon }, true as never)).toEqual({
+      mirrorHorizontal: true,
+      vertices: flipped,
+    });
+
+    const mirrored = createPolygonItem({ vertices: flipped, mirrorHorizontal: true });
+    expect(mirrorField?.descriptor.getValue(mirrored)).toBe(true);
+    expect(mirrorField?.descriptor.buildChange({ item: mirrored }, false as never)).toEqual({
+      mirrorHorizontal: false,
+      vertices,
+    });
+  });
+
+  it('leaves alone a polygon that is already mirrored the way Mirror asks for', () => {
+    // A mixed selection turns Mirror on for every polygon: the ones already
+    // mirrored must not flip back.
+    const plain = createPolygonItem();
+    const mirrored = createPolygonItem({ mirrorHorizontal: true });
+    const mirrorField = buildSelectionInspectorSections([plain, mirrored], environment)
+      .flatMap((section) => section.fields)
+      .find((field) => field.descriptor.propertyKey === 'mirrorHorizontal');
+
+    expect(mirrorField?.state.isMixed).toBe(true);
+    expect(mirrorField?.descriptor.buildChange({ item: mirrored }, true as never)).toEqual({});
+    expect(mirrorField?.descriptor.buildChange({ item: plain }, false as never)).toEqual({});
+  });
 });

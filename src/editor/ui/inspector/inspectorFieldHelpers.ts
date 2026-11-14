@@ -25,6 +25,7 @@ export const SECTION_ORDER = {
   fill: 10,
   stroke: 15,
   ngon: 17,
+  polygon: 18,
   text: 20,
   geometry: 50,
   advancedText: 60,

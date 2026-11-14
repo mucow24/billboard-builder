@@ -286,14 +286,16 @@ describe('document schema', () => {
     ).toThrow();
   });
 
-  it('round-trips a polygon item and preserves vertices, closed, and curveRadius', () => {
+  it('round-trips a polygon item and preserves vertices, closed, curveRadius, and mirrorHorizontal', () => {
     const document = createDefaultProjectDocument();
     const vertices = [
       { x: 10, y: 10 },
       { x: 210, y: 10 },
       { x: 110, y: 190 },
     ];
-    document.nodes = [createPolygonItem({ vertices, closed: false, curveRadius: 12 })];
+    document.nodes = [
+      createPolygonItem({ vertices, closed: false, curveRadius: 12, mirrorHorizontal: true }),
+    ];
 
     const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
 
@@ -302,7 +304,19 @@ describe('document schema', () => {
       vertices,
       closed: false,
       curveRadius: 12,
+      mirrorHorizontal: true,
     });
+  });
+
+  it('accepts a polygon saved before polygons could be mirrored', () => {
+    const document = createDefaultProjectDocument();
+    const { mirrorHorizontal: ignoredMirrorHorizontal, ...legacyPolygon } = createPolygonItem();
+    void ignoredMirrorHorizontal;
+    document.nodes = [legacyPolygon as never];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+
+    expect(parsed.nodes[0]).toMatchObject({ kind: 'polygon', mirrorHorizontal: false });
   });
 
   it('rejects polygon items with fewer than 3 vertices', () => {
