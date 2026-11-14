@@ -515,22 +515,41 @@ function PixiGeneratorContent({
   const pixelScale = quantizeGeneratorPixelScale(zoom);
   const generatorCanvas = useGeneratorCanvas(item, canvasWidth, canvasHeight, pixelScale);
 
+  // useGeneratorCanvas hands back a new canvas whenever its pixel size
+  // changes, so the texture changes with it and the sprite below re-derives
+  // its scale. Each canvas is private, so build its texture directly instead
+  // of going through Texture.from's global cache.
   const texture = useMemo(
-    () => (generatorCanvas ? Texture.from(generatorCanvas) : Texture.EMPTY),
+    () =>
+      generatorCanvas
+        ? new Texture({ source: new CanvasSource({ resource: generatorCanvas }) })
+        : Texture.EMPTY,
     [generatorCanvas],
   );
 
-  // The canvas element is reused — tell PixiJS to re-upload pixels when params change.
+  // Destroy superseded textures or their GPU memory accumulates.
+  useEffect(() => {
+    if (texture === Texture.EMPTY) return;
+    return () => {
+      texture.destroy(true);
+    };
+  }, [texture]);
+
+  // Between size changes the canvas element is reused — tell PixiJS to
+  // re-upload its pixels when the pattern changes.
   useEffect(() => {
     if (texture !== Texture.EMPTY) {
       texture.source.update();
     }
-  }, [texture, item.generatorParams, item.seed, canvasWidth, canvasHeight, pixelScale]);
+  }, [texture, item.generatorParams, item.seed]);
 
   if (!generatorCanvas) return null;
 
+  // Keyed by texture: a sprite that outlives its texture would keep the scale
+  // it derived from the old one for a frame.
   return (
     <pixiSprite
+      key={texture.uid}
       texture={texture}
       width={canvasWidth}
       height={canvasHeight}

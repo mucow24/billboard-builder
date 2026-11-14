@@ -798,13 +798,22 @@ export function useCanvasInteractionSession({
     [selectedItems, selectedNodes],
   );
 
+  // A generator always fills the canvas: it has no position, size or rotation
+  // of its own. A selection that contains one is treated like a locked one,
+  // outline only, with the same entry points refusing to start.
+  const selectionHasGenerator = useMemo(
+    () => selectedItems.some((item) => item.kind === 'generator'),
+    [selectedItems],
+  );
+  const selectionFixed = selectionLocked || selectionHasGenerator;
+
   const beginDrag = useCallback((item: CanvasItem, pointer: Point, source: PointerGestureSource = 'stage') => {
     if (item.kind === 'generator' || item.locked) return;
     updateSession(createDragSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupDrag = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (selectionLocked) return;
+    if (selectionFixed) return;
     const nextSession = createGroupDragSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -813,7 +822,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionFixed, updateSession]);
 
   const beginResize = useCallback((
     item: ShapeItem,
@@ -821,7 +830,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
-    if (item.locked) return;
+    if (item.locked || (item as CanvasItem).kind === 'generator') return;
     updateSession(
       createResizeSession(item, handle, pointer, orderedItems.filter((entry) => entry.id !== item.id), source)
     );
@@ -832,7 +841,7 @@ export function useCanvasInteractionSession({
     pointer: Point,
     source: PointerGestureSource = 'stage',
   ) => {
-    if (selectionLocked) return;
+    if (selectionFixed) return;
     const nextSession = createGroupResizeSession(handle, pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -841,15 +850,15 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionFixed, updateSession]);
 
   const beginRotate = useCallback((item: ShapeItem, pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (item.locked) return;
+    if (item.locked || (item as CanvasItem).kind === 'generator') return;
     updateSession(createRotateSession(item, pointer, orderedItems.filter((entry) => entry.id !== item.id), source));
   }, [orderedItems, updateSession]);
 
   const beginGroupRotate = useCallback((pointer: Point, source: PointerGestureSource = 'stage') => {
-    if (selectionLocked) return;
+    if (selectionFixed) return;
     const nextSession = createGroupRotateSession(pointer, {
       selectedItems,
       siblingItems: orderedItems.filter((entry) => !selectedLeafIdSet.has(entry.id)),
@@ -858,7 +867,7 @@ export function useCanvasInteractionSession({
     if (nextSession) {
       updateSession(nextSession);
     }
-  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
+  }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionFixed, updateSession]);
 
   const beginPolygonVertexHandle = useCallback((
     item: PolygonCanvasItem,
@@ -1267,6 +1276,7 @@ export function useCanvasInteractionSession({
     selectedNode,
     selectedRenderedItem,
     selectedItemId,
+    selectionHasGenerator,
     selectionLocked,
     session,
     subgroupOutlineFrames,

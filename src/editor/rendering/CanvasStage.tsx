@@ -113,6 +113,7 @@ export function CanvasStage({
     marqueeInProgress = false,
     selectedNode,
     selectedRenderedItem,
+    selectionHasGenerator = false,
     selectionLocked = false,
     session,
     subgroupOutlineFrames = [],
@@ -142,11 +143,12 @@ export function CanvasStage({
   const viewport = viewportState;
 
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
-  // A locked selection can't be transformed, so it gets no handles. A
+  // A locked selection can't be transformed, so it gets no handles; neither
+  // does one with a generator in it, which always fills the canvas. A
   // marquee selects as it is dragged out; until release its selection gets
   // none either, so handles don't pop in and out under the pointer (or swap
   // its cursor) mid-drag.
-  const hideTransformHandles = selectionLocked || marqueeInProgress;
+  const hideTransformHandles = selectionLocked || selectionHasGenerator || marqueeInProgress;
   const {
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,

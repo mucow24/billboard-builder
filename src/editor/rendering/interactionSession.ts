@@ -285,7 +285,13 @@ export function getCanvasConstrainedMarqueeRect(
 export function getMarqueeSelection(session: MarqueeSession, nodes: CanvasNode[]): string[] {
   const rect = normalizeRectFromPoints(session.pointerStart, session.currentPointer);
   const nodeIds = flattenVisibleLeafNodes(nodes)
-    .filter(({ item }) => !item.hidden && !item.locked && itemIntersectsSelectionRect(item, rect))
+    // A generator covers the whole canvas, so every marquee would sweep it up
+    // (and, since it can't be transformed, take the selection's handles away).
+    .filter(({ item }) =>
+      !item.hidden &&
+      !item.locked &&
+      item.kind !== 'generator' &&
+      itemIntersectsSelectionRect(item, rect))
     .map((leaf) => leaf.selectableNodeId);
   return Array.from(new Set(nodeIds));
 }

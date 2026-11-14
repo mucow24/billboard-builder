@@ -15,6 +15,7 @@ import {
   type SelectionFrame,
 } from './interactionSession';
 import {
+  createGeneratorItem,
   createGroupNode,
   createLineItem,
   createPolygonItem,
@@ -371,6 +372,20 @@ describe('interactionSession', () => {
     expect(getMarqueeSelection({ ...marquee, currentPointer: { x: 150, y: 120 } }, [outer, loose])).toEqual([
       outer.id,
     ]);
+  });
+
+  it('never marquee-selects a generator, which covers the whole canvas', () => {
+    const generator = { ...createGeneratorItem('noise', 1024, 1024), id: 'generator' };
+    const rectangle = createRectangleItem({ id: 'rectangle', x: 100, y: 100, width: 60, height: 40 });
+    const marquee = {
+      kind: 'marquee' as const,
+      pointerStart: { x: 90, y: 90 },
+      pointerSource: 'stage' as const,
+      currentPointer: { x: 270, y: 210 },
+      guides: [],
+    };
+
+    expect(getMarqueeSelection(marquee, [generator, rectangle])).toEqual([rectangle.id]);
   });
 
   it('resolves group resize sessions into updates and a committed frame', () => {
