@@ -47,7 +47,6 @@ export function CanvasStage({
   const dispatch = useEditorStore((s) => s.dispatch);
   const selectSingleNode = useEditorStore((s) => s.selectSingleNode);
   const toggleSelectedNode = useEditorStore((s) => s.toggleSelectedNode);
-  const toggleSelectedNodes = useEditorStore((s) => s.toggleSelectedNodes);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const updateSelectedItems = useEditorStore((s) => s.updateSelectedItems);
   const selectedPolygonVertex = useEditorStore((s) => s.editor.session.selectedPolygonVertex);
@@ -63,6 +62,13 @@ export function CanvasStage({
   const onAddItem = useCallback(
     (item: CanvasItem) => {
       dispatch({ type: 'add_node', item });
+    },
+    [dispatch],
+  );
+
+  const onSelectNodes = useCallback(
+    (nodeIds: string[]) => {
+      dispatch({ type: 'select_nodes', nodeIds });
     },
     [dispatch],
   );
@@ -116,8 +122,8 @@ export function CanvasStage({
     selectedNodeIds,
     onGuidesChange,
     onSelectNode: selectSingleNode,
+    onSelectNodes,
     onToggleSelectNode: toggleSelectedNode,
-    onToggleSelectNodes: toggleSelectedNodes,
     onUpdateItem,
     onUpdateItems: updateSelectedItems,
     onAddItem,
@@ -136,6 +142,10 @@ export function CanvasStage({
   const viewport = viewportState;
 
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
+  // A marquee selects as it is dragged out. Until release its selection is
+  // drawn the way a locked one is, as outlines only, so handles don't pop in
+  // and out under the pointer (or swap its cursor) mid-drag.
+  const selectionOutlinesOnly = selectionLocked || session?.kind === 'marquee';
   const {
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,
@@ -156,7 +166,7 @@ export function CanvasStage({
     renderedSelectedItems,
     renderedSelectionFrame,
     selectedRenderedItem,
-    selectionLocked,
+    selectionLocked: selectionOutlinesOnly,
     session: session as never,
     cropSession: cropSession as never,
     zoom: viewport.zoom,
@@ -238,7 +248,7 @@ export function CanvasStage({
         renderedItems={renderedItems}
         renderedSelectedItems={renderedSelectedItems}
         selectedRenderedItem={selectedRenderedItem}
-        selectionLocked={selectionLocked}
+        selectionLocked={selectionOutlinesOnly}
         session={session as never}
         showGroupSelection={showGroupInteractionHooks}
         size={viewport.viewportSize}

@@ -25,6 +25,7 @@ import {
   createResizeSession,
   createRotateSession,
   currentSelectionSetSignature,
+  getMarqueeHitIds,
   resolveInteractionSession,
   type InteractionSession,
   type PointerGestureSource,
@@ -32,6 +33,7 @@ import {
   type SessionWithModifiers,
   type ShapeItem,
 } from './interactionSession';
+import type { RenderableCanvasItem } from './renderAdapter';
 import { useCropSession } from './useCropSession';
 import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInteractionDerivedState';
 import {
@@ -46,6 +48,7 @@ import {
   isCanvasItemNode,
   isGroupNode,
 } from '../document/sceneGraph';
+import { toggleSelectionNodes } from '../core/selectionOps';
 import type {
   CanvasItem,
   ImageCanvasItem,
@@ -68,8 +71,9 @@ interface UseCanvasInteractionSessionParams {
   viewport?: { zoom: number; panX: number; panY: number };
   onGuidesChange: (guides: GuideLine[]) => void;
   onSelectNode: (itemId?: string) => void;
+  /** Replaces the selection with exactly these nodes. */
+  onSelectNodes: (nodeIds: string[]) => void;
   onToggleSelectNode?: (itemId: string) => void;
-  onToggleSelectNodes?: (itemIds: string[]) => void;
   onUpdateItem: (itemId: string, changes: Partial<CanvasItem>) => void;
   onUpdateItems?: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   onAddItem: (item: CanvasItem) => void;
@@ -94,6 +98,22 @@ interface HandledItemPointerEvent {
   button: number;
   itemId: string;
   selectionNodeId: string;
+}
+
+// A marquee selects as it is dragged out. Which node an item selects depends
+// on the selection (a selected group makes its children selectable), so the
+// marquee keeps the mapping it started with: re-reading it after its own live
+// selection would drill into any group it touched.
+interface MarqueeStart {
+  renderableByLeafId: Map<string, RenderableCanvasItem>;
+  selectedNodeIds: string[];
+  // The selection the marquee last applied, so a move that touches the same
+  // items dispatches nothing.
+  appliedSelectionKey: string;
+}
+
+function getSelectionKey(nodeIds: string[]): string {
+  return nodeIds.join('\u0000');
 }
 
 interface StageDescendantClickSample {
@@ -140,8 +160,8 @@ export function useCanvasInteractionSession({
   viewport = { zoom: 1, panX: 0, panY: 0 },
   onGuidesChange,
   onSelectNode,
+  onSelectNodes,
   onToggleSelectNode,
-  onToggleSelectNodes,
   onUpdateItem,
   onUpdateItems,
   onAddItem,
@@ -155,6 +175,7 @@ export function useCanvasInteractionSession({
   const guidesRef = useRef<GuideLine[]>([]);
   const guidesRafRef = useRef<number | null>(null);
   const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
+  const marqueeStartRef = useRef<MarqueeStart | null>(null);
   const pendingItemGestureRef = useRef<PendingItemGesture | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
   const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
@@ -515,6 +536,35 @@ export function useCanvasInteractionSession({
     startCropSession(item);
   }, [clearPendingItemGesture, clearPendingMarquee, startCropSession, updateGuides, updateSession]);
 
+  const startMarquee = useCallback((): MarqueeStart => {
+    const start = {
+      renderableByLeafId,
+      selectedNodeIds,
+      appliedSelectionKey: getSelectionKey(selectedNodeIds),
+    };
+    marqueeStartRef.current = start;
+    return start;
+  }, [renderableByLeafId, selectedNodeIds]);
+
+  // Selects what the marquee touches: the selectable node behind each hit item
+  // or, in toggle mode, those nodes toggled against the selection the marquee
+  // started from. Runs on every marquee move and once more on release.
+  const applyMarqueeSelection = useCallback((hitIds: string[], toggleMode: boolean) => {
+    const start = marqueeStartRef.current ?? startMarquee();
+    const hitNodeIds = Array.from(
+      new Set(hitIds.map((itemId) => start.renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId)),
+    );
+    const nextSelection = toggleMode
+      ? toggleSelectionNodes(start.selectedNodeIds, hitNodeIds)
+      : hitNodeIds;
+    const nextKey = getSelectionKey(nextSelection);
+    if (nextKey === start.appliedSelectionKey) {
+      return;
+    }
+    start.appliedSelectionKey = nextKey;
+    onSelectNodes(nextSelection);
+  }, [onSelectNodes, startMarquee]);
+
   const finishSession = useCallback((current: InteractionSession, pointer: Point) => {
     const resolved = resolveSession(current, pointer);
     updateGuides([]);
@@ -530,18 +580,8 @@ export function useCanvasInteractionSession({
         onSetActiveTool(commit.nextTool);
         return;
       case 'marquee':
-        if (commit.toggleMode && onToggleSelectNodes) {
-          onToggleSelectNodes(Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId))));
-        } else if (commit.hitIds.length > 0) {
-          const selectableIds = Array.from(new Set(commit.hitIds.map((itemId) => renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId)));
-          onSelectNode(selectableIds[0]);
-          if (selectableIds.length > 1 && onToggleSelectNodes) {
-            onSelectNode(undefined);
-            onToggleSelectNodes(selectableIds);
-          }
-        } else {
-          onSelectNode(undefined);
-        }
+        applyMarqueeSelection(commit.hitIds, commit.toggleMode);
+        marqueeStartRef.current = null;
         return;
       case 'group':
         setSelectionFrame(commit.selectionFrame);
@@ -567,7 +607,7 @@ export function useCanvasInteractionSession({
         }
         return;
     }
-  }, [onAddItem, updateGuides, onSetActiveTool, onSelectNode, onSelectPolygonVertex, onToggleSelectNodes, onUpdateItem, onUpdateItems, orderedItems, renderableByLeafId, resolveSession, stageBounds]);
+  }, [applyMarqueeSelection, onAddItem, updateGuides, onSetActiveTool, onSelectPolygonVertex, onUpdateItem, onUpdateItems, orderedItems, resolveSession, stageBounds]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
@@ -613,6 +653,7 @@ export function useCanvasInteractionSession({
           toggleMode: pendingMarqueeRef.current.toggleMode,
           guides: [],
         };
+        startMarquee();
       }
       if (!current) {
         return;
@@ -634,8 +675,21 @@ export function useCanvasInteractionSession({
       clearPendingMarquee();
       updateGuides(next.guides);
       updateSession(next);
+      if (next.kind === 'marquee') {
+        applyMarqueeSelection(getMarqueeHitIds(next, orderedItems), next.toggleMode);
+      }
     },
-    [clearPendingItemGesture, clearPendingMarquee, createPendingItemSession, updateGuides, resolveSession, updateSession],
+    [
+      applyMarqueeSelection,
+      clearPendingItemGesture,
+      clearPendingMarquee,
+      createPendingItemSession,
+      orderedItems,
+      resolveSession,
+      startMarquee,
+      updateGuides,
+      updateSession,
+    ],
   );
 
   const handleWindowMouseMove = useEffectEvent((event: MouseEvent) => {

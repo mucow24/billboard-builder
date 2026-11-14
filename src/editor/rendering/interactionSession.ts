@@ -278,6 +278,14 @@ export function getCanvasConstrainedMarqueeRect(
   );
 }
 
+/** The ids of the items a marquee touches, in the order of `orderedItems`. */
+export function getMarqueeHitIds(session: MarqueeSession, orderedItems: CanvasItem[]): string[] {
+  const rect = normalizeRectFromPoints(session.pointerStart, session.currentPointer);
+  return orderedItems
+    .filter((item) => !item.hidden && !item.locked && itemIntersectsSelectionRect(item, rect))
+    .map((item) => item.id);
+}
+
 export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
   if (item.kind === 'polygon') {
     return {
@@ -985,13 +993,9 @@ export function buildInteractionCommit(
   }
 
   if (resolved.kind === 'marquee') {
-    const rect = normalizeRectFromPoints(resolved.pointerStart, resolved.currentPointer);
-    const hitIds = orderedItems
-      .filter((item) => !item.hidden && !item.locked && itemIntersectsSelectionRect(item, rect))
-      .map((item) => item.id);
     return {
       kind: 'marquee',
-      hitIds,
+      hitIds: getMarqueeHitIds(resolved, orderedItems),
       toggleMode: resolved.toggleMode,
     };
   }

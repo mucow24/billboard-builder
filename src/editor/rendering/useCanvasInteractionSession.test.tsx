@@ -148,8 +148,8 @@ function createHookParamsBase() {
     selectedNodeIds: [] as string[],
     onGuidesChange: vi.fn(),
     onSelectNode: vi.fn(),
+    onSelectNodes: vi.fn(),
     onToggleSelectNode: undefined as undefined | ReturnType<typeof vi.fn>,
-    onToggleSelectNodes: undefined as undefined | ReturnType<typeof vi.fn>,
     onUpdateItem: vi.fn(),
     onUpdateItems: undefined as undefined | ReturnType<typeof vi.fn>,
     onAddItem: vi.fn(),
@@ -838,7 +838,6 @@ describe('useCanvasInteractionSession', () => {
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
       document: createDocument([first, second]),
-      onToggleSelectNodes: vi.fn(),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
@@ -865,7 +864,120 @@ describe('useCanvasInteractionSession', () => {
       );
     });
 
-    expect(params.onToggleSelectNodes).toHaveBeenCalledWith([first.id, second.id]);
+    expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id, second.id]);
+  });
+
+  describe('live marquee selection', () => {
+    // Drives the hook the way the editor does: the selection the hook is
+    // handed follows whatever it last asked to select.
+    function renderWithLiveSelection(
+      document: ProjectDocument,
+      initialSelection: string[] = [],
+    ) {
+      const stageRef = makeStageRef();
+      stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
+      const params = createHookParams({ document, selectedNodeIds: initialSelection, stageRef: stageRef.ref });
+      const hook = renderHook((props) => useCanvasInteractionSession(props), { initialProps: params });
+      const setSelection = (selectedNodeIds: string[]) => {
+        hook.rerender({ ...params, selectedNodeIds });
+      };
+      params.onSelectNode.mockImplementation((nodeId?: string) => setSelection(nodeId ? [nodeId] : []));
+      params.onSelectNodes.mockImplementation((nodeIds: string[]) => setSelection(nodeIds));
+      return { ...hook, params };
+    }
+
+    function moveTo(
+      result: { current: ReturnType<typeof useCanvasInteractionSession> },
+      pointer: { x: number; y: number },
+    ) {
+      act(() => {
+        result.current.handleStagePointerMove(makeStageEvent(pointer));
+      });
+    }
+
+    it('selects and deselects items while the marquee is still being dragged', () => {
+      const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+      const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+      const { result, params } = renderWithLiveSelection(createDocument([first, second]));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent({ x: 90, y: 90 }));
+      });
+      moveTo(result, { x: 95, y: 95 });
+      expect(params.onSelectNodes).not.toHaveBeenCalled();
+
+      moveTo(result, { x: 150, y: 120 });
+      expect(result.current.session?.kind).toBe('marquee');
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id]);
+
+      moveTo(result, { x: 160, y: 125 });
+      expect(params.onSelectNodes).toHaveBeenCalledTimes(1);
+
+      moveTo(result, { x: 240, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id, second.id]);
+
+      moveTo(result, { x: 150, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id]);
+
+      moveTo(result, { x: 95, y: 95 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([]);
+
+      moveTo(result, { x: 240, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id, second.id]);
+      const callsBeforeRelease = params.onSelectNodes.mock.calls.length;
+
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent({ x: 240, y: 120 }));
+      });
+      expect(result.current.session).toBeNull();
+      expect(params.onSelectNodes).toHaveBeenCalledTimes(callsBeforeRelease);
+      expect(result.current.renderedSelectedItems.map((item) => item.id)).toEqual([first.id, second.id]);
+    });
+
+    it('applies the release point when the last move was missed', () => {
+      const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+      const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+      const { result, params } = renderWithLiveSelection(createDocument([first, second]));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent({ x: 90, y: 90 }));
+      });
+      moveTo(result, { x: 150, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id]);
+
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent({ x: 240, y: 120 }));
+      });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id, second.id]);
+    });
+
+    it('keeps selecting a touched group as a whole after selecting it live', () => {
+      const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+      const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+      const loose = createRectangleItem({ id: 'loose', x: 100, y: 300, width: 80, height: 40 });
+      const group = createGroupNode([first, second], 'Poster Group');
+      const { result, params } = renderWithLiveSelection(createDocument([group, loose]));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent({ x: 90, y: 90 }));
+      });
+      moveTo(result, { x: 150, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([group.id]);
+
+      // With the group selected, its children become directly selectable; the
+      // marquee must not drill into the group it is selecting.
+      moveTo(result, { x: 240, y: 120 });
+      moveTo(result, { x: 150, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenCalledTimes(1);
+
+      moveTo(result, { x: 150, y: 320 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([group.id, loose.id]);
+
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent({ x: 150, y: 320 }));
+      });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([group.id, loose.id]);
+    });
   });
 
   it('clears a pending marquee without committing when the pointer never moves', () => {
