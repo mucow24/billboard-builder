@@ -197,6 +197,11 @@
   flex-wrap: wrap;
   align-items: center;
   pointer-events: none;
+  /* Same text size as the toolbar buttons (Export, Canvas). The line height
+     stays at the 24px the HUD had at the body's 16px, so the bar keeps its
+     height and the smaller text gets room around it. */
+  font-size: 0.82rem;
+  line-height: 1.5rem;
 }
 
 .canvas-hud-pill,
@@ -208,9 +213,10 @@
 }
 
 /* The size pill and the zoom controls share one height, as short as the text
-   allows: one line plus the 1px border, with no vertical padding inside. */
+   allows: one line plus the 1px border, with no vertical padding inside.
+   The side padding keeps the size pill as wide as it was at 16px text. */
 .canvas-hud-pill {
-  padding: 0 0.62rem;
+  padding: 0 1.1rem;
   border-radius: var(--radius-full);
 }
 
@@ -282,10 +288,12 @@
   }
 }
 
+/* The side padding keeps the four buttons, together, as wide as they were
+   at 16px text. */
 .canvas-hud-button {
   border: 0;
   border-radius: var(--radius-full);
-  padding: 0 0.62rem;
+  padding: 0 0.74rem;
   background: transparent;
   color: inherit;
   font: inherit;
