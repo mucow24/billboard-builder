@@ -165,6 +165,12 @@ export class FocusVeilFilter extends Filter {
       },
       // The canvas inside the hole is copied through unchanged, so the layer
       // must be drawn at the screen's resolution and with its antialiasing.
+      // Even so, antialiased edges inside the canvas can come out up to 3/255
+      // different from drawing straight to the screen (probably a different
+      // MSAA sample count or pattern; unconfirmed). Leave antialias on anyway:
+      // 'off' would make every vector edge jagged while the veil is up. The
+      // e2e test "shows the export-bounds cue ..." in editor.toolbar.spec.ts
+      // allows for this.
       resolution: 'inherit',
       antialias: 'inherit',
       padding: 0,

@@ -160,15 +160,33 @@ test.describe('editor toolbar flows', () => {
 
     // The veil blurs and darkens the items outside the canvas, stops at the
     // canvas's edge, and is drawn under the selection handles.
-    // While the veil is up the canvas is drawn through it at the same
-    // resolution, but into a multisampled texture rather than straight to
-    // the screen, which can move an antialiased pixel by a level or three.
-    // A handle is 95% opaque, so the veiled rectangle behind it shifts it a
-    // little; a veil over the handle would darken it by most of its brightness.
     expect(await maxChannelDifference(page, withCue.offCanvasRect, withoutCue.offCanvasRect)).toBeGreaterThan(60);
     expect(await maxChannelDifference(page, withCue.justOutside, withoutCue.justOutside)).toBeGreaterThan(60);
+
+    // Inside the canvas, "untouched" means within 4 levels, not identical.
+    // Turning the veil on shifts some pixels inside the canvas by up to 3 of
+    // 255 levels, though the filter copies them through unchanged. The
+    // shifted pixels sit on antialiased edges that fall between screen
+    // pixels (here the checkerboard cells, about 5.6px at this zoom).
+    //
+    // Suspected cause (not confirmed): with the veil off, Pixi draws the
+    // content layer straight to the screen; with it on, the layer is drawn
+    // into the filter's multisampled offscreen texture first, and the two
+    // antialias edges slightly differently (sample count or pattern).
+    //
+    // Deliberately not fixed. Turning antialiasing off on the filter texture
+    // would probably make the levels match, but every vector edge (shapes,
+    // lines, the canvas border) would go jagged while the veil is on. A
+    // 3-level shift can't be seen.
+    //
+    // If this starts failing with a larger difference, the hole or the copy
+    // is broken (e.g. Pixi's blur passes write into their input texture; see
+    // FocusVeilFilter.apply). Don't just raise the limit.
     expect(await maxChannelDifference(page, withCue.justInside, withoutCue.justInside)).toBeLessThanOrEqual(4);
     expect(await maxChannelDifference(page, withCue.canvasCenter, withoutCue.canvasCenter)).toBeLessThanOrEqual(4);
+
+    // A handle is 95% opaque, so the veiled rectangle behind it shifts it a
+    // little; a veil over the handle would darken it by most of its brightness.
     expect(await maxChannelDifference(page, withCue.handle, withoutCue.handle)).toBeLessThanOrEqual(16);
 
     await canvasButton.hover();
