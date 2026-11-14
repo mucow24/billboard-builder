@@ -479,17 +479,26 @@ export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zo
   return (
     <>
       <pixiGraphics ref={setMaskNode} draw={drawClipMask} eventMode="none" />
-      <pixiSprite
-        texture={texture}
+      {/* The mirror flip lives on a wrapper's scale, never in a negative sprite
+          width: Pixi's width setter keeps the sign the scale already has, so a
+          sprite that was once given a negative width stays flipped when the
+          width turns positive again, and lands outside the clip mask. */}
+      <pixiContainer
         x={presentation.x}
         y={presentation.y}
-        width={presentation.width * presentation.scaleX}
-        height={presentation.height}
         rotation={(presentation.rotation * Math.PI) / 180}
-        filters={adjustmentFilters}
-        mask={maskNode}
+        scale={{ x: presentation.scaleX, y: 1 }}
         eventMode="none"
-      />
+      >
+        <pixiSprite
+          texture={texture}
+          width={presentation.width}
+          height={presentation.height}
+          filters={adjustmentFilters}
+          mask={maskNode}
+          eventMode="none"
+        />
+      </pixiContainer>
     </>
   );
 }
