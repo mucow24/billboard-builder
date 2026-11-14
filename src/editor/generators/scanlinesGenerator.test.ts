@@ -13,17 +13,17 @@ function createMockContext() {
 }
 
 describe('scanlinesGeneratorSpec', () => {
-  it('keeps the earlier look in default params, with opacity apart from an opaque color', () => {
+  it('defaults to solid black lines, with opacity apart from an opaque color', () => {
     expect(scanlinesGeneratorSpec.createDefaultParams()).toEqual({
       generatorType: 'scanlines',
       scanlineColor: '#000000',
-      opacity: 0.09,
-      scanlineHeight: 1,
-      scanlineSpacing: 4,
+      opacity: 1,
+      scanlineHeight: 5,
+      scanlineSpacing: 5,
     });
   });
 
-  it('draws default scanlines with 1px height and a 4px gap', () => {
+  it('draws default scanlines with 5px height and a 5px gap', () => {
     const ctx = createMockContext();
 
     scanlinesGeneratorSpec.draw(
@@ -34,14 +34,11 @@ describe('scanlinesGeneratorSpec', () => {
       0,
     );
 
-    // The same fill the earlier default, #00000017, produced.
-    expect(ctx.fillStyle).toBe(rgba('#00000017', 1));
-    expect(ctx.fillStyle).toBe('rgba(0, 0, 0, 0.09)');
-    expect(ctx.fillRect).toHaveBeenCalledTimes(4);
-    expect(ctx.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 8, 1);
-    expect(ctx.fillRect).toHaveBeenNthCalledWith(2, 0, 5, 8, 1);
-    expect(ctx.fillRect).toHaveBeenNthCalledWith(3, 0, 10, 8, 1);
-    expect(ctx.fillRect).toHaveBeenNthCalledWith(4, 0, 15, 8, 1);
+    expect(ctx.fillStyle).toBe(rgba('#000000', 1));
+    expect(ctx.fillStyle).toBe('rgba(0, 0, 0, 1)');
+    expect(ctx.fillRect).toHaveBeenCalledTimes(2);
+    expect(ctx.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 8, 5);
+    expect(ctx.fillRect).toHaveBeenNthCalledWith(2, 0, 10, 8, 5);
   });
 
   it('draws taller scanlines with the configured gap', () => {

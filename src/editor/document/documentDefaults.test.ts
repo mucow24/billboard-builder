@@ -151,9 +151,9 @@ describe('document defaults', () => {
     expect(scanlines.generatorParams).toEqual({
       generatorType: 'scanlines',
       scanlineColor: '#000000',
-      opacity: 0.09,
-      scanlineHeight: 1,
-      scanlineSpacing: 4,
+      opacity: 1,
+      scanlineHeight: 5,
+      scanlineSpacing: 5,
     });
   });
 });
