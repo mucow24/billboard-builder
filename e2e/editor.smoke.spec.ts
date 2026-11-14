@@ -210,13 +210,19 @@ test.describe('editor smoke flows', () => {
     };
 
     // Drag a box over a wide strip of the canvas; it shows while dragging.
+    // Alt is held: it makes a click zoom out, but a box always zooms in, and
+    // the cursor says so.
     const from = { x: canvasWidth * 0.2, y: canvasHeight * 0.3 };
     const to = { x: canvasWidth * 0.45, y: canvasHeight * 0.4 };
+    const stageSurface = page.locator('.editor-stage');
     await selectTool(page, 'Zoom');
+    await page.keyboard.down('Alt');
+    await expect(stageSurface).toHaveCSS('cursor', 'zoom-out');
     await beginCanvasDrag(page, from);
     await movePointerToCanvasPoint(page, to);
     const zoomBox = page.getByTestId('canvas-zoom-box');
     await expect(zoomBox).toBeVisible();
+    await expect(stageSurface).toHaveCSS('cursor', 'zoom-in');
     const fitted = await readStageDebug(page);
     const shownBox = await zoomBox.boundingBox();
     if (!shownBox) {
@@ -234,6 +240,7 @@ test.describe('editor smoke flows', () => {
 
     // Releasing zooms so that strip fills the room across, centered in it.
     await releasePointer(page);
+    await page.keyboard.up('Alt');
     await expect(zoomBox).toHaveCount(0);
     await expect(selectButton).toHaveAttribute('aria-pressed', 'true');
     const { viewport } = await expectVisibleAlignedZoom(page);

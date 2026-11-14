@@ -424,13 +424,14 @@ export function useCanvasViewport({
         : activeTool === 'pan' || (spacebarHeld && !hasActiveSession)
           ? 'grab'
           : activeTool === 'zoom'
-            ? modifierKeys.altKey
+            ? // A box always zooms in, Alt or not.
+              modifierKeys.altKey && !zoomBox
               ? 'zoom-out'
               : 'zoom-in'
             : activeTool === 'select'
               ? 'default'
               : 'crosshair',
-    [activeTool, modifierKeys.altKey, spacebarHeld],
+    [activeTool, modifierKeys.altKey, spacebarHeld, zoomBox],
   );
 
   const handleStagePointerUp = useCallback(() => {

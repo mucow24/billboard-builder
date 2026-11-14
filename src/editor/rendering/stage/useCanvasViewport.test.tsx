@@ -490,6 +490,26 @@ describe('useCanvasViewport', () => {
       expect(result.current.zoom).toBe(2.828125);
     });
 
+    it('shows the zoom-in cursor while an Alt-drag draws a box', () => {
+      const { result } = renderZoomTool();
+
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Alt' }));
+      });
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 300 }, true);
+      });
+      expect(result.current.getStageCursor(false)).toBe('zoom-out');
+
+      pointer('pointermove', 500, 350);
+      expect(result.current.getStageCursor(false)).toBe('zoom-in');
+
+      pointer('pointerup', 500, 350);
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { key: 'Alt' }));
+      });
+    });
+
     it('keeps the box inside the viewport when the pointer leaves it', () => {
       const { result } = renderZoomTool();
 
