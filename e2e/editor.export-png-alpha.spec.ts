@@ -159,8 +159,6 @@ test.describe('PNG export over a transparent background', () => {
     expect(project.background).toBe('#ffffff00');
     await uploadProject(page, project, 'export-alpha.json');
     await expect.poll(async () => (await readStageDebug(page)).renderedItemCount).toBe(4);
-    // Filters follow the zoom on screen; at 100% the canvas is drawn as exported.
-    await page.getByRole('button', { name: 'Set zoom to 100%' }).click();
 
     const scan = await exportAndScanColours(page);
 
