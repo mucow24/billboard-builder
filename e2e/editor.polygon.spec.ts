@@ -244,16 +244,16 @@ test.describe('polygon tool flows', () => {
       ]);
     });
 
-    await test.step('caps a typed curve radius at 100', async () => {
+    await test.step('caps a typed curve radius at 500', async () => {
       const radius = page.getByRole('spinbutton', { name: 'Curve radius' });
-      await radius.fill('150');
+      await radius.fill('750');
       await radius.press('Enter');
-      await expect(radius).toHaveValue('100');
-      await expect(page.getByRole('slider', { name: 'Curve radius' })).toHaveAttribute('max', '100');
+      await expect(radius).toHaveValue('500');
+      await expect(page.getByRole('slider', { name: 'Curve radius' })).toHaveAttribute('max', '500');
 
       const saved = await saveAndReadProject(page);
       expect(saved.nodes).toEqual([
-        expect.objectContaining({ curveRadius: 100 }),
+        expect.objectContaining({ curveRadius: 500 }),
       ]);
 
       await radius.fill('24');

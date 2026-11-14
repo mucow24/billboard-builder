@@ -17,7 +17,7 @@ import type { InspectorFieldDescriptor } from './selectionInspectorModel';
 import { renderMirrorField } from './selectionInspectorRenderers';
 
 /** Largest Curve radius the inspector offers, in pixels. */
-const POLYGON_CURVE_RADIUS_MAX = 100;
+const POLYGON_CURVE_RADIUS_MAX = 500;
 
 /**
  * Freeform polygon fields. Fill (with gradient) applies only while the polygon
@@ -92,7 +92,7 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
       slider: true,
       step: 1,
       tooltip:
-        'Rounds every corner by this many pixels, from 0 (sharp corners) to 100. Corners next to a short side round less, as a curve never reaches past the middle of a side.',
+        'Rounds every corner by this many pixels, from 0 (sharp corners) to 500. Corners next to a short side round less, as a curve never reaches past the middle of a side.',
       valueType: 'number',
     }),
     createCustomField({

@@ -675,19 +675,20 @@ describe('polygon descriptors', () => {
     expect(sectionKeys.indexOf('polygon')).toBe(sectionKeys.indexOf('stroke') + 1);
   });
 
-  it('limits Curve radius to 0 through 100 pixels, typed or dragged', () => {
+  it('limits Curve radius to 0 through 500 pixels, typed or dragged', () => {
     const polygon = createPolygonItem();
     const radiusField = buildSelectionInspectorSections([polygon], environment)
       .flatMap((section) => section.fields)
       .find((field) => field.descriptor.propertyKey === 'curveRadius');
     const descriptor = radiusField?.descriptor;
 
-    expect(descriptor).toMatchObject({ controlKind: 'number', min: 0, max: 100, slider: true });
+    expect(descriptor).toMatchObject({ controlKind: 'number', min: 0, max: 500, slider: true });
     // No wider bound for the typed value: the text box clamps to the slider's range.
     expect(descriptor).not.toHaveProperty('textMax');
     expect(descriptor).not.toHaveProperty('textMin');
-    expect(descriptor?.buildChange({ item: polygon }, 150 as never)).toEqual({ curveRadius: 100 });
-    expect(descriptor?.buildChange({ item: polygon }, 37 as never)).toEqual({ curveRadius: 37 });
+    expect(descriptor?.buildChange({ item: polygon }, 750 as never)).toEqual({ curveRadius: 500 });
+    expect(descriptor?.buildChange({ item: polygon }, 320 as never)).toEqual({ curveRadius: 320 });
+    expect(descriptor?.buildChange({ item: polygon }, -5 as never)).toEqual({ curveRadius: 0 });
   });
 
   it('mirrors the polygon by flipping its vertices left to right, and flips them back', () => {
