@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 import {
   CircleIcon,
-  Component1Icon,
   CursorArrowIcon,
   HandIcon,
   ImageIcon,
@@ -17,7 +16,35 @@ import { getAllGenerators } from '../generators';
 import type { CanvasTool } from '../document/documentTypes';
 import { GENERATOR_ICONS } from './ToolbarMenus';
 
-type IconComponent = typeof CursorArrowIcon;
+type IconComponent = ComponentType<{ width?: number | string; height?: number | string }>;
+
+// Radix has no freeform-polygon icon. This one is drawn on the same 15x15 grid:
+// a concave outline (so it cannot be read as the regular N-gon) with a dot on
+// every vertex, since the tool places the shape one vertex at a time.
+const POLYGON_ICON_VERTICES: Array<[number, number]> = [
+  [2, 3],
+  [8, 2],
+  [13, 5.5],
+  [8.5, 8.5],
+  [12.5, 13],
+  [3, 12],
+];
+
+function PolygonIcon({ width = 15, height = 15 }: { width?: number | string; height?: number | string }) {
+  return (
+    <svg width={width} height={height} viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <polygon
+        points={POLYGON_ICON_VERTICES.map(([x, y]) => `${x},${y}`).join(' ')}
+        stroke="currentColor"
+        strokeWidth={1}
+        strokeLinejoin="round"
+      />
+      {POLYGON_ICON_VERTICES.map(([x, y]) => (
+        <circle key={`${x},${y}`} cx={x} cy={y} r={1.3} fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
 
 const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; Icon: IconComponent }> = [
   { id: 'select', label: 'Select', hotkey: 'V', Icon: CursorArrowIcon },
@@ -27,7 +54,7 @@ const TOOLS: Array<{ id: CanvasTool; label: string; hotkey: string; Icon: IconCo
   { id: 'rectangle', label: 'Rect', hotkey: 'R', Icon: SquareIcon },
   { id: 'ellipse', label: 'Ellipse', hotkey: 'O', Icon: CircleIcon },
   { id: 'ngon', label: 'N-gon', hotkey: 'G', Icon: VercelLogoIcon },
-  { id: 'polygon', label: 'Polygon', hotkey: 'P', Icon: Component1Icon },
+  { id: 'polygon', label: 'Polygon', hotkey: 'P', Icon: PolygonIcon },
   { id: 'line', label: 'Line', hotkey: 'L', Icon: SlashIcon },
 ];
 
