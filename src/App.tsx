@@ -52,6 +52,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
   const clipboardStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
+  const inspectorPanelRef = useRef<HTMLDivElement | null>(null);
   const getRendererHandle = useCallback(() => stageRef.current, []);
 
   const {
@@ -173,6 +174,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
           showExportBoundsCue={showExportBoundsCue}
           guides={guides}
           onGuidesChange={setGuides}
+          overlayPanelRef={inspectorPanelRef}
           stageRef={stageRef}
         />
 
@@ -238,6 +240,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             onInspectorTabChange={toggleInspectorTab}
             itemCount={layerRows.length}
             favoriteCount={favorites.length}
+            inspectorPanelRef={inspectorPanelRef}
             inspectorPanel={
               <PropertiesPanel
                 activeTab={inspectorTab}

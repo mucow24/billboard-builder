@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
 import { useKeyHeld } from '../../../app/useKeyHeld';
 import type { CanvasTool } from '../../document/documentTypes';
@@ -8,12 +8,14 @@ import { useModifierKeys } from '../useModifierKeys';
 import {
   alignViewportPanToDevicePixels,
   clampZoom,
-  floorZoomToSeamFriendlyStep,
+  fitCanvasToArea,
   getDevicePixelRatio,
+  getFitArea,
   snapZoomToSeamFriendlyStep,
   toCanvasPointer,
   toViewportPoint,
   toViewportRect,
+  type ViewportArea,
 } from './viewportMath';
 
 const ZOOM_STEP = 1.2;
@@ -23,6 +25,9 @@ interface UseCanvasViewportParams {
   activeTool: CanvasTool;
   canvasHeight: number;
   canvasWidth: number;
+  // A panel floating over the viewport's right side (the inspector), which
+  // Fit keeps the canvas clear of while it is shown.
+  overlayPanelRef?: RefObject<HTMLElement | null>;
 }
 
 type PanUpdate = Point | ((currentPan: Point) => Point);
@@ -31,6 +36,7 @@ export function useCanvasViewport({
   activeTool,
   canvasHeight,
   canvasWidth,
+  overlayPanelRef,
 }: UseCanvasViewportParams) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
@@ -59,30 +65,58 @@ export function useCanvasViewport({
     });
   }, []);
 
+  // The panel that floats over the viewport's right side, measured when Fit
+  // runs, so the canvas is fitted into the part of the viewport left of it.
+  const getOverlayPanelRect = useCallback((): ViewportArea | null => {
+    const panel = overlayPanelRef?.current;
+    const viewportBounds = viewportRef.current?.getBoundingClientRect();
+    if (!panel || !viewportBounds) {
+      return null;
+    }
+    const panelBounds = panel.getBoundingClientRect();
+    return {
+      left: panelBounds.left - viewportBounds.left,
+      top: panelBounds.top - viewportBounds.top,
+      width: panelBounds.width,
+      height: panelBounds.height,
+    };
+  }, [overlayPanelRef]);
+
   const fitCanvasToViewport = useCallback(() => {
     if (viewportSize.width <= 0 || viewportSize.height <= 0) {
       return;
     }
 
-    const requestedZoom = clampZoom(
-      Math.min(
-        viewportSize.width / Math.max(canvasWidth, 1),
-        viewportSize.height / Math.max(canvasHeight, 1),
-      ) * 0.9,
+    const fit = fitCanvasToArea(
+      { width: canvasWidth, height: canvasHeight },
+      getFitArea(viewportSize, getOverlayPanelRect()),
+      getDevicePixelRatio(),
     );
-    const nextZoom = floorZoomToSeamFriendlyStep(requestedZoom, getDevicePixelRatio());
 
-    setZoom(nextZoom);
-    setAlignedPan({
-      x: (viewportSize.width - canvasWidth * nextZoom) / 2,
-      y: (viewportSize.height - canvasHeight * nextZoom) / 2,
-    });
-  }, [canvasHeight, canvasWidth, setAlignedPan, viewportSize.height, viewportSize.width]);
+    setZoom(fit.zoom);
+    setAlignedPan(fit.pan);
+  }, [canvasHeight, canvasWidth, getOverlayPanelRect, setAlignedPan, viewportSize]);
 
-  useEffect(() => {
+  const [viewportMeasured, setViewportMeasured] = useState(false);
+  useLayoutEffect(() => {
     const node = viewportRef.current;
     if (!node) {
       return;
+    }
+
+    const applySize = (width: number, height: number) => {
+      setViewportSize({
+        width: Math.max(320, Math.round(width)),
+        height: Math.max(320, Math.round(height)),
+      });
+      setViewportMeasured(true);
+    };
+
+    // Measure before the first paint: the ResizeObserver reports only after
+    // it, and the first fit would otherwise use the default size.
+    const bounds = node.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0) {
+      applySize(bounds.width, bounds.height);
     }
 
     const observer = new ResizeObserver((entries) => {
@@ -90,24 +124,25 @@ export function useCanvasViewport({
       if (!entry) {
         return;
       }
-      const { width, height } = entry.contentRect;
-      setViewportSize({
-        width: Math.max(320, Math.round(width)),
-        height: Math.max(320, Math.round(height)),
-      });
+      applySize(entry.contentRect.width, entry.contentRect.height);
     });
 
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
 
-  const hasFittedRef = useRef(false);
-  useEffect(() => {
-    if (!hasFittedRef.current) {
-      fitCanvasToViewport();
-      hasFittedRef.current = true;
+  // Fit once on mount, and once more when the first measurement replaces the
+  // default viewport size. The second fit also sees the overlay panel, whose
+  // ref is attached only after this component's first layout effects.
+  const initialFitRef = useRef<'none' | 'default-size' | 'measured'>('none');
+  useLayoutEffect(() => {
+    const target = viewportMeasured ? 'measured' : 'default-size';
+    if (initialFitRef.current === 'measured' || initialFitRef.current === target) {
+      return;
     }
-  }, [fitCanvasToViewport]);
+    fitCanvasToViewport();
+    initialFitRef.current = target;
+  }, [fitCanvasToViewport, viewportMeasured]);
 
   // Sync refs during render (not in useEffect) so stable callbacks
   // read current values in the same render pass that changes zoom/pan.

@@ -77,6 +77,66 @@ export function floorZoomToSeamFriendlyStep(
   return clampZoom(Math.floor(zoom * scale) / scale);
 }
 
+export interface ViewportArea {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+// Beside a panel narrower than this, there is too little room to fit the
+// canvas into, so Fit uses the whole viewport instead.
+export const MIN_FIT_AREA_WIDTH = 320;
+
+// The part of the viewport that Fit shows the canvas in: everything left of a
+// panel floating over the viewport's right side. `panelRect` is in viewport
+// coordinates; null (or an empty rect, as a hidden panel measures) means
+// nothing covers the viewport.
+export function getFitArea(
+  viewportSize: { width: number; height: number },
+  panelRect: ViewportArea | null,
+): ViewportArea {
+  const wholeViewport = { left: 0, top: 0, width: viewportSize.width, height: viewportSize.height };
+  if (!panelRect || panelRect.width <= 0 || panelRect.height <= 0) {
+    return wholeViewport;
+  }
+
+  const overlapsViewport =
+    panelRect.left < viewportSize.width &&
+    panelRect.left + panelRect.width > 0 &&
+    panelRect.top < viewportSize.height &&
+    panelRect.top + panelRect.height > 0;
+  if (!overlapsViewport || panelRect.left < MIN_FIT_AREA_WIDTH) {
+    return wholeViewport;
+  }
+
+  return { ...wholeViewport, width: panelRect.left };
+}
+
+// The zoom and pan that show the whole canvas centered in `area`, with a
+// margin of 5% of the area on each side.
+export function fitCanvasToArea(
+  canvasSize: { width: number; height: number },
+  area: ViewportArea,
+  devicePixelRatio: number,
+): { zoom: number; pan: Point } {
+  const requestedZoom = clampZoom(
+    Math.min(
+      area.width / Math.max(canvasSize.width, 1),
+      area.height / Math.max(canvasSize.height, 1),
+    ) * 0.9,
+  );
+  const zoom = floorZoomToSeamFriendlyStep(requestedZoom, devicePixelRatio);
+
+  return {
+    zoom,
+    pan: {
+      x: area.left + (area.width - canvasSize.width * zoom) / 2,
+      y: area.top + (area.height - canvasSize.height * zoom) / 2,
+    },
+  };
+}
+
 export function toCanvasPointer(pointer: Point, zoom: number, pan: Point): Point {
   return {
     x: (pointer.x - pan.x) / zoom,

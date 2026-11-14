@@ -25,6 +25,9 @@ export interface CanvasStageProps {
   showExportBoundsCue?: boolean;
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
+  // The inspector panel floating over the stage's right side; Fit keeps the
+  // canvas clear of it.
+  overlayPanelRef?: React.RefObject<HTMLElement | null>;
   stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
@@ -34,6 +37,7 @@ export function CanvasStage({
   showExportBoundsCue = false,
   guides,
   onGuidesChange,
+  overlayPanelRef,
   stageRef,
 }: CanvasStageProps) {
   const document = useEditorStore((s) => s.editor.document);
@@ -69,6 +73,7 @@ export function CanvasStage({
     activeTool,
     canvasHeight: document.canvas.height,
     canvasWidth: document.canvas.width,
+    overlayPanelRef,
   });
 
   const {

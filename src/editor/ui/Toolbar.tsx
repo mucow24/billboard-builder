@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -66,6 +66,7 @@ interface ToolbarProps {
   itemCount: number;
   favoriteCount: number;
   inspectorPanel?: ReactNode;
+  inspectorPanelRef?: Ref<HTMLDivElement>;
 }
 
 export function Toolbar({
@@ -113,6 +114,7 @@ export function Toolbar({
   itemCount,
   favoriteCount,
   inspectorPanel,
+  inspectorPanelRef,
 }: ToolbarProps) {
   const rootRef = useRef<HTMLElement | null>(null);
   const canvasPopoverRef = useRef<HTMLDivElement | null>(null);
@@ -438,6 +440,7 @@ export function Toolbar({
             })}
           </div>
           <div
+            ref={inspectorPanelRef}
             className="top-toolbar-inspector-panel"
             style={{ display: panelCollapsed ? 'none' : undefined }}
           >
