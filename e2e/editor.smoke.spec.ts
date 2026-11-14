@@ -97,6 +97,74 @@ test.describe('editor smoke flows', () => {
     expect(nextDebug.viewport.panY).not.toBe(initialPan.y);
   });
 
+  test('fits the canvas clear of the toolbar, the tool palette and the open properties panel', async ({ page }) => {
+    await openFreshEditor(page);
+
+    const [canvasWidth, canvasHeight] = ((await page.getByTestId('canvas-size').textContent()) ?? '')
+      .split('x')
+      .map((value) => Number(value.trim()));
+    const panel = page.locator('.top-toolbar-inspector-panel');
+    await expect(panel).toBeVisible();
+    const [stageBox, toolbarBox, paletteBox, panelBox] = await Promise.all([
+      page.getByTestId('canvas-stage-root').boundingBox(),
+      page.locator('.overlay-topbar').boundingBox(),
+      page.locator('.overlay-tools').boundingBox(),
+      panel.boundingBox(),
+    ]);
+    if (!stageBox || !toolbarBox || !paletteBox || !panelBox) {
+      throw new Error('The stage, toolbar, tool palette or properties panel has no layout box.');
+    }
+    // The room left clear, in stage coordinates.
+    const areaTop = toolbarBox.y + toolbarBox.height - stageBox.y;
+    const areaLeft = paletteBox.x + paletteBox.width - stageBox.x;
+    const panelLeft = panelBox.x - stageBox.x;
+    expect(areaTop).toBeGreaterThan(0);
+    expect(areaLeft).toBeGreaterThan(0);
+
+    // How far the fitted canvas's sides are from the edges of the room it was
+    // fitted into (up to `areaRight`).
+    async function readFitMargins(areaRight: number) {
+      const { viewport } = await readStageDebug(page);
+      return {
+        left: viewport.panX - areaLeft,
+        right: areaRight - (viewport.panX + canvasWidth * viewport.zoom),
+        top: viewport.panY - areaTop,
+        bottom: stageBox!.height - (viewport.panY + canvasHeight * viewport.zoom),
+      };
+    }
+
+    function expectCenteredWithMargin(margins: Awaited<ReturnType<typeof readFitMargins>>) {
+      for (const margin of Object.values(margins)) {
+        expect(margin).toBeGreaterThan(0);
+      }
+      expect(Math.abs(margins.left - margins.right)).toBeLessThan(2);
+      expect(Math.abs(margins.top - margins.bottom)).toBeLessThan(2);
+    }
+
+    // The startup fit keeps the canvas clear of all three.
+    expectCenteredWithMargin(await readFitMargins(panelLeft));
+
+    // So does Fit.
+    await page.getByRole('button', { name: 'Set zoom to 100%' }).click();
+    await expect(page.getByTestId('viewport-zoom')).toContainText('Zoom: 100%');
+    await page.getByRole('button', { name: 'Fit canvas to viewport' }).click();
+    await expect(page.getByTestId('viewport-zoom')).not.toContainText('Zoom: 100%');
+    expectCenteredWithMargin(await readFitMargins(panelLeft));
+
+    // With the panel collapsed, Fit uses the stage's full width right of the
+    // tool palette.
+    await page.getByRole('tab', { name: 'Properties' }).click();
+    await expect(panel).toBeHidden();
+    await page.getByRole('button', { name: 'Fit canvas to viewport' }).click();
+    await expect
+      .poll(async () => {
+        const margins = await readFitMargins(stageBox.width);
+        return Math.abs(margins.left - margins.right);
+      })
+      .toBeLessThan(2);
+    expectCenteredWithMargin(await readFitMargins(stageBox.width));
+  });
+
   test('zooms to a percentage typed into the zoom readout', async ({ page }) => {
     await openFreshEditor(page);
 

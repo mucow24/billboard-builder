@@ -77,6 +77,116 @@ export function floorZoomToSeamFriendlyStep(
   return clampZoom(Math.floor(zoom * scale) / scale);
 }
 
+export interface ViewportArea {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+// Room smaller than this is too little to fit the canvas into: Fit then
+// ignores the right panel, and if that is not enough, everything over the
+// viewport.
+export const MIN_FIT_AREA_WIDTH = 320;
+export const MIN_FIT_AREA_HEIGHT = 240;
+
+// What floats over the viewport's edges, in viewport coordinates: a bar along
+// the top (the toolbar), a strip down the left (the tool palette) and a panel
+// down the right (the inspector). A missing or empty rect (as an element with
+// display: none measures) covers nothing.
+export interface FitObstructions {
+  top?: ViewportArea | null;
+  left?: ViewportArea | null;
+  right?: ViewportArea | null;
+}
+
+function coversViewport(
+  rect: ViewportArea | null | undefined,
+  viewportSize: { width: number; height: number },
+): rect is ViewportArea {
+  return (
+    !!rect &&
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.left < viewportSize.width &&
+    rect.left + rect.width > 0 &&
+    rect.top < viewportSize.height &&
+    rect.top + rect.height > 0
+  );
+}
+
+function clipViewport(
+  viewportSize: { width: number; height: number },
+  { top, left, right }: FitObstructions,
+): ViewportArea {
+  let areaTop = 0;
+  let areaLeft = 0;
+  let areaRight = viewportSize.width;
+  if (coversViewport(top, viewportSize)) {
+    areaTop = Math.max(areaTop, top.top + top.height);
+  }
+  if (coversViewport(left, viewportSize)) {
+    areaLeft = Math.max(areaLeft, left.left + left.width);
+  }
+  if (coversViewport(right, viewportSize)) {
+    areaRight = Math.min(areaRight, right.left);
+  }
+
+  return {
+    left: areaLeft,
+    top: areaTop,
+    width: areaRight - areaLeft,
+    height: viewportSize.height - areaTop,
+  };
+}
+
+function isRoomy(area: ViewportArea): boolean {
+  return area.width >= MIN_FIT_AREA_WIDTH && area.height >= MIN_FIT_AREA_HEIGHT;
+}
+
+// The part of the viewport that Fit shows the canvas in: below the toolbar,
+// right of the tool palette and left of the inspector panel.
+export function getFitArea(
+  viewportSize: { width: number; height: number },
+  obstructions: FitObstructions,
+): ViewportArea {
+  const clear = clipViewport(viewportSize, obstructions);
+  if (isRoomy(clear)) {
+    return clear;
+  }
+
+  const underPanel = clipViewport(viewportSize, { ...obstructions, right: null });
+  if (isRoomy(underPanel)) {
+    return underPanel;
+  }
+
+  return { left: 0, top: 0, width: viewportSize.width, height: viewportSize.height };
+}
+
+// The zoom and pan that show the whole canvas centered in `area`, with a
+// margin of 5% of the area on each side.
+export function fitCanvasToArea(
+  canvasSize: { width: number; height: number },
+  area: ViewportArea,
+  devicePixelRatio: number,
+): { zoom: number; pan: Point } {
+  const requestedZoom = clampZoom(
+    Math.min(
+      area.width / Math.max(canvasSize.width, 1),
+      area.height / Math.max(canvasSize.height, 1),
+    ) * 0.9,
+  );
+  const zoom = floorZoomToSeamFriendlyStep(requestedZoom, devicePixelRatio);
+
+  return {
+    zoom,
+    pan: {
+      x: area.left + (area.width - canvasSize.width * zoom) / 2,
+      y: area.top + (area.height - canvasSize.height * zoom) / 2,
+    },
+  };
+}
+
 export function toCanvasPointer(pointer: Point, zoom: number, pan: Point): Point {
   return {
     x: (pointer.x - pan.x) / zoom,

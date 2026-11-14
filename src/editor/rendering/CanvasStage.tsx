@@ -14,7 +14,7 @@ import { CanvasViewportHud } from './stage/CanvasViewportHud';
 import { buildStageDerivedState } from './stage/stageDerived';
 import { buildStageSceneHandlers } from './stage/stageHandlers';
 import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
-import { useCanvasViewport } from './stage/useCanvasViewport';
+import { useCanvasViewport, type FitObstructionRefs } from './stage/useCanvasViewport';
 import { useEditorStore } from '../state/store';
 
 import { NOOP } from './noop';
@@ -25,6 +25,9 @@ export interface CanvasStageProps {
   showExportBoundsCue?: boolean;
   guides: GuideLine[];
   onGuidesChange: (guides: GuideLine[]) => void;
+  // The toolbar, tool palette and inspector panel floating over the stage's
+  // edges; Fit keeps the canvas clear of them.
+  fitObstructionRefs?: FitObstructionRefs;
   stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
@@ -34,6 +37,7 @@ export function CanvasStage({
   showExportBoundsCue = false,
   guides,
   onGuidesChange,
+  fitObstructionRefs,
   stageRef,
 }: CanvasStageProps) {
   const document = useEditorStore((s) => s.editor.document);
@@ -69,6 +73,7 @@ export function CanvasStage({
     activeTool,
     canvasHeight: document.canvas.height,
     canvasWidth: document.canvas.width,
+    fitObstructionRefs,
   });
 
   const {

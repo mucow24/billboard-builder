@@ -856,7 +856,9 @@ test.describe('editor groups', () => {
 
     // This double-click lands inside the line bounding box but away from the visible
     // stroke, so the stage-surface fallback path is the one that must resolve the drill-in.
-    await doubleClickCanvas(page, { x: 320, y: 260 });
+    // It also keeps 70+ canvas px from every group handle: their hit areas are a fixed
+    // 24 screen px, so they cover more of the canvas the further the view is zoomed out.
+    await doubleClickCanvas(page, { x: 360, y: 250 });
     await assertNoDocumentTextSelection(page);
     await openLayersTab(page);
     await expectActiveLayerLabel(page, 'Line');

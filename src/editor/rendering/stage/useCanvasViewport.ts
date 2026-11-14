@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
 import { useKeyHeld } from '../../../app/useKeyHeld';
 import type { CanvasTool } from '../../document/documentTypes';
@@ -8,12 +8,15 @@ import { useModifierKeys } from '../useModifierKeys';
 import {
   alignViewportPanToDevicePixels,
   clampZoom,
-  floorZoomToSeamFriendlyStep,
+  fitCanvasToArea,
   getDevicePixelRatio,
+  getFitArea,
   snapZoomToSeamFriendlyStep,
   toCanvasPointer,
   toViewportPoint,
   toViewportRect,
+  type FitObstructions,
+  type ViewportArea,
 } from './viewportMath';
 
 const ZOOM_STEP = 1.2;
@@ -23,6 +26,16 @@ interface UseCanvasViewportParams {
   activeTool: CanvasTool;
   canvasHeight: number;
   canvasWidth: number;
+  // What floats over the viewport's edges, which Fit keeps the canvas clear of.
+  fitObstructionRefs?: FitObstructionRefs;
+}
+
+// The elements floating over the viewport's top edge (the toolbar), left edge
+// (the tool palette) and right edge (the inspector panel).
+export interface FitObstructionRefs {
+  top?: RefObject<HTMLElement | null>;
+  left?: RefObject<HTMLElement | null>;
+  right?: RefObject<HTMLElement | null>;
 }
 
 type PanUpdate = Point | ((currentPan: Point) => Point);
@@ -31,6 +44,7 @@ export function useCanvasViewport({
   activeTool,
   canvasHeight,
   canvasWidth,
+  fitObstructionRefs,
 }: UseCanvasViewportParams) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
@@ -59,30 +73,66 @@ export function useCanvasViewport({
     });
   }, []);
 
+  // Read when Fit runs, so a caller may pass a fresh object every render.
+  const fitObstructionRefsRef = useRef(fitObstructionRefs);
+  fitObstructionRefsRef.current = fitObstructionRefs;
+
+  // Measures what floats over the viewport's edges, in viewport coordinates.
+  const measureFitObstructions = useCallback((): FitObstructions => {
+    const viewportBounds = viewportRef.current?.getBoundingClientRect();
+    const refs = fitObstructionRefsRef.current;
+    if (!viewportBounds || !refs) {
+      return {};
+    }
+    const measure = (ref: RefObject<HTMLElement | null> | undefined): ViewportArea | null => {
+      const bounds = ref?.current?.getBoundingClientRect();
+      return bounds
+        ? {
+            left: bounds.left - viewportBounds.left,
+            top: bounds.top - viewportBounds.top,
+            width: bounds.width,
+            height: bounds.height,
+          }
+        : null;
+    };
+    return { top: measure(refs.top), left: measure(refs.left), right: measure(refs.right) };
+  }, []);
+
   const fitCanvasToViewport = useCallback(() => {
     if (viewportSize.width <= 0 || viewportSize.height <= 0) {
       return;
     }
 
-    const requestedZoom = clampZoom(
-      Math.min(
-        viewportSize.width / Math.max(canvasWidth, 1),
-        viewportSize.height / Math.max(canvasHeight, 1),
-      ) * 0.9,
+    const fit = fitCanvasToArea(
+      { width: canvasWidth, height: canvasHeight },
+      getFitArea(viewportSize, measureFitObstructions()),
+      getDevicePixelRatio(),
     );
-    const nextZoom = floorZoomToSeamFriendlyStep(requestedZoom, getDevicePixelRatio());
 
-    setZoom(nextZoom);
-    setAlignedPan({
-      x: (viewportSize.width - canvasWidth * nextZoom) / 2,
-      y: (viewportSize.height - canvasHeight * nextZoom) / 2,
-    });
-  }, [canvasHeight, canvasWidth, setAlignedPan, viewportSize.height, viewportSize.width]);
+    setZoom(fit.zoom);
+    setAlignedPan(fit.pan);
+  }, [canvasHeight, canvasWidth, measureFitObstructions, setAlignedPan, viewportSize]);
 
-  useEffect(() => {
+  const [viewportMeasured, setViewportMeasured] = useState(false);
+  useLayoutEffect(() => {
     const node = viewportRef.current;
     if (!node) {
       return;
+    }
+
+    const applySize = (width: number, height: number) => {
+      setViewportSize({
+        width: Math.max(320, Math.round(width)),
+        height: Math.max(320, Math.round(height)),
+      });
+      setViewportMeasured(true);
+    };
+
+    // Measure before the first paint: the ResizeObserver reports only after
+    // it, and the first fit would otherwise use the default size.
+    const bounds = node.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0) {
+      applySize(bounds.width, bounds.height);
     }
 
     const observer = new ResizeObserver((entries) => {
@@ -90,24 +140,26 @@ export function useCanvasViewport({
       if (!entry) {
         return;
       }
-      const { width, height } = entry.contentRect;
-      setViewportSize({
-        width: Math.max(320, Math.round(width)),
-        height: Math.max(320, Math.round(height)),
-      });
+      applySize(entry.contentRect.width, entry.contentRect.height);
     });
 
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
 
-  const hasFittedRef = useRef(false);
-  useEffect(() => {
-    if (!hasFittedRef.current) {
-      fitCanvasToViewport();
-      hasFittedRef.current = true;
+  // Fit once on mount, and once more when the first measurement replaces the
+  // default viewport size. The second fit also sees the toolbar, tool palette
+  // and inspector panel, which come later in the app and so get their refs
+  // attached only after this component's first layout effects.
+  const initialFitRef = useRef<'none' | 'default-size' | 'measured'>('none');
+  useLayoutEffect(() => {
+    const target = viewportMeasured ? 'measured' : 'default-size';
+    if (initialFitRef.current === 'measured' || initialFitRef.current === target) {
+      return;
     }
-  }, [fitCanvasToViewport]);
+    fitCanvasToViewport();
+    initialFitRef.current = target;
+  }, [fitCanvasToViewport, viewportMeasured]);
 
   // Sync refs during render (not in useEffect) so stable callbacks
   // read current values in the same render pass that changes zoom/pan.

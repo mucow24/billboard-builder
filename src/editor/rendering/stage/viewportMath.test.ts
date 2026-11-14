@@ -4,7 +4,11 @@ import {
   alignToDevicePixels,
   alignViewportPanToDevicePixels,
   clampZoom,
+  fitCanvasToArea,
   floorZoomToSeamFriendlyStep,
+  getFitArea,
+  MIN_FIT_AREA_HEIGHT,
+  MIN_FIT_AREA_WIDTH,
   snapZoomToSeamFriendlyStep,
   toCanvasPointer,
   toOverlayStyle,
@@ -32,6 +36,82 @@ describe('viewportMath', () => {
     expect(snapZoomToSeamFriendlyStep(0.8, 1)).toBe(0.796875);
     expect(snapZoomToSeamFriendlyStep(0.33, 1)).toBe(0.328125);
     expect(floorZoomToSeamFriendlyStep(0.6328125, 1)).toBe(0.625);
+  });
+
+  const toolbar = { left: 0, top: 0, width: 1280, height: 50 };
+  const toolPalette = { left: 7, top: 50, width: 40, height: 400 };
+  const panel = { left: 956, top: 50, width: 317, height: 662 };
+
+  it('fits below the toolbar, right of the tool palette and left of the panel', () => {
+    const viewportSize = { width: 1280, height: 720 };
+
+    expect(getFitArea(viewportSize, {})).toEqual({ left: 0, top: 0, width: 1280, height: 720 });
+    expect(getFitArea(viewportSize, { top: toolbar, left: toolPalette, right: panel })).toEqual({
+      left: 47,
+      top: 50,
+      width: 909,
+      height: 670,
+    });
+    expect(getFitArea(viewportSize, { right: panel })).toEqual({ left: 0, top: 0, width: 956, height: 720 });
+  });
+
+  it('ignores what is hidden or outside the viewport', () => {
+    const viewportSize = { width: 1280, height: 720 };
+    // An element with display: none measures as an empty rect at the origin.
+    const hidden = { left: 0, top: 0, width: 0, height: 0 };
+
+    expect(getFitArea(viewportSize, { top: toolbar, left: toolPalette, right: hidden })).toEqual({
+      left: 47,
+      top: 50,
+      width: 1233,
+      height: 670,
+    });
+    expect(getFitArea(viewportSize, { top: hidden, left: hidden, right: hidden })).toEqual({
+      left: 0,
+      top: 0,
+      width: 1280,
+      height: 720,
+    });
+    expect(getFitArea(viewportSize, { right: { ...panel, left: 1300 } })).toEqual({
+      left: 0,
+      top: 0,
+      width: 1280,
+      height: 720,
+    });
+  });
+
+  it('ignores the panel when it leaves too little room, and then everything', () => {
+    const narrow = { width: 640, height: 720 };
+    const obstructions = { top: toolbar, left: toolPalette };
+
+    expect(
+      getFitArea(narrow, { ...obstructions, right: { ...panel, left: 47 + MIN_FIT_AREA_WIDTH } }),
+    ).toEqual({ left: 47, top: 50, width: MIN_FIT_AREA_WIDTH, height: 670 });
+    expect(
+      getFitArea(narrow, { ...obstructions, right: { ...panel, left: 47 + MIN_FIT_AREA_WIDTH - 1 } }),
+    ).toEqual({ left: 47, top: 50, width: 593, height: 670 });
+
+    const short = { width: 640, height: 50 + MIN_FIT_AREA_HEIGHT - 1 };
+    expect(getFitArea(short, { ...obstructions, right: panel })).toEqual({
+      left: 0,
+      top: 0,
+      width: 640,
+      height: 50 + MIN_FIT_AREA_HEIGHT - 1,
+    });
+  });
+
+  it('centers the fitted canvas in the area with a margin', () => {
+    expect(fitCanvasToArea({ width: 1024, height: 1024 }, { left: 0, top: 0, width: 1280, height: 720 }, 1)).toEqual({
+      zoom: 0.625,
+      pan: { x: 320, y: 40 },
+    });
+
+    // A wide canvas beside a panel: the area's width limits the zoom.
+    const fit = fitCanvasToArea({ width: 2000, height: 500 }, { left: 0, top: 0, width: 956, height: 720 }, 1);
+    expect(fit.zoom).toBe(0.421875);
+    expect(fit.pan.x).toBeCloseTo((956 - 2000 * 0.421875) / 2, 6);
+    expect(fit.pan.x + 2000 * fit.zoom).toBeLessThan(956);
+    expect(fit.pan.y).toBeCloseTo((720 - 500 * 0.421875) / 2, 6);
   });
 
   it('converts points between viewport and canvas spaces', () => {

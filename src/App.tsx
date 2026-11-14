@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { CanvasRendererHandle } from './editor/rendering/renderer/canvasRendererTypes';
 
@@ -52,6 +52,13 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
   const clipboardStatus = useStatusToast();
   const [topbarHeight, setTopbarHeight] = useState(56);
   const topbarRef = useRef<HTMLDivElement | null>(null);
+  const inspectorPanelRef = useRef<HTMLDivElement | null>(null);
+  const toolPaletteRef = useRef<HTMLDivElement | null>(null);
+  // Fit keeps the canvas clear of what floats over the stage's edges.
+  const fitObstructionRefs = useMemo(
+    () => ({ top: topbarRef, left: toolPaletteRef, right: inspectorPanelRef }),
+    [],
+  );
   const getRendererHandle = useCallback(() => stageRef.current, []);
 
   const {
@@ -173,6 +180,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
           showExportBoundsCue={showExportBoundsCue}
           guides={guides}
           onGuidesChange={setGuides}
+          fitObstructionRefs={fitObstructionRefs}
           stageRef={stageRef}
         />
 
@@ -238,6 +246,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             onInspectorTabChange={toggleInspectorTab}
             itemCount={layerRows.length}
             favoriteCount={favorites.length}
+            inspectorPanelRef={inspectorPanelRef}
             inspectorPanel={
               <PropertiesPanel
                 activeTab={inspectorTab}
@@ -307,7 +316,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
               </div>
             ) : null}
 
-            <div className="overlay-tools">
+            <div ref={toolPaletteRef} className="overlay-tools">
               <ToolPalette
                 activeTool={activeTool}
                 onChange={setActiveTool}
