@@ -15,6 +15,7 @@ import { buildStageDerivedState } from './stage/stageDerived';
 import { buildStageSceneHandlers } from './stage/stageHandlers';
 import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
 import { useCanvasViewport, type FitObstructionRefs } from './stage/useCanvasViewport';
+import { toOverlayStyle } from './stage/viewportMath';
 import { useEditorStore } from '../state/store';
 
 import { NOOP } from './noop';
@@ -74,6 +75,7 @@ export function CanvasStage({
     canvasHeight: document.canvas.height,
     canvasWidth: document.canvas.width,
     fitObstructionRefs,
+    onZoomToolGestureEnd: () => setActiveTool('select'),
   });
 
   const {
@@ -163,10 +165,6 @@ export function CanvasStage({
 
   const sceneHandlers = buildStageSceneHandlers({
     activeTool,
-    applyZoomToolClick: (point, zoomOut) => {
-      viewport.applyZoomToolClick(point, zoomOut);
-      setActiveTool('select');
-    },
     handleScenePointerUp: viewport.handleStagePointerUp,
     handleStageMouseDown,
     handleStagePointerMove,
@@ -174,6 +172,7 @@ export function CanvasStage({
     hasActiveSession: Boolean(session),
     isPanGesture: viewport.isPanGesture,
     startPanDrag: viewport.startPanDrag,
+    startZoomToolGesture: viewport.startZoomToolGesture,
     zoomInFromWheel: viewport.zoomInFromWheel,
   });
 
@@ -250,6 +249,14 @@ export function CanvasStage({
         viewportPan={viewport.pan}
         zoom={viewport.zoom}
       />
+      {viewport.zoomBox ? (
+        <div
+          className="canvas-zoom-box"
+          data-testid="canvas-zoom-box"
+          aria-hidden="true"
+          style={toOverlayStyle(viewport.zoomBox)}
+        />
+      ) : null}
       {debugMode ? (
         <CanvasStageDebug
           beginGroupDrag={beginGroupDrag}

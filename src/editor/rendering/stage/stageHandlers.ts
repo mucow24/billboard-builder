@@ -3,7 +3,6 @@ import type { CanvasTool } from '../../document/documentTypes';
 
 interface BuildStageSceneHandlersParams {
   activeTool: CanvasTool;
-  applyZoomToolClick: (point: { x: number; y: number }, zoomOut: boolean) => void;
   handleScenePointerUp: () => boolean;
   handleStageMouseDown: (event: CanvasPointerEvent) => void;
   handleStagePointerMove: (event: CanvasPointerEvent) => void;
@@ -11,12 +10,12 @@ interface BuildStageSceneHandlersParams {
   hasActiveSession: boolean;
   isPanGesture: (event: MouseEvent, hasActiveSession: boolean) => boolean;
   startPanDrag: (pointer: { x: number; y: number }) => void;
+  startZoomToolGesture: (pointer: { x: number; y: number }, zoomOut: boolean) => void;
   zoomInFromWheel: (point: { x: number; y: number }, deltaY: number) => void;
 }
 
 export function buildStageSceneHandlers({
   activeTool,
-  applyZoomToolClick,
   handleScenePointerUp,
   handleStageMouseDown,
   handleStagePointerMove,
@@ -24,6 +23,7 @@ export function buildStageSceneHandlers({
   hasActiveSession,
   isPanGesture,
   startPanDrag,
+  startZoomToolGesture,
   zoomInFromWheel,
 }: BuildStageSceneHandlersParams) {
   return {
@@ -36,7 +36,9 @@ export function buildStageSceneHandlers({
         return;
       }
       if (activeTool === 'zoom' && pointer) {
-        applyZoomToolClick(pointer, Boolean(nativeEvent.altKey));
+        if (nativeEvent.button === 0) {
+          startZoomToolGesture(pointer, Boolean(nativeEvent.altKey));
+        }
         return;
       }
       handleStageMouseDown(event);

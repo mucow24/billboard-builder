@@ -1,13 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import {
+  beginCanvasDrag,
   clickEmptyCanvas,
   createGroupNodeFixture,
   createGroupedProjectDocument,
   dragEmptyCanvas,
+  movePointerToCanvasPoint,
   openFreshEditor,
   openLayersTab,
   readStageDebug,
+  releasePointer,
   selectTool,
   createRectangleFixture,
   createTextFixture,
@@ -163,6 +166,91 @@ test.describe('editor smoke flows', () => {
       })
       .toBeLessThan(2);
     expectCenteredWithMargin(await readFitMargins(stageBox.width));
+  });
+
+  test('zooms two steps per zoom tool click, and to a dragged box clear of the toolbar, tool palette and panel', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+
+    const [canvasWidth, canvasHeight] = ((await page.getByTestId('canvas-size').textContent()) ?? '')
+      .split('x')
+      .map((value) => Number(value.trim()));
+    const devicePixelRatio = await page.evaluate(() => window.devicePixelRatio);
+    const zoomGrid = ZOOM_ALIGNMENT_GRID * devicePixelRatio;
+    const selectButton = page.getByRole('button', { name: 'Select (V)' });
+
+    // A click zooms in by two wheel steps (1.2 squared), then the tool goes
+    // back to Select.
+    const initialZoom = (await readStageDebug(page)).viewport.zoom;
+    await selectTool(page, 'Zoom');
+    await clickEmptyCanvas(page, { x: canvasWidth / 2, y: canvasHeight / 2 });
+    await expect(selectButton).toHaveAttribute('aria-pressed', 'true');
+    const clicked = await expectVisibleAlignedZoom(page);
+    expect(clicked.viewport.zoom).toBeCloseTo(Math.round(initialZoom * 1.44 * zoomGrid) / zoomGrid, 9);
+
+    await page.getByRole('button', { name: 'Fit canvas to viewport' }).click();
+    await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBe(initialZoom);
+
+    const [stageBox, toolbarBox, paletteBox, panelBox] = await Promise.all([
+      page.getByTestId('canvas-stage-root').boundingBox(),
+      page.locator('.overlay-topbar').boundingBox(),
+      page.locator('.overlay-tools').boundingBox(),
+      page.locator('.top-toolbar-inspector-panel').boundingBox(),
+    ]);
+    if (!stageBox || !toolbarBox || !paletteBox || !panelBox) {
+      throw new Error('The stage, toolbar, tool palette or properties panel has no layout box.');
+    }
+    // The room clear of all three, in stage coordinates.
+    const area = {
+      left: paletteBox.x + paletteBox.width - stageBox.x,
+      top: toolbarBox.y + toolbarBox.height - stageBox.y,
+      right: panelBox.x - stageBox.x,
+      bottom: stageBox.height,
+    };
+
+    // Drag a box over a wide strip of the canvas; it shows while dragging.
+    const from = { x: canvasWidth * 0.2, y: canvasHeight * 0.3 };
+    const to = { x: canvasWidth * 0.45, y: canvasHeight * 0.4 };
+    await selectTool(page, 'Zoom');
+    await beginCanvasDrag(page, from);
+    await movePointerToCanvasPoint(page, to);
+    const zoomBox = page.getByTestId('canvas-zoom-box');
+    await expect(zoomBox).toBeVisible();
+    const fitted = await readStageDebug(page);
+    const shownBox = await zoomBox.boundingBox();
+    if (!shownBox) {
+      throw new Error('The zoom box has no layout box.');
+    }
+    const expectedBox = {
+      x: stageBox.x + fitted.viewport.panX + from.x * fitted.viewport.zoom,
+      y: stageBox.y + fitted.viewport.panY + from.y * fitted.viewport.zoom,
+      width: (to.x - from.x) * fitted.viewport.zoom,
+      height: (to.y - from.y) * fitted.viewport.zoom,
+    };
+    for (const side of ['x', 'y', 'width', 'height'] as const) {
+      expect(Math.abs(shownBox[side] - expectedBox[side])).toBeLessThan(1.5);
+    }
+
+    // Releasing zooms so that strip fills the room across, centered in it.
+    await releasePointer(page);
+    await expect(zoomBox).toHaveCount(0);
+    await expect(selectButton).toHaveAttribute('aria-pressed', 'true');
+    const { viewport } = await expectVisibleAlignedZoom(page);
+    expect(viewport.zoom).toBeGreaterThan(fitted.viewport.zoom);
+    const shown = {
+      left: viewport.panX + from.x * viewport.zoom,
+      top: viewport.panY + from.y * viewport.zoom,
+      right: viewport.panX + to.x * viewport.zoom,
+      bottom: viewport.panY + to.y * viewport.zoom,
+    };
+    expect(shown.left).toBeGreaterThanOrEqual(area.left - 1);
+    expect(shown.right).toBeLessThanOrEqual(area.right + 1);
+    expect(shown.top).toBeGreaterThanOrEqual(area.top - 1);
+    expect(shown.bottom).toBeLessThanOrEqual(area.bottom + 1);
+    expect((shown.right - shown.left) / (area.right - area.left)).toBeGreaterThan(0.95);
+    expect(Math.abs((shown.left + shown.right) / 2 - (area.left + area.right) / 2)).toBeLessThan(1);
+    expect(Math.abs((shown.top + shown.bottom) / 2 - (area.top + area.bottom) / 2)).toBeLessThan(1);
   });
 
   test('zooms to a percentage typed into the zoom readout', async ({ page }) => {

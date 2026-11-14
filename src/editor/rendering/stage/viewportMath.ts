@@ -187,6 +187,40 @@ export function fitCanvasToArea(
   };
 }
 
+// The zoom and pan that show `rect`, in canvas coordinates, as large as it
+// fits in `area` and centered there: where a box dragged with the zoom tool
+// takes the view. A side of zero length puts no limit on the zoom.
+export function fitRectToArea(
+  rect: { x: number; y: number; width: number; height: number },
+  area: ViewportArea,
+  devicePixelRatio: number,
+): { zoom: number; pan: Point } {
+  const zoomForSide = (room: number, length: number) =>
+    length > 0 ? room / length : Number.POSITIVE_INFINITY;
+  const requestedZoom = clampZoom(
+    Math.min(zoomForSide(area.width, rect.width), zoomForSide(area.height, rect.height)),
+  );
+  const zoom = floorZoomToSeamFriendlyStep(requestedZoom, devicePixelRatio);
+
+  return {
+    zoom,
+    pan: {
+      x: area.left + area.width / 2 - (rect.x + rect.width / 2) * zoom,
+      y: area.top + area.height / 2 - (rect.y + rect.height / 2) * zoom,
+    },
+  };
+}
+
+// The rectangle spanned by two corners, in any order.
+export function rectFromCorners(a: Point, b: Point): ViewportArea {
+  return {
+    left: Math.min(a.x, b.x),
+    top: Math.min(a.y, b.y),
+    width: Math.abs(b.x - a.x),
+    height: Math.abs(b.y - a.y),
+  };
+}
+
 export function toCanvasPointer(pointer: Point, zoom: number, pan: Point): Point {
   return {
     x: (pointer.x - pan.x) / zoom,
