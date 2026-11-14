@@ -51,6 +51,7 @@ import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
 import { measureTextBaselineShift } from './textBaselineShift';
 import { measureTextRasterPadding } from './textRasterPadding';
+import { registerZoomScaledFilter } from './zoomScaledFilters';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
 const ZERO_PIVOT = { x: 0, y: 0 } as const;
@@ -722,8 +723,11 @@ const PixiItemView = memo(function PixiItemView({
     const dpr = window.devicePixelRatio || 1;
     const maxTextureSize = getMaxTextureSize();
     const itemMaxDim = Math.max(renderBox.width, renderBox.height, 1);
+    // Every zoom-dependent setting is written by the function registered with
+    // the filter, so the PNG export can set the same filters for its own 1:1
+    // scale and put them back (see zoomScaledFilters.ts).
     if (item.blurRadius > 0) {
-      const strength = item.blurRadius * zoom;
+      const blurRadius = item.blurRadius;
       // ClampingBlurFilter is a Gaussian BlurFilter with shaders that clamp
       // sample UVs to the input texture's active frame (uInputClamp).
       // Pixi's stock BlurFilter samples raw UVs; TexturePool reuses power-
@@ -731,43 +735,54 @@ const PixiItemView = memo(function PixiItemView({
       // keep stale data from previous use, and the blur kernel pulls those
       // bright values into the result. Clamping eliminates that read.
       const blurFilter = new ClampingBlurFilter({
-        strength,
+        strength: blurRadius * zoom,
         clipToViewport: false,
       });
-      // With clamping in place, padding determines where the visible blur
-      // halo ends. Pixi's auto-padding (strength*2) cuts the Gaussian tail
-      // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
-      // so pad to 6× for a smooth fadeout.
-      blurFilter.padding = strength * 6;
-      const blurRegionPx = (itemMaxDim + blurFilter.padding * 2) * zoom;
-      blurFilter.resolution = clampRasterResolution(dpr, blurRegionPx, maxTextureSize);
-      filters.push(blurFilter);
+      filters.push(
+        registerZoomScaledFilter(blurFilter, zoom, dpr, (filterZoom, baseResolution) => {
+          const strength = blurRadius * filterZoom;
+          blurFilter.strength = strength;
+          // With clamping in place, padding determines where the visible blur
+          // halo ends. Pixi's auto-padding (strength*2) cuts the Gaussian tail
+          // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
+          // so pad to 6× for a smooth fadeout.
+          blurFilter.padding = strength * 6;
+          const blurRegionPx = (itemMaxDim + blurFilter.padding * 2) * filterZoom;
+          blurFilter.resolution = clampRasterResolution(baseResolution, blurRegionPx, maxTextureSize);
+        }),
+      );
     }
     if (item.kind !== 'text') {
       const s = item.shadow;
       const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
       if (hasShadow) {
-        const shadowBlur = (s.blur / 2) * zoom;
-        const shadowOffsetX = s.offsetX * zoom;
-        const shadowOffsetY = s.offsetY * zoom;
         const shadowFilter = new DropShadowFilter({
           color: s.color,
           alpha: s.opacity,
-          blur: shadowBlur,
-          offset: { x: shadowOffsetX, y: shadowOffsetY },
+          blur: (s.blur / 2) * zoom,
+          offset: { x: s.offsetX * zoom, y: s.offsetY * zoom },
           quality: 8,
         });
         shadowFilter.clipToViewport = false;
-        // DropShadowFilter wraps a Kawase blur whose reach scales with
-        // blur × quality. Auto-padding (offset + blur*2 + quality*4) clips
-        // the tail; extend it the same way as BlurFilter.
-        shadowFilter.padding =
-          Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
-          shadowBlur * 6 +
-          32;
-        const shadowRegionPx = (itemMaxDim + shadowFilter.padding * 2) * zoom;
-        shadowFilter.resolution = clampRasterResolution(dpr, shadowRegionPx, maxTextureSize);
-        filters.push(shadowFilter);
+        filters.push(
+          registerZoomScaledFilter(shadowFilter, zoom, dpr, (filterZoom, baseResolution) => {
+            const shadowBlur = (s.blur / 2) * filterZoom;
+            const shadowOffsetX = s.offsetX * filterZoom;
+            const shadowOffsetY = s.offsetY * filterZoom;
+            shadowFilter.blur = shadowBlur;
+            shadowFilter.offset = { x: shadowOffsetX, y: shadowOffsetY };
+            // DropShadowFilter wraps a Kawase blur whose reach scales with
+            // blur × quality. Auto-padding (offset + blur*2 + quality*4) clips
+            // the tail; extend it the same way as BlurFilter. Set last: the
+            // blur and offset setters reset the padding to the auto value.
+            shadowFilter.padding =
+              Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
+              shadowBlur * 6 +
+              32;
+            const shadowRegionPx = (itemMaxDim + shadowFilter.padding * 2) * filterZoom;
+            shadowFilter.resolution = clampRasterResolution(baseResolution, shadowRegionPx, maxTextureSize);
+          }),
+        );
       }
     }
     return filters.length > 0 ? filters : undefined;
