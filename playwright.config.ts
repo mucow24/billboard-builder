@@ -37,7 +37,16 @@ export default defineConfig({
       height: 1200,
     },
     launchOptions: {
-      args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
+      // --force_high_performance_gpu: on laptops with two GPUs, Chromium's
+      // D3D11 backend otherwise picks the integrated one, and eight workers
+      // drawing WebGL on it starve the desktop compositor until the machine
+      // stops responding to input. With one GPU the flag changes nothing.
+      args: [
+        '--use-angle=d3d11',
+        '--enable-gpu',
+        '--ignore-gpu-blocklist',
+        '--force_high_performance_gpu',
+      ],
     },
   },
   webServer: {
