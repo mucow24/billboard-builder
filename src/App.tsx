@@ -59,6 +59,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       answerLeavePrompt,
       closeLibrary,
       deleteLibraryDocument,
+      duplicateLibraryDocument,
       exportLibraryDocument,
       handleExportJson,
       handleRevert,
@@ -204,7 +205,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             onCanvasSizeChange={setCanvasSize}
             onDelete={deleteSelectedNodes}
             onExport={() => handleExport(stageRef.current)}
-            onExportJson={handleExportJson}
+            onSaveToJson={handleExportJson}
             onExportSvg={() => {
               void handleExportSvg();
             }}
@@ -342,6 +343,9 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
           onRename={renameLibraryDocument}
           onDelete={(id) => {
             void deleteLibraryDocument(id);
+          }}
+          onDuplicate={(id) => {
+            void duplicateLibraryDocument(id);
           }}
           onExportJson={(id) => {
             void exportLibraryDocument(id);

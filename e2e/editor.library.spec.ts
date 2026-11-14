@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
   captureDownload,
   clickItem,
+  clickCanvasSaveItem,
   clickToolbarPopoverItem,
   createProjectDocument,
   createRectangleFixture,
@@ -11,6 +12,7 @@ import {
   openLayersTab,
   openLibrary,
   readDownloadedJson,
+  saveToLibrary,
   unsavedChangesPrompt,
   uploadProject,
   waitForEditor,
@@ -36,7 +38,8 @@ function layerRows(page: Page) {
 async function expectSaveAndRevert(page: Page, expected: { save: boolean; revert: boolean }) {
   await page.getByRole('button', { name: 'Canvas', exact: true }).click();
   const menu = page.getByRole('group', { name: 'Canvas actions' });
-  const save = menu.getByRole('button', { name: 'Save', exact: true });
+  await menu.getByRole('button', { name: 'Save', exact: true }).click();
+  const save = menu.getByRole('button', { name: 'To library', exact: true });
   const revert = menu.getByRole('button', { name: 'Revert', exact: true });
   await (expected.save ? expect(save).toBeEnabled() : expect(save).toBeDisabled());
   await (expected.revert ? expect(revert).toBeEnabled() : expect(revert).toBeDisabled());
@@ -84,7 +87,7 @@ async function openEditorWithAlphaAndBeta(page: Page) {
     namedDocument('Alpha', [createRectangleFixture({ id: 'alpha-rect' })]),
     'alpha.json',
   );
-  await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+  await saveToLibrary(page);
   await clickToolbarPopoverItem(page, 'Canvas', 'New');
   await uploadProject(
     page,
@@ -94,7 +97,7 @@ async function openEditorWithAlphaAndBeta(page: Page) {
     ]),
     'beta.json',
   );
-  await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+  await saveToLibrary(page);
   await expect(unsavedDot(page)).toHaveCount(0);
 }
 
@@ -121,7 +124,7 @@ test.describe('document library', () => {
     await expect(unsavedDot(page)).toBeVisible();
     await expectSaveAndRevert(page, { save: true, revert: false });
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+    await saveToLibrary(page);
     await expect(unsavedDot(page)).toHaveCount(0);
     await expectSaveAndRevert(page, { save: false, revert: false });
 
@@ -158,7 +161,7 @@ test.describe('document library', () => {
       ]),
       'poster.json',
     );
-    await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+    await saveToLibrary(page);
     await expect(unsavedDot(page)).toHaveCount(0);
 
     // A saved canvas comes back from a reload with nothing unsaved.
@@ -285,7 +288,7 @@ test.describe('document library', () => {
       }),
     ];
     await uploadProject(page, document, 'red.json');
-    await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+    await saveToLibrary(page);
 
     // Previews are not read at startup: after a reload the library fetches
     // them from storage when it opens.
@@ -319,6 +322,16 @@ test.describe('document library', () => {
     expect(Math.max(sample.width, sample.height)).toBeLessThanOrEqual(480);
     expect(sample.width / sample.height).toBeCloseTo(document.canvas.width / document.canvas.height, 1);
     expect(sample).toMatchObject({ red: 255, green: 0, blue: 0, alpha: 255 });
+
+    // Shown in those proportions too: the box around it is not filled out with
+    // checkerboard, so canvases of different shapes look different.
+    const shown = await preview.boundingBox();
+    const box = await dialog.getByRole('button', { name: 'Open Red' }).boundingBox();
+    if (!shown || !box) {
+      throw new Error('The preview is not laid out.');
+    }
+    expect(shown.width / shown.height).toBeCloseTo(document.canvas.width / document.canvas.height, 1);
+    expect(shown.width * shown.height).toBeLessThan(box.width * box.height * 0.9);
   });
 
   test('LIB-06 renames canvases from the library and from the toolbar, without marking them unsaved', async ({ page }) => {
@@ -361,10 +374,10 @@ test.describe('document library', () => {
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha renamed');
   });
 
-  test('LIB-07 exports a library canvas as JSON, and the open canvas from the Export menu', async ({ page }) => {
+  test('LIB-07 exports a library canvas as JSON, and the open canvas from Canvas > Save > To JSON', async ({ page }) => {
     await openEditorWithAlphaAndBeta(page);
 
-    // An unsaved change to the open canvas: only Export > JSON includes it.
+    // An unsaved change to the open canvas: only Save > To JSON includes it.
     await clickItem(page, 'beta-rect');
     await page.keyboard.press('Delete');
     await expect(unsavedDot(page)).toBeVisible();
@@ -387,11 +400,50 @@ test.describe('document library', () => {
     await closeLibrary(page);
 
     const workingDownload = await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Export', 'JSON');
+      await clickCanvasSaveItem(page, 'To JSON');
     });
     expect(workingDownload.suggestedFilename()).toBe('Beta.json');
     const workingBeta = await readDownloadedJson(workingDownload);
     expect(workingBeta.nodes).toEqual([expect.objectContaining({ id: 'beta-text' })]);
+
+    // Canvas > Save > To JSON is the same download, and leaves the changes unsaved.
+    const savedToJson = await captureDownload(page, async () => {
+      await clickCanvasSaveItem(page, 'To JSON');
+    });
+    expect(savedToJson.suggestedFilename()).toBe('Beta.json');
+    expect((await readDownloadedJson(savedToJson)).nodes).toEqual([
+      expect.objectContaining({ id: 'beta-text' }),
+    ]);
+    await expect(unsavedDot(page)).toBeVisible();
+  });
+
+  test('LIB-12 duplicates a library canvas without leaving the open one', async ({ page }) => {
+    await openEditorWithAlphaAndBeta(page);
+
+    let dialog = await openLibrary(page);
+    await dialog.getByRole('button', { name: 'Duplicate Alpha' }).click();
+    await expect(libraryCards(dialog)).toHaveCount(3);
+    expect(await libraryNames(dialog)).toEqual(['Alpha copy', 'Beta', 'Alpha']);
+    await expect(dialog.getByRole('button', { name: 'Open Alpha copy' }).locator('img')).toHaveAttribute(
+      'src',
+      /^data:image\/png;base64,/,
+    );
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta');
+
+    // The copy is a canvas of its own: renaming it leaves Alpha alone.
+    await dialog.getByRole('button', { name: 'Open Alpha copy' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha copy');
+    await expect(unsavedDot(page)).toHaveCount(0);
+    expect((await readPersistedCanvasDocument(page))?.nodes).toEqual([
+      expect.objectContaining({ id: 'alpha-rect' }),
+    ]);
+
+    dialog = await openLibrary(page);
+    await dialog.getByRole('button', { name: 'Duplicate Alpha copy' }).click();
+    await expect(libraryCards(dialog)).toHaveCount(4);
+    expect((await libraryNames(dialog))[0]).toBe('Alpha copy 2');
+    await expect(dialog.locator('.library-card-date').first()).toHaveText(/^Saved \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   });
 
   test('LIB-08 deletes canvases from the library after asking, including the open one', async ({ page }) => {
@@ -468,7 +520,7 @@ test.describe('document library', () => {
     await expect(layerRows(page)).toHaveCount(1);
     await expect(unsavedDot(page)).toBeVisible();
 
-    await clickToolbarPopoverItem(page, 'Canvas', 'Save');
+    await saveToLibrary(page);
     await clickItem(page, 'alpha-rect');
     await page.keyboard.press('Delete');
     await expect(layerRows(page)).toHaveCount(0);

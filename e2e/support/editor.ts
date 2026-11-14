@@ -1441,6 +1441,20 @@ export async function clickCanvasLoadItem(page: Page, itemName: string) {
   await canvasMenu.getByRole('button', { name: itemName, exact: true }).click();
 }
 
+/** Clicks an item of the Canvas > Save submenu: 'To library' or 'To JSON'. */
+export async function clickCanvasSaveItem(page: Page, itemName: string) {
+  await openToolbarPopover(page, 'Canvas');
+  const canvasMenu = page.getByRole('group', { name: 'Canvas actions' });
+  await canvasMenu.getByRole('button', { name: 'Save', exact: true }).click();
+  await canvasMenu.getByRole('button', { name: itemName, exact: true }).click();
+}
+
+/** Canvas > Save > To library, and waits for the save to be over. */
+export async function saveToLibrary(page: Page) {
+  await clickCanvasSaveItem(page, 'To library');
+  await waitForLibraryIdle(page);
+}
+
 /** Starts Canvas > Load > From JSON and returns its file chooser. */
 export async function startProjectFileChooser(page: Page): Promise<FileChooser> {
   const [chooser] = await Promise.all([
@@ -1680,11 +1694,11 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
   return download;
 }
 
-/** Downloads the canvas as it is in the editor (Export > JSON) and reads the file. */
+/** Downloads the canvas as it is in the editor (Canvas > Save > To JSON) and reads the file. */
 export async function saveAndReadProject(page: Page) {
   return readDownloadedJson(
     await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Export', 'JSON');
+      await clickCanvasSaveItem(page, 'To JSON');
     }),
   );
 }

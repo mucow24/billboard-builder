@@ -43,6 +43,26 @@ interface UseDocumentLibraryControllerArgs {
   setErrorMessage: (message: string | null) => void;
 }
 
+/**
+ * The name for a copy of a document named `name`: "<name> copy", or
+ * "<name> copy 2", "<name> copy 3"... when the library already has that name.
+ * A copy of a copy counts on from it, rather than getting "copy copy".
+ */
+export function nameForCopy(name: string, takenNames: Iterable<string>): string {
+  const taken = new Set(takenNames);
+  const base = name.replace(/ copy(?: \d+)?$/, '');
+  const first = `${base} copy`;
+  if (!taken.has(first)) {
+    return first;
+  }
+  for (let index = 2; ; index++) {
+    const candidate = `${first} ${index}`;
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+}
+
 /** Registers the stored uploaded fonts a document is about to need. Never fails. */
 async function restoreUploadedFonts(references: DocumentFontReference[]) {
   const { editor, registerAvailableFont } = useEditorStore.getState();
@@ -390,6 +410,59 @@ export function useDocumentLibraryController({
       });
     }
 
+    /**
+     * Adds a copy of the saved version of a library document to the library,
+     * with its preview, under a name of its own. The document in the editor
+     * stays open.
+     */
+    function duplicateLibraryDocument(id: string): Promise<boolean> {
+      return runExclusive(false, async () => {
+        const session = useDocumentLibrarySession.getState();
+        const entry = session.entries.find((candidate) => candidate.id === id);
+        if (!entry) {
+          return false;
+        }
+        try {
+          const libraryDocument = await defaultDocumentLibraryService.loadDocument(entry);
+          if (!libraryDocument) {
+            throw new Error('It is no longer in the library.');
+          }
+          let preview = session.previews[id] ?? null;
+          if (preview === null) {
+            try {
+              preview = (await defaultDocumentLibraryService.loadPreviews())[id] ?? null;
+            } catch (error) {
+              console.warn('The preview of the duplicated document could not be read.', error);
+            }
+          }
+
+          const now = Date.now();
+          const copy: DocumentLibraryEntry = {
+            id: crypto.randomUUID(),
+            name: nameForCopy(
+              entry.name,
+              session.entries.map((candidate) => candidate.name),
+            ),
+            createdAt: now,
+            updatedAt: now,
+            fonts: entry.fonts,
+          };
+          await defaultDocumentLibraryService.save(copy, libraryDocument, preview);
+          useDocumentLibrarySession.setState((state) => ({
+            entries: upsertLibraryEntry(state.entries, copy),
+            previews: preview === null ? state.previews : { ...state.previews, [copy.id]: preview },
+          }));
+          setErrorMessage(null);
+          return true;
+        } catch (error) {
+          setErrorMessage(
+            `Failed to duplicate "${entry.name}": ${getErrorMessage(error, 'Unknown error.')}`,
+          );
+          return false;
+        }
+      });
+    }
+
     /** Downloads the saved version of a library document as a JSON project file. */
     async function exportLibraryDocument(id: string): Promise<boolean> {
       const entry = useDocumentLibrarySession
@@ -439,6 +512,7 @@ export function useDocumentLibraryController({
       importProjectFile,
       renameLibraryDocument,
       deleteLibraryDocument,
+      duplicateLibraryDocument,
       exportLibraryDocument,
       loadLibraryPreviews,
     };

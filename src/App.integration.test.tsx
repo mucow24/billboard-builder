@@ -290,7 +290,9 @@ describe('App integration', () => {
 
     await renderApp();
 
-    clickToolbarPopoverItem('Export', 'JSON');
+    fireEvent.click(screen.getByRole('button', { name: 'Canvas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'To JSON' }));
     clickToolbarPopoverItem('Export', 'PNG');
 
     expect(mockDownloadProject).toHaveBeenCalledOnce();

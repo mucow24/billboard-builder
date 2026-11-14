@@ -59,7 +59,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onLoadFromJson: vi.fn(),
     onLoadFromLibrary: vi.fn(),
     onRevert: vi.fn(),
-    onExportJson: vi.fn(),
+    onSaveToJson: vi.fn(),
     canRevert: false,
     hasUnsavedChanges: false,
     onNewProject: vi.fn(),
@@ -144,11 +144,13 @@ describe('Toolbar', () => {
     const onLoadFromLibrary = vi.fn();
     const onRevert = vi.fn();
     const onSave = vi.fn();
+    const onSaveToJson = vi.fn();
     const onNewProject = vi.fn();
 
     renderToolbar({
       canRevert: true,
       hasUnsavedChanges: true,
+      onSaveToJson,
       onLoadFromJson,
       onLoadFromLibrary,
       onNewProject,
@@ -169,7 +171,14 @@ describe('Toolbar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'To library' }));
     expect(onSave).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('group', { name: 'Canvas actions' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getByRole('button', { name: 'To JSON' }));
+    expect(onSaveToJson).toHaveBeenCalledOnce();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Revert' }));
@@ -190,8 +199,11 @@ describe('Toolbar', () => {
     expect(screen.queryByRole('img', { name: 'Unsaved changes' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    const save = screen.getByRole('button', { name: 'Save' });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const save = screen.getByRole('button', { name: 'To library' });
     const revert = screen.getByRole('button', { name: 'Revert' });
+    // Saving to JSON is always possible.
+    expect(screen.getByRole('button', { name: 'To JSON' })).toBeEnabled();
     expect(save).toBeDisabled();
     expect(revert).toBeDisabled();
     await user.click(save);
@@ -208,19 +220,19 @@ describe('Toolbar', () => {
     expect(screen.getByRole('img', { name: 'Unsaved changes' })).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('button', { name: 'To library' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Revert' })).toBeDisabled();
   });
 
-  it('exports the canvas as JSON from the Export menu', async () => {
+  it('offers JSON under Canvas > Save, not in the Export menu', async () => {
     const user = userEvent.setup();
-    const onExportJson = vi.fn();
 
-    renderToolbar({ onExportJson });
+    renderToolbar();
 
     await user.click(screen.getByRole('button', { name: /^Export/ }));
-    await user.click(screen.getByRole('button', { name: 'JSON' }));
-    expect(onExportJson).toHaveBeenCalledOnce();
+    expect(screen.getByRole('group', { name: 'Export actions' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /JSON/ })).not.toBeInTheDocument();
   });
 
   it('publishes export-intent activity on hover and focus for the export trigger', async () => {
