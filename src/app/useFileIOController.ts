@@ -110,7 +110,7 @@ export function useFileIOController({
     }
   }
 
-  /** Export > JSON: downloads the document as it is in the editor, unsaved changes included. */
+  /** Canvas > Save > To JSON: downloads the document as it is in the editor, unsaved changes included. */
   function handleExportJson() {
     const basename = sanitizeBasename(document.name, DEFAULT_CANVAS_NAME);
     downloadProject(document, `${basename}.json`);

@@ -110,6 +110,7 @@ describe('UnsavedChangesDialog', () => {
           onOpen={vi.fn()}
           onRename={vi.fn()}
           onDelete={vi.fn()}
+          onDuplicate={vi.fn()}
           onExportJson={vi.fn()}
         />
         <UnsavedChangesDialog canvasName="Poster" neverSaved={false} onAnswer={onAnswer} />

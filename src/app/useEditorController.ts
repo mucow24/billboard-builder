@@ -269,6 +269,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       openLibraryDocument: library.openLibraryDocument,
       renameLibraryDocument: library.renameLibraryDocument,
       deleteLibraryDocument: library.deleteLibraryDocument,
+      duplicateLibraryDocument: library.duplicateLibraryDocument,
       exportLibraryDocument: library.exportLibraryDocument,
       moveNode,
       nudgeSelectedNodes,

@@ -28,6 +28,7 @@ function renderDialog(overrides: Partial<Parameters<typeof DocumentLibraryDialog
     onOpen: vi.fn(),
     onRename: vi.fn(),
     onDelete: vi.fn(),
+    onDuplicate: vi.fn(),
     onExportJson: vi.fn(),
     ...overrides,
   };
@@ -111,6 +112,25 @@ describe('DocumentLibraryDialog', () => {
     expect(props.onOpen).toHaveBeenCalledExactlyOnceWith('poster');
   });
 
+  it('shows when each document was saved as YYYY-MM-DD HH:MM, in full in its tooltip', () => {
+    const savedAt = new Date(2026, 2, 7, 14, 5).getTime();
+    renderDialog({ entries: [createEntry({ updatedAt: savedAt })] });
+
+    const date = card('Poster').getByText('Saved 2026-03-07 14:05');
+    expect(date).toBeVisible();
+    expect(date.getAttribute('title')).toMatch(/^Saved .*2026/);
+  });
+
+  it('duplicates a document', async () => {
+    const user = userEvent.setup();
+    const { props } = renderDialog();
+
+    await user.click(screen.getByRole('button', { name: 'Duplicate Poster' }));
+
+    expect(props.onDuplicate).toHaveBeenCalledExactlyOnceWith('poster');
+    expect(props.onOpen).not.toHaveBeenCalled();
+  });
+
   it('exports a document as JSON', async () => {
     const user = userEvent.setup();
     const { props } = renderDialog();
@@ -181,6 +201,9 @@ describe('DocumentLibraryDialog', () => {
       await user.click(screen.getByRole('button', { name: 'Delete Poster' }));
 
       expect(props.onDelete).not.toHaveBeenCalled();
+      // The question takes the place of the buttons, not of the name.
+      expect(card('Poster').getByText('Poster')).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Duplicate Poster' })).not.toBeInTheDocument();
       const confirmation = within(screen.getByRole('group', { name: 'Delete Poster?' }));
       expect(confirmation.getByRole('button', { name: 'Cancel' })).toHaveFocus();
       await user.click(confirmation.getByRole('button', { name: 'Delete' }));

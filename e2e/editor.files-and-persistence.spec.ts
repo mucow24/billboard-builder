@@ -6,6 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   captureDownload,
   clickItem,
+  clickCanvasSaveItem,
   clickToolbarPopoverItem,
   createGroupNodeFixture,
   createGroupedProjectDocument,
@@ -379,7 +380,7 @@ test.describe('editor file and persistence flows', () => {
     await uploadProject(page, document, 'roundtrip.json');
 
     const projectDownload = await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Export', 'JSON');
+      await clickCanvasSaveItem(page, 'To JSON');
     });
     const savedDocument = await readDownloadedJson(projectDownload);
 
@@ -486,7 +487,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedProject = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await clickToolbarPopoverItem(page, 'Export', 'JSON');
+        await clickCanvasSaveItem(page, 'To JSON');
       }),
     );
     expect(savedProject.nodes).toEqual([]);
@@ -529,7 +530,7 @@ test.describe('editor file and persistence flows', () => {
     await expect(display).toHaveText('My Banner');
 
     const projectDownload = await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Export', 'JSON');
+      await clickCanvasSaveItem(page, 'To JSON');
     });
     expect(projectDownload.suggestedFilename()).toBe('My Banner.json');
 
@@ -597,7 +598,7 @@ test.describe('editor file and persistence flows', () => {
 
     const savedGroupedDocument = await readDownloadedJson(
       await captureDownload(page, async () => {
-        await clickToolbarPopoverItem(page, 'Export', 'JSON');
+        await clickCanvasSaveItem(page, 'To JSON');
       }),
     );
 

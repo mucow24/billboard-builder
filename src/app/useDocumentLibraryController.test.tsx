@@ -2,7 +2,11 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDocumentLibrarySession } from './documentLibrarySession';
-import { useDocumentLibraryController, type LeaveChoice } from './useDocumentLibraryController';
+import {
+  nameForCopy,
+  useDocumentLibraryController,
+  type LeaveChoice,
+} from './useDocumentLibraryController';
 import {
   createDefaultProjectDocument,
   createRectangleItem,
@@ -746,6 +750,85 @@ describe('useDocumentLibraryController', () => {
 
       await expect(result.current.actions.importProjectFile(null)).resolves.toBe(false);
       expect(mockReadProjectFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('duplicating', () => {
+    async function duplicate(result: Controller, id: string) {
+      let duplicated = false;
+      await act(async () => {
+        duplicated = await result.current.actions.duplicateLibraryDocument(id);
+      });
+      return duplicated;
+    }
+
+    it('adds a copy of the saved version with its preview, newest first, and leaves the editor alone', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      await save(result);
+      addRectangle('unsaved');
+      const originalId = result.current.state.documentId;
+      // A later time than the save, so the copy is listed first.
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+
+      expect(await duplicate(result, originalId)).toBe(true);
+
+      const [copy, original] = result.current.state.entries;
+      expect(original.id).toBe(originalId);
+      expect(copy.id).not.toBe(originalId);
+      expect(copy.name).toBe('Poster copy');
+      expect(result.current.state.previews[copy.id]).toBe('data:image/png;base64,PREVIEW');
+      const copied = await defaultDocumentLibraryService.loadDocument(copy);
+      expect(copied?.name).toBe('Poster copy');
+      expect(copied?.nodes.flatMap(collectLeafItems).map((item) => item.id)).toEqual(['first']);
+      // Still on the original, with its unsaved change.
+      expect(result.current.state.documentId).toBe(originalId);
+      expect(itemIds()).toEqual(['first', 'unsaved']);
+      expect(result.current.state.hasUnsavedChanges).toBe(true);
+      const stored = (await defaultDocumentLibraryService.listEntries()).entries;
+      expect(stored.map((entry) => entry.name)).toEqual(['Poster copy', 'Poster']);
+    });
+
+    it('copies the stored preview when it has not been read yet, as after a reload', async () => {
+      const { result } = renderController();
+      addRectangle('first');
+      await save(result);
+      act(() => {
+        useDocumentLibrarySession.setState({ previews: {} });
+      });
+
+      const originalId = result.current.state.documentId;
+      await duplicate(result, originalId);
+
+      const copyId = result.current.state.entries.find((entry) => entry.id !== originalId)!.id;
+      expect(result.current.state.previews).toEqual({ [copyId]: 'data:image/png;base64,PREVIEW' });
+      expect((await defaultDocumentLibraryService.loadPreviews())[copyId]).toBe(
+        'data:image/png;base64,PREVIEW',
+      );
+    });
+
+    it('says why when the copy cannot be stored, and adds nothing', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      await save(result);
+      vi.spyOn(defaultDocumentLibraryService, 'save').mockRejectedValueOnce(new Error('full'));
+
+      expect(await duplicate(result, result.current.state.documentId)).toBe(false);
+
+      expect(result.current.state.entries).toHaveLength(1);
+      expect(setErrorMessage).toHaveBeenLastCalledWith('Failed to duplicate "Poster": full');
+    });
+  });
+
+  describe('naming a copy', () => {
+    it('adds "copy", then numbers further copies, counting on from a copy of a copy', () => {
+      expect(nameForCopy('Poster', ['Poster'])).toBe('Poster copy');
+      expect(nameForCopy('Poster', ['Poster', 'Poster copy'])).toBe('Poster copy 2');
+      expect(nameForCopy('Poster', ['Poster copy', 'Poster copy 2'])).toBe('Poster copy 3');
+      expect(nameForCopy('Poster copy', ['Poster', 'Poster copy'])).toBe('Poster copy 2');
+      expect(nameForCopy('Poster copy 2', ['Poster copy', 'Poster copy 2'])).toBe('Poster copy 3');
     });
   });
 

@@ -44,7 +44,8 @@ interface ToolbarProps {
   onCanvasSizeChange: (canvas: CanvasSize) => void;
   onDelete: () => void;
   onExport: () => void;
-  onExportJson: () => void;
+  /** Canvas > Save > To JSON: downloads the canvas as a project file. */
+  onSaveToJson: () => void;
   onExportSvg: () => void;
   onExportToClipboard: () => void;
   onExportIntentChange?: (active: boolean) => void;
@@ -91,7 +92,7 @@ export function Toolbar({
   onCanvasSizeChange,
   onDelete,
   onExport,
-  onExportJson,
+  onSaveToJson,
   onExportSvg,
   onExportToClipboard,
   onExportIntentChange,
@@ -240,7 +241,6 @@ export function Toolbar({
             {exportMenuOpen ? (
               <ExportMenu
                 menuId={exportMenuId}
-                onExportJson={onExportJson}
                 onExportPng={onExport}
                 onExportSvg={onExportSvg}
                 onExportToClipboard={onExportToClipboard}
@@ -288,6 +288,7 @@ export function Toolbar({
               onLoadFromLibrary={onLoadFromLibrary}
               onRevert={onRevert}
               onSave={onSave}
+              onSaveToJson={onSaveToJson}
               onNewProject={onNewProject}
               createMenuActionHandler={createMenuActionHandler}
             />

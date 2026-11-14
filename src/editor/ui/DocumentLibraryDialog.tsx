@@ -1,4 +1,4 @@
-import { Cross2Icon, DownloadIcon, Pencil1Icon, TrashIcon } from '@radix-ui/react-icons';
+import { CopyIcon, Cross2Icon, DownloadIcon, Pencil1Icon, TrashIcon } from '@radix-ui/react-icons';
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 
 import type { DocumentLibraryEntry } from '../persistence/documentLibraryService';
@@ -19,9 +19,21 @@ interface DocumentLibraryDialogProps {
   onOpen: (id: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onExportJson: (id: string) => void;
 }
 
+/** The local time of `timestamp` as YYYY-MM-DD HH:MM: short enough to share a line with the card's buttons. */
+function formatSavedDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+/** The full local date and time of `timestamp`, for the tooltip of the short date. */
 function formatSavedAt(timestamp: number): string {
   return new Date(timestamp).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
@@ -35,6 +47,7 @@ interface LibraryCardProps {
   onOpen: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onDuplicate: () => void;
   onExportJson: () => void;
 }
 
@@ -46,6 +59,7 @@ function LibraryCard({
   onOpen,
   onRename,
   onDelete,
+  onDuplicate,
   onExportJson,
 }: LibraryCardProps) {
   const [mode, setMode] = useState<'idle' | 'renaming' | 'confirming-delete'>('idle');
@@ -130,6 +144,25 @@ function LibraryCard({
         ) : null}
       </button>
 
+      <div className="library-card-name-row">
+        {mode === 'renaming' ? (
+          <input
+            ref={renameInputRef}
+            className="library-card-name-input"
+            aria-label={`New name for ${entry.name}`}
+            type="text"
+            value={draftName}
+            onChange={(event) => setDraftName(event.target.value)}
+            onBlur={commitRename}
+            onKeyDown={handleRenameKeyDown}
+          />
+        ) : (
+          <span className="library-card-name" title={entry.name}>
+            {entry.name}
+          </span>
+        )}
+      </div>
+
       {mode === 'confirming-delete' ? (
         <div
           className="library-card-confirm"
@@ -152,22 +185,9 @@ function LibraryCard({
         </div>
       ) : (
         <div className="library-card-footer">
-          {mode === 'renaming' ? (
-            <input
-              ref={renameInputRef}
-              className="library-card-name-input"
-              aria-label={`New name for ${entry.name}`}
-              type="text"
-              value={draftName}
-              onChange={(event) => setDraftName(event.target.value)}
-              onBlur={commitRename}
-              onKeyDown={handleRenameKeyDown}
-            />
-          ) : (
-            <span className="library-card-name" title={entry.name}>
-              {entry.name}
-            </span>
-          )}
+          <span className="library-card-date" title={`Saved ${formatSavedAt(entry.updatedAt)}`}>
+            Saved {formatSavedDate(entry.updatedAt)}
+          </span>
           <div className="library-card-actions">
             <button
               ref={renameButtonRef}
@@ -178,6 +198,15 @@ function LibraryCard({
               onClick={beginRename}
             >
               <Pencil1Icon width={15} height={15} />
+            </button>
+            <button
+              type="button"
+              className="library-icon-button"
+              aria-label={`Duplicate ${entry.name}`}
+              title="Duplicate"
+              onClick={onDuplicate}
+            >
+              <CopyIcon width={15} height={15} />
             </button>
             <button
               type="button"
@@ -201,14 +230,13 @@ function LibraryCard({
           </div>
         </div>
       )}
-      <span className="library-card-date">Saved {formatSavedAt(entry.updatedAt)}</span>
     </li>
   );
 }
 
 /**
  * The library: every saved document as a card with a preview, to open, rename,
- * export or delete. A modal dialog: it closes on Escape, on its close button
+ * duplicate, export or delete. A modal dialog: it closes on Escape, on its close button
  * and on a click beside it.
  */
 export function DocumentLibraryDialog({
@@ -221,6 +249,7 @@ export function DocumentLibraryDialog({
   onOpen,
   onRename,
   onDelete,
+  onDuplicate,
   onExportJson,
 }: DocumentLibraryDialogProps) {
   const titleId = useId();
@@ -275,7 +304,7 @@ export function DocumentLibraryDialog({
         {entries.length === 0 ? (
           entriesKnown ? (
             <p className="library-empty">
-              Nothing saved yet. Canvas &gt; Save puts the open canvas here.
+              Nothing saved yet. Canvas &gt; Save &gt; To library puts the open canvas here.
             </p>
           ) : null
         ) : (
@@ -290,6 +319,7 @@ export function DocumentLibraryDialog({
                 onOpen={() => onOpen(entry.id)}
                 onRename={(name) => onRename(entry.id, name)}
                 onDelete={() => onDelete(entry.id)}
+                onDuplicate={() => onDuplicate(entry.id)}
                 onExportJson={() => onExportJson(entry.id)}
               />
             ))}

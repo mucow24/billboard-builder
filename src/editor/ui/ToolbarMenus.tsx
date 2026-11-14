@@ -227,7 +227,10 @@ interface CanvasMenuProps {
   onLoadFromJson: () => void;
   onLoadFromLibrary: () => void;
   onRevert: () => void;
+  /** Canvas > Save > To library. */
   onSave: () => void;
+  /** Canvas > Save > To JSON: downloads the canvas as a project file. */
+  onSaveToJson: () => void;
   onNewProject: () => void;
   createMenuActionHandler: (action: () => void) => () => void;
 }
@@ -244,6 +247,7 @@ export function CanvasMenu({
   onLoadFromLibrary,
   onRevert,
   onSave,
+  onSaveToJson,
   onNewProject,
   createMenuActionHandler,
 }: CanvasMenuProps) {
@@ -275,16 +279,33 @@ export function CanvasMenu({
           <path d="M12 3.5v3h3" />
         </ToolbarMenuAction>
       </ToolbarSubmenu>
-      <ToolbarMenuAction
+      <ToolbarSubmenu
         label="Save"
-        hint={`${modKey}+S`}
-        disabled={!canSave}
-        onSelect={createMenuActionHandler(onSave)}
+        panelLabel="Save the canvas"
+        icon={
+          <>
+            <path d="M4 4.5h12v11H4z" />
+            <path d="M7 4.5v4h6v-4" />
+            <path d="M7 15.5h6" />
+          </>
+        }
       >
-        <path d="M4 4.5h12v11H4z" />
-        <path d="M7 4.5v4h6v-4" />
-        <path d="M7 15.5h6" />
-      </ToolbarMenuAction>
+        <ToolbarMenuAction
+          label="To library"
+          hint={`${modKey}+S`}
+          disabled={!canSave}
+          onSelect={createMenuActionHandler(onSave)}
+        >
+          <rect x="3.5" y="4" width="5.5" height="5.5" rx="1" />
+          <rect x="11" y="4" width="5.5" height="5.5" rx="1" />
+          <rect x="3.5" y="11.5" width="5.5" height="5.5" rx="1" />
+          <rect x="11" y="11.5" width="5.5" height="5.5" rx="1" />
+        </ToolbarMenuAction>
+        <ToolbarMenuAction label="To JSON" onSelect={createMenuActionHandler(onSaveToJson)}>
+          <path d="M6 3.5h6l3 3v10H6z" />
+          <path d="M12 3.5v3h3" />
+        </ToolbarMenuAction>
+      </ToolbarSubmenu>
       <ToolbarMenuAction label="Revert" disabled={!canRevert} onSelect={createMenuActionHandler(onRevert)}>
         <path d="M7.5 5 4 8.5 7.5 12" />
         <path d="M4.5 8.5h7a4 4 0 1 1 0 8H9" />
@@ -305,7 +326,6 @@ export function CanvasMenu({
 
 interface ExportMenuProps {
   menuId: string;
-  onExportJson: () => void;
   onExportPng: () => void;
   onExportSvg: () => void;
   onExportToClipboard: () => void;
@@ -314,7 +334,6 @@ interface ExportMenuProps {
 
 export function ExportMenu({
   menuId,
-  onExportJson,
   onExportPng,
   onExportSvg,
   onExportToClipboard,
@@ -330,10 +349,6 @@ export function ExportMenu({
       <ToolbarMenuAction label="SVG" onSelect={createMenuActionHandler(onExportSvg)}>
         <path d="M4 4.5h12v11H4z" />
         <path d="M6.5 8l2 4 1.5-3 1.5 3 2-4" />
-      </ToolbarMenuAction>
-      <ToolbarMenuAction label="JSON" onSelect={createMenuActionHandler(onExportJson)}>
-        <path d="M8 4.5c-2 0-2 1.5-2 2.75S5.5 10 4.5 10c1 0 1.5 1.5 1.5 2.75s0 2.75 2 2.75" />
-        <path d="M12 4.5c2 0 2 1.5 2 2.75S14.5 10 15.5 10c-1 0-1.5 1.5-1.5 2.75s0 2.75-2 2.75" />
       </ToolbarMenuAction>
       <ToolbarMenuAction label="To clipboard" onSelect={createMenuActionHandler(onExportToClipboard)}>
         <rect x="5" y="4.5" width="10" height="12" rx="1" />
