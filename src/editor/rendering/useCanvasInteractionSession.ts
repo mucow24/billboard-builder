@@ -660,10 +660,16 @@ export function useCanvasInteractionSession({
       ctrlKey: event.ctrlKey,
       shiftKey: event.shiftKey,
     });
+    // Inside the stage, Pixi hands every move to handleStagePointerMove (its
+    // event system listens on the whole document, so DOM overlays don't hide
+    // moves from it), which advances sessions and pending item gestures at
+    // full precision whoever started them. Advancing them here too would
+    // apply each move twice, the second time from this mouse event's
+    // whole-pixel coordinates, and the rounded copy lands last. Only crop
+    // interactions are advanced here alone, so an overlay-started one still
+    // needs the moves inside the stage.
     const shouldUseInsideStageWindowFallback =
-      cropSessionRef.current?.activeInteraction?.source === 'overlay' ||
-      sessionRef.current?.pointerSource === 'overlay' ||
-      pendingItemGestureRef.current?.source === 'overlay';
+      cropSessionRef.current?.activeInteraction?.source === 'overlay';
     if (!shouldUseInsideStageWindowFallback && isClientPointInsideStage(event.clientX, event.clientY)) {
       return;
     }

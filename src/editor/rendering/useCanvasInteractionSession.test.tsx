@@ -1203,7 +1203,7 @@ describe('useCanvasInteractionSession', () => {
     });
   });
 
-  it('updates overlay-owned drags from window mousemove events that stay inside the stage', () => {
+  it('applies each move of an overlay-owned drag once, from the stage, while it stays inside the stage', () => {
     const stageRef = makeStageRef();
     stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
     const item = createRectangleItem({
@@ -1217,32 +1217,36 @@ describe('useCanvasInteractionSession', () => {
       stageRef: stageRef.ref,
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
+    const previewItem = () => {
+      if (result.current.session?.kind !== 'drag') {
+        throw new Error('Expected drag session.');
+      }
+      return result.current.session.previewItem;
+    };
 
     act(() => {
       result.current.beginDrag(item, { x: 220, y: 140 }, 'overlay');
     });
+    // A browser follows each pointer move with a mouse move at whole-pixel
+    // coordinates. Only the stage's precise move may count.
     act(() => {
-      window.dispatchEvent(
-        new MouseEvent('mousemove', {
-          clientX: 320,
-          clientY: 200,
-          shiftKey: true,
-        }),
-      );
+      result.current.handleStagePointerMove(makeStageEvent({ x: 320.4, y: 160.6 }, 'canvas-background', { ctrlKey: true }));
     });
+    act(() => {
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 320, clientY: 161, ctrlKey: true }));
+    });
+    expect(previewItem().x).toBeCloseTo(300.4, 6);
+    expect(previewItem().y).toBeCloseTo(140.6, 6);
 
-    expect(result.current.session?.kind).toBe('drag');
-    if (result.current.session?.kind !== 'drag') {
-      throw new Error('Expected drag session.');
-    }
-    expect(result.current.session.axisLock).toBe('x');
-    expect(result.current.session.previewItem).toMatchObject({
-      x: 300,
-      y: 120,
+    // Outside the stage, where the stage sees nothing, the window still
+    // carries the drag.
+    act(() => {
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 1100, clientY: 160, ctrlKey: true }));
     });
+    expect(previewItem()).toMatchObject({ x: 1080, y: 140 });
   });
 
-  it('updates overlay-owned resize sessions from window mousemove events that stay inside the stage', () => {
+  it('advances overlay-owned resize sessions from stage moves, not window moves, inside the stage', () => {
     const stageRef = makeStageRef();
     stageRef.setBounds({ right: 1000, bottom: 1000, width: 1000, height: 1000 });
     const item = createRectangleItem({
@@ -1258,6 +1262,13 @@ describe('useCanvasInteractionSession', () => {
     const { result } = renderHook(() => useCanvasInteractionSession(params));
     const handlePoint = getShapeHandlePoints(item)['middle-right'];
 
+    const previewWidth = () => {
+      if (result.current.session?.kind !== 'resize') {
+        throw new Error('Expected resize session.');
+      }
+      return result.current.session.previewItem.width;
+    };
+
     act(() => {
       result.current.beginResize(item, 'middle-right', handlePoint, 'overlay');
     });
@@ -1269,15 +1280,12 @@ describe('useCanvasInteractionSession', () => {
         }),
       );
     });
+    expect(previewWidth()).toBe(item.width);
 
-    expect(result.current.session?.kind).toBe('resize');
-    if (result.current.session?.kind !== 'resize') {
-      throw new Error('Expected resize session.');
-    }
-    expect(result.current.session.previewItem).toMatchObject({
-      width: expect.any(Number),
+    act(() => {
+      result.current.handleStagePointerMove(makeStageEvent({ x: 420, y: 160 }));
     });
-    expect(result.current.session.previewItem.width).toBeGreaterThan(item.width);
+    expect(previewWidth()).toBeGreaterThan(item.width);
   });
 
   it('disables snapping while ctrl-dragging', () => {
