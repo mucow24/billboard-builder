@@ -104,8 +104,8 @@ test.describe('generator layers', () => {
     await openPropertiesTab(page);
 
     await expect(page.getByText('Scanline Color')).toBeVisible();
-    // Opacity is a setting of its own, starting at the alpha the default color used to carry.
-    await expect(page.getByLabel('Opacity value')).toHaveValue('0.09');
+    // Opacity is a setting of its own, starting fully opaque.
+    await expect(page.getByLabel('Opacity value')).toHaveValue('1');
     await expect(page.getByText('Height:')).toBeVisible();
 
     const spacingInput = page.getByLabel('Spacing value');
