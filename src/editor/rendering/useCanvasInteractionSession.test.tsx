@@ -703,7 +703,7 @@ describe('useCanvasInteractionSession', () => {
     );
   });
 
-  it('never gives a straight line a vertex sub-selection, but does once it is bent', () => {
+  it('selects a tapped point of a bent line, and splits a line only when its "+" is dragged', () => {
     const straight = createLineItem({
       id: 'straight',
       vertices: [{ x: 160, y: 160 }, { x: 400, y: 184 }],
@@ -719,17 +719,10 @@ describe('useCanvasInteractionSession', () => {
     };
     const { result } = renderHook(() => useCanvasInteractionSession(params));
 
-    // A no-move click on a straight line's endpoint selects no vertex, so
-    // Delete and the arrow keys keep acting on the whole line.
-    act(() => {
-      result.current.beginPolygonVertexHandle(straight, 1, straight.vertices[1]);
-    });
-    act(() => {
-      result.current.handleStageMouseUp(makeStageEvent(straight.vertices[1], 'shape'));
-    });
-    expect(onSelectPolygonVertex).not.toHaveBeenCalled();
+    // A straight line never holds a vertex sub-selection; the reducer enforces
+    // that (see the store tests), so it is not checked here.
 
-    // The same click on a bent line selects the vertex, like on a polygon.
+    // A no-move click on a bent line's point selects it, like on a polygon.
     act(() => {
       result.current.beginPolygonVertexHandle(bent, 1, bent.vertices[1]);
     });
