@@ -25,6 +25,7 @@ import {
   readStageDebug,
   releasePointer,
   saveAndReadProject,
+  savedLineEnds,
   selectTool,
   setCanvasTestHooksEnabled,
   uploadProject,
@@ -108,10 +109,11 @@ const leafPickupCases: LeafPickupCase[] = [
     from: { x: 220, y: 540 },
     to: { x: 340, y: 620 },
     expectCommittedMovement(savedItem) {
-      expect(Number(savedItem.startX)).toBeGreaterThan(220);
-      expect(Number(savedItem.startY)).toBeGreaterThan(580);
-      expect(Number(savedItem.endX)).toBeGreaterThan(500);
-      expect(Number(savedItem.endY)).toBeGreaterThan(620);
+      const ends = savedLineEnds(savedItem);
+      expect(ends.startX).toBeGreaterThan(220);
+      expect(ends.startY).toBeGreaterThan(580);
+      expect(ends.endX).toBeGreaterThan(500);
+      expect(ends.endY).toBeGreaterThan(620);
     },
   },
 ];

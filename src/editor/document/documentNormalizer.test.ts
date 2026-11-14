@@ -190,7 +190,8 @@ describe('document normalizer', () => {
       zIndex: 2,
     });
     expect(normalized.nodes[2].children[1]).toMatchObject({
-      kind: 'line',
+      kind: 'polygon',
+      closed: false,
       zIndex: 3,
     });
     expect(normalized.fonts).toEqual([
@@ -314,6 +315,126 @@ describe('document normalizer', () => {
     const item = normalized.nodes[0] as typeof polygon;
     expect(item.vertices).toHaveLength(4);
     expect(item.vertices[0]).toEqual({ x: item.x, y: item.y });
+  });
+
+  it('rebuilds an open polygon from the diagonal of its box when its vertices degenerate below two', () => {
+    const line = createLineItem();
+    const broken = { ...line, x: 30, y: 40, width: 120, height: 60, vertices: [{ x: 1, y: 2 }] };
+
+    const normalized = normalizeProjectDocument({ version: 2, nodes: [broken as never], fonts: [] });
+
+    expect(normalized.nodes[0]).toMatchObject({
+      kind: 'polygon',
+      closed: false,
+      vertices: [
+        { x: 30, y: 40 },
+        { x: 150, y: 100 },
+      ],
+      x: 30,
+      y: 40,
+      width: 120,
+      height: 60,
+    });
+  });
+
+  it('keeps a two-vertex line as it is, and only an explicit closed: false makes one', () => {
+    const twoPoints = [
+      { x: 5, y: 5 },
+      { x: 50, y: 80 },
+    ];
+    const line = createLineItem({ vertices: twoPoints, curveRadius: 9 });
+    const { closed: ignoredClosed, ...withoutClosed } = createPolygonItem();
+    void ignoredClosed;
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [line, withoutClosed as never],
+      fonts: [],
+    });
+
+    expect(normalized.nodes[0]).toMatchObject({ closed: false, vertices: twoPoints, curveRadius: 9, rotation: 0 });
+    expect(normalized.nodes[1]).toMatchObject({ closed: true });
+  });
+
+  it('turns a line saved with start and end points into an open two-vertex polygon', () => {
+    const legacyLine = {
+      id: 'old-line',
+      kind: 'line',
+      name: 'Divider',
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      zIndex: 0,
+      locked: true,
+      lockAspectRatio: false,
+      hidden: false,
+      opacity: 0.5,
+      shadow: { color: '#000000', blur: 0, offsetX: 0, offsetY: 0, opacity: 0 },
+      blurRadius: 3,
+      stroke: '#abcdefff',
+      strokeWidth: 0,
+      startX: 400,
+      startY: 200,
+      endX: 100,
+      endY: 200,
+    };
+
+    const normalized = normalizeProjectDocument({ version: 2, nodes: [legacyLine as never], fonts: [] });
+    const item = normalized.nodes[0];
+
+    expect(item).toMatchObject({
+      id: 'old-line',
+      kind: 'polygon',
+      name: 'Divider',
+      closed: false,
+      curveRadius: 0,
+      vertices: [
+        { x: 400, y: 200 },
+        { x: 100, y: 200 },
+      ],
+      // The box is derived from the vertices; a flat line is 1 high.
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 1,
+      rotation: 0,
+      locked: true,
+      opacity: 0.5,
+      blurRadius: 3,
+      stroke: '#abcdefff',
+      // An old line was never thinner than 1.
+      strokeWidth: 1,
+      gradientEnabled: false,
+    });
+    for (const key of ['startX', 'startY', 'endX', 'endY']) {
+      expect(item).not.toHaveProperty(key);
+    }
+    // Normalizing the result again changes nothing.
+    expect(normalizeProjectDocument({ version: 2, nodes: [item], fonts: [] }).nodes[0]).toEqual(item);
+  });
+
+  it('falls back to the box of an old line that has no start and end points', () => {
+    const legacyLine = {
+      ...createRectangleItem({ id: 'boxed-line', x: 10, y: 20, width: 90, height: 30 }),
+      kind: 'line',
+      stroke: '#ffffffff',
+      strokeWidth: 6,
+    };
+
+    const normalized = normalizeProjectDocument({ version: 2, nodes: [legacyLine as never], fonts: [] });
+
+    expect(normalized.nodes[0]).toMatchObject({
+      kind: 'polygon',
+      closed: false,
+      vertices: [
+        { x: 10, y: 20 },
+        { x: 100, y: 50 },
+      ],
+    });
   });
 
   it('coerces missing or whitespace canvas names to "Untitled canvas"', () => {

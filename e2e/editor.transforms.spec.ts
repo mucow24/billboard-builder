@@ -19,6 +19,7 @@ import {
   openPropertiesTab,
   readStageDebug,
   saveAndReadProject,
+  savedLineEnds,
   setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
@@ -234,36 +235,38 @@ test.describe('editor transforms', () => {
     const stageDebug = await readStageDebug(page);
     expect(stageDebug.hasLineHandles).toBe(true);
 
+    // The line is too short on screen here to show the "+" that splits it, so
+    // dragging it by its middle still moves it.
     await dragItemTo(page, 'transform-line', 360, 620);
 
     let savedProject = await saveAndReadProject(page);
     let savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'transform-line'
     );
-    expect(Number(savedLine?.startX)).toBeGreaterThan(200);
-    expect(Number(savedLine?.startY)).toBeGreaterThan(580);
-    expect(Number(savedLine?.endX)).toBeGreaterThan(440);
-    expect(Number(savedLine?.endY)).toBeGreaterThan(620);
+    expect(savedLineEnds(savedLine).startX).toBeGreaterThan(200);
+    expect(savedLineEnds(savedLine).startY).toBeGreaterThan(580);
+    expect(savedLineEnds(savedLine).endX).toBeGreaterThan(440);
+    expect(savedLineEnds(savedLine).endY).toBeGreaterThan(620);
 
     // ST-11: Drag start endpoint
-    const startX = Number(savedLine?.startX);
+    const startX = savedLineEnds(savedLine).startX;
     await dragHandle(page, 'transform-line', 'line-start', -80, 40);
 
     savedProject = await saveAndReadProject(page);
     savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'transform-line'
     );
-    expect(Number(savedLine?.startX)).toBeLessThan(startX - 40);
+    expect(savedLineEnds(savedLine).startX).toBeLessThan(startX - 40);
 
     // ST-12: Drag end endpoint
-    const endX = Number(savedLine?.endX);
+    const endX = savedLineEnds(savedLine).endX;
     await dragHandle(page, 'transform-line', 'line-end', 80, -30);
 
     savedProject = await saveAndReadProject(page);
     savedLine = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
       (item) => item.id === 'transform-line'
     );
-    expect(Number(savedLine?.endX)).toBeGreaterThan(endX + 40);
+    expect(savedLineEnds(savedLine).endX).toBeGreaterThan(endX + 40);
   });
 
   test('ST-07 ST-08 ST-09 supports image transform flows through real canvas interaction', async ({

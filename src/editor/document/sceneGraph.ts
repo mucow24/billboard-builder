@@ -193,18 +193,6 @@ export function cloneCanvasNode(node: CanvasNode, offset = DUPLICATE_ITEM_OFFSET
       vertices: node.vertices.map((v) => ({ x: v.x + offset, y: v.y + offset })),
     };
   }
-  if (node.kind === 'line') {
-    return {
-      ...node,
-      id: nextId,
-      x: node.x + offset,
-      y: node.y + offset,
-      startX: node.startX + offset,
-      startY: node.startY + offset,
-      endX: node.endX + offset,
-      endY: node.endY + offset,
-    };
-  }
 
   return {
     ...node,

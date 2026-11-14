@@ -1,4 +1,5 @@
 import type { CanvasItem } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 import {
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -14,6 +15,7 @@ import {
   getResizeHandleViewportRects,
   getShapeOverlayHandlePoints,
   getViewportHandleRect,
+  hasTransformBox,
 } from './overlayGeometry';
 
 interface RotationSession {
@@ -147,31 +149,32 @@ export function buildStageDerivedState(params: {
     !hideTransformHandles &&
     params.renderedSelectedItems.length <= 1 &&
     params.selectedRenderedItem &&
-    // Polygons get the resize box in addition to their vertex handles; only
-    // lines (endpoint handles) opt out of the shape box entirely.
-    params.selectedRenderedItem.kind !== 'line'
+    // Polygons and bent lines get the resize box in addition to their vertex
+    // handles; only a straight line (endpoint handles) opts out of it.
+    hasTransformBox(params.selectedRenderedItem)
       ? getResizeHandleViewportRects(
           getShapeOverlayHandlePoints(params.selectedRenderedItem, params.zoom),
           params.viewport.toViewportPoint,
         )
       : null;
+  // A line is an open polygon; its two ends are its first and last vertex.
+  const selectedLine =
+    params.selectedRenderedItem && isLineItem(params.selectedRenderedItem)
+      ? params.selectedRenderedItem
+      : null;
   const selectedLineHandleRects =
     !cropSession &&
     !hideTransformHandles &&
     params.renderedSelectedItems.length <= 1 &&
-    params.selectedRenderedItem?.kind === 'line'
+    selectedLine
       ? {
           start: getViewportHandleRect(
-            params.viewport.toViewportPoint({
-              x: params.selectedRenderedItem.startX,
-              y: params.selectedRenderedItem.startY,
-            }),
+            params.viewport.toViewportPoint(selectedLine.vertices[0]),
           ),
           end: getViewportHandleRect(
-            params.viewport.toViewportPoint({
-              x: params.selectedRenderedItem.endX,
-              y: params.selectedRenderedItem.endY,
-            }),
+            params.viewport.toViewportPoint(
+              selectedLine.vertices[selectedLine.vertices.length - 1],
+            ),
           ),
         }
       : null;
@@ -242,7 +245,7 @@ export function buildStageDerivedState(params: {
           handle,
           params.viewport.toViewportPoint(
             getShapeOverlayHandlePoints(
-              cropSession.previewItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+              cropSession.previewItem as CanvasItem,
               params.zoom,
             )[handle],
           ),
@@ -255,7 +258,7 @@ export function buildStageDerivedState(params: {
           handle,
           params.viewport.toViewportPoint(
             getShapeOverlayHandlePoints(
-              cropSession.fullImageItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+              cropSession.fullImageItem as CanvasItem,
               params.zoom,
             )[handle],
           ),
@@ -265,7 +268,7 @@ export function buildStageDerivedState(params: {
   const cropFullImageRotaterViewportPoint = cropSession
     ? params.viewport.toViewportPoint(
         getShapeOverlayHandlePoints(
-          cropSession.fullImageItem as Exclude<CanvasItem, Extract<CanvasItem, { kind: 'line' }>>,
+          cropSession.fullImageItem as CanvasItem,
           params.zoom,
         ).rotater,
       )

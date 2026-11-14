@@ -12,7 +12,6 @@ import type {
   GeneratorCanvasItem,
   ImageCropRect,
   ImageCanvasItem,
-  LineCanvasItem,
   NgonCanvasItem,
   PolygonCanvasItem,
   ProjectDocument,
@@ -20,7 +19,7 @@ import type {
   TextCanvasItem,
 } from './documentTypes';
 import {
-  POLYGON_MIN_VERTICES,
+  polygonMinVertices,
   polygonBounds,
   rectanglePolygonVertices,
 } from './polygonVertices';
@@ -202,25 +201,31 @@ export function createPolygonItem(
   };
   // Vertices are the geometry source of truth; when the caller passes only a
   // box (create tool, click-to-place), start from the default square.
-  if (item.vertices.length < POLYGON_MIN_VERTICES) {
-    item.vertices = rectanglePolygonVertices(item.x, item.y, item.width, item.height);
+  if (item.vertices.length < polygonMinVertices(item.closed)) {
+    item.vertices = item.closed
+      ? rectanglePolygonVertices(item.x, item.y, item.width, item.height)
+      : [
+          { x: item.x, y: item.y },
+          { x: item.x + item.width, y: item.y + item.height },
+        ];
   }
   return { ...item, ...polygonBounds(item.vertices) };
 }
 
-export function createLineItem(position?: Partial<LineCanvasItem>): LineCanvasItem {
-  return {
-    ...createBaseItem('line', 'Line'),
+/**
+ * A line is an open polygon that starts with two vertices. The fill fields are
+ * part of the polygon model but an open chain never paints them.
+ */
+export function createLineItem(position?: Partial<PolygonCanvasItem>): PolygonCanvasItem {
+  return createPolygonItem({
+    name: 'Line',
     width: 240,
     height: 24,
     stroke: '#ffffffff',
     strokeWidth: 6,
-    startX: position?.x ?? 160,
-    startY: position?.y ?? 160,
-    endX: (position?.x ?? 160) + 240,
-    endY: (position?.y ?? 160) + 24,
+    closed: false,
     ...position,
-  };
+  });
 }
 
 export function createImageItem(params: {

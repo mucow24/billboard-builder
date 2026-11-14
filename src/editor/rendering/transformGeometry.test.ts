@@ -243,11 +243,8 @@ function expectedFrameFromHandleDrag(
 }
 
 function itemOutlinePoints(item: CanvasItem) {
-  if (item.kind === 'line') {
-    return [
-      { x: item.startX, y: item.startY },
-      { x: item.endX, y: item.endY },
-    ];
+  if (item.kind === 'polygon') {
+    return item.vertices.map((vertex) => ({ x: vertex.x, y: vertex.y }));
   }
   const corners = [
     { x: 0, y: 0 },
@@ -298,10 +295,7 @@ describe('transform geometry helpers', () => {
 
   it('computes a render box for line items', () => {
     const line = createLineItem({
-      startX: 240,
-      startY: 120,
-      endX: 160,
-      endY: 150,
+      vertices: [{ x: 240, y: 120 }, { x: 160, y: 150 }],
     });
 
     expect(getRenderBox(line)).toEqual({
@@ -314,7 +308,7 @@ describe('transform geometry helpers', () => {
 
   it('offsets every item in a dragged group, including line endpoints', () => {
     const rectangle = createRectangleItem({ x: 100, y: 120, width: 80, height: 40 });
-    const line = createLineItem({ startX: 160, startY: 140, endX: 260, endY: 180 });
+    const line = createLineItem({ vertices: [{ x: 160, y: 140 }, { x: 260, y: 180 }] });
 
     const previews = buildGroupDragPreviews([rectangle, line], 25, -15);
 
@@ -323,12 +317,9 @@ describe('transform geometry helpers', () => {
       y: 105,
     });
     expect(previews[1]).toMatchObject({
-      startX: 185,
-      startY: 125,
-      endX: 285,
-      endY: 165,
-      x: 145,
-      y: 105,
+      vertices: [{ x: 185, y: 125 }, { x: 285, y: 165 }],
+      x: 185,
+      y: 125,
     });
   });
 
@@ -355,7 +346,7 @@ describe('transform geometry helpers', () => {
 
   it('resizes group previews proportionally for shapes and lines', () => {
     const rectangle = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
-    const line = createLineItem({ startX: 180, startY: 100, endX: 260, endY: 140 });
+    const line = createLineItem({ vertices: [{ x: 180, y: 100 }, { x: 260, y: 140 }] });
     const bounds = { x: 100, y: 100, width: 160, height: 40 };
 
     const previews = buildGroupResizePreviews(
@@ -372,10 +363,7 @@ describe('transform geometry helpers', () => {
       height: 40,
     });
     expect(previews[1]).toMatchObject({
-      startX: 220,
-      startY: 100,
-      endX: 340,
-      endY: 140,
+      vertices: [{ x: 220, y: 100 }, { x: 340, y: 140 }],
       x: 220,
       y: 100,
       width: 120,
@@ -474,7 +462,7 @@ describe('transform geometry helpers', () => {
 
   it('maps rotated group resize previews into the resized frame instead of the original frame center', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
-    const second = createLineItem({ id: 'second', startX: 220, startY: 100, endX: 300, endY: 140 });
+    const second = createLineItem({ id: 'second', vertices: [{ x: 220, y: 100 }, { x: 300, y: 140 }] });
     const bounds = { x: 100, y: 100, width: 200, height: 40 };
     const rotatedFrame = { bounds, rotation: 90 };
 
@@ -495,42 +483,19 @@ describe('transform geometry helpers', () => {
 
     expect(getSelectionFrameForRotation(previews, 90)).toEqual(resizedFrame);
 
-    if (previews[1].kind !== 'line' || rotatedItems[1].kind !== 'line') {
+    const preview = previews[1];
+    const rotated = rotatedItems[1];
+    if (preview.kind !== 'polygon' || rotated.kind !== 'polygon') {
       throw new Error('Expected line previews.');
     }
 
-    expect(previews[1].startX).toBeCloseTo(
-      mapPointBetweenFrames(
-        { x: rotatedItems[1].startX, y: rotatedItems[1].startY },
-        rotatedFrame,
-        resizedFrame
-      ).x,
-      5
-    );
-    expect(previews[1].startY).toBeCloseTo(
-      mapPointBetweenFrames(
-        { x: rotatedItems[1].startX, y: rotatedItems[1].startY },
-        rotatedFrame,
-        resizedFrame
-      ).y,
-      5
-    );
-    expect(previews[1].endX).toBeCloseTo(
-      mapPointBetweenFrames(
-        { x: rotatedItems[1].endX, y: rotatedItems[1].endY },
-        rotatedFrame,
-        resizedFrame
-      ).x,
-      5
-    );
-    expect(previews[1].endY).toBeCloseTo(
-      mapPointBetweenFrames(
-        { x: rotatedItems[1].endX, y: rotatedItems[1].endY },
-        rotatedFrame,
-        resizedFrame
-      ).y,
-      5
-    );
+    // Both ends of the line map from the rotated frame into the resized one.
+    expect(preview.vertices).toHaveLength(2);
+    rotated.vertices.forEach((vertex, index) => {
+      const expected = mapPointBetweenFrames(vertex, rotatedFrame, resizedFrame);
+      expect(preview.vertices[index].x).toBeCloseTo(expected.x, 5);
+      expect(preview.vertices[index].y).toBeCloseTo(expected.y, 5);
+    });
   });
 
   it('keeps the rotated resize preview frame anchored to the dragged handle path', () => {
@@ -569,7 +534,7 @@ describe('transform geometry helpers', () => {
 
   it('rotates group previews for shapes and lines and snaps when requested', () => {
     const rectangle = createRectangleItem({ x: 100, y: 100, width: 80, height: 40 });
-    const line = createLineItem({ startX: 180, startY: 120, endX: 260, endY: 120 });
+    const line = createLineItem({ vertices: [{ x: 180, y: 120 }, { x: 260, y: 120 }] });
     const bounds = getSelectionRenderBounds([rectangle, line]);
     if (!bounds) {
       throw new Error('Expected selection bounds');
@@ -601,10 +566,7 @@ describe('transform geometry helpers', () => {
       rotation: 45,
     });
     const line = createLineItem({
-      startX: 20,
-      startY: 160,
-      endX: 220,
-      endY: 160,
+      vertices: [{ x: 20, y: 160 }, { x: 220, y: 160 }],
     });
 
     expect(
@@ -633,7 +595,7 @@ describe('transform geometry helpers', () => {
     const baseItems = [
       createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 }),
       createRectangleItem({ id: 'second', x: 240, y: 130, width: 60, height: 70 }),
-      createLineItem({ id: 'third', startX: 190, startY: 90, endX: 330, endY: 210 }),
+      createLineItem({ id: 'third', vertices: [{ x: 190, y: 90 }, { x: 330, y: 210 }] }),
     ];
     const bounds = getSelectionRenderBounds(baseItems);
     if (!bounds) {
@@ -676,10 +638,6 @@ describe('transform geometry helpers', () => {
     const bounds = { x: 100, y: 100, width: 240, height: 160 };
     const nextBounds = getResizedBoundsFromHandle(bounds, 'middle-right', { x: 420, y: 180 });
     const preview = buildGroupResizePreviews([item], bounds, 'middle-right', { x: 420, y: 180 })[0];
-    if (preview.kind === 'line') {
-      throw new Error('Expected a rectangle preview.');
-    }
-
     const expectedCorners = getItemSelectionPoints(item).map((point) =>
       mapPointBetweenFrames(
         point,

@@ -93,7 +93,6 @@ export function CanvasStage({
     beginCropFullRotate,
     beginCropPan,
     beginCropResize,
-    beginLineHandle,
     beginPolygonEdgeInsert,
     beginPolygonVertexHandle,
     beginResize,
@@ -216,7 +215,6 @@ export function CanvasStage({
         commitCropSession={commitCropSession}
         beginGroupResize={beginGroupResize}
         beginGroupRotate={beginGroupRotate}
-        beginLineHandle={beginLineHandle}
         beginPolygonVertexHandle={beginPolygonVertexHandle}
         beginPolygonEdgeInsert={beginPolygonEdgeInsert}
         selectedPolygonVertexIndex={selectedPolygonVertexIndex}
@@ -305,7 +303,7 @@ export function CanvasStage({
           beginGroupDrag={beginGroupDrag}
           beginGroupResize={beginGroupResize}
           beginGroupRotate={beginGroupRotate}
-          beginLineHandle={beginLineHandle}
+          beginPolygonVertexHandle={beginPolygonVertexHandle}
           beginResize={beginResize}
           beginRotate={beginRotate}
           cropFullImageHandleViewportPoints={cropFullImageHandleViewportPoints}

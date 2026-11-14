@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getItemDisplayKind,
   insertPolygonVertex,
+  isLineItem,
+  isStraightLine,
   mirrorPolygonVerticesHorizontally,
   polygonBounds,
   polygonEdgeCount,
   polygonEdgeMidpoint,
+  polygonMinVertices,
   rectanglePolygonVertices,
   removePolygonVertex,
   translatePolygonVertices,
@@ -82,6 +86,46 @@ describe('removePolygonVertex', () => {
 
   it('ignores out-of-range indices', () => {
     expect(removePolygonVertex(SQUARE, 4)).toBe(SQUARE);
+  });
+
+  it('lets an open chain drop to its 2-vertex floor, and no further', () => {
+    const bent = SQUARE.slice(0, 3);
+    const straight = removePolygonVertex(bent, 1, false);
+    expect(straight).toEqual([SQUARE[0], SQUARE[2]]);
+    expect(removePolygonVertex(straight, 0, false)).toBe(straight);
+    // Closed is the default: the same triangle stays a triangle.
+    expect(removePolygonVertex(bent, 1, true)).toBe(bent);
+  });
+});
+
+describe('lines as open polygons', () => {
+  it('needs 3 vertices closed and 2 open', () => {
+    expect(polygonMinVertices(true)).toBe(3);
+    expect(polygonMinVertices(false)).toBe(2);
+  });
+
+  it('calls only an open polygon a line', () => {
+    expect(isLineItem({ kind: 'polygon', closed: false })).toBe(true);
+    expect(isLineItem({ kind: 'polygon', closed: true })).toBe(false);
+    // A polygon with no closed flag is closed, as the normalizer treats it.
+    expect(isLineItem({ kind: 'polygon' })).toBe(false);
+    expect(isLineItem({ kind: 'rectangle' })).toBe(false);
+  });
+
+  it('calls a line straight only while it has just its two ends', () => {
+    const ends = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
+    expect(isStraightLine({ kind: 'polygon', closed: false, vertices: ends })).toBe(true);
+    expect(
+      isStraightLine({ kind: 'polygon', closed: false, vertices: [...ends, { x: 10, y: 10 }] }),
+    ).toBe(false);
+    expect(isStraightLine({ kind: 'polygon', closed: true, vertices: ends })).toBe(false);
+    expect(isStraightLine({ kind: 'rectangle' })).toBe(false);
+  });
+
+  it("shows an open polygon as 'line' and every other item as its own kind", () => {
+    expect(getItemDisplayKind({ kind: 'polygon', closed: false })).toBe('line');
+    expect(getItemDisplayKind({ kind: 'polygon', closed: true })).toBe('polygon');
+    expect(getItemDisplayKind({ kind: 'text' })).toBe('text');
   });
 });
 

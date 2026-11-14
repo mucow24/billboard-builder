@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCreatedItem,
   getCreatePreview,
-  getLineHandleRects,
+  getPolygonVertexHandleRects,
   getSelectionOutlinePoints,
   getShapeHandleRects,
   getShapeHandlePoints,
@@ -11,7 +11,6 @@ import {
   localToStage,
   rotateVector,
   solveDragSession,
-  solveLineHandleSession,
   solvePolygonVertexSession,
   solveResizeSession,
   solveRotateSession,
@@ -24,7 +23,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../document/documentDefaults';
-import type { LineCanvasItem } from '../document/documentTypes';
+import type { PolygonCanvasItem } from '../document/documentTypes';
 
 describe('interaction geometry', () => {
   it('creates normalized rectangle bounds regardless of drag direction', () => {
@@ -250,26 +249,25 @@ describe('interaction geometry', () => {
 
   it('updates only the dragged line endpoint', () => {
     const item = createLineItem({
-      startX: 160,
-      startY: 160,
-      endX: 400,
-      endY: 184,
+      vertices: [{ x: 160, y: 160 }, { x: 400, y: 184 }],
     });
-    const result = solveLineHandleSession(
+    // A line's start is vertex 0 of its open polygon.
+    const result = solvePolygonVertexSession(
       item,
-      'start',
+      0,
       { x: 240, y: 200 },
       { x: 0, y: 0 },
       [],
       { x: 0, y: 0, width: 1200, height: 600 }
     );
 
-    const line = result.item as LineCanvasItem;
+    const line = result.item as PolygonCanvasItem;
 
-    expect(line.startX).toBe(240);
-    expect(line.startY).toBe(200);
-    expect(line.endX).toBe(400);
-    expect(line.endY).toBe(184);
+    expect(line.vertices).toEqual([
+      { x: 240, y: 200 },
+      { x: 400, y: 184 },
+    ]);
+    expect(line).toMatchObject({ x: 240, y: 184, width: 160, height: 16, closed: false });
   });
 
   it('snaps dragged rectangles against sibling guides during drag', () => {
@@ -320,20 +318,19 @@ describe('interaction geometry', () => {
       rotation: 90,
     });
     const line = createLineItem({
-      startX: 20,
-      startY: 30,
-      endX: 120,
-      endY: 90,
+      vertices: [{ x: 20, y: 30 }, { x: 120, y: 90 }],
     });
 
     const rects = getShapeHandleRects(rectangle);
     const outline = getSelectionOutlinePoints(rectangle);
-    const lineRects = getLineHandleRects(line);
+    // A line's endpoint handles are the vertex handles of its open polygon.
+    const lineRects = getPolygonVertexHandleRects(line);
 
     expect(rects['top-left']).toMatchObject({ width: 16, height: 16 });
     expect(outline).toHaveLength(8);
-    expect(lineRects.start).toMatchObject({ x: 12, y: 22, width: 16, height: 16 });
-    expect(lineRects.end).toMatchObject({ x: 112, y: 82, width: 16, height: 16 });
+    expect(lineRects).toHaveLength(2);
+    expect(lineRects[0]).toMatchObject({ x: 12, y: 22, width: 16, height: 16 });
+    expect(lineRects[1]).toMatchObject({ x: 112, y: 82, width: 16, height: 16 });
   });
 
   it('disables resize snapping for rotated items even when siblings are close', () => {
@@ -389,25 +386,24 @@ describe('interaction geometry', () => {
 
   it('snaps line handle drags to the anchor axes when close enough', () => {
     const item = createLineItem({
-      startX: 100,
-      startY: 120,
-      endX: 240,
-      endY: 260,
+      vertices: [{ x: 100, y: 120 }, { x: 240, y: 260 }],
     });
 
-    const result = solveLineHandleSession(
+    const result = solvePolygonVertexSession(
       item,
-      'end',
+      1,
       { x: 104, y: 126 },
       { x: 0, y: 0 },
       [],
       { x: 0, y: 0, width: 1200, height: 600 },
-      false
+      true
     );
 
     expect(result.item).toMatchObject({
-      endX: 100,
-      endY: 120,
+      vertices: [
+        { x: 100, y: 120 },
+        { x: 100, y: 120 },
+      ],
     });
     expect(result.guides).toEqual(
       expect.arrayContaining([
@@ -449,15 +445,12 @@ describe('interaction geometry', () => {
 
   it('snaps line handle to anchor axis at wider range when given a larger threshold', () => {
     const item = createLineItem({
-      startX: 100,
-      startY: 120,
-      endX: 240,
-      endY: 260,
+      vertices: [{ x: 100, y: 120 }, { x: 240, y: 260 }],
     });
     // 12px away from anchor Y — too far for default threshold (8), but within 16
-    const result = solveLineHandleSession(
+    const result = solvePolygonVertexSession(
       item,
-      'end',
+      1,
       { x: 200, y: 132 },
       { x: 0, y: 0 },
       [],
@@ -467,7 +460,10 @@ describe('interaction geometry', () => {
     );
 
     expect(result.item).toMatchObject({
-      endY: 120,
+      vertices: [
+        { x: 100, y: 120 },
+        { x: 200, y: 120 },
+      ],
     });
     expect(result.guides).toEqual(
       expect.arrayContaining([
@@ -825,6 +821,70 @@ describe('polygon interactions', () => {
     );
 
     expect(result.item).toBe(item);
+  });
+
+  it('aligns the end of a bent line to its one neighbor, never wrapping to the other end', () => {
+    // Open chain: vertex 2 (the end) neighbors only vertex 1. Its y is within
+    // the snap threshold of vertex 0's, which a closed ring would align to.
+    const item = createLineItem({
+      vertices: [
+        { x: 100, y: 100 },
+        { x: 300, y: 300 },
+        { x: 500, y: 100 },
+      ],
+    });
+    const open = solvePolygonVertexSession(item, 2, { x: 520, y: 104 }, { x: 0, y: 0 }, [], stageRect, true);
+    expect((open.item as PolygonCanvasItem).vertices[2]).toEqual({ x: 520, y: 104 });
+    expect(open.guides).toEqual([]);
+
+    const closed = solvePolygonVertexSession(
+      { ...item, closed: true },
+      2,
+      { x: 520, y: 104 },
+      { x: 0, y: 0 },
+      [],
+      stageRect,
+      true,
+    );
+    expect((closed.item as PolygonCanvasItem).vertices[2]).toEqual({ x: 520, y: 100 });
+
+    // It still aligns to the neighbor it does have.
+    const toNeighbor = solvePolygonVertexSession(item, 2, { x: 304, y: 180 }, { x: 0, y: 0 }, [], stageRect, true);
+    expect((toNeighbor.item as PolygonCanvasItem).vertices[2]).toEqual({ x: 300, y: 180 });
+  });
+
+  it('drags a line out from its first vertex to its second', () => {
+    const created = buildCreatedItem('line', { x: 320, y: 240 }, { x: 120, y: 140 });
+    expect(created).toMatchObject({
+      kind: 'polygon',
+      name: 'Line',
+      closed: false,
+      vertices: [
+        { x: 320, y: 240 },
+        { x: 120, y: 140 },
+      ],
+      x: 120,
+      y: 140,
+      width: 200,
+      height: 100,
+    });
+    expect(getCreatePreview('line', { x: 320, y: 240 }, { x: 120, y: 140 })).toMatchObject({
+      closed: false,
+      vertices: [
+        { x: 320, y: 240 },
+        { x: 120, y: 140 },
+      ],
+    });
+  });
+
+  it('drops a centered default line for click-without-drag', () => {
+    const created = buildCreatedItem('line', { x: 300, y: 200 }, { x: 301, y: 200 });
+    expect(created).toMatchObject({ kind: 'polygon', closed: false, width: 240, height: 24 });
+    if (created.kind !== 'polygon') throw new Error('Expected a line.');
+    expect(created.vertices).toEqual([
+      { x: 180, y: 188 },
+      { x: 420, y: 212 },
+    ]);
   });
 
   it('scales every vertex from the old AABB into the resized box on a box resize', () => {

@@ -89,7 +89,7 @@ describe('useCanvasDebugSnapshot', () => {
 
   it('registers a snapshot function that reads selected item geometry and group hook overlays', () => {
     const rectangle = createRectangleItem({ id: 'shape', x: 10, y: 20, width: 80, height: 50 });
-    const line = createLineItem({ id: 'line', startX: 20, startY: 30, endX: 120, endY: 80 });
+    const line = createLineItem({ id: 'line', vertices: [{ x: 20, y: 30 }, { x: 120, y: 80 }] });
 
     const overlay = document.createElement('div');
     overlay.dataset.testid = 'canvas-group-overlay';
@@ -135,7 +135,7 @@ describe('useCanvasDebugSnapshot', () => {
     const root = document.createElement('div');
     root.append(overlay, handle, rotater, shapeHandle);
 
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useCanvasDebugSnapshot({
         beginGroupDrag: () => {},
         beginGroupResize: () => {},
@@ -171,9 +171,28 @@ describe('useCanvasDebugSnapshot', () => {
       }),
     );
 
+    // The stage debug state names a line 'line' and reports its two ends.
+    expect(result.current.selectedItems).toEqual([
+      expect.objectContaining({ id: 'shape', kind: 'rectangle', rotation: 0 }),
+      expect.objectContaining({
+        id: 'line',
+        kind: 'line',
+        rotation: 0,
+        startX: 20,
+        startY: 30,
+        endX: 120,
+        endY: 80,
+      }),
+    ]);
+
     const snapshot = window.__BB_TEST__?.captureRenderSnapshot?.() as {
       sessionKind: string;
-      selectedItems: Array<{ id: string; geometry: { width: number; height: number } }>;
+      selectedItems: Array<{
+        id: string;
+        kind: string;
+        outlinePoints: Array<{ x: number; y: number }>;
+        geometry: { width: number; height: number };
+      }>;
       groupOverlay: { rotation: number; width: number };
       groupHandles: Record<string, { x: number; y: number }>;
       groupRotater: { x: number; y: number };
@@ -190,9 +209,13 @@ describe('useCanvasDebugSnapshot', () => {
           id: 'shape',
           geometry: expect.objectContaining({ width: 80, height: 50 }),
         }),
+        // A line (an open polygon) reports kind 'line' and is outlined along
+        // its vertices rather than around its box.
         expect.objectContaining({
           id: 'line',
-          geometry: expect.objectContaining({ width: 100, height: 50 }),
+          kind: 'line',
+          outlinePoints: [{ x: 20, y: 30 }, { x: 120, y: 80 }],
+          geometry: expect.objectContaining({ x: 20, y: 30, width: 100, height: 50, rotation: 0 }),
         }),
       ]),
     );

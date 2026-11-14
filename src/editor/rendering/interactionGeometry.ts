@@ -10,7 +10,6 @@ import type {
   CanvasItem,
   CanvasTool,
   GuideLine,
-  LineCanvasItem,
   PolygonCanvasItem,
   PolygonVertex,
   SnapRect,
@@ -157,7 +156,7 @@ function rectFromBounds(bounds: {
 }
 
 export function getShapeHandlePoints(
-  item: Exclude<CanvasItem, LineCanvasItem>
+  item: CanvasItem
 ) {
   const renderBox = getRenderBox(item);
   const origin = { x: renderBox.x, y: renderBox.y };
@@ -185,7 +184,7 @@ export function getShapeHandlePoints(
 }
 
 export function getShapeHandleRects(
-  item: Exclude<CanvasItem, LineCanvasItem>
+  item: CanvasItem
 ) {
   const points = getShapeHandlePoints(item);
   return Object.fromEntries(
@@ -211,25 +210,8 @@ export function getPolygonVertexHandleRects(item: PolygonCanvasItem): SnapRect[]
   }));
 }
 
-export function getLineHandleRects(item: LineCanvasItem) {
-  return {
-    start: {
-      x: item.startX - HANDLE_SIZE / 2,
-      y: item.startY - HANDLE_SIZE / 2,
-      width: HANDLE_SIZE,
-      height: HANDLE_SIZE,
-    },
-    end: {
-      x: item.endX - HANDLE_SIZE / 2,
-      y: item.endY - HANDLE_SIZE / 2,
-      width: HANDLE_SIZE,
-      height: HANDLE_SIZE,
-    },
-  };
-}
-
 export function getSelectionOutlinePoints(
-  item: Exclude<CanvasItem, LineCanvasItem>
+  item: CanvasItem
 ) {
   const renderBox = getRenderBox(item);
   const origin = { x: renderBox.x, y: renderBox.y };
@@ -243,7 +225,7 @@ export function getSelectionOutlinePoints(
   return corners.flatMap((point) => [point.x, point.y]);
 }
 
-function getCenter(item: Exclude<CanvasItem, LineCanvasItem>) {
+function getCenter(item: CanvasItem) {
   const renderBox = getRenderBox(item);
   return localToStage(
     {
@@ -326,7 +308,7 @@ function scaleRectPoint(
   };
 }
 
-function applyShapeFrame<T extends Exclude<CanvasItem, LineCanvasItem>>(
+function applyShapeFrame<T extends CanvasItem>(
   item: T,
   localRect: SnapRect
 ): T {
@@ -390,28 +372,6 @@ export function withPolygonGeometry(
   };
 }
 
-function withLineGeometry(
-  item: LineCanvasItem,
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number
-): LineCanvasItem {
-  return {
-    ...item,
-    startX,
-    startY,
-    endX,
-    endY,
-    x: Math.min(startX, endX),
-    y: Math.min(startY, endY),
-    width: Math.max(1, Math.abs(endX - startX)),
-    height: Math.max(1, Math.abs(endY - startY)),
-    scaleX: 1,
-    scaleY: 1,
-  };
-}
-
 export function solveDragSession(
   item: CanvasItem,
   startPointer: Point,
@@ -441,32 +401,6 @@ export function solveDragSession(
     };
   }
 
-  if (item.kind === 'line') {
-    const rawStartX = item.startX + deltaX;
-    const rawStartY = item.startY + deltaY;
-    const rawEndX = item.endX + deltaX;
-    const rawEndY = item.endY + deltaY;
-    const rawRect = {
-      x: Math.min(rawStartX, rawEndX),
-      y: Math.min(rawStartY, rawEndY),
-      width: Math.max(1, Math.abs(rawEndX - rawStartX)),
-      height: Math.max(1, Math.abs(rawEndY - rawStartY)),
-    };
-    const snapped = snapEnabled ? getSnappedRect(rawRect, siblingItems, stageRect, threshold, cache) : { rect: rawRect, guides: [] };
-    const offsetX = snapped.rect.x - rawRect.x;
-    const offsetY = snapped.rect.y - rawRect.y;
-
-    return {
-      item: withLineGeometry(
-        item,
-        rawStartX + offsetX,
-        rawStartY + offsetY,
-        rawEndX + offsetX,
-        rawEndY + offsetY
-      ),
-      guides: snapped.guides,
-    };
-  }
 
   const renderBox = getRenderBox(item);
   const aabb = getItemAABB(item);
@@ -572,7 +506,7 @@ function snapResizeEdge(
 }
 
 export function solveResizeSession(
-  item: Exclude<CanvasItem, LineCanvasItem>,
+  item: CanvasItem,
   handle: ResizeHandle,
   pointer: Point,
   pointerOffset: Point,
@@ -734,7 +668,7 @@ export function solveResizeSession(
 }
 
 export function solveRotateSession(
-  item: Exclude<CanvasItem, LineCanvasItem>,
+  item: CanvasItem,
   startPointer: Point,
   currentPointer: Point,
   snapAbsolute = false
@@ -782,73 +716,11 @@ export function solveRotateSession(
   };
 }
 
-export function solveLineHandleSession(
-  item: LineCanvasItem,
-  handle: 'start' | 'end',
-  pointer: Point,
-  pointerOffset: Point,
-  siblingItems: CanvasItem[],
-  stageRect: SnapRect,
-  snapEnabled = true,
-  threshold = SNAP_THRESHOLD,
-  cache?: SnapCandidateCache
-): InteractionItemPreview {
-  const adjustedPointer = {
-    x: pointer.x - pointerOffset.x,
-    y: pointer.y - pointerOffset.y,
-  };
-  const snapped = snapEnabled ? getSnappedRect(
-    {
-      x: adjustedPointer.x - 1,
-      y: adjustedPointer.y - 1,
-      width: 2,
-      height: 2,
-    },
-    siblingItems,
-    stageRect,
-    threshold,
-    cache
-  ) : { rect: { x: adjustedPointer.x - 1, y: adjustedPointer.y - 1, width: 2, height: 2 }, guides: [] };
-  const nextPoint = {
-    x: snapped.rect.x + 1,
-    y: snapped.rect.y + 1,
-  };
-  const anchorPoint = handle === 'start' ? { x: item.endX, y: item.endY } : { x: item.startX, y: item.startY };
-  const guides = [...snapped.guides];
-  if (Math.abs(nextPoint.y - anchorPoint.y) <= threshold) {
-    nextPoint.y = anchorPoint.y;
-    guides.push({ orientation: 'horizontal', position: anchorPoint.y });
-  }
-  if (Math.abs(nextPoint.x - anchorPoint.x) <= threshold) {
-    nextPoint.x = anchorPoint.x;
-    guides.push({ orientation: 'vertical', position: anchorPoint.x });
-  }
-
-  return {
-    item:
-      handle === 'start'
-        ? withLineGeometry(
-            item,
-            nextPoint.x,
-            nextPoint.y,
-            item.endX,
-            item.endY
-          )
-        : withLineGeometry(
-            item,
-            item.startX,
-            item.startY,
-            nextPoint.x,
-            nextPoint.y
-          ),
-    guides,
-  };
-}
-
 /**
  * Drag one polygon vertex: snap the dragged point against siblings/canvas,
- * then axis-align it to its two neighbor vertices (mirroring how a line
- * endpoint aligns to its opposite end).
+ * then axis-align it to its neighbor vertices. An end of a line (an open
+ * chain) has one neighbor, so a two-vertex line's endpoint aligns to its
+ * opposite end.
  */
 export function solvePolygonVertexSession(
   item: PolygonCanvasItem,
@@ -884,10 +756,11 @@ export function solvePolygonVertexSession(
   };
   const guides = [...snapped.guides];
   if (snapEnabled) {
-    const neighbors = [
-      item.vertices[(vertexIndex + vertexCount - 1) % vertexCount],
-      item.vertices[(vertexIndex + 1) % vertexCount],
-    ];
+    // A closed ring wraps around; an open chain's ends do not.
+    const neighborIndices = item.closed
+      ? [(vertexIndex + vertexCount - 1) % vertexCount, (vertexIndex + 1) % vertexCount]
+      : [vertexIndex - 1, vertexIndex + 1].filter((index) => index >= 0 && index < vertexCount);
+    const neighbors = neighborIndices.map((index) => item.vertices[index]);
     for (const anchor of neighbors) {
       if (Math.abs(nextPoint.y - anchor.y) <= threshold) {
         nextPoint.y = anchor.y;
@@ -919,20 +792,6 @@ function centerDefaultItem<T extends CanvasItem>(item: T, pointer: Point): T {
         pointer.x - (bounds.x + bounds.width / 2),
         pointer.y - (bounds.y + bounds.height / 2)
       )
-    ) as T;
-  }
-
-  if (item.kind === 'line') {
-    const centerX = (item.startX + item.endX) / 2;
-    const centerY = (item.startY + item.endY) / 2;
-    const deltaX = pointer.x - centerX;
-    const deltaY = pointer.y - centerY;
-    return withLineGeometry(
-      item,
-      item.startX + deltaX,
-      item.startY + deltaY,
-      item.endX + deltaX,
-      item.endY + deltaY
     ) as T;
   }
 
@@ -994,13 +853,11 @@ export function buildCreatedItem(
   }
 
   if (tool === 'line') {
-    return withLineGeometry(
-      createLineItem(),
-      startPointer.x,
-      startPointer.y,
-      currentPointer.x,
-      currentPointer.y
-    );
+    // A line is dragged out from its first vertex to its second.
+    return withPolygonGeometry(createLineItem(), [
+      { x: startPointer.x, y: startPointer.y },
+      { x: currentPointer.x, y: currentPointer.y },
+    ]);
   }
 
   const bounds = normalizeBounds(
@@ -1033,13 +890,11 @@ export function getCreatePreview(
   currentPointer: Point
 ) {
   if (tool === 'line') {
-    return withLineGeometry(
-      createLineItem(),
-      startPointer.x,
-      startPointer.y,
-      currentPointer.x,
-      currentPointer.y
-    );
+    // A line is dragged out from its first vertex to its second.
+    return withPolygonGeometry(createLineItem(), [
+      { x: startPointer.x, y: startPointer.y },
+      { x: currentPointer.x, y: currentPointer.y },
+    ]);
   }
 
   const bounds = normalizeBounds(

@@ -1,6 +1,7 @@
-import type { CanvasItem, GeneratorCanvasItem, LineCanvasItem } from '../../document/documentTypes';
+import type { CanvasItem, GeneratorCanvasItem, PolygonCanvasItem } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 
-type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
+type ShapeItem = Exclude<CanvasItem, GeneratorCanvasItem>;
 import { type Point, type ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
@@ -25,9 +26,10 @@ interface CanvasTestHooksProps {
     source?: PointerGestureSource,
   ) => void;
   beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
-  beginLineHandle: (
-    item: Extract<CanvasItem, { kind: 'line' }>,
-    handle: 'start' | 'end',
+  // Drives the line handle hooks: a line's ends are its first and last vertex.
+  beginPolygonVertexHandle: (
+    item: PolygonCanvasItem,
+    vertexIndex: number,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
@@ -93,7 +95,7 @@ export function CanvasTestHooks({
   beginGroupDrag,
   beginGroupResize,
   beginGroupRotate,
-  beginLineHandle,
+  beginPolygonVertexHandle,
   beginResize,
   beginRotate,
   cropFullImageHandleViewportPoints = null,
@@ -311,10 +313,7 @@ export function CanvasTestHooks({
                 key={`shape-handle-${handle}`}
                 data-testid={`canvas-shape-handle-${handle}`}
                 onMouseDown={(event) => {
-                  if (
-                    !selectedRenderedItem ||
-                    selectedRenderedItem.kind === 'line'
-                  ) {
+                  if (!selectedRenderedItem) {
                     return;
                   }
                   if (event.button === 1 || spacebarHeld) {
@@ -356,10 +355,7 @@ export function CanvasTestHooks({
                 key={`line-handle-${handle}`}
                 data-testid={`canvas-line-handle-${handle}`}
                 onMouseDown={(event) => {
-                  if (
-                    !selectedRenderedItem ||
-                    selectedRenderedItem.kind !== 'line'
-                  ) {
+                  if (!selectedRenderedItem || !isLineItem(selectedRenderedItem)) {
                     return;
                   }
                   if (event.button === 1 || spacebarHeld) {
@@ -374,9 +370,9 @@ export function CanvasTestHooks({
                   if (!pointer) {
                     return;
                   }
-                  beginLineHandle(
+                  beginPolygonVertexHandle(
                     selectedRenderedItem,
-                    handle as 'start' | 'end',
+                    handle === 'start' ? 0 : selectedRenderedItem.vertices.length - 1,
                     toCanvasPointer(pointer),
                     OVERLAY_POINTER_SOURCE,
                   );

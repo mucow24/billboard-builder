@@ -24,6 +24,7 @@ import {
   openPropertiesTab,
   readStageDebug,
   saveAndReadProject,
+  savedLineEnds,
   setCanvasTestHooksEnabled,
   uploadProject,
 } from './support/editor';
@@ -38,10 +39,7 @@ type SavedNode = {
   width?: number;
   height?: number;
   rotation?: number;
-  startX?: number;
-  startY?: number;
-  endX?: number;
-  endY?: number;
+  vertices?: Array<{ x: number; y: number }>;
   children?: SavedNode[];
 };
 
@@ -871,7 +869,8 @@ test.describe('editor groups', () => {
 
     // Drag line start handle (now at 180,240 — clear of the rectangle's bottom edge at y=220)
     await dragEmptyCanvas(page, { x: 180, y: 240 }, { x: 260, y: 280 });
-    // Drag line body (midpoint after start moved)
+    // Drag line body (midpoint after start moved). The line is too short on
+    // screen here to show the "+" that splits it, so its middle is still body.
     await dragEmptyCanvas(page, { x: 350, y: 290 }, { x: 470, y: 360 });
 
     stageDebug = await readStageDebug(page);
@@ -887,22 +886,14 @@ test.describe('editor groups', () => {
         rotation: 0,
       }),
     );
-    expect(expectSavedNode(savedProject, 'line-child')).toEqual(
-      expect.objectContaining({
-        x: expect.any(Number),
-        y: expect.any(Number),
-        startX: expect.any(Number),
-        startY: expect.any(Number),
-        endX: expect.any(Number),
-        endY: expect.any(Number),
-      }),
-    );
+    // A line is saved as an open polygon whose first and last vertex are its ends.
+    const lineChildEnds = savedLineEnds(expectSavedNode(savedProject, 'line-child'));
     // After start-handle drag (delta 80,40) then body drag (delta ~120,70):
     // startX ≈ 180+80+120=380, startY ≈ 240+40+70=350
-    expect(Number(expectSavedNode(savedProject, 'line-child').startX)).toBeGreaterThan(340);
-    expect(Number(expectSavedNode(savedProject, 'line-child').startY)).toBeGreaterThan(310);
-    expect(Number(expectSavedNode(savedProject, 'line-child').endX)).toBeGreaterThan(520);
-    expect(Number(expectSavedNode(savedProject, 'line-child').endY)).toBeGreaterThan(340);
+    expect(lineChildEnds.startX).toBeGreaterThan(340);
+    expect(lineChildEnds.startY).toBeGreaterThan(310);
+    expect(lineChildEnds.endX).toBeGreaterThan(520);
+    expect(lineChildEnds.endY).toBeGreaterThan(340);
   });
 
   test('NI-11 NI-12 true grouped-node child manipulation survives undo, redo, and escape with the correct hierarchy state', async ({
@@ -1107,19 +1098,12 @@ test.describe('editor groups', () => {
     expect(Number(savedRectangle.width)).toBeGreaterThan(220);
     expect(Number(savedRectangle.height)).toBeCloseTo(100, 0);
 
-    expect(savedLine).toEqual(
-      expect.objectContaining({
-        startX: expect.any(Number),
-        startY: expect.any(Number),
-        endX: expect.any(Number),
-        endY: expect.any(Number),
-      }),
-    );
-    expect(Number(savedLine.startX)).toBeGreaterThanOrEqual(180);
-    expect(Number(savedLine.startY)).toBeCloseTo(220, 0);
-    expect(Number(savedLine.endX)).toBeGreaterThan(440);
-    expect(Number(savedLine.endY)).toBeCloseTo(280, 0);
-    expect(Number(savedLine.endX) - Number(savedLine.startX)).toBeGreaterThan(290);
+    const savedLineEndPoints = savedLineEnds(savedLine);
+    expect(savedLineEndPoints.startX).toBeGreaterThanOrEqual(180);
+    expect(savedLineEndPoints.startY).toBeCloseTo(220, 0);
+    expect(savedLineEndPoints.endX).toBeGreaterThan(440);
+    expect(savedLineEndPoints.endY).toBeCloseTo(280, 0);
+    expect(savedLineEndPoints.endX - savedLineEndPoints.startX).toBeGreaterThan(290);
   });
 
 });

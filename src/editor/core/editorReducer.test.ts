@@ -11,7 +11,7 @@ import { parseProjectDocument, serializeProjectDocument } from '../document/docu
 import type { CanvasNode, DocumentFontReference, UploadedFont } from '../document/documentTypes';
 import { cloneCanvasNode, collectLeafItems } from '../document/sceneGraph';
 import { createDefaultEditorState, type EditorState } from './editorState';
-import { applyEditorCommand, reduceEditorState } from './editorReducer';
+import { applyEditorCommand, createItemForKind, reduceEditorState } from './editorReducer';
 import { createTransactionAction, toEditorAction } from './editorActions';
 
 describe('editor reducer', () => {
@@ -176,8 +176,22 @@ describe('editor reducer', () => {
     ).not.toThrow();
   });
 
+  it('creates a line as an open two-vertex polygon', () => {
+    const item = createItemForKind('line', 10, 20);
+
+    expect(item).toMatchObject({
+      kind: 'polygon',
+      name: 'Line',
+      closed: false,
+      vertices: [
+        { x: 10, y: 20 },
+        { x: 250, y: 44 },
+      ],
+    });
+  });
+
   it('recomputes line geometry from endpoint updates', () => {
-    const item = createLineItem({ startX: 10, startY: 20, endX: 110, endY: 60 });
+    const item = createLineItem({ vertices: [{ x: 10, y: 20 }, { x: 110, y: 60 }] });
     const document = {
       ...createDefaultProjectDocument(),
       nodes: [item],
@@ -186,7 +200,7 @@ describe('editor reducer', () => {
     const nextDocument = applyEditorCommand(document, {
       type: 'update_node',
       itemId: item.id,
-      changes: { endX: 160, endY: 90 },
+      changes: { vertices: [item.vertices[0], { x: 160, y: 90 }] },
     });
     const nextItem = nextDocument.nodes.flatMap(collectLeafItems)[0];
 

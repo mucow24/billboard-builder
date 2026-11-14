@@ -3,6 +3,7 @@ import type {
   DocumentFontReference,
   ProjectDocument,
 } from './documentTypes';
+import { getItemDisplayKind, isLineItem } from './polygonVertices';
 import { collectLeafItems, isGroupNode } from './sceneGraph';
 
 export interface FavoriteSelectionPayload {
@@ -87,7 +88,17 @@ export function summarizeFavoriteNodes(nodes: readonly CanvasNode[]): FavoriteNo
   }
 
   for (const item of leafItems) {
-    kindCounts.set(item.kind, (kindCounts.get(item.kind) ?? 0) + 1);
+    // Counted by what the item is called, so a line counts as 'line'.
+    const displayKind = getItemDisplayKind(item);
+    kindCounts.set(displayKind, (kindCounts.get(displayKind) ?? 0) + 1);
+
+    if (isLineItem(item)) {
+      // A line paints only its stroke.
+      if (item.kind === 'polygon') {
+        pushPreviewColor(item.stroke);
+      }
+      continue;
+    }
 
     switch (item.kind) {
       case 'rectangle':
@@ -100,9 +111,6 @@ export function summarizeFavoriteNodes(nodes: readonly CanvasNode[]): FavoriteNo
         break;
       case 'text':
         pushPreviewColor(item.fill);
-        break;
-      case 'line':
-        pushPreviewColor(item.stroke);
         break;
       case 'image':
         if (item.adjustments.tintStrength > 0) {

@@ -222,7 +222,7 @@ test.describe('polygon tool flows', () => {
     expect(polygonNode.vertices).toHaveLength(3);
   });
 
-  test('inspector Closed checkbox and Curve radius persist through save', async ({ page }) => {
+  test('inspector Curve radius persists through save, and there is no Closed checkbox', async ({ page }) => {
     await openFreshEditor(page);
     await uploadPolygonFixture(page);
 
@@ -271,17 +271,16 @@ test.describe('polygon tool flows', () => {
       await radius.press('Enter');
     });
 
-    await page.getByRole('button', { name: 'Geometry' }).click();
-
-    await test.step('unchecks Closed to open the chain and hides the fill section', async () => {
+    await test.step('has no Closed checkbox and no Geometry section: a polygon is always closed', async () => {
       await expect(page.getByRole('button', { name: 'Toggle gradient' })).toBeVisible();
-      await page.getByRole('checkbox', { name: 'Closed' }).uncheck();
-
-      await expect(page.getByRole('button', { name: 'Toggle gradient' })).toBeHidden();
+      await expect(page.getByRole('checkbox', { name: 'Closed' })).toHaveCount(0);
+      await expect(
+        page.getByTestId('properties-tab-body').getByRole('button', { name: 'Geometry', exact: true }),
+      ).toHaveCount(0);
 
       const saved = await saveAndReadProject(page);
       expect(saved.nodes).toEqual([
-        expect.objectContaining({ closed: false, curveRadius: 24 }),
+        expect.objectContaining({ closed: true, curveRadius: 24 }),
       ]);
     });
   });

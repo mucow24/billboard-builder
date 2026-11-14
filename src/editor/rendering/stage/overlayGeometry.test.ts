@@ -6,6 +6,7 @@ import {
   getCanvasOverlayMetrics,
   getShapeOverlayHandlePoints,
   getViewportHandleRect,
+  showsEdgeAddHandle,
 } from './overlayGeometry';
 
 describe('overlayGeometry', () => {
@@ -49,5 +50,18 @@ describe('overlayGeometry', () => {
       width: 16,
       height: 16,
     });
+  });
+
+  it('shows the edge "+" from 42 screen px on a polygon and from 72 on a line', () => {
+    // Closed polygon: the body is the interior, so the "+" only has to fit.
+    expect(showsEdgeAddHandle(41, 1, true)).toBe(false);
+    expect(showsEdgeAddHandle(42, 1, true)).toBe(true);
+    // A line's body is the segment, so the "+" must leave room to grab it.
+    expect(showsEdgeAddHandle(71, 1, false)).toBe(false);
+    expect(showsEdgeAddHandle(72, 1, false)).toBe(true);
+    // The length that counts is the one on screen.
+    expect(showsEdgeAddHandle(200, 0.25, false)).toBe(false);
+    expect(showsEdgeAddHandle(200, 0.5, false)).toBe(true);
+    expect(showsEdgeAddHandle(30, 3, false)).toBe(true);
   });
 });

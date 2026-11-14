@@ -256,11 +256,15 @@ const PolygonCanvasItemSchema = BaseCanvasItemSchema.extend({
   gradientAngle: z.number().optional(),
   stroke: z.string(),
   strokeWidth: z.number().nonnegative(),
-  vertices: z.array(PolygonVertexSchema).min(3),
+  // A closed polygon needs 3; an open one (a line) needs 2. The normalizer
+  // rebuilds a closed polygon that arrives with only 2.
+  vertices: z.array(PolygonVertexSchema).min(2),
   closed: z.boolean().optional(),
   curveRadius: z.number().nonnegative().optional(),
 });
 
+// The old saved shape of a line. Still accepted; the normalizer turns it into
+// an open polygon, which is how lines are saved now.
 const LineCanvasItemSchema = BaseCanvasItemSchema.extend({
   kind: z.literal('line'),
   stroke: z.string(),

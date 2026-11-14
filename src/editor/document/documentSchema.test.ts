@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createDefaultProjectDocument,
+  createLineItem,
   createGeneratorItem,
   createGroupNode,
   createImageItem,
@@ -305,12 +306,63 @@ describe('document schema', () => {
     });
   });
 
-  it('rejects polygon items with fewer than 3 vertices', () => {
-    const polygon = createPolygonItem();
-    polygon.vertices = [
+  it('opens a file whose line was saved with start and end points as an open two-vertex polygon', () => {
+    const { vertices, closed, curveRadius, fill, secondaryFill, gradientEnabled, gradientAngle, ...base } =
+      createLineItem({ id: 'old-line', name: 'My line', stroke: '#112233ff', strokeWidth: 4 });
+    void [vertices, closed, curveRadius, fill, secondaryFill, gradientEnabled, gradientAngle];
+    const legacyLine = { ...base, kind: 'line', startX: 40, startY: 50, endX: 20, endY: 10 };
+
+    const parsed = parseProjectDocument({
+      version: 2,
+      canvas: { width: 1024, height: 1024 },
+      background: '#ffffff00',
+      fonts: [],
+      nodes: [legacyLine],
+    });
+
+    expect(parsed.nodes[0]).toMatchObject({
+      id: 'old-line',
+      kind: 'polygon',
+      name: 'My line',
+      closed: false,
+      curveRadius: 0,
+      stroke: '#112233ff',
+      strokeWidth: 4,
+      vertices: [
+        { x: 40, y: 50 },
+        { x: 20, y: 10 },
+      ],
+      x: 20,
+      y: 10,
+      width: 20,
+      height: 40,
+    });
+    // It saves in the new shape and reopens unchanged.
+    const reopened = parseProjectDocument(JSON.parse(serializeProjectDocument(parsed)));
+    expect(reopened.nodes[0]).toEqual(parsed.nodes[0]);
+    expect(serializeProjectDocument(parsed)).not.toContain('startX');
+  });
+
+  it('accepts a line with two vertices and rebuilds a closed polygon that arrives with two', () => {
+    const document = createDefaultProjectDocument();
+    const twoPoints = [
       { x: 0, y: 0 },
       { x: 10, y: 10 },
     ];
+    const closedPolygon = createPolygonItem();
+    closedPolygon.vertices = twoPoints;
+    document.nodes = [createLineItem({ vertices: twoPoints }), closedPolygon];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+
+    expect(parsed.nodes[0]).toMatchObject({ kind: 'polygon', closed: false, vertices: twoPoints });
+    expect(parsed.nodes[1]).toMatchObject({ kind: 'polygon', closed: true });
+    expect((parsed.nodes[1] as typeof closedPolygon).vertices).toHaveLength(4);
+  });
+
+  it('rejects polygon items with fewer than 2 vertices', () => {
+    const polygon = createPolygonItem();
+    polygon.vertices = [{ x: 0, y: 0 }];
 
     expect(() =>
       parseProjectDocument({

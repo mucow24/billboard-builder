@@ -109,14 +109,6 @@ function getResizeSnapKeys(activeAnchor: string | null | undefined): {
 }
 
 export function getItemRect(item: CanvasItem): SnapRect {
-  if (item.kind === 'line') {
-    return {
-      x: Math.min(item.startX, item.endX),
-      y: Math.min(item.startY, item.endY),
-      width: Math.abs(item.endX - item.startX),
-      height: Math.abs(item.endY - item.startY),
-    };
-  }
   return {
     x: item.x,
     y: item.y,

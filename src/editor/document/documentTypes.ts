@@ -16,7 +16,6 @@ export type CanvasLeafKind =
   | 'ellipse'
   | 'ngon'
   | 'polygon'
-  | 'line'
   | 'generator';
 
 export type TextAlign = 'left' | 'center' | 'right';
@@ -161,19 +160,26 @@ export interface PolygonCanvasItem extends BaseCanvasItem, GradientFillItem {
   kind: 'polygon';
   stroke: string;
   strokeWidth: number;
-  // Absolute canvas coordinates, in order, length >= 3 (like line's endpoints,
-  // x/y/width/height hold the derived AABB). Edited via on-canvas vertex
-  // handles; edge midpoints split into new vertices.
+  // Absolute canvas coordinates, in order; x/y/width/height hold the derived
+  // AABB. A closed polygon has at least 3, a line at least 2. Edited via
+  // on-canvas vertex handles; edge midpoints split into new vertices.
   vertices: PolygonVertex[];
-  // When false the polygon is OPEN: the stroke runs along the vertex chain
-  // with no closing edge and no fill, and hit-testing follows the stroke.
+  // When false the item is a LINE: the stroke runs along the vertex chain with
+  // no closing edge and no fill, and hit-testing follows the stroke. The Line
+  // tool creates these with two vertices; the Polygon tool creates closed
+  // ones. There is no control to switch between the two.
   closed: boolean;
   // Corner-rounding radius in canvas units; 0 = sharp corners. Each corner's
   // trim is clamped to half its shorter adjacent edge, so any value is safe.
   curveRadius: number;
 }
 
-export interface LineCanvasItem extends BaseCanvasItem {
+/**
+ * How lines were saved before they became open polygons. Only the schema and
+ * the normalizer know this shape: the normalizer turns it into a two-vertex
+ * open polygon, so nothing past loading ever sees one.
+ */
+export interface LegacyLineCanvasItem extends Omit<BaseCanvasItem, 'kind'> {
   kind: 'line';
   stroke: string;
   strokeWidth: number;
@@ -306,7 +312,6 @@ export type CanvasItem =
   | EllipseCanvasItem
   | NgonCanvasItem
   | PolygonCanvasItem
-  | LineCanvasItem
   | GeneratorCanvasItem;
 
 export interface GroupNode {

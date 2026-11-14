@@ -26,6 +26,8 @@ export const SECTION_ORDER = {
   stroke: 15,
   ngon: 17,
   polygon: 18,
+  // Same slot as Polygon: a line shows one or the other, never both.
+  line: 18,
   text: 20,
   geometry: 50,
   advancedText: 60,
@@ -162,7 +164,6 @@ export function createRotationField(): NumberFieldDescriptor {
     50,
     (item) => item.rotation,
     ({ item }, nextValue) => {
-      if (item.kind === 'line') return { rotation: nextValue };
       const renderBox = getRenderBox(item);
       const half = { x: renderBox.width / 2, y: renderBox.height / 2 };
       const center = localToStage(half, renderBox, item.rotation);

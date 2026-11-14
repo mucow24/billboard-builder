@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
+import { getItemDisplayKind } from '../../document/polygonVertices';
 import { isCanvasItemNode } from '../../document/sceneGraph';
 
 import {
@@ -242,7 +243,7 @@ export function LayersInspectorTab({
                     </button>
                   ) : (
                     <span
-                      className={`layer-row-type layer-row-type-${row.node.kind}`}
+                      className={`layer-row-type layer-row-type-${getItemDisplayKind(row.node)}`}
                       data-testid={`layers-preview-anchor-${row.node.id}`}
                       aria-hidden="true"
                       style={rowPreviewStyle}

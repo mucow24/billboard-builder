@@ -2,10 +2,8 @@ import {
   buildCreatedItem,
   CREATE_CLICK_THRESHOLD,
   getCreatePreview,
-  getLineHandleRects,
   getShapeHandlePoints,
   solveDragSession,
-  solveLineHandleSession,
   solvePolygonVertexSession,
   solveResizeSession,
   solveRotateSession,
@@ -30,13 +28,12 @@ import type {
   CanvasTool,
   GeneratorCanvasItem,
   GuideLine,
-  LineCanvasItem,
   PolygonCanvasItem,
 } from '../document/documentTypes';
-import { insertPolygonVertex } from '../document/polygonVertices';
+import { insertPolygonVertex, isLineItem } from '../document/polygonVertices';
 import { flattenVisibleLeafNodes } from '../document/sceneGraph';
 
-export type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
+export type ShapeItem = Exclude<CanvasItem, GeneratorCanvasItem>;
 export type PointerGestureSource = 'stage' | 'overlay';
 
 export interface SelectionFrame {
@@ -50,7 +47,6 @@ interface InteractionSessionBase {
     | 'drag'
     | 'resize'
     | 'rotate'
-    | 'line-handle'
     | 'polygon-vertex'
     | 'marquee'
     | 'group-drag'
@@ -71,7 +67,7 @@ export interface CreateSession extends InteractionSessionBase {
 }
 
 interface ItemSession extends InteractionSessionBase {
-  kind: 'drag' | 'resize' | 'rotate' | 'line-handle' | 'polygon-vertex';
+  kind: 'drag' | 'resize' | 'rotate' | 'polygon-vertex';
   itemId: string;
   originalItem: CanvasItem;
   previewItem: CanvasItem;
@@ -92,12 +88,6 @@ export interface ResizeSession extends ItemSession {
 export interface RotateSession extends ItemSession {
   kind: 'rotate';
   handle: 'rotater';
-}
-
-export interface LineHandleSession extends ItemSession {
-  kind: 'line-handle';
-  handle: 'start' | 'end';
-  pointerOffset: Point;
 }
 
 export interface PolygonVertexSession extends ItemSession {
@@ -147,7 +137,6 @@ export type InteractionSession =
   | DragSession
   | ResizeSession
   | RotateSession
-  | LineHandleSession
   | PolygonVertexSession
   | MarqueeSession
   | GroupDragSession
@@ -156,7 +145,13 @@ export type InteractionSession =
 
 export type SessionWithModifiers = InteractionSession & { shiftConstrain?: boolean };
 
+// Pointer travel (canvas units) up to which a press-and-release on an item or
+// handle is a click rather than a drag.
+export const PICKUP_DRAG_THRESHOLD = 3;
+
 export type InteractionCommit =
+  // The gesture changes nothing (a tap on a line's "+").
+  | { kind: 'none' }
   | { kind: 'create'; item: CanvasItem; nextTool: 'select' }
   | { kind: 'marquee'; nodeIds: string[] }
   | { kind: 'single-item'; itemId: string; changes: Partial<CanvasItem> }
@@ -299,21 +294,6 @@ export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
   if (item.kind === 'polygon') {
     return {
       vertices: item.vertices,
-      x: item.x,
-      y: item.y,
-      width: item.width,
-      height: item.height,
-      scaleX: 1,
-      scaleY: 1,
-    };
-  }
-
-  if (item.kind === 'line') {
-    return {
-      startX: item.startX,
-      startY: item.startY,
-      endX: item.endX,
-      endY: item.endY,
       x: item.x,
       y: item.y,
       width: item.width,
@@ -527,32 +507,6 @@ export function createRotateSession(
     pointerStart: pointer,
     pointerSource,
     handle: 'rotater',
-    guides: [],
-    snapDisabled: false,
-  };
-}
-
-export function createLineHandleSession(
-  item: LineCanvasItem,
-  handle: 'start' | 'end',
-  pointer: Point,
-  siblingItems: CanvasItem[],
-  pointerSource: PointerGestureSource = 'stage',
-): LineHandleSession {
-  const rect = getLineHandleRects(item)[handle];
-  return {
-    kind: 'line-handle',
-    itemId: item.id,
-    originalItem: item,
-    previewItem: item,
-    siblingItems,
-    pointerStart: pointer,
-    pointerSource,
-    pointerOffset: {
-      x: pointer.x - (rect.x + rect.width / 2),
-      y: pointer.y - (rect.y + rect.height / 2),
-    },
-    handle,
     guides: [],
     snapDisabled: false,
   };
@@ -833,20 +787,6 @@ export function resolveInteractionSession(
       );
       return { ...current, previewItem: next.item, guides: [] };
     }
-    case 'line-handle': {
-      const next = solveLineHandleSession(
-        current.originalItem as LineCanvasItem,
-        current.handle,
-        pointer,
-        current.pointerOffset,
-        current.siblingItems,
-        stageBounds,
-        !current.snapDisabled,
-        threshold,
-        cache
-      );
-      return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
-    }
     case 'polygon-vertex': {
       const next = solvePolygonVertexSession(
         current.originalItem as PolygonCanvasItem,
@@ -1050,6 +990,23 @@ export function buildInteractionCommit(
       })),
       selectionFrame,
     };
+  }
+
+  // A tap on a line's "+" adds nothing: only dragging it out splits the line.
+  // The "+" sits on the middle of the line, right where a line gets clicked
+  // and grabbed, and a point added there by a stray click or the second click
+  // of a double-click would be invisible (it lies on the line) yet give the
+  // line a transform box and make Delete remove the point instead of the
+  // line. A closed polygon's "+" is on its outline, off its body, so a tap
+  // there still inserts a point (massimo's semantics).
+  if (
+    resolved.kind === 'polygon-vertex' &&
+    resolved.insertedVertex &&
+    isLineItem(resolved.previewItem) &&
+    Math.hypot(pointer.x - resolved.pointerStart.x, pointer.y - resolved.pointerStart.y) <=
+      PICKUP_DRAG_THRESHOLD
+  ) {
+    return { kind: 'none' };
   }
 
   return {

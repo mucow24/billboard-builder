@@ -5,7 +5,6 @@ import type { FederatedPointerEvent } from 'pixi.js';
 import type {
   CanvasItem,
   GeneratorCanvasItem,
-  LineCanvasItem,
   PolygonCanvasItem,
 } from '../../document/documentTypes';
 import { polygonEdgeCount, polygonEdgeMidpoint } from '../../document/polygonVertices';
@@ -18,7 +17,11 @@ import {
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 import { getRenderBox } from '../transformGeometry';
-import { BASE_POLYGON_SELECTION_OUTSET } from './overlayGeometry';
+import {
+  BASE_POLYGON_SELECTION_OUTSET,
+  hasTransformBox,
+  showsEdgeAddHandle,
+} from './overlayGeometry';
 
 // ── Colours ──────────────────────────────────────────────────────────────────
 const SELECTION_STROKE = 0x7dd3fc;
@@ -34,10 +37,6 @@ const BASE_ROTATE_HANDLE_OFFSET = 50;
 // Edge "+" insert discs are slightly smaller than vertex handles so the two
 // read differently at a glance.
 const BASE_EDGE_ADD_RADIUS = 6;
-// Minimum on-screen edge length (px) for showing an edge "+" disc — a densely
-// traced shape otherwise drowns in overlapping discs when zoomed out. The
-// discs come back as you zoom in; vertex handles always stay.
-const EDGE_ADD_MIN_EDGE_PX = 42;
 
 function getZoomScaledDimensions(zoom: number) {
   const nz = zoom > 0 ? zoom : 1;
@@ -140,24 +139,18 @@ export interface PixiSelectionOverlayProps {
   } | null;
   zoom: number;
   beginResize: (
-    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+    item: Exclude<CanvasItem, GeneratorCanvasItem>,
     handle: ResizeHandle,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
   beginRotate: (
-    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+    item: Exclude<CanvasItem, GeneratorCanvasItem>,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
   beginGroupResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
-  beginLineHandle: (
-    item: Extract<CanvasItem, { kind: 'line' }>,
-    handle: 'start' | 'end',
-    pointer: Point,
-    source?: PointerGestureSource,
-  ) => void;
   beginPolygonVertexHandle: (
     item: PolygonCanvasItem,
     vertexIndex: number,
@@ -187,7 +180,6 @@ export function PixiSelectionOverlay({
   beginRotate,
   beginGroupResize,
   beginGroupRotate,
-  beginLineHandle,
   beginPolygonVertexHandle,
   beginPolygonEdgeInsert,
   selectedPolygonVertexIndex,
@@ -230,31 +222,23 @@ export function PixiSelectionOverlay({
     );
   }
 
-  if (selectedRenderedItem.kind === 'line') {
-    return (
-      <LineSelectionHandles
-        item={selectedRenderedItem as RenderableCanvasItem & { kind: 'line' }}
-        zoom={zoom}
-        beginLineHandle={beginLineHandle}
-        toCanvasPointer={toCanvasPointer}
-      />
-    );
-  }
-
   if (selectedRenderedItem.kind === 'polygon') {
     // Show both: the standard transform box (resize + rotate handles, pushed
     // outward so it clears the vertices) drawn first, then the on-shape
-    // vertex/edge handles on top.
+    // vertex/edge handles on top. A straight line skips the box and shows
+    // only its two endpoint handles and the "+" between them.
     return (
       <>
-        <ShapeSelectionOverlay
-          item={selectedRenderedItem}
-          zoom={zoom}
-          outset={BASE_POLYGON_SELECTION_OUTSET}
-          beginResize={beginResize}
-          beginRotate={beginRotate}
-          toCanvasPointer={toCanvasPointer}
-        />
+        {hasTransformBox(selectedRenderedItem) ? (
+          <ShapeSelectionOverlay
+            item={selectedRenderedItem}
+            zoom={zoom}
+            outset={BASE_POLYGON_SELECTION_OUTSET}
+            beginResize={beginResize}
+            beginRotate={beginRotate}
+            toCanvasPointer={toCanvasPointer}
+          />
+        ) : null}
         <PolygonSelectionHandles
           item={selectedRenderedItem as RenderableCanvasItem & { kind: 'polygon' }}
           zoom={zoom}
@@ -293,12 +277,7 @@ function ItemOutlineOnly({
   const drawOutline = useCallback(
     (g: Graphics) => {
       g.clear();
-      if (item.kind === 'line') {
-        const li = item as RenderableCanvasItem & { kind: 'line' };
-        g.moveTo(li.startX, li.startY);
-        g.lineTo(li.endX, li.endY);
-        g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
-      } else if (item.kind === 'polygon') {
+      if (item.kind === 'polygon') {
         const polygon = item as RenderableCanvasItem & { kind: 'polygon' };
         drawPolygonChain(g, polygon);
         g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
@@ -310,7 +289,7 @@ function ItemOutlineOnly({
     [item, renderBox.width, renderBox.height, selectionStroke],
   );
 
-  if (item.kind === 'line' || item.kind === 'polygon') {
+  if (item.kind === 'polygon') {
     return <pixiGraphics draw={drawOutline} eventMode="none" />;
   }
 
@@ -562,12 +541,12 @@ function ShapeSelectionOverlay({
           const canvasPointer = toCanvasPointer({ x: e.global.x, y: e.global.y });
           if (name === 'rotater') {
             beginRotate(
-              item as Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+              item as Exclude<CanvasItem, GeneratorCanvasItem>,
               canvasPointer,
             );
           } else {
             beginResize(
-              item as Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+              item as Exclude<CanvasItem, GeneratorCanvasItem>,
               name,
               canvasPointer,
             );
@@ -656,17 +635,18 @@ function PolygonSelectionHandles({
 
   const vertices = item.vertices;
   const edgeCount = polygonEdgeCount(vertices.length, item.closed);
-  // Density gate: hide the "+" disc on edges too short on screen to host it.
+  // Density gate: hide the "+" disc on edges too short on screen to host it
+  // (see showsEdgeAddHandle; a line's segments need to be longer).
   const edgeHandles = useMemo(() => {
     const handles: Array<{ edgeIndex: number; point: Point }> = [];
     for (let edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++) {
       const a = vertices[edgeIndex];
       const b = vertices[(edgeIndex + 1) % vertices.length];
-      if (Math.hypot(b.x - a.x, b.y - a.y) * zoom < EDGE_ADD_MIN_EDGE_PX) continue;
+      if (!showsEdgeAddHandle(Math.hypot(b.x - a.x, b.y - a.y), zoom, item.closed)) continue;
       handles.push({ edgeIndex, point: polygonEdgeMidpoint(vertices, edgeIndex) });
     }
     return handles;
-  }, [vertices, edgeCount, zoom]);
+  }, [vertices, edgeCount, zoom, item.closed]);
 
   return (
     <pixiContainer label="polygon-selection-overlay">
@@ -703,67 +683,6 @@ function PolygonSelectionHandles({
           }}
         />
       ))}
-    </pixiContainer>
-  );
-}
-
-// ── Line Selection (two endpoint handles) ────────────────────────────────────
-
-function LineSelectionHandles({
-  item,
-  zoom,
-  beginLineHandle,
-  toCanvasPointer,
-}: {
-  item: RenderableCanvasItem & { kind: 'line' };
-  zoom: number;
-  beginLineHandle: PixiSelectionOverlayProps['beginLineHandle'];
-  toCanvasPointer: (pointer: Point) => Point;
-}) {
-  const { handleRadius, handleStroke } = getZoomScaledDimensions(zoom);
-
-  const handleStartMouseDown = useCallback(
-    (e: FederatedPointerEvent) => {
-      e.stopPropagation();
-      beginLineHandle(
-        item as Extract<CanvasItem, { kind: 'line' }>,
-        'start',
-        toCanvasPointer({ x: e.global.x, y: e.global.y }),
-      );
-    },
-    [item, beginLineHandle, toCanvasPointer],
-  );
-
-  const handleEndMouseDown = useCallback(
-    (e: FederatedPointerEvent) => {
-      e.stopPropagation();
-      beginLineHandle(
-        item as Extract<CanvasItem, { kind: 'line' }>,
-        'end',
-        toCanvasPointer({ x: e.global.x, y: e.global.y }),
-      );
-    },
-    [item, beginLineHandle, toCanvasPointer],
-  );
-
-  return (
-    <pixiContainer label="line-selection-overlay">
-      <InteractiveHandle
-        name="start"
-        x={item.startX}
-        y={item.startY}
-        radius={handleRadius}
-        strokeWidth={handleStroke}
-        onMouseDown={handleStartMouseDown}
-      />
-      <InteractiveHandle
-        name="end"
-        x={item.endX}
-        y={item.endY}
-        radius={handleRadius}
-        strokeWidth={handleStroke}
-        onMouseDown={handleEndMouseDown}
-      />
     </pixiContainer>
   );
 }

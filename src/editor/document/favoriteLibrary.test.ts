@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createGroupNode,
+  createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from './documentDefaults';
@@ -118,6 +120,20 @@ describe('favorite library document helpers', () => {
         ['text', 1],
       ]),
       previewColors: ['#123456', '#abcdef', '#fedcba', '#654321'],
+    });
+  });
+
+  it('counts a line as a line and previews only its stroke color', () => {
+    const line = createLineItem({ id: 'line', stroke: '#112233ff', fill: '#999999' });
+    const polygon = createPolygonItem({ id: 'polygon', fill: '#445566', strokeWidth: 0 });
+
+    expect(summarizeFavoriteNodes([line, polygon])).toEqual({
+      itemCount: 2,
+      kindCounts: new Map([
+        ['line', 1],
+        ['polygon', 1],
+      ]),
+      previewColors: ['#112233ff', '#445566'],
     });
   });
 

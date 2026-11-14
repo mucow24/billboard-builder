@@ -18,14 +18,15 @@
  */
 import { useEffect, useRef } from 'react';
 
-import type { CanvasItem, LineCanvasItem } from '../../document/documentTypes';
+import type { CanvasItem } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 import type { ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { Point } from '../transformGeometry';
 import { getItemAABB } from '../selectionGeometry';
 import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
 import { toViewportPoint } from './viewportMath';
-import { getShapeOverlayHandlePoints } from './overlayGeometry';
+import { getShapeOverlayHandlePoints, hasTransformBox } from './overlayGeometry';
 
 export type ResizeHandleName =
   | 'top-left'
@@ -319,19 +320,18 @@ export function useCanvasTestApi({
         return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       }
       if (handle === 'line-start' || handle === 'line-end') {
-        if (item.kind !== 'line') {
+        // A line is an open polygon; its ends are its first and last vertex.
+        if (!isLineItem(item)) {
           throw new Error(
             `__BB_TEST__: handle "${handle}" requires a line item but item "${item.id}" is "${item.kind}"`,
           );
         }
-        const line = item as LineCanvasItem;
-        return handle === 'line-start'
-          ? { x: line.startX, y: line.startY }
-          : { x: line.endX, y: line.endY };
+        const end = handle === 'line-start' ? item.vertices[0] : item.vertices[item.vertices.length - 1];
+        return { x: end.x, y: end.y };
       }
-      if (item.kind === 'line') {
+      if (!hasTransformBox(item)) {
         throw new Error(
-          `__BB_TEST__: shape handle "${handle}" is not valid for a line item`,
+          `__BB_TEST__: shape handle "${handle}" is not valid for a straight line item`,
         );
       }
       const points = getShapeOverlayHandlePoints(item, zoomRef.current);

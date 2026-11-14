@@ -7,7 +7,6 @@ import {
   gradientOrSolidFill,
   imageShape,
   itemFilterDef,
-  lineShape,
   ngonShape,
   polygonShape,
   rectShape,
@@ -69,8 +68,6 @@ function serializeLeaf(
 
   const filterAttr = pushItemFilter(item, defs);
   switch (item.kind) {
-    case 'line':
-      return lineShape(item, effectiveOpacity, filterAttr);
     case 'rectangle':
       return wrapItem(
         item,

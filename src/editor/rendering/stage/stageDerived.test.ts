@@ -6,6 +6,7 @@ import {
   createRectangleItem,
 } from '../../document/documentDefaults';
 
+import { getViewportHandleRect, hasTransformBox } from './overlayGeometry';
 import { buildStageDerivedState } from './stageDerived';
 
 describe('stageDerived', () => {
@@ -61,7 +62,7 @@ describe('stageDerived', () => {
   it('derives group overlay geometry and line handle rects for grouped sessions', () => {
     const first = createRectangleItem({ id: 'first', x: 20, y: 30, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 140, y: 60, width: 60, height: 50 });
-    const line = createLineItem({ id: 'line', startX: 10, startY: 20, endX: 100, endY: 50 });
+    const line = createLineItem({ id: 'line', vertices: [{ x: 10, y: 20 }, { x: 100, y: 50 }] });
 
     const grouped = buildStageDerivedState({
       activeTool: 'select',
@@ -115,8 +116,74 @@ describe('stageDerived', () => {
       },
     });
 
-    expect(lineDerived.selectedLineHandleRects).not.toBeNull();
+    // A straight line: endpoint handles on its first and last vertex, no box.
+    expect(lineDerived.selectedLineHandleRects).toEqual({
+      start: getViewportHandleRect({ x: 10, y: 20 }),
+      end: getViewportHandleRect({ x: 100, y: 50 }),
+    });
     expect(lineDerived.selectedShapeHandleRects).toBeNull();
+
+    // A bent line keeps the end handles (first and last vertex, whatever lies
+    // between) and gains the transform box.
+    const bent = createLineItem({
+      id: 'bent',
+      vertices: [{ x: 10, y: 20 }, { x: 60, y: 90 }, { x: 100, y: 50 }],
+    });
+    const bentDerived = buildStageDerivedState({
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [bent],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: bent,
+      session: null,
+      zoom: 1,
+      viewport: {
+        toViewportPoint: (point) => point,
+        toViewportRect: (rect) => ({
+          left: rect.x,
+          top: rect.y,
+          width: rect.width,
+          height: rect.height,
+        }),
+      },
+    });
+    expect(bentDerived.selectedLineHandleRects).toEqual({
+      start: getViewportHandleRect({ x: 10, y: 20 }),
+      end: getViewportHandleRect({ x: 100, y: 50 }),
+    });
+    expect(bentDerived.selectedShapeHandleRects).not.toBeNull();
+  });
+
+  it('gives no line handle rects to a closed polygon', () => {
+    const polygon = createPolygonItem();
+    const derived = buildStageDerivedState({
+      canvasBounds,
+      renderedGroupBounds: null,
+      renderedSelectedItems: [polygon],
+      renderedSelectionFrame: null,
+      selectedRenderedItem: polygon,
+      session: null,
+      zoom: 1,
+      viewport: {
+        toViewportPoint: (point) => point,
+        toViewportRect: (rect) => ({
+          left: rect.x,
+          top: rect.y,
+          width: rect.width,
+          height: rect.height,
+        }),
+      },
+    });
+    expect(derived.selectedLineHandleRects).toBeNull();
+  });
+
+  it('gives the transform box to everything but a straight line', () => {
+    const twoPoints = [{ x: 0, y: 0 }, { x: 100, y: 40 }];
+    const threePoints = [...twoPoints, { x: 200, y: 0 }];
+    expect(hasTransformBox(createLineItem({ vertices: twoPoints }))).toBe(false);
+    expect(hasTransformBox(createLineItem({ vertices: threePoints }))).toBe(true);
+    expect(hasTransformBox(createPolygonItem({ vertices: threePoints }))).toBe(true);
+    expect(hasTransformBox(createRectangleItem())).toBe(true);
   });
 
   it('gives a selected polygon an outset resize box in addition to its vertex handles', () => {

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasPointerEvent, CanvasRendererHandle } from './renderer/canvasRendererTypes';
 import { useCanvasInteractionSession } from './useCanvasInteractionSession';
-import { getLineHandleRects, getShapeHandlePoints } from './interactionGeometry';
+import { getShapeHandlePoints } from './interactionGeometry';
 import { getSelectionFrameForRotation } from './transformGeometry';
 import {
   createGroupNode,
@@ -680,24 +680,17 @@ describe('useCanvasInteractionSession', () => {
 
   it('commits only the dragged line endpoint', () => {
     const item = createLineItem({
-      startX: 160,
-      startY: 160,
-      endX: 400,
-      endY: 184,
+      vertices: [{ x: 160, y: 160 }, { x: 400, y: 184 }],
     });
     const params = createHookParams({
       document: createDocument([item]),
     });
     const { result } = renderHook(() => useCanvasInteractionSession(params));
-    const startHandle = getLineHandleRects(item).start;
-    const startCenter = {
-      x: startHandle.x + startHandle.width / 2,
-      y: startHandle.y + startHandle.height / 2,
-    };
-
+    // A line's start handle is vertex 0 of its open polygon.
     act(() => {
-      result.current.beginLineHandle(item, 'start', startCenter);
+      result.current.beginPolygonVertexHandle(item, 0, item.vertices[0]);
     });
+    expect(result.current.session?.kind).toBe('polygon-vertex');
     act(() => {
       result.current.handleStageMouseUp(makeStageEvent({ x: 240, y: 200 }, 'shape'));
     });
@@ -705,10 +698,63 @@ describe('useCanvasInteractionSession', () => {
     expect(params.onUpdateItem).toHaveBeenCalledWith(
       item.id,
       expect.objectContaining({
-        startX: 240,
-        startY: 200,
-        endX: 400,
-        endY: 184,
+        vertices: [{ x: 240, y: 200 }, { x: 400, y: 184 }],
+      })
+    );
+  });
+
+  it('selects a tapped point of a bent line, and splits a line only when its "+" is dragged', () => {
+    const straight = createLineItem({
+      id: 'straight',
+      vertices: [{ x: 160, y: 160 }, { x: 400, y: 184 }],
+    });
+    const bent = createLineItem({
+      id: 'bent',
+      vertices: [{ x: 160, y: 300 }, { x: 280, y: 380 }, { x: 400, y: 300 }],
+    });
+    const onSelectPolygonVertex = vi.fn();
+    const params = {
+      ...createHookParams({ document: createDocument([straight, bent]) }),
+      onSelectPolygonVertex,
+    };
+    const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+    // A straight line never holds a vertex sub-selection; the reducer enforces
+    // that (see the store tests), so it is not checked here.
+
+    // A no-move click on a bent line's point selects it, like on a polygon.
+    act(() => {
+      result.current.beginPolygonVertexHandle(bent, 1, bent.vertices[1]);
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent(bent.vertices[1], 'shape'));
+    });
+    expect(onSelectPolygonVertex).toHaveBeenCalledWith({ itemId: 'bent', vertexIndex: 1 });
+
+    // A tap on a straight line's "+" changes nothing: no point, no selection.
+    onSelectPolygonVertex.mockClear();
+    vi.mocked(params.onUpdateItem).mockClear();
+    act(() => {
+      result.current.beginPolygonEdgeInsert(straight, 0, { x: 280, y: 172 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: 280, y: 172 }, 'shape'));
+    });
+    expect(params.onUpdateItem).not.toHaveBeenCalled();
+    expect(onSelectPolygonVertex).not.toHaveBeenCalled();
+
+    // Dragging the "+" out splits the line and bends it: the new vertex is selected.
+    act(() => {
+      result.current.beginPolygonEdgeInsert(straight, 0, { x: 280, y: 172 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: 280, y: 240 }, 'shape'));
+    });
+    expect(onSelectPolygonVertex).toHaveBeenCalledWith({ itemId: 'straight', vertexIndex: 1 });
+    expect(params.onUpdateItem).toHaveBeenLastCalledWith(
+      'straight',
+      expect.objectContaining({
+        vertices: [{ x: 160, y: 160 }, { x: 280, y: 240 }, { x: 400, y: 184 }],
       })
     );
   });
@@ -2632,9 +2678,13 @@ describe('useCanvasInteractionSession', () => {
       const { result } = renderHook(() => useCanvasInteractionSession(params));
 
       act(() => {
-        result.current.beginLineHandle(line, 'end', { x: line.endX, y: line.endY });
+        result.current.beginPolygonVertexHandle(line, 1, line.vertices[1]);
       });
+      expect(result.current.session).toBeNull();
 
+      act(() => {
+        result.current.beginPolygonEdgeInsert(line, 0, { x: 220, y: 112 });
+      });
       expect(result.current.session).toBeNull();
     });
 

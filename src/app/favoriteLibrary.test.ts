@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createGroupNode,
+  createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../editor/document/documentDefaults';
@@ -23,6 +25,10 @@ describe('favorite library helpers', () => {
     });
 
     expect(buildDefaultFavoriteName([rectangle])).toBe('Rectangle favorite');
+    // An open polygon is a line, whatever its layer is named.
+    expect(buildDefaultFavoriteName([createLineItem()])).toBe('Line favorite');
+    expect(buildDefaultFavoriteName([createPolygonItem({ closed: false })])).toBe('Line favorite');
+    expect(buildDefaultFavoriteName([createPolygonItem()])).toBe('Polygon favorite');
     expect(buildDefaultFavoriteName([text])).toBe('Text:Headline with spacing');
     expect(buildDefaultFavoriteName([first, second])).toBe('2 items favorite');
   });

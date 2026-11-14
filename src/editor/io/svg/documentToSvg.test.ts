@@ -122,14 +122,15 @@ describe('documentToSvg — polygon', () => {
     expect(svg).toContain('fill="#abcdef"');
   });
 
-  it('emits an open stroke-only path with round caps when closed is false', () => {
+  it('emits an open stroke-only path with square-cut ends when closed is false', () => {
     const svg = svgOf([
       createPolygonItem({ vertices, closed: false, stroke: '#112233ff', strokeWidth: 4 }),
     ]);
     const d = svg.match(/<path d="([^"]+)"/)?.[1];
     expect(d).toBe('M 0 0 L 100 0 L 50 100');
     expect(svg).toContain('fill="none"');
-    expect(svg).toContain('stroke-linecap="round"');
+    expect(svg).toContain('stroke-linejoin="round"');
+    expect(svg).not.toContain('stroke-linecap');
     expect(svg).toContain('stroke-width="4"');
   });
 
@@ -144,11 +145,16 @@ describe('documentToSvg — polygon', () => {
 });
 
 describe('documentToSvg — line', () => {
-  it('emits a <line> with absolute endpoints and no transform wrapper', () => {
+  it('emits a line as an open two-point path inside its translate group', () => {
     const svg = svgOf([
-      createLineItem({ startX: 5, startY: 5, endX: 50, endY: 80, strokeWidth: 6, stroke: '#ffffffff' }),
+      createLineItem({ vertices: [{ x: 5, y: 5 }, { x: 50, y: 80 }], strokeWidth: 6, stroke: '#ffffffff' }),
     ]);
-    expect(svg).toContain('<line x1="5" y1="5" x2="50" y2="80"');
+    expect(svg).not.toContain('<line');
+    expect(svg).toContain('translate(5 5)');
+    expect(svg.match(/<path d="([^"]+)"/)?.[1]).toBe('M 0 0 L 45 75');
+    expect(svg).toContain('fill="none"');
+    expect(svg).toContain('stroke-linejoin="round"');
+    expect(svg).not.toContain('stroke-linecap');
     expect(svg).toContain('stroke="#ffffff"');
     expect(svg).toContain('stroke-width="6"');
   });

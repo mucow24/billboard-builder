@@ -273,7 +273,7 @@ export function SelectionInspector({
       ) : primaryItem ? (
         <div className="selection-inspector-header">
           <SelectionHeading
-            kind={getItemGlyph(primaryItem.kind)}
+            kind={getItemGlyph(primaryItem)}
             lockState={selectionLockState}
             onLockedChange={onSelectionLockedChange}
             subtitle={getInspectorHeadingSubtitle(primaryItem)}

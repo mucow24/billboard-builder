@@ -1,7 +1,5 @@
-import type {
-  CanvasItem,
-  LineCanvasItem,
-} from '../../document/documentTypes';
+import type { CanvasItem } from '../../document/documentTypes';
+import { isStraightLine } from '../../document/polygonVertices';
 import {
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -66,8 +64,34 @@ export function getCanvasOverlayMetrics(zoom: number) {
   };
 }
 
+// Minimum on-screen edge length (px) for showing an edge "+" disc. On a closed
+// polygon a densely traced shape otherwise drowns in overlapping discs when
+// zoomed out. The discs come back as you zoom in; vertex handles always stay.
+export const EDGE_ADD_MIN_EDGE_PX = 42;
+// A line needs more room. Its body is the segment itself: the two end handles
+// and the "+" each take a fixed slice of it on screen (24px and 18px grab
+// areas), and what is left is the only place to grab the line to move it.
+// Below this length the "+" would leave under 15px on either side of it.
+export const EDGE_ADD_MIN_OPEN_EDGE_PX = 72;
+
+/** Whether the edge of this canvas length gets its "+" at this zoom. */
+export function showsEdgeAddHandle(edgeLength: number, zoom: number, closed: boolean): boolean {
+  const minEdgePx = closed ? EDGE_ADD_MIN_EDGE_PX : EDGE_ADD_MIN_OPEN_EDGE_PX;
+  return edgeLength * zoom >= minEdgePx;
+}
+
+/**
+ * Whether a selected item gets the transform box (resize and rotate handles).
+ * A straight line, the two-vertex open polygon the Line tool draws, does not:
+ * its box would be a sliver, and its two endpoint handles already do the job.
+ * Once a line is bent (three or more vertices) it gets the box like a polygon.
+ */
+export function hasTransformBox(item: CanvasItem): boolean {
+  return !isStraightLine(item);
+}
+
 export function getShapeOverlayHandlePoints(
-  item: Exclude<CanvasItem, LineCanvasItem>,
+  item: CanvasItem,
   zoom: number,
 ) {
   const renderBox = getRenderBox(item);

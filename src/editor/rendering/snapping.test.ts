@@ -58,10 +58,7 @@ describe('snapping geometry', () => {
 
   it('derives line bounds from endpoint geometry', () => {
     const line = createLineItem({
-      startX: 400,
-      startY: 200,
-      endX: 100,
-      endY: 80,
+      vertices: [{ x: 400, y: 200 }, { x: 100, y: 80 }],
     });
 
     expect(getItemRect(line)).toEqual({
@@ -237,7 +234,7 @@ describe('getItemAABB', () => {
   });
 
   it('returns line bounds unchanged (lines have no rotation)', () => {
-    const line = createLineItem({ startX: 100, startY: 50, endX: 300, endY: 200 });
+    const line = createLineItem({ vertices: [{ x: 100, y: 50 }, { x: 300, y: 200 }] });
     const aabb = getItemAABB(line);
     expect(aabb).toEqual(getItemRect(line));
   });

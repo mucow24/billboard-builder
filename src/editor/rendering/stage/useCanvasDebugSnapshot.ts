@@ -1,8 +1,9 @@
 import { useEffect, useMemo } from 'react';
 
 import type { CanvasItem } from '../../document/documentTypes';
+import { getItemDisplayKind, isLineItem } from '../../document/polygonVertices';
 import {
-  getLineHandleRects,
+  getPolygonVertexHandleRects,
   getShapeHandleRects,
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -13,9 +14,12 @@ import type { PointerGestureSource } from '../interactionSession';
 import type { CanvasRendererHandle } from '../renderer/canvasRendererTypes';
 import { getRenderBox } from '../transformGeometry';
 import { useCanvasTestApi } from './canvasTestApi';
-import { getShapeOverlayHandlePoints } from './overlayGeometry';
+import { getShapeOverlayHandlePoints, hasTransformBox } from './overlayGeometry';
 
 // `Window.__BB_TEST__` is declared in `./canvasTestApi.ts`; both files share it.
+//
+// Every `kind` reported here is the display kind: a line (an open polygon) is
+// 'line', so tests can tell it from a closed polygon without reading vertices.
 
 function buildHandleDebug(clientRect: {
   x: number;
@@ -197,7 +201,6 @@ export function useCanvasDebugSnapshot({
       sessionHandle:
         session?.kind === 'resize' ||
         session?.kind === 'rotate' ||
-        session?.kind === 'line-handle' ||
         session?.kind === 'group-resize' ||
         session?.kind === 'group-rotate'
           ? session.handle ?? null
@@ -221,13 +224,9 @@ export function useCanvasDebugSnapshot({
               rotation: cropSession.fullImageItem.rotation,
             },
             cropHandlePoints:
-              cropSession.previewItem.kind !== 'line'
-                ? getShapeOverlayHandlePoints(cropSession.previewItem, zoom)
-                : null,
+              getShapeOverlayHandlePoints(cropSession.previewItem, zoom),
             fullImageHandlePoints:
-              cropSession.fullImageItem.kind !== 'line'
-                ? getShapeOverlayHandlePoints(cropSession.fullImageItem, zoom)
-                : null,
+              getShapeOverlayHandlePoints(cropSession.fullImageItem, zoom),
             cropHandleViewportPoints,
             fullImageHandleViewportPoints: cropFullImageHandleViewportPoints,
             fullImageRotaterViewportPoint: cropFullImageRotaterViewportPoint,
@@ -237,7 +236,7 @@ export function useCanvasDebugSnapshot({
         ? {
             ...getRenderBox(selectedDocumentItem),
             rotation: selectedDocumentItem.rotation,
-            kind: selectedDocumentItem.kind,
+            kind: getItemDisplayKind(selectedDocumentItem),
             id: selectedDocumentItem.id,
           }
         : null,
@@ -245,7 +244,7 @@ export function useCanvasDebugSnapshot({
         ? {
             ...getRenderBox(previewItem),
             rotation: previewItem.rotation,
-            kind: previewItem.kind,
+            kind: getItemDisplayKind(previewItem),
             id: previewItem.id,
           }
         : null,
@@ -260,13 +259,17 @@ export function useCanvasDebugSnapshot({
         : null,
       nodeClientRect,
       anchorClientRects:
-        selectedRenderedItem && selectedRenderedItem.kind !== 'line'
+        selectedRenderedItem && hasTransformBox(selectedRenderedItem)
           ? getShapeHandleRects(selectedRenderedItem)
           : null,
       handles: nodeClientRect ? buildHandleDebug(nodeClientRect) : null,
       lineHandleRects:
-        selectedRenderedItem?.kind === 'line'
-          ? getLineHandleRects(selectedRenderedItem)
+        // A line's two ends are its first and last vertex.
+        selectedRenderedItem && isLineItem(selectedRenderedItem)
+          ? {
+              start: getPolygonVertexHandleRects(selectedRenderedItem)[0],
+              end: getPolygonVertexHandleRects(selectedRenderedItem).at(-1)!,
+            }
           : null,
       selectedItemViewportRect,
       marqueeViewportRect,
@@ -281,20 +284,21 @@ export function useCanvasDebugSnapshot({
       hasLineHandles: Boolean(selectedLineHandleRects),
       lastDrilldownSource,
       selectedItems: renderedSelectedItems.map((item) =>
-        item.kind === 'line'
+        isLineItem(item)
           ? {
               ...getRenderBox(item),
-              kind: item.kind,
+              kind: getItemDisplayKind(item),
               id: item.id,
               rotation: 0,
-              startX: item.startX,
-              startY: item.startY,
-              endX: item.endX,
-              endY: item.endY,
+              // A line's ends: its first and last vertex.
+              startX: item.vertices[0].x,
+              startY: item.vertices[0].y,
+              endX: item.vertices[item.vertices.length - 1].x,
+              endY: item.vertices[item.vertices.length - 1].y,
             }
           : {
               ...getRenderBox(item),
-              kind: item.kind,
+              kind: getItemDisplayKind(item),
               id: item.id,
               rotation: item.rotation,
             },
@@ -349,21 +353,13 @@ export function useCanvasDebugSnapshot({
       const selectedItems = renderedItems
         .filter((item) => selectedNodeIds.includes(item.id))
         .map((item) => {
-          if (item.kind === 'line') {
+          if (isLineItem(item)) {
+            // A line is outlined along its vertices, not around its box.
             return {
               id: item.id,
-              kind: item.kind,
-              outlinePoints: [
-                { x: item.startX, y: item.startY },
-                { x: item.endX, y: item.endY },
-              ],
-              geometry: {
-                x: Math.min(item.startX, item.endX),
-                y: Math.min(item.startY, item.endY),
-                width: Math.max(1, Math.abs(item.endX - item.startX)),
-                height: Math.max(1, Math.abs(item.endY - item.startY)),
-                rotation: 0,
-              },
+              kind: getItemDisplayKind(item),
+              outlinePoints: item.vertices.map((vertex) => ({ x: vertex.x, y: vertex.y })),
+              geometry: { ...getRenderBox(item), rotation: 0 },
             };
           }
 
@@ -378,7 +374,7 @@ export function useCanvasDebugSnapshot({
           ];
           return {
             id: item.id,
-            kind: item.kind,
+            kind: getItemDisplayKind(item),
             outlinePoints,
             geometry: {
               x: origin.x,
@@ -434,7 +430,6 @@ export function useCanvasDebugSnapshot({
         sessionHandle:
           session?.kind === 'resize' ||
           session?.kind === 'rotate' ||
-          session?.kind === 'line-handle' ||
           session?.kind === 'group-resize' ||
           session?.kind === 'group-rotate'
             ? session.handle ?? null
