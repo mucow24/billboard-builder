@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { Container, Rectangle } from 'pixi.js';
 
 import { FocusVeilFilter, type FocusVeilHole } from './focusVeilFilter';
@@ -6,27 +6,20 @@ import { FocusVeilFilter, type FocusVeilHole } from './focusVeilFilter';
 /** How long the veil takes to fade fully in or out. */
 export const FOCUS_VEIL_FADE_MS = 160;
 
-// CSS `ease` (cubic-bezier(0.25, 0.1, 0.25, 1)), solved for y at time x.
-function cssEase(x: number): number {
-  if (x <= 0) return 0;
-  if (x >= 1) return 1;
-  const bezier = (t: number, p1: number, p2: number) =>
-    3 * (1 - t) * (1 - t) * t * p1 + 3 * (1 - t) * t * t * p2 + t * t * t;
-  let lo = 0;
-  let hi = 1;
-  for (let i = 0; i < 20; i++) {
-    const mid = (lo + hi) / 2;
-    if (bezier(mid, 0.25, 0.25) < x) lo = mid;
-    else hi = mid;
-  }
-  return bezier((lo + hi) / 2, 0.1, 1);
+// Eases the fade in and out; close enough to CSS `ease` to look the same.
+function smoothstep(t: number): number {
+  return t * t * (3 - 2 * t);
 }
 
 interface UseFocusVeilOptions {
   active: boolean;
   /** The canvas on screen, in the stage's CSS pixels. */
   canvasRect: FocusVeilHole;
-  /** The layer the veil filters; it must sit at the stage's origin, unscaled. */
+  /**
+   * The layer the veil filters. It must sit at the stage's origin, unscaled:
+   * the filter places the hole relative to the filtered area, which this hook
+   * pins to (0, 0, width, height).
+   */
   layerRef: RefObject<Container | null>;
   rendererReady: boolean;
   size: { width: number; height: number };
@@ -39,20 +32,25 @@ interface UseFocusVeilOptions {
  */
 export function useFocusVeil({ active, canvasRect, layerRef, rendererReady, size }: UseFocusVeilOptions) {
   const filterRef = useRef<FocusVeilFilter | null>(null);
+  // The layer the filter is attached to, kept for unmount: by then React has
+  // already cleared layerRef.
+  const attachedLayerRef = useRef<Container | null>(null);
   const progressRef = useRef(0);
   const holeRef = useRef(canvasRect);
   holeRef.current = canvasRect;
   const sizeRef = useRef(size);
   sizeRef.current = size;
 
+  // A layout effect, so the hole moves in the same commit as the pan and
+  // zoom it is computed from, and never trails the canvas by a frame.
   const { left, top, right, bottom } = canvasRect;
-  useEffect(() => {
+  useLayoutEffect(() => {
     filterRef.current?.setHole({ left, top, right, bottom });
-    const layer = layerRef.current;
-    if (layer instanceof Container && layer.filters && filterRef.current) {
+    const layer = attachedLayerRef.current;
+    if (layer && !layer.destroyed) {
       layer.filterArea = new Rectangle(0, 0, size.width, size.height);
     }
-  }, [left, top, right, bottom, size.width, size.height, layerRef]);
+  }, [left, top, right, bottom, size.width, size.height]);
 
   useEffect(() => {
     const layer = layerRef.current;
@@ -62,6 +60,7 @@ export function useFocusVeil({ active, canvasRect, layerRef, rendererReady, size
       progressRef.current = progress;
       if (progress <= 0) {
         if (layer.filters) layer.filters = null;
+        attachedLayerRef.current = null;
         return;
       }
       let filter = filterRef.current;
@@ -71,10 +70,13 @@ export function useFocusVeil({ active, canvasRect, layerRef, rendererReady, size
       }
       filter.setHole(holeRef.current);
       filter.progress = progress;
-      if (!layer.filters) {
+      // Compare with the filter itself, not just "has filters": after a
+      // remount the layer may still hold a filter that has been destroyed.
+      if (layer.filters?.[0] !== filter) {
         layer.filterArea = new Rectangle(0, 0, sizeRef.current.width, sizeRef.current.height);
         layer.filters = [filter];
       }
+      attachedLayerRef.current = layer;
     };
 
     const from = progressRef.current;
@@ -84,7 +86,7 @@ export function useFocusVeil({ active, canvasRect, layerRef, rendererReady, size
     let frame = 0;
     const step = () => {
       const t = duration > 0 ? Math.min(1, (performance.now() - start) / duration) : 1;
-      setProgress(from + (target - from) * cssEase(t));
+      setProgress(from + (target - from) * smoothstep(t));
       if (t < 1) frame = requestAnimationFrame(step);
     };
     step();
@@ -93,6 +95,9 @@ export function useFocusVeil({ active, canvasRect, layerRef, rendererReady, size
 
   useEffect(
     () => () => {
+      const layer = attachedLayerRef.current;
+      if (layer && !layer.destroyed) layer.filters = null;
+      attachedLayerRef.current = null;
       filterRef.current?.destroy();
       filterRef.current = null;
     },

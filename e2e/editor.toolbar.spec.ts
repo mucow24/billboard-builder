@@ -108,6 +108,17 @@ test.describe('editor toolbar flows', () => {
           fill: '#f97316',
           stroke: '#ea580cff',
         }),
+        // Touches the right edge from outside. It stays unselected, so no
+        // handles cover the edge there.
+        createRectangleFixture({
+          id: 'toolbar-export-right-of-canvas',
+          x: 1024,
+          y: 600,
+          width: 180,
+          height: 300,
+          fill: '#22c55e',
+          stroke: '#16a34aff',
+        }),
       ]),
       'toolbar-export-cue.json',
     );
@@ -115,18 +126,25 @@ test.describe('editor toolbar flows', () => {
     const exportButton = page.getByRole('button', { name: 'Export', exact: true });
     const canvasButton = page.getByRole('button', { name: 'Canvas', exact: true });
     const stageRoot = page.getByTestId('canvas-stage-root');
-    const [canvasCenter, offCanvasRectCenter, canvasLeftEdge, offCanvasHandle] = await canvasPointsToPage(page, [
-      { x: 512, y: 512 },
-      { x: -90, y: 380 },
-      // On the canvas's left edge, which the rectangle touches, between its
-      // resize handles there.
-      { x: 0, y: 280 },
-      // The rectangle's middle-left resize handle, outside the canvas.
-      { x: -180, y: 380 },
-    ]);
-    // Either side of the edge, a few screen pixels clear of its antialiasing.
-    const justInsideCanvas = { x: canvasLeftEdge.x + 4, y: canvasLeftEdge.y };
-    const justOutsideCanvas = { x: canvasLeftEdge.x - 4, y: canvasLeftEdge.y };
+    const [canvasCenter, offCanvasRectCenter, canvasLeftEdge, canvasRightEdge, offCanvasHandle] =
+      await canvasPointsToPage(page, [
+        { x: 512, y: 512 },
+        { x: -90, y: 380 },
+        // On the canvas's left edge, which the first rectangle touches,
+        // between its resize handles there.
+        { x: 0, y: 280 },
+        // On the right edge, beside the second rectangle. The right edge is
+        // where the hole depends on the zoom, so a wrong scale or unit in the
+        // hole shows up here.
+        { x: 1024, y: 750 },
+        // The first rectangle's middle-left resize handle, outside the canvas.
+        { x: -180, y: 380 },
+      ]);
+    // Either side of each edge, a few screen pixels clear of its antialiasing.
+    const justInsideLeft = { x: canvasLeftEdge.x + 4, y: canvasLeftEdge.y };
+    const justOutsideLeft = { x: canvasLeftEdge.x - 4, y: canvasLeftEdge.y };
+    const justInsideRight = { x: canvasRightEdge.x - 4, y: canvasRightEdge.y };
+    const justOutsideRight = { x: canvasRightEdge.x + 4, y: canvasRightEdge.y };
     // A patch of the rendered page around a point. The small patches stay
     // clear of the canvas edge and inside the handle's opaque fill (radius 8
     // on screen).
@@ -135,18 +153,21 @@ test.describe('editor toolbar flows', () => {
     // The veil fades over a few frames; wait for the picture to settle.
     const settledPatchAt = async (point: { x: number; y: number }, half = 8) => {
       let previous = await patchAt(point, half);
-      for (;;) {
+      for (let attempt = 0; attempt < 20; attempt++) {
         await page.waitForTimeout(100);
         const next = await patchAt(point, half);
         if (next.equals(previous)) return next;
         previous = next;
       }
+      throw new Error(`The stage around (${point.x}, ${point.y}) never stopped changing; the veil never settled.`);
     };
     const capture = async () => ({
       canvasCenter: await settledPatchAt(canvasCenter),
       offCanvasRect: await settledPatchAt(offCanvasRectCenter),
-      justInside: await settledPatchAt(justInsideCanvas, 1.5),
-      justOutside: await settledPatchAt(justOutsideCanvas, 1.5),
+      justInsideLeft: await settledPatchAt(justInsideLeft, 1.5),
+      justOutsideLeft: await settledPatchAt(justOutsideLeft, 1.5),
+      justInsideRight: await settledPatchAt(justInsideRight, 1.5),
+      justOutsideRight: await settledPatchAt(justOutsideRight, 1.5),
       handle: await settledPatchAt(offCanvasHandle, 2),
     });
 
@@ -161,7 +182,8 @@ test.describe('editor toolbar flows', () => {
     // The veil blurs and darkens the items outside the canvas, stops at the
     // canvas's edge, and is drawn under the selection handles.
     expect(await maxChannelDifference(page, withCue.offCanvasRect, withoutCue.offCanvasRect)).toBeGreaterThan(60);
-    expect(await maxChannelDifference(page, withCue.justOutside, withoutCue.justOutside)).toBeGreaterThan(60);
+    expect(await maxChannelDifference(page, withCue.justOutsideLeft, withoutCue.justOutsideLeft)).toBeGreaterThan(60);
+    expect(await maxChannelDifference(page, withCue.justOutsideRight, withoutCue.justOutsideRight)).toBeGreaterThan(60);
 
     // Inside the canvas, "untouched" means within 4 levels, not identical.
     // Turning the veil on shifts some pixels inside the canvas by up to 3 of
@@ -181,8 +203,9 @@ test.describe('editor toolbar flows', () => {
     //
     // If this starts failing with a larger difference, the hole or the copy
     // is broken (e.g. Pixi's blur passes write into their input texture; see
-    // FocusVeilFilter.apply). Don't just raise the limit.
-    expect(await maxChannelDifference(page, withCue.justInside, withoutCue.justInside)).toBeLessThanOrEqual(4);
+    // FocusVeilFilter.apply) or misplaced. Don't just raise the limit.
+    expect(await maxChannelDifference(page, withCue.justInsideLeft, withoutCue.justInsideLeft)).toBeLessThanOrEqual(4);
+    expect(await maxChannelDifference(page, withCue.justInsideRight, withoutCue.justInsideRight)).toBeLessThanOrEqual(4);
     expect(await maxChannelDifference(page, withCue.canvasCenter, withoutCue.canvasCenter)).toBeLessThanOrEqual(4);
 
     // A handle is 95% opaque, so the veiled rectangle behind it shifts it a

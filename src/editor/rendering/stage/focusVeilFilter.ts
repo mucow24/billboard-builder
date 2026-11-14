@@ -38,12 +38,11 @@ uniform sampler2D uBlurred;
 uniform vec4 uInputSize;
 uniform vec4 uHole;
 uniform vec4 uVeilColor;
-uniform vec2 uOrigin;
 uniform float uProgress;
 
 void main(void) {
   vec4 sharp = texture(uTexture, vTextureCoord);
-  vec2 position = uOrigin + vTextureCoord * uInputSize.xy;
+  vec2 position = vTextureCoord * uInputSize.xy;
   if (position.x >= uHole.x && position.x < uHole.z && position.y >= uHole.y && position.y < uHole.w) {
     finalColor = sharp;
     return;
@@ -82,7 +81,6 @@ const wgsl = `struct GlobalFilterUniforms {
 struct VeilUniforms {
   uHole: vec4<f32>,
   uVeilColor: vec4<f32>,
-  uOrigin: vec2<f32>,
   uProgress: f32,
 };
 
@@ -112,7 +110,7 @@ fn mainVertex(@location(0) aPosition: vec2<f32>) -> VSOutput {
 fn mainFragment(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let sharp = textureSample(uTexture, uSampler, uv);
   let blurred = textureSample(uBlurred, uSampler, uv);
-  let position = veilUniforms.uOrigin + uv * gfu.uInputSize.xy;
+  let position = uv * gfu.uInputSize.xy;
   let hole = veilUniforms.uHole;
   if (position.x >= hole.x && position.x < hole.z && position.y >= hole.y && position.y < hole.w) {
     return sharp;
@@ -133,7 +131,6 @@ export interface FocusVeilHole {
 interface VeilUniformValues {
   uHole: Float32Array;
   uVeilColor: Float32Array;
-  uOrigin: Float32Array;
   uProgress: number;
 }
 
@@ -158,19 +155,15 @@ export class FocusVeilFilter extends Filter {
             value: new Float32Array([(r / 255) * a, (g / 255) * a, (b / 255) * a, a]),
             type: 'vec4<f32>',
           },
-          uOrigin: { value: new Float32Array(2), type: 'vec2<f32>' },
           uProgress: { value: 0, type: 'f32' },
         },
         uBlurred: Texture.EMPTY.source,
       },
       // The canvas inside the hole is copied through unchanged, so the layer
       // must be drawn at the screen's resolution and with its antialiasing.
-      // Even so, antialiased edges inside the canvas can come out up to 3/255
-      // different from drawing straight to the screen (probably a different
-      // MSAA sample count or pattern; unconfirmed). Leave antialias on anyway:
-      // 'off' would make every vector edge jagged while the veil is up. The
-      // e2e test "shows the export-bounds cue ..." in editor.toolbar.spec.ts
-      // allows for this.
+      // Antialiased edges inside can still shift by up to 3/255; keep
+      // antialiasing on regardless. The e2e test "shows the export-bounds
+      // cue ..." in editor.toolbar.spec.ts explains this in full.
       resolution: 'inherit',
       antialias: 'inherit',
       padding: 0,
@@ -207,29 +200,22 @@ export class FocusVeilFilter extends Filter {
     output: RenderSurface,
     clearMode: boolean,
   ) {
-    // Where the filtered area starts on screen, so the shader can place the
-    // hole whatever area Pixi gives the filter.
-    const bounds = (filterManager as unknown as { _activeFilterData: { bounds: { minX: number; minY: number } } })
-      ._activeFilterData.bounds;
-    const origin = this.veilUniforms.uOrigin;
-    origin[0] = bounds.minX;
-    origin[1] = bounds.minY;
+    // The shaders place the hole at vTextureCoord * uInputSize.xy, which is
+    // a stage position only because the filtered area starts at the stage's
+    // origin: useFocusVeil puts this filter on a layer at the origin,
+    // unscaled, with filterArea (0, 0, width, height). The filter is only
+    // attached while progress > 0, so the blur always has some strength.
 
-    if (this.blur.strength > 0) {
-      // Pixi's blur passes ping-pong through their input texture, so they
-      // get a copy: the input is still needed, untouched, for the canvas.
-      const scratch = TexturePool.getSameSizeTexture(input);
-      const blurred = TexturePool.getSameSizeTexture(input);
-      this.copy.apply(filterManager, input, scratch, true);
-      this.blur.apply(filterManager, scratch, blurred, true);
-      this.resources.uBlurred = blurred.source;
-      super.apply(filterManager, input, output, clearMode);
-      TexturePool.returnTexture(scratch);
-      TexturePool.returnTexture(blurred);
-    } else {
-      this.resources.uBlurred = input.source;
-      super.apply(filterManager, input, output, clearMode);
-    }
+    // Pixi's blur passes ping-pong through their input texture, so they get
+    // a copy: the input is still needed, untouched, for the canvas.
+    const scratch = TexturePool.getSameSizeTexture(input);
+    const blurred = TexturePool.getSameSizeTexture(input);
+    this.copy.apply(filterManager, input, scratch, true);
+    this.blur.apply(filterManager, scratch, blurred, true);
+    this.resources.uBlurred = blurred.source;
+    super.apply(filterManager, input, output, clearMode);
+    TexturePool.returnTexture(scratch);
+    TexturePool.returnTexture(blurred);
   }
 
   override destroy() {
