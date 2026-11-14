@@ -363,6 +363,165 @@ describe('useCanvasViewport', () => {
     expect(result.current.handleStagePointerUp()).toBe(false);
   });
 
+  describe('zoom tool', () => {
+    function element(rect: DOMRect) {
+      const node = document.createElement('div');
+      node.getBoundingClientRect = () => rect;
+      return { current: node };
+    }
+
+    // Starts at the mount fit of a 1024px canvas in 1280x720: zoom 0.625,
+    // pan (320, 40). Fit and the box keep clear of x 47..956, y 50..720.
+    function renderZoomTool() {
+      const onZoomToolGestureEnd = vi.fn();
+      const rendered = renderHook(
+        ({ activeTool }: { activeTool: 'zoom' | 'select' }) =>
+          useCanvasViewport({
+            activeTool,
+            canvasHeight: 1024,
+            canvasWidth: 1024,
+            fitObstructionRefs: {
+              top: element(domRect(0, 0, 1280, 50)),
+              left: element(domRect(7, 50, 40, 400)),
+              right: element(domRect(956, 50, 317, 662)),
+            },
+            onZoomToolGestureEnd,
+          }),
+        { initialProps: { activeTool: 'zoom' } },
+      );
+      const viewportElement = document.createElement('div');
+      viewportElement.getBoundingClientRect = () => domRect(0, 0, 1280, 720);
+      act(() => {
+        rendered.result.current.viewportRef.current = viewportElement;
+      });
+      expect(rendered.result.current.zoom).toBe(0.625);
+      expect(rendered.result.current.pan).toEqual({ x: 320, y: 40 });
+      return { ...rendered, onZoomToolGestureEnd };
+    }
+
+    function pointer(type: 'pointermove' | 'pointerup' | 'pointercancel', x: number, y: number) {
+      act(() => {
+        window.dispatchEvent(
+          new PointerEvent(type, { clientX: x, clientY: y, buttons: type === 'pointermove' ? 1 : 0 }),
+        );
+      });
+    }
+
+    it('zooms in two wheel steps around the point a click starts at', () => {
+      const { result, onZoomToolGestureEnd } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 300 }, false);
+      });
+      // A release a few pixels away is still a click.
+      pointer('pointermove', 403, 302);
+      expect(result.current.zoomBox).toBeNull();
+      pointer('pointerup', 403, 302);
+
+      // 0.625 * 1.2^2 = 0.9, snapped to 0.90625; canvas (128, 416) stays put.
+      expect(result.current.zoom).toBe(0.90625);
+      expect(result.current.toCanvasPointer({ x: 400, y: 300 })).toEqual({ x: 128, y: 416 });
+      expect(onZoomToolGestureEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('zooms out two wheel steps on an Alt-click', () => {
+      const { result } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 300 }, true);
+      });
+      pointer('pointerup', 400, 300);
+
+      // 0.625 / 1.2^2 = 0.434, snapped to 0.4375.
+      expect(result.current.zoom).toBe(0.4375);
+    });
+
+    it('shows the dragged box and zooms to fit it clear of the toolbar, tool palette and panel', () => {
+      const { result, onZoomToolGestureEnd } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 600, y: 240 }, false);
+      });
+      pointer('pointermove', 500, 200);
+      expect(result.current.zoomBox).toEqual({ left: 500, top: 200, width: 100, height: 40 });
+      pointer('pointermove', 400, 140);
+      expect(result.current.zoomBox).toEqual({ left: 400, top: 140, width: 200, height: 100 });
+      expect(onZoomToolGestureEnd).not.toHaveBeenCalled();
+      pointer('pointerup', 400, 140);
+
+      // The box is canvas (128, 160) 320x160. The room is 909x670, so its
+      // width limits the zoom: 909 / 320 = 2.84, floored to 2.828125.
+      expect(result.current.zoomBox).toBeNull();
+      expect(result.current.zoom).toBe(2.828125);
+      const topLeft = result.current.toViewportPoint({ x: 128, y: 160 });
+      const bottomRight = result.current.toViewportPoint({ x: 448, y: 320 });
+      expect(topLeft.x).toBeGreaterThanOrEqual(47);
+      expect(bottomRight.x).toBeLessThanOrEqual(956);
+      expect((topLeft.x + bottomRight.x) / 2).toBeCloseTo(47 + 909 / 2, 0);
+      expect((topLeft.y + bottomRight.y) / 2).toBeCloseTo(50 + 670 / 2, 0);
+      expect(onZoomToolGestureEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the box inside the viewport when the pointer leaves it', () => {
+      const { result } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 1000, y: 500 }, false);
+      });
+      pointer('pointermove', 1500, 900);
+
+      expect(result.current.zoomBox).toEqual({ left: 1000, top: 500, width: 280, height: 220 });
+    });
+
+    it('swallows the stage pointerup and leaves the finish to the window listener', () => {
+      const { result } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 300 }, false);
+      });
+      expect(result.current.handleStagePointerUp()).toBe(true);
+      expect(result.current.zoom).toBe(0.625);
+
+      pointer('pointerup', 400, 300);
+      expect(result.current.zoom).toBe(0.90625);
+      expect(result.current.handleStagePointerUp()).toBe(false);
+    });
+
+    it('drops the box without zooming on pointercancel, a lost release or a tool switch', () => {
+      const { result, rerender, onZoomToolGestureEnd } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 140 }, false);
+      });
+      pointer('pointermove', 600, 240);
+      pointer('pointercancel', 600, 240);
+      expect(result.current.zoomBox).toBeNull();
+      pointer('pointerup', 600, 240);
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 140 }, false);
+      });
+      pointer('pointermove', 600, 240);
+      act(() => {
+        window.dispatchEvent(new PointerEvent('pointermove', { clientX: 620, clientY: 250, buttons: 0 }));
+      });
+      expect(result.current.zoomBox).toBeNull();
+      pointer('pointerup', 620, 250);
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 140 }, false);
+      });
+      pointer('pointermove', 600, 240);
+      rerender({ activeTool: 'select' });
+      expect(result.current.zoomBox).toBeNull();
+      pointer('pointerup', 600, 240);
+
+      expect(result.current.zoom).toBe(0.625);
+      expect(result.current.pan).toEqual({ x: 320, y: 40 });
+      expect(onZoomToolGestureEnd).not.toHaveBeenCalled();
+    });
+  });
+
   it('recovers a stuck pan when a window pointermove arrives with no buttons held', () => {
     const { result } = renderHook(() =>
       useCanvasViewport({
