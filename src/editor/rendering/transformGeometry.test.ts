@@ -15,10 +15,11 @@ import {
 } from './transformGeometry';
 import {
   createEllipseItem,
+  createImageItem,
   createLineItem,
   createRectangleItem,
 } from '../document/documentDefaults';
-import type { CanvasItem } from '../document/documentTypes';
+import type { CanvasItem, ImageCanvasItem } from '../document/documentTypes';
 
 function rotatePoint(point: { x: number; y: number }, origin: { x: number; y: number }, rotation: number) {
   const radians = (rotation * Math.PI) / 180;
@@ -681,6 +682,136 @@ describe('transform geometry helpers', () => {
         mapPointThroughSignedResize(point, bounds, angle, 'top-center', currentPointer)
       );
       expectPointSetClose(getItemSelectionPoints(preview), expectedPoints);
+    });
+  });
+
+  describe('group resize with an image in the selection', () => {
+    // A crop-zoomed image: the source is drawn larger than the frame and offset.
+    function createZoomedImage(overrides: Partial<ImageCanvasItem> = {}): ImageCanvasItem {
+      return {
+        ...createImageItem({
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 100,
+          originalWidth: 400,
+          originalHeight: 200,
+          src: 'data:image/svg+xml,',
+          mimeType: 'image/svg+xml',
+        }),
+        id: 'image',
+        sourceTransform: { x: -50, y: -20, width: 300, height: 150, rotation: 0 },
+        ...overrides,
+      };
+    }
+
+    // The graphic has to keep filling the same part of the frame it did
+    // before the resize, or the bounds grow while the picture stays put.
+    function expectSourceScaledWithFrame(before: ImageCanvasItem, after: CanvasItem) {
+      if (after.kind !== 'image') {
+        throw new Error('Expected the image preview to stay an image.');
+      }
+      const ratioX = after.width / before.width;
+      const ratioY = after.height / before.height;
+      expect(after.sourceTransform.x).toBeCloseTo(before.sourceTransform.x * ratioX, 5);
+      expect(after.sourceTransform.y).toBeCloseTo(before.sourceTransform.y * ratioY, 5);
+      expect(after.sourceTransform.width).toBeCloseTo(before.sourceTransform.width * ratioX, 5);
+      expect(after.sourceTransform.height).toBeCloseTo(before.sourceTransform.height * ratioY, 5);
+      expect(after.sourceTransform.rotation).toBe(before.sourceTransform.rotation);
+    }
+
+    it('scales the image source with its frame when the axis-aligned group grows', () => {
+      const image = createZoomedImage();
+      const rectangle = createRectangleItem({ id: 'rect', x: 400, y: 100, width: 100, height: 100 });
+      const bounds = getSelectionRenderBounds([image, rectangle]);
+      if (!bounds) {
+        throw new Error('Expected selection bounds.');
+      }
+
+      const [preview] = buildGroupResizePreviews(
+        [image, rectangle],
+        bounds,
+        'bottom-right',
+        { x: bounds.x + bounds.width * 2, y: bounds.y + bounds.height * 2 },
+      );
+
+      expect(preview).toMatchObject({ width: 400, height: 200 });
+      expect(preview).toMatchObject({
+        sourceTransform: { x: -100, y: -40, width: 600, height: 300, rotation: 0 },
+      });
+    });
+
+    it('scales the image source along one axis for an edge handle', () => {
+      const image = createZoomedImage();
+      const rectangle = createRectangleItem({ id: 'rect', x: 400, y: 100, width: 100, height: 100 });
+      const bounds = getSelectionRenderBounds([image, rectangle]);
+      if (!bounds) {
+        throw new Error('Expected selection bounds.');
+      }
+
+      const [preview] = buildGroupResizePreviews(
+        [image, rectangle],
+        bounds,
+        'middle-right',
+        { x: bounds.x + bounds.width * 2, y: bounds.y },
+      );
+
+      expect(preview).toMatchObject({
+        width: 400,
+        height: 100,
+        sourceTransform: { x: -100, y: -20, width: 600, height: 150, rotation: 0 },
+      });
+    });
+
+    it('scales the image source with a rotated image inside an axis-aligned group', () => {
+      const image = createZoomedImage({ rotation: 30 });
+      const rectangle = createRectangleItem({ id: 'rect', x: 400, y: 100, width: 100, height: 100 });
+      const bounds = getSelectionRenderBounds([image, rectangle]);
+      if (!bounds) {
+        throw new Error('Expected selection bounds.');
+      }
+
+      const [preview] = buildGroupResizePreviews(
+        [image, rectangle],
+        bounds,
+        'bottom-right',
+        { x: bounds.x + bounds.width * 1.5, y: bounds.y + bounds.height * 1.5 },
+      );
+
+      expect(preview.width).toBeCloseTo(300, 5);
+      expectSourceScaledWithFrame(image, preview);
+    });
+
+    it('scales the image source when the group frame is rotated', () => {
+      const baseItems = [
+        createZoomedImage(),
+        createRectangleItem({ id: 'rect', x: 400, y: 100, width: 100, height: 100 }),
+      ];
+      const bounds = getSelectionRenderBounds(baseItems);
+      if (!bounds) {
+        throw new Error('Expected selection bounds.');
+      }
+      const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+      const angle = 40;
+      const rotatedItems = buildGroupRotatePreviews(
+        baseItems,
+        bounds,
+        { x: center.x, y: center.y - 120 },
+        rotatePoint({ x: center.x, y: center.y - 120 }, center, angle)
+      );
+      const rotatedImage = rotatedItems[0] as ImageCanvasItem;
+
+      const [preview] = buildGroupResizePreviews(
+        rotatedItems,
+        bounds,
+        'bottom-right',
+        localToStage({ x: bounds.width, y: bounds.height * 0.75 }, center, angle),
+        angle,
+      );
+
+      expect(preview.width).toBeGreaterThan(rotatedImage.width);
+      expect(preview.height).toBeGreaterThan(rotatedImage.height);
+      expectSourceScaledWithFrame(rotatedImage, preview);
     });
   });
 });

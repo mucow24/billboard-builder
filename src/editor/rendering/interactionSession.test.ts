@@ -17,6 +17,7 @@ import {
 import {
   createGeneratorItem,
   createGroupNode,
+  createImageItem,
   createLineItem,
   createPolygonItem,
   createRectangleItem,
@@ -422,6 +423,50 @@ describe('interactionSession', () => {
     expect(commit.selectionFrame).toEqual({
       bounds: { x: 100, y: 100, width: 260, height: 40 },
       rotation: 0,
+    });
+  });
+
+  it('commits a scaled image source when a group resize stretches an image', () => {
+    const image = {
+      ...createImageItem({
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+        originalWidth: 400,
+        originalHeight: 200,
+        src: 'data:image/svg+xml,',
+        mimeType: 'image/svg+xml',
+      }),
+      id: 'image',
+      sourceTransform: { x: -50, y: -20, width: 300, height: 150, rotation: 0 },
+    };
+    const rectangle = createRectangleItem({ id: 'rect', x: 320, y: 100, width: 80, height: 100 });
+    const session = createGroupResizeSession('middle-right', { x: 400, y: 150 }, {
+      selectedItems: [image, rectangle],
+      siblingItems: [],
+      activeSelectionFrame: { bounds: { x: 100, y: 100, width: 300, height: 100 }, rotation: 0 },
+    });
+    if (!session) {
+      throw new Error('Expected group resize session.');
+    }
+
+    const resolved = resolveInteractionSession(session, { x: 700, y: 150 }, {
+      stageBounds: canvasBounds,
+    });
+    const commit = buildInteractionCommit(resolved, {
+      nodes: [image, rectangle],
+      pointer: { x: 700, y: 150 },
+      canvasBounds,
+    });
+
+    if (commit.kind !== 'group') {
+      throw new Error('Expected group commit.');
+    }
+    expect(commit.updates.find((update) => update.itemId === 'image')?.changes).toMatchObject({
+      width: 400,
+      height: 100,
+      sourceTransform: { x: -100, y: -20, width: 600, height: 150, rotation: 0 },
     });
   });
 
