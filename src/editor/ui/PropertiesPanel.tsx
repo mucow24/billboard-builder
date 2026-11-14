@@ -12,6 +12,7 @@ export type { InspectorTab } from './inspector/types';
 export function PropertiesPanel({
   activeTab,
   availableFonts,
+  canvasSize,
   fonts,
   layerRows,
   missingFontFamilies,
@@ -184,6 +185,7 @@ export function PropertiesPanel({
           >
             <SelectionInspector
               availableFonts={availableFonts}
+              canvasSize={canvasSize}
               fonts={fonts}
               onGroupOpacityChange={onGroupOpacityChange}
               onItemChange={onItemChange}

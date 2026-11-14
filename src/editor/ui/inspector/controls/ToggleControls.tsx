@@ -9,6 +9,7 @@ interface CheckboxInputProps {
   label: string;
   mixed?: boolean;
   onChange: (checked: boolean) => void;
+  tooltip?: string;
 }
 
 export function CheckboxInput({
@@ -17,6 +18,7 @@ export function CheckboxInput({
   label,
   mixed = false,
   onChange,
+  tooltip,
 }: CheckboxInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -28,7 +30,7 @@ export function CheckboxInput({
   }, [mixed]);
 
   return (
-    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
       <div className="inspector-checkbox-control">
         <input
           className="inspector-checkbox-input"
@@ -51,6 +53,7 @@ interface ToggleButtonInputProps {
   label: string;
   mixed?: boolean;
   onChange: (value: boolean) => void;
+  tooltip?: string;
 }
 
 export function ToggleButtonInput({
@@ -60,9 +63,10 @@ export function ToggleButtonInput({
   label,
   mixed = false,
   onChange,
+  tooltip,
 }: ToggleButtonInputProps) {
   return (
-    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label}>
+    <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
       <button
         type="button"
         aria-label={label}
@@ -88,6 +92,7 @@ interface ToggleGroupInputProps {
   label: string;
   onChange: (value: Record<string, boolean>) => void;
   options: ToggleOption[];
+  tooltip?: string;
   value: Record<string, boolean>;
 }
 
@@ -96,10 +101,11 @@ export function ToggleGroupInput({
   label,
   onChange,
   options,
+  tooltip,
   value,
 }: ToggleGroupInputProps) {
   return (
-    <FieldShell label={label} layout="stacked">
+    <FieldShell label={label} layout="stacked" tooltip={tooltip}>
       <div className="toggle-group-grid" role="group" aria-label={label}>
         {options.map((option) => {
           const active = Boolean(value[option.key]);

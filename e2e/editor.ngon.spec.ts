@@ -46,7 +46,10 @@ test.describe('ngon tool flows', () => {
     await openPropertiesTab(page);
 
     await test.step('shows Sides slider in properties panel', async () => {
-      await page.getByRole('button', { name: 'Geometry' }).click();
+      // Sides has its own section, open from the start: nothing to expand first.
+      await expect(
+        page.getByTestId('properties-tab-body').getByRole('button', { name: 'N-gon', exact: true }),
+      ).toHaveAttribute('aria-expanded', 'true');
       await expect(page.getByRole('slider', { name: 'Sides' })).toBeVisible();
       await expect(page.getByRole('spinbutton', { name: 'Sides' })).toBeVisible();
     });

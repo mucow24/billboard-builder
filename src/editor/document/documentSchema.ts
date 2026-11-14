@@ -107,6 +107,9 @@ const PerspectiveGridGeneratorParamsSchema = z.object({
 const ScanlinesGeneratorParamsSchema = z.object({
   generatorType: z.literal('scanlines'),
   scanlineColor: z.string(),
+  // Absent in files saved before opacity had its own setting; the normalizer
+  // then takes it from the color's alpha.
+  opacity: z.number().min(0).max(1).optional(),
   scanlineHeight: z.number().int().min(1),
   scanlineSpacing: z.number().int().min(0),
 });

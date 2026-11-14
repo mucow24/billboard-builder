@@ -24,12 +24,16 @@ export function GradientFillWidget({
   onCommit,
 }: GradientFillWidgetProps) {
   const effectiveGradient = !gradientMixed && gradientEnabled;
+  // The second color and the swap only matter to a gradient. A mixed selection
+  // holds at least one gradient, so they stay usable there.
+  const secondaryDisabled = disabled || (!gradientMixed && !gradientEnabled);
 
   return (
     <div className="gradient-fill-widget">
       <ColorPickerControl
         disabled={disabled}
         label="Fill"
+        title="Main fill color. With the gradient on, this is the color the gradient starts from."
         mixed={primaryMixed}
         value={primaryColor}
         variant="compact"
@@ -39,14 +43,16 @@ export function GradientFillWidget({
         type="button"
         className="gradient-fill-swap-button"
         aria-label="Swap fill colors"
-        disabled={disabled}
+        title="Swap the fill and secondary colors. Only available while the gradient is on."
+        disabled={secondaryDisabled}
         onClick={() => onCommit({ kind: 'swap' })}
       >
         ⇄
       </button>
       <ColorPickerControl
-        disabled={disabled}
+        disabled={secondaryDisabled}
         label="Secondary fill"
+        title="Color the gradient ends on. Only available while the gradient is on."
         mixed={secondaryMixed}
         value={secondaryColor}
         variant="compact"
@@ -60,6 +66,7 @@ export function GradientFillWidget({
             : 'gradient-fill-toggle-button'
         }
         aria-label="Toggle gradient"
+        title="Switch between a solid fill and a gradient from the fill color to the secondary color."
         aria-pressed={gradientMixed ? 'mixed' : gradientEnabled}
         disabled={disabled}
         onClick={() =>

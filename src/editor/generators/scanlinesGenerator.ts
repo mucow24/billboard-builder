@@ -7,14 +7,16 @@ export const scanlinesGeneratorSpec: GeneratorSpec<ScanlinesGeneratorParams> = {
   type: 'scanlines',
   label: 'Scanlines',
   fields: [
-    { key: 'scanlineColor', label: 'Scanline Color', type: 'color' },
-    { key: 'scanlineHeight', label: 'Height', type: 'range', min: 1, max: 20, step: 1, textMin: 1, textMax: Infinity },
-    { key: 'scanlineSpacing', label: 'Spacing', type: 'range', min: 1, max: 20, step: 1, textMin: 0, textMax: Infinity },
+    { key: 'scanlineColor', label: 'Scanline Color', tooltip: 'Color of the lines.', type: 'color' },
+    { key: 'opacity', label: 'Opacity', tooltip: 'Transparency of the lines, from 0 (invisible) to 1 (solid).', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'scanlineHeight', label: 'Height', tooltip: 'Thickness of each line, in pixels.', type: 'range', min: 1, max: 20, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'scanlineSpacing', label: 'Spacing', tooltip: 'Gap between lines, in pixels.', type: 'range', min: 1, max: 20, step: 1, textMin: 0, textMax: Infinity },
   ],
   createDefaultParams(): ScanlinesGeneratorParams {
     return {
       generatorType: 'scanlines',
-      scanlineColor: '#00000017',
+      scanlineColor: '#000000',
+      opacity: 0.09,
       scanlineHeight: 1,
       scanlineSpacing: 4,
     };
@@ -25,7 +27,7 @@ export const scanlinesGeneratorSpec: GeneratorSpec<ScanlinesGeneratorParams> = {
     const step = lineHeight + gap;
 
     ctx.save();
-    ctx.fillStyle = rgba(params.scanlineColor, 1);
+    ctx.fillStyle = rgba(params.scanlineColor, params.opacity);
     for (let y = 0; y < h; y += step) {
       ctx.fillRect(0, y, w, lineHeight);
     }

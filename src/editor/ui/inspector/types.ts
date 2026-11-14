@@ -17,6 +17,8 @@ export type InspectorTab = 'properties' | 'layers' | 'favorites';
 export interface PropertiesPanelProps {
   activeTab: InspectorTab;
   availableFonts: UploadedFont[];
+  /** Size of the document canvas; sets the slider range of generator properties that depend on it. */
+  canvasSize?: { height: number; width: number };
   fonts: DocumentFontReference[];
   layerRows: LayerRow[];
   missingFontFamilies: string[];
@@ -66,6 +68,7 @@ export interface LayersInspectorTabProps {
 
 export interface SelectionInspectorProps {
   availableFonts: UploadedFont[];
+  canvasSize?: { height: number; width: number };
   fonts: DocumentFontReference[];
   onGroupOpacityChange: (opacity: number) => void;
   onItemChange: (changes: SelectionItemChange) => void;

@@ -7,13 +7,13 @@ export const zigzagsGeneratorSpec: GeneratorSpec<ZigzagsGeneratorParams> = {
   type: 'zigzags',
   label: 'Zigzags',
   fields: [
-    { key: 'accentColor', label: 'Accent Color', type: 'color' },
-    { key: 'bandColorA', label: 'Secondary Color', type: 'color' },
-    { key: 'count', label: 'Count', type: 'range', min: 1, max: 48, step: 1, textMin: 1, textMax: 48 },
-    { key: 'zigzagAmplitude', label: 'Amplitude', type: 'range', min: 0, max: 160, step: 1, textMin: 0, textMax: Infinity },
-    { key: 'thickness', label: 'Thickness', type: 'range', min: 1, max: 64, step: 1, textMin: 1, textMax: 64 },
-    { key: 'opacity', label: 'Opacity', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'seedOverride', label: 'Seed Override', type: 'optionalNumber', min: 1, max: 999999999 },
+    { key: 'accentColor', label: 'Accent Color', tooltip: 'Color of every other zigzag line.', type: 'color' },
+    { key: 'bandColorA', label: 'Secondary Color', tooltip: 'Color of the lines in between.', type: 'color' },
+    { key: 'count', label: 'Count', tooltip: 'Number of zigzag lines, stacked top to bottom.', type: 'range', min: 1, max: 48, step: 1, textMin: 1, textMax: 48 },
+    { key: 'zigzagAmplitude', label: 'Amplitude', tooltip: "Height of each zigzag's peaks, in pixels.", type: 'range', min: 0, max: 160, step: 1, textMin: 0, textMax: Infinity },
+    { key: 'thickness', label: 'Thickness', tooltip: 'Width of the lines, in pixels.', type: 'range', min: 1, max: 64, step: 1, textMin: 1, textMax: 64 },
+    { key: 'opacity', label: 'Opacity', tooltip: 'Transparency of the lines, from 0 (invisible) to 1 (solid).', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'seedOverride', label: 'Seed Override', tooltip: "Fix the random pattern to a number of your choice. Leave at 0 to use the item's own random pattern.", type: 'optionalNumber', min: 0, max: 999999999 },
   ],
   createDefaultParams(): ZigzagsGeneratorParams {
     return {

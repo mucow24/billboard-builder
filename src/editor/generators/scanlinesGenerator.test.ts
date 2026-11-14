@@ -13,10 +13,11 @@ function createMockContext() {
 }
 
 describe('scanlinesGeneratorSpec', () => {
-  it('preserves the prior visual cadence in default params', () => {
+  it('keeps the earlier look in default params, with opacity apart from an opaque color', () => {
     expect(scanlinesGeneratorSpec.createDefaultParams()).toEqual({
       generatorType: 'scanlines',
-      scanlineColor: '#00000017',
+      scanlineColor: '#000000',
+      opacity: 0.09,
       scanlineHeight: 1,
       scanlineSpacing: 4,
     });
@@ -33,7 +34,9 @@ describe('scanlinesGeneratorSpec', () => {
       0,
     );
 
+    // The same fill the earlier default, #00000017, produced.
     expect(ctx.fillStyle).toBe(rgba('#00000017', 1));
+    expect(ctx.fillStyle).toBe('rgba(0, 0, 0, 0.09)');
     expect(ctx.fillRect).toHaveBeenCalledTimes(4);
     expect(ctx.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 8, 1);
     expect(ctx.fillRect).toHaveBeenNthCalledWith(2, 0, 5, 8, 1);
@@ -50,7 +53,8 @@ describe('scanlinesGeneratorSpec', () => {
       20,
       {
         generatorType: 'scanlines',
-        scanlineColor: '#00000017',
+        scanlineColor: '#000000',
+        opacity: 0.09,
         scanlineHeight: 3,
         scanlineSpacing: 4,
       },
@@ -63,7 +67,7 @@ describe('scanlinesGeneratorSpec', () => {
     expect(ctx.fillRect).toHaveBeenNthCalledWith(3, 0, 14, 12, 3);
   });
 
-  it('supports zero spacing and uses the configured alpha color', () => {
+  it('supports zero spacing and applies the opacity setting to the color', () => {
     const ctx = createMockContext();
 
     scanlinesGeneratorSpec.draw(
@@ -72,14 +76,15 @@ describe('scanlinesGeneratorSpec', () => {
       7,
       {
         generatorType: 'scanlines',
-        scanlineColor: '#11223380',
+        scanlineColor: '#112233',
+        opacity: 0.5,
         scanlineHeight: 2,
         scanlineSpacing: 0,
       },
       0,
     );
 
-    expect(ctx.fillStyle).toBe(rgba('#11223380', 1));
+    expect(ctx.fillStyle).toBe('rgba(17, 34, 51, 0.5)');
     expect(ctx.fillRect).toHaveBeenCalledTimes(4);
     expect(ctx.fillRect).toHaveBeenNthCalledWith(1, 0, 0, 10, 2);
     expect(ctx.fillRect).toHaveBeenNthCalledWith(2, 0, 2, 10, 2);

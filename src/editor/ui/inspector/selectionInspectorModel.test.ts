@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createEllipseItem,
   createGeneratorItem,
   createImageItem,
   createLineItem,
@@ -279,7 +280,8 @@ describe('selectionInspectorModel', () => {
     const ngonFieldKeys = ngonSections.flatMap((section) =>
       section.fields.map((field) => `${section.key}:${field.descriptor.propertyKey}`)
     );
-    expect(ngonFieldKeys).toContain('geometry:sides');
+    expect(ngonFieldKeys).toContain('ngon:sides');
+    expect(ngonFieldKeys).not.toContain('geometry:sides');
     expect(ngonFieldKeys).toContain('fill:gradientFill');
     expect(ngonFieldKeys).toContain('stroke:stroke');
     expect(ngonFieldKeys).not.toContain('geometry:cornerRadius');
@@ -288,9 +290,123 @@ describe('selectionInspectorModel', () => {
     const mixedFieldKeys = mixedSections.flatMap((section) =>
       section.fields.map((field) => `${section.key}:${field.descriptor.propertyKey}`)
     );
-    expect(mixedFieldKeys).not.toContain('geometry:sides');
+    expect(mixedFieldKeys).not.toContain('ngon:sides');
     expect(mixedFieldKeys).not.toContain('geometry:cornerRadius');
     expect(mixedFieldKeys).toContain('stroke:stroke');
+  });
+
+  it('gives Sides a section of its own, placed right after Stroke', () => {
+    const sections = buildSelectionInspectorSections(
+      [createNgonItem({ sides: 8 })],
+      buildInspectorEnvironment([], []),
+    );
+    const sectionKeys = sections.map((section) => section.key);
+    const ngonSection = sections.find((section) => section.key === 'ngon');
+
+    expect(sectionKeys.indexOf('ngon')).toBe(sectionKeys.indexOf('stroke') + 1);
+    expect(ngonSection?.label).toBe('N-gon');
+    expect(ngonSection?.fields.map((field) => field.descriptor.label)).toEqual(['Sides']);
+  });
+
+  it('orders the Image and Shadow fields as the panel shows them', () => {
+    const sections = buildSelectionInspectorSections(
+      [createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+      })],
+      buildInspectorEnvironment([], []),
+    );
+    const labelsOf = (key: string) =>
+      sections.find((section) => section.key === key)?.fields.map((field) => field.descriptor.label);
+
+    expect(labelsOf('image')).toEqual([
+      'Mirror',
+      'Preserve aspect ratio',
+      'Brightness',
+      'Contrast',
+      'Opacity',
+      'Tint color',
+      'Tint strength',
+    ]);
+    expect(labelsOf('shadow')).toEqual(['Opacity', 'Color', 'Blur Radius', 'Offset X', 'Offset Y']);
+  });
+
+  it('gives every property a tooltip, for every kind of item', () => {
+    const environment = buildInspectorEnvironment([], []);
+    const generators = [
+      'bands', 'burst', 'zigzags', 'flatGrid', 'perspectiveGrid', 'scanlines', 'noise', 'vignette', 'shapes',
+    ].map((type) => createGeneratorItem(type, 1024, 1024));
+    const items = [
+      createTextItem(),
+      createRectangleItem(),
+      createEllipseItem(),
+      createNgonItem(),
+      createLineItem(),
+      createPolygonItem(),
+      createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+      }),
+      ...generators,
+    ];
+
+    for (const item of items) {
+      const fields = buildSelectionInspectorSections([item], environment).flatMap(
+        (section) => section.fields,
+      );
+      // Fill and Dimensions are widgets with no label of their own; their
+      // controls carry the tooltips instead.
+      const missing = fields
+        .filter((field) => !['gradientFill', 'dimensions'].includes(field.descriptor.propertyKey))
+        .filter((field) => !field.descriptor.tooltip)
+        .map((field) => `${item.kind}: ${field.descriptor.label}`);
+      expect(missing).toEqual([]);
+    }
+  });
+
+  it('sizes the Burst Rays offset sliders to three quarters of the canvas either way', () => {
+    const burst = createGeneratorItem('burst', 2048, 1024);
+    const sections = buildSelectionInspectorSections(
+      [burst],
+      buildInspectorEnvironment([], [], { width: 2048, height: 1024 }),
+    );
+    const find = (propertyKey: string) =>
+      sections
+        .find((section) => section.key === 'generator')
+        ?.fields.find((field) => field.descriptor.propertyKey === propertyKey)?.descriptor;
+
+    expect(find('gen_offsetX')).toMatchObject({ min: -1536, max: 1536 });
+    expect(find('gen_offsetY')).toMatchObject({ min: -768, max: 768 });
+  });
+
+  it('follows the canvas size, not the size of the layer box, for the Burst Rays offsets', () => {
+    const burst = { ...createGeneratorItem('burst', 400, 300), width: 400, height: 300 };
+    const sections = buildSelectionInspectorSections(
+      [burst],
+      buildInspectorEnvironment([], [], { width: 1000, height: 500 }),
+    );
+    const offsetX = sections
+      .find((section) => section.key === 'generator')
+      ?.fields.find((field) => field.descriptor.propertyKey === 'gen_offsetX')?.descriptor;
+
+    expect(offsetX).toMatchObject({ min: -750, max: 750 });
+  });
+
+  it('limits the Flat Grid offset sliders to one grid spacing', () => {
+    const grid = createGeneratorItem('flatGrid', 1024, 1024);
+    grid.generatorParams = { ...grid.generatorParams, gridSpacingX: 10, gridSpacingY: 25 } as typeof grid.generatorParams;
+    const sections = buildSelectionInspectorSections([grid], buildInspectorEnvironment([], []));
+    const find = (propertyKey: string) =>
+      sections
+        .find((section) => section.key === 'generator')
+        ?.fields.find((field) => field.descriptor.propertyKey === propertyKey)?.descriptor;
+
+    expect(find('gen_offsetX')).toMatchObject({ min: 0, max: 10, textMin: -Infinity, textMax: Infinity });
+    expect(find('gen_offsetY')).toMatchObject({ min: 0, max: 25 });
   });
 
   it('produces generator section descriptors with correct textMin/textMax bounds', () => {
@@ -365,12 +481,12 @@ describe('selectionInspectorModel', () => {
       textMax: 48,
     });
     expect(findNumberField('burst', 'gen_offsetX')).toMatchObject({
-      min: -512,
-      max: 512,
+      min: -768,
+      max: 768,
     });
     expect(findNumberField('burst', 'gen_offsetY')).toMatchObject({
-      min: -512,
-      max: 512,
+      min: -768,
+      max: 768,
     });
     expect(findNumberField('zigzags', 'gen_count')).toMatchObject({
       min: 1,
@@ -460,7 +576,7 @@ describe('selectionInspectorModel', () => {
     expect((change as { rotation: number }).rotation).toBe(90);
   });
 
-  it('produces scanlines descriptors with color, height, and gap-size spacing bounds', () => {
+  it('produces scanlines descriptors with color, opacity, height, and gap-size spacing bounds', () => {
     const generator = createGeneratorItem('scanlines', 1024, 1024);
     const environment = buildInspectorEnvironment([], []);
     const sections = buildSelectionInspectorSections([generator], environment);
@@ -473,6 +589,10 @@ describe('selectionInspectorModel', () => {
         'gen_scanlineSpacing',
       ]),
     );
+    expect(generatorSection?.fields.map((field) => field.descriptor.label).slice(0, 2)).toEqual([
+      'Scanline Color',
+      'Opacity',
+    ]);
 
     const heightField = generatorSection?.fields.find(
       (field) => field.descriptor.propertyKey === 'gen_scanlineHeight',

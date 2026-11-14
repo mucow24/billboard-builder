@@ -108,6 +108,7 @@ function FieldRenderer({
           disabled={field.disabled}
           digits={field.descriptor.digits}
           label={field.descriptor.label}
+          tooltip={field.descriptor.tooltip}
           max={field.descriptor.max}
           mixed={field.state.isMixed}
           min={field.descriptor.min}
@@ -126,6 +127,7 @@ function FieldRenderer({
         <TextInput
           disabled={field.disabled}
           label={field.descriptor.label}
+          tooltip={field.descriptor.tooltip}
           mixed={field.state.isMixed}
           multiline={field.descriptor.multiline}
           value={typeof field.state.value === 'string' ? field.state.value : null}
@@ -138,6 +140,7 @@ function FieldRenderer({
           checked={typeof field.state.value === 'boolean' ? field.state.value : null}
           disabled={field.disabled}
           label={field.descriptor.label}
+          tooltip={field.descriptor.tooltip}
           mixed={field.state.isMixed}
           onChange={commitValue}
         />
@@ -147,6 +150,7 @@ function FieldRenderer({
         <FieldShell
           hint={field.state.isMixed ? 'Mixed' : undefined}
           label={field.descriptor.label}
+          tooltip={field.descriptor.tooltip}
         >
           <ColorPickerControl
             disabled={field.disabled}
@@ -163,6 +167,7 @@ function FieldRenderer({
         <SelectInput
           disabled={field.disabled}
           label={field.descriptor.label}
+          tooltip={field.descriptor.tooltip}
           mixed={field.state.isMixed}
           options={field.options}
           value={typeof field.state.value === 'string' ? field.state.value : null}
@@ -181,6 +186,7 @@ function FieldRenderer({
 
 export function SelectionInspector({
   availableFonts,
+  canvasSize,
   fonts,
   onGroupOpacityChange,
   onItemChange,
@@ -193,7 +199,7 @@ export function SelectionInspector({
   selectedItems,
 }: SelectionInspectorProps) {
   const isMultiNodeSelection = selectedNodeCount > 1;
-  const environment = buildInspectorEnvironment(availableFonts, fonts);
+  const environment = buildInspectorEnvironment(availableFonts, fonts, canvasSize);
   const sections = buildSelectionInspectorSections(selectedItems, environment);
 
   if (selectedGroup && !isMultiNodeSelection) {
@@ -211,6 +217,7 @@ export function SelectionInspector({
         <SectionBlock title="Group">
           <NumberInput
             label="Group Opacity"
+            tooltip="Transparency of the whole group, from 0 (invisible) to 1 (solid). Applied on top of each item's own opacity."
             min={0}
             max={1}
             step={0.01}
@@ -223,6 +230,7 @@ export function SelectionInspector({
             <button
               type="button"
               className="inspector-action-button"
+              title="Select the items inside this group instead of the group itself."
               onClick={onSelectGroupChildren}
             >
               Select children

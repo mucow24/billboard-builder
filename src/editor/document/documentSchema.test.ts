@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createDefaultProjectDocument,
+  createGeneratorItem,
   createGroupNode,
   createImageItem,
   createNgonItem,
@@ -379,5 +380,29 @@ describe('document schema', () => {
       nodes: [],
     });
     expect(legacy.name).toBe('Untitled canvas');
+  });
+
+  it('opens a file whose scanlines layer was saved before opacity had its own setting', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createGeneratorItem('scanlines', 1024, 1024)];
+    const file = JSON.parse(serializeProjectDocument(document));
+    file.nodes[0].generatorParams = {
+      generatorType: 'scanlines',
+      scanlineColor: '#00000017',
+      scanlineHeight: 1,
+      scanlineSpacing: 4,
+    };
+
+    const parsed = parseProjectDocument(file);
+    const node = parsed.nodes[0];
+    if (node?.kind !== 'generator') {
+      throw new Error('Expected generator node.');
+    }
+
+    expect(node.generatorParams).toMatchObject({
+      generatorType: 'scanlines',
+      scanlineColor: '#000000',
+      opacity: 23 / 255,
+    });
   });
 });

@@ -416,8 +416,12 @@ test.describe('editor properties flows', () => {
     await clickItem(page, 'gradient-rect');
     await openPropertiesTab(page);
     let inspector = page.getByTestId('properties-tab-body');
-    await expect(inspector.getByLabel('Secondary fill')).toBeEnabled();
+    // The second color and the swap only apply to a gradient, so a solid fill disables them.
+    await expect(inspector.getByLabel('Secondary fill')).toBeDisabled();
+    await expect(inspector.getByRole('button', { name: 'Swap fill colors' })).toBeDisabled();
     await inspector.getByRole('button', { name: 'Toggle gradient' }).click();
+    await expect(inspector.getByLabel('Secondary fill')).toBeEnabled();
+    await expect(inspector.getByRole('button', { name: 'Swap fill colors' })).toBeEnabled();
     await inspector.getByRole('button', { name: 'Secondary fill', exact: true }).click();
     await page.getByLabel('Secondary fill hex').fill('#00ff00ff');
     await page.getByLabel('Secondary fill hex').press('Enter');
@@ -556,7 +560,7 @@ test.describe('editor properties flows', () => {
     await expectSliders(page, 'Stroke', ['Width']);
     await expectSliders(page, 'Geometry', ['Rotation', 'Corner radius']);
     await expectSliders(page, 'Blur', ['Radius']);
-    await expectSliders(page, 'Shadow', ['Blur Radius', 'Opacity', 'Offset X', 'Offset Y']);
+    await expectSliders(page, 'Shadow', ['Opacity', 'Blur Radius', 'Offset X', 'Offset Y']);
 
     // Text: font size, line height, character spacing, rotation
     await clickItem(page, 'slider-text');
