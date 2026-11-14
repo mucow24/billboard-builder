@@ -198,7 +198,6 @@ export function CanvasStage({
       <CanvasViewportHud
         canvasHeight={document.canvas.height}
         canvasWidth={document.canvas.width}
-        guidesCount={guides.length}
         onFitCanvas={viewport.fitCanvasToViewport}
         onSetZoom={viewport.setZoomFromHud}
         zoom={viewport.zoom}
@@ -257,6 +256,7 @@ export function CanvasStage({
           cropSession={cropSession as never}
           groupHandleViewportPoints={groupHandleViewportPoints}
           groupOverlayFrame={groupOverlayFrame}
+          guideCount={guides.length}
           groupOverlayViewportRect={groupOverlayViewportRect}
           groupRotaterViewportPoint={groupRotaterViewportPoint}
           lastTestHookEvent={lastTestHookEvent}
@@ -386,7 +386,8 @@ function CanvasStageDebug({
   viewportRef,
   viewportSize,
   zoom,
-}: Parameters<typeof useCanvasDebugSnapshot>[0]) {
+  guideCount,
+}: Parameters<typeof useCanvasDebugSnapshot>[0] & { guideCount: number }) {
   const debugInfo = useCanvasDebugSnapshot({
     beginGroupDrag,
     beginGroupResize,
@@ -429,6 +430,7 @@ function CanvasStageDebug({
     <div className="canvas-debug" aria-hidden="true">
       <pre data-testid="stage-debug">{JSON.stringify(debugInfo)}</pre>
       <pre data-testid="selected-item-debug">{JSON.stringify(debugInfo)}</pre>
+      <pre data-testid="guide-count">{guideCount}</pre>
     </div>
   );
 }

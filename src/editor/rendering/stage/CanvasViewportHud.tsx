@@ -5,7 +5,6 @@ import { parseZoomPercentInput } from './viewportMath';
 interface CanvasViewportHudProps {
   canvasHeight: number;
   canvasWidth: number;
-  guidesCount: number;
   onFitCanvas: () => void;
   onSetZoom: (nextZoom: number) => void;
   zoom: number;
@@ -116,7 +115,6 @@ function ZoomReadout({ onSetZoom, zoom }: { onSetZoom: (nextZoom: number) => voi
 export function CanvasViewportHud({
   canvasHeight,
   canvasWidth,
-  guidesCount,
   onFitCanvas,
   onSetZoom,
   zoom,
@@ -126,9 +124,6 @@ export function CanvasViewportHud({
     <div className="canvas-hud">
       <div className="canvas-hud-pill" data-testid="canvas-size">
         {canvasWidth} x {canvasHeight}
-      </div>
-      <div className="canvas-hud-pill" data-testid="guide-count">
-        Guides: {guidesCount}
       </div>
       <div className="canvas-hud-controls" aria-label="Viewport controls">
         <button
