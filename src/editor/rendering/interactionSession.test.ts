@@ -10,6 +10,7 @@ import {
   createPolygonEdgeInsertSession,
   createPolygonVertexSession,
   getCommitChanges,
+  getMarqueeSelection,
   resolveInteractionSession,
   type SelectionFrame,
 } from './interactionSession';
@@ -126,7 +127,7 @@ describe('interactionSession', () => {
   it('uses the final pointer to build a create commit when there is no preview item yet', () => {
     const session = createCreateSession('rectangle', { x: 100, y: 120 });
     const commit = buildInteractionCommit(session, {
-      orderedItems: [],
+      nodes: [],
       pointer: { x: 180, y: 200 },
       canvasBounds,
     });
@@ -160,7 +161,7 @@ describe('interactionSession', () => {
     expect(moved.previewItem).not.toBeNull();
 
     const commit = buildInteractionCommit(moved, {
-      orderedItems: [],
+      nodes: [],
       pointer: { x: 501, y: 400 },
       canvasBounds,
     });
@@ -184,7 +185,7 @@ describe('interactionSession', () => {
     if (dragged.kind !== 'create') throw new Error('expected create session');
 
     const commit = buildInteractionCommit(dragged, {
-      orderedItems: [],
+      nodes: [],
       pointer: { x: 260, y: 300 },
       canvasBounds,
     });
@@ -201,11 +202,10 @@ describe('interactionSession', () => {
         pointerStart: { x: 90, y: 90 },
         pointerSource: 'stage',
         currentPointer: { x: 180, y: 160 },
-        toggleMode: true,
         guides: [],
       },
       {
-        orderedItems: [visible, hidden],
+        nodes: [visible, hidden],
         pointer: { x: 180, y: 160 },
         canvasBounds,
       }
@@ -213,8 +213,7 @@ describe('interactionSession', () => {
 
     expect(commit).toEqual({
       kind: 'marquee',
-      hitIds: ['visible'],
-      toggleMode: true,
+      nodeIds: ['visible'],
     });
   });
 
@@ -227,11 +226,10 @@ describe('interactionSession', () => {
         pointerStart: { x: 90, y: 90 },
         pointerSource: 'stage',
         currentPointer: { x: 200, y: 170 },
-        toggleMode: false,
         guides: [],
       },
       {
-        orderedItems: [unlocked, locked],
+        nodes: [unlocked, locked],
         pointer: { x: 200, y: 170 },
         canvasBounds,
       }
@@ -239,8 +237,7 @@ describe('interactionSession', () => {
 
     expect(commit).toEqual({
       kind: 'marquee',
-      hitIds: ['unlocked'],
-      toggleMode: false,
+      nodeIds: ['unlocked'],
     });
   });
 
@@ -259,11 +256,10 @@ describe('interactionSession', () => {
         pointerStart: { x: -260, y: 80 },
         pointerSource: 'stage',
         currentPointer: { x: -40, y: 280 },
-        toggleMode: false,
         guides: [],
       },
       {
-        orderedItems: [offCanvas],
+        nodes: [offCanvas],
         pointer: { x: -40, y: 280 },
         canvasBounds,
       }
@@ -271,8 +267,7 @@ describe('interactionSession', () => {
 
     expect(commit).toEqual({
       kind: 'marquee',
-      hitIds: ['off-canvas'],
-      toggleMode: false,
+      nodeIds: ['off-canvas'],
     });
   });
 
@@ -298,11 +293,10 @@ describe('interactionSession', () => {
         pointerStart: { x: -300, y: 100 },
         pointerSource: 'stage',
         currentPointer: { x: 90, y: 300 },
-        toggleMode: false,
         guides: [],
       },
       {
-        orderedItems: [partlyVisible, fullyOutside],
+        nodes: [partlyVisible, fullyOutside],
         pointer: { x: 90, y: 300 },
         canvasBounds,
       }
@@ -310,9 +304,28 @@ describe('interactionSession', () => {
 
     expect(commit).toEqual({
       kind: 'marquee',
-      hitIds: ['partly-visible', 'fully-outside'],
-      toggleMode: false,
+      nodeIds: ['partly-visible', 'fully-outside'],
     });
+  });
+
+  it('selects the outermost group of each touched item, once, in stacking order', () => {
+    const innerLeaf = createRectangleItem({ id: 'inner-leaf', x: 100, y: 100, width: 60, height: 40 });
+    const outerLeaf = createRectangleItem({ id: 'outer-leaf', x: 200, y: 100, width: 60, height: 40 });
+    const inner = createGroupNode([innerLeaf], 'Inner');
+    const outer = createGroupNode([inner, outerLeaf], 'Outer');
+    const loose = createRectangleItem({ id: 'loose', x: 100, y: 200, width: 60, height: 40 });
+    const marquee = {
+      kind: 'marquee' as const,
+      pointerStart: { x: 90, y: 90 },
+      pointerSource: 'stage' as const,
+      currentPointer: { x: 270, y: 210 },
+      guides: [],
+    };
+
+    expect(getMarqueeSelection(marquee, [outer, loose])).toEqual([outer.id, loose.id]);
+    expect(getMarqueeSelection({ ...marquee, currentPointer: { x: 150, y: 120 } }, [outer, loose])).toEqual([
+      outer.id,
+    ]);
   });
 
   it('resolves group resize sessions into updates and a committed frame', () => {
@@ -336,7 +349,7 @@ describe('interactionSession', () => {
       stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
     });
     const commit = buildInteractionCommit(resolved, {
-      orderedItems: [first, second],
+      nodes: [first, second],
       pointer: { x: 360, y: 120 },
       canvasBounds,
     });
@@ -410,7 +423,7 @@ describe('interactionSession', () => {
       stageBounds: { x: 0, y: 0, width: 1024, height: 1024 },
     });
     const commit = buildInteractionCommit(resolved, {
-      orderedItems: [first, second],
+      nodes: [first, second],
       pointer: { x: 250, y: 50 },
       canvasBounds,
     });
@@ -562,7 +575,7 @@ describe('interactionSession', () => {
 
     // Original ratio is 200/40 = 5. The constrained result should maintain that.
     const commit = buildInteractionCommit(resolved, {
-      orderedItems: [first, second],
+      nodes: [first, second],
       pointer: { x: 400, y: 170 },
       canvasBounds,
     });
@@ -601,7 +614,7 @@ describe('interactionSession', () => {
 
     expect(resolved.guides).toContainEqual({ orientation: 'vertical', position: 470 });
     const commit = buildInteractionCommit(resolved, {
-      orderedItems: [first, second],
+      nodes: [first, second],
       pointer: { x: 462, y: 462 },
       canvasBounds,
     });
@@ -637,7 +650,7 @@ describe('interactionSession', () => {
 
     expect(resolved.guides).toContainEqual({ orientation: 'horizontal', position: 470 });
     const commit = buildInteractionCommit(resolved, {
-      orderedItems: [first, second],
+      nodes: [first, second],
       pointer: { x: 462, y: 462 },
       canvasBounds,
     });
@@ -711,7 +724,7 @@ describe('polygon vertex sessions', () => {
     expect(resolved.previewItem.vertices[1]).toEqual({ x: 360, y: 80 });
 
     const commit = buildInteractionCommit(resolved, {
-      orderedItems: [item],
+      nodes: [item],
       pointer: { x: 360, y: 80 },
       canvasBounds: stageBounds,
     });
@@ -749,7 +762,7 @@ describe('polygon vertex sessions', () => {
     // A no-move tap still commits the insert (the preview already differs from
     // the document item).
     const commit = buildInteractionCommit(session, {
-      orderedItems: [item],
+      nodes: [item],
       pointer: { x: 300, y: 200 },
       canvasBounds: stageBounds,
     });

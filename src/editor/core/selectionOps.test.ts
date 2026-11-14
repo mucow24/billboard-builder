@@ -4,7 +4,6 @@ import {
   normalizeSelectionForNodes,
   selectAllNodes,
   toggleSelectionNode,
-  toggleSelectionNodes,
 } from './selectionOps';
 import {
   createEllipseItem,
@@ -16,10 +15,6 @@ describe('selectionOps', () => {
   it('toggles a single node in and out of the selection', () => {
     expect(toggleSelectionNode(['a'], 'b')).toEqual(['a', 'b']);
     expect(toggleSelectionNode(['a', 'b'], 'a')).toEqual(['b']);
-  });
-
-  it('toggles batches by removing selected ids and appending new ids', () => {
-    expect(toggleSelectionNodes(['a', 'b', 'c'], ['b', 'd'])).toEqual(['a', 'c', 'd']);
   });
 
   it('normalizes selection ids against available nodes and preserves first-seen order', () => {

@@ -691,6 +691,74 @@ test.describe('editor canvas entrypoints', () => {
     ]);
   });
 
+  test('CS-26 marquee selects and deselects items live while it is dragged out', async ({ page }) => {
+    const group = createGroupNodeFixture(
+      [
+        createRectangleFixture({
+          id: 'live-group-left',
+          name: 'Live Group Left',
+          x: 120,
+          y: 120,
+          width: 140,
+          height: 90,
+          zIndex: 0,
+        }),
+        createRectangleFixture({
+          id: 'live-group-right',
+          name: 'Live Group Right',
+          x: 320,
+          y: 120,
+          width: 140,
+          height: 90,
+          zIndex: 1,
+        }),
+      ],
+      { id: 'live-group', name: 'Live Group' },
+    );
+    const loose = createRectangleFixture({
+      id: 'live-loose',
+      name: 'Live Loose',
+      x: 120,
+      y: 360,
+      width: 140,
+      height: 90,
+      zIndex: 2,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([group, loose]), 'live-marquee.json');
+    await setCanvasTestHooksEnabled(page, false);
+    const selectedNodeIds = async () => (await readRenderSnapshot(page)).selectedNodeIds;
+
+    await beginCanvasDrag(page, { x: 80, y: 80 });
+    await movePointerToCanvasPoint(page, { x: 180, y: 160 });
+    await expect.poll(async () => (await readStageDebug(page)).sessionKind).toBe('marquee');
+    await expect.poll(selectedNodeIds).toEqual(['live-group']);
+
+    // Touching both children keeps the group selected as a whole: selecting it
+    // live must not drill the marquee into it.
+    await movePointerToCanvasPoint(page, { x: 380, y: 160 });
+    await expect.poll(selectedNodeIds).toEqual(['live-group']);
+
+    await movePointerToCanvasPoint(page, { x: 380, y: 400 });
+    await expect.poll(selectedNodeIds).toEqual(['live-group', 'live-loose']);
+    // Until release the selection is outlined, without handles to grab.
+    expect((await readStageDebug(page)).groupHandleViewportPoints).toBeNull();
+
+    await movePointerToCanvasPoint(page, { x: 180, y: 160 });
+    await expect.poll(selectedNodeIds).toEqual(['live-group']);
+
+    await movePointerToCanvasPoint(page, { x: 100, y: 100 });
+    await expect.poll(selectedNodeIds).toEqual([]);
+
+    await movePointerToCanvasPoint(page, { x: 380, y: 400 });
+    await expect.poll(selectedNodeIds).toEqual(['live-group', 'live-loose']);
+    await releasePointer(page);
+
+    expect(await selectedNodeIds()).toEqual(['live-group', 'live-loose']);
+    await expect.poll(async () => (await readStageDebug(page)).groupHandleViewportPoints).not.toBeNull();
+  });
+
   test('CS-18 starts a one-gesture pickup drag from fully off-canvas content in the unclipped scene', async ({
     page,
   }) => {

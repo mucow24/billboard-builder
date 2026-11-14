@@ -5,6 +5,7 @@ import {
   ColorMatrixFilter,
   FillGradient,
   Graphics,
+  Matrix,
   Rectangle,
   Texture,
 } from 'pixi.js';
@@ -28,7 +29,7 @@ import type {
 import { getFontRegistrationCount, subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
-import { computeGradientEndpoints } from '../geometry/gradientGeometry';
+import { computeGradientEndpoints, computeGradientTextureMatrix } from '../geometry/gradientGeometry';
 import { computeNgonPoints } from '../geometry/ngonGeometry';
 import {
   buildPolygonPathSegments,
@@ -65,6 +66,9 @@ type GradientCapable =
   | PolygonCanvasItem
   | TextCanvasItem;
 
+/** Length in texels of the colour strip a gradient is sampled from (Pixi's default). */
+const GRADIENT_TEXTURE_SIZE = 256;
+
 /**
  * `origin` is where the item's box starts in the space the gradient is resolved
  * in. Shapes draw from (0, 0). A text texture starts above and to the left of
@@ -79,16 +83,33 @@ function buildPixiGradient(
 ): FillGradient | null {
   const endpoints = computeGradientEndpoints(item, width, height);
   if (!endpoints) return null;
+  const line = {
+    x0: endpoints.x0 + origin.x,
+    y0: endpoints.y0 + origin.y,
+    x1: endpoints.x1 + origin.x,
+    y1: endpoints.y1 + origin.y,
+  };
+  // Pixi mirrors a gradient whose line runs right-and-up or left-and-down
+  // when it builds the texture that shapes are filled with. So the texture is
+  // built from a plain left-to-right line, which Pixi gets right, and then
+  // laid along the real line with our own matrix. Text does not use the
+  // texture: it reads `start` and `end`, which are set to the real line after.
   const grad = new FillGradient({
     type: 'linear',
-    start: { x: endpoints.x0 + origin.x, y: endpoints.y0 + origin.y },
-    end: { x: endpoints.x1 + origin.x, y: endpoints.y1 + origin.y },
+    start: { x: 0, y: 0 },
+    end: { x: 1, y: 0 },
     colorStops: [
       { offset: 0, color: item.fill },
       { offset: 1, color: item.secondaryFill },
     ],
     textureSpace: 'global',
+    textureSize: GRADIENT_TEXTURE_SIZE,
   });
+  grad.buildGradient();
+  grad.start = { x: line.x0, y: line.y0 };
+  grad.end = { x: line.x1, y: line.y1 };
+  const m = computeGradientTextureMatrix(line, GRADIENT_TEXTURE_SIZE);
+  grad.transform = new Matrix(m.a, m.b, m.c, m.d, m.tx, m.ty);
   return grad;
 }
 
