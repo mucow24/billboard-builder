@@ -13,15 +13,6 @@ export interface Point {
 }
 
 export function getRenderBox(item: CanvasItem): RenderBox {
-  if (item.kind === 'line') {
-    return {
-      x: Math.min(item.startX, item.endX),
-      y: Math.min(item.startY, item.endY),
-      width: Math.max(1, Math.abs(item.endX - item.startX)),
-      height: Math.max(1, Math.abs(item.endY - item.startY)),
-    };
-  }
-
   return {
     x: item.x,
     y: item.y,

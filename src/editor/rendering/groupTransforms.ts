@@ -264,16 +264,6 @@ function rebuildShapeItemFromCorners<T extends CanvasItem>(
 export function buildGroupDragPreviews(items: CanvasItem[], deltaX: number, deltaY: number): CanvasItem[] {
   return items.map((item) => item.kind === 'polygon'
     ? mapPolygonItem(item, (point) => ({ x: point.x + deltaX, y: point.y + deltaY }))
-    : item.kind === 'line'
-    ? {
-        ...item,
-        x: item.x + deltaX,
-        y: item.y + deltaY,
-        startX: item.startX + deltaX,
-        startY: item.startY + deltaY,
-        endX: item.endX + deltaX,
-        endY: item.endY + deltaY,
-      }
     : {
         ...item,
         x: item.x + deltaX,
@@ -347,21 +337,6 @@ function buildAxisAlignedGroupResizePreviews(
     if (item.kind === 'polygon') {
       return mapPolygonItem(item, (point) => scalePointWithinBounds(point, bounds, nextBounds));
     }
-    if (item.kind === 'line') {
-      const start = scalePointWithinBounds({ x: item.startX, y: item.startY }, bounds, nextBounds);
-      const end = scalePointWithinBounds({ x: item.endX, y: item.endY }, bounds, nextBounds);
-      return {
-        ...item,
-        startX: start.x,
-        startY: start.y,
-        endX: end.x,
-        endY: end.y,
-        x: Math.min(start.x, end.x),
-        y: Math.min(start.y, end.y),
-        width: Math.max(1, Math.abs(end.x - start.x)),
-        height: Math.max(1, Math.abs(end.y - start.y)),
-      };
-    }
     const [topLeft, topRight, , bottomLeft] = getItemSelectionPoints(item).map((point) =>
       scalePointWithinBounds(point, bounds, nextBounds)
     );
@@ -399,29 +374,6 @@ export function buildGroupResizePreviews(
     if (item.kind === 'polygon') {
       return mapPolygonItem(item, (point) => mapPointBetweenResizeFrames(point, fromAxes, toAxes));
     }
-    if (item.kind === 'line') {
-      const start = mapPointBetweenResizeFrames(
-        { x: item.startX, y: item.startY },
-        fromAxes,
-        toAxes
-      );
-      const end = mapPointBetweenResizeFrames(
-        { x: item.endX, y: item.endY },
-        fromAxes,
-        toAxes
-      );
-      return {
-        ...item,
-        startX: start.x,
-        startY: start.y,
-        endX: end.x,
-        endY: end.y,
-        x: Math.min(start.x, end.x),
-        y: Math.min(start.y, end.y),
-        width: Math.max(1, Math.abs(end.x - start.x)),
-        height: Math.max(1, Math.abs(end.y - start.y)),
-      };
-    }
 
     const mappedPoints = getItemSelectionPoints(item).map((point) =>
       mapPointBetweenResizeFrames(point, fromAxes, toAxes)
@@ -441,21 +393,6 @@ export function buildGroupRotatePreviews(items: CanvasItem[], bounds: RenderBox,
   return items.map((item) => {
     if (item.kind === 'polygon') {
       return mapPolygonItem(item, (point) => rotatePoint(point, center, deltaDegrees));
-    }
-    if (item.kind === 'line') {
-      const start = rotatePoint({ x: item.startX, y: item.startY }, center, deltaDegrees);
-      const end = rotatePoint({ x: item.endX, y: item.endY }, center, deltaDegrees);
-      return {
-        ...item,
-        startX: start.x,
-        startY: start.y,
-        endX: end.x,
-        endY: end.y,
-        x: Math.min(start.x, end.x),
-        y: Math.min(start.y, end.y),
-        width: Math.max(1, Math.abs(end.x - start.x)),
-        height: Math.max(1, Math.abs(end.y - start.y)),
-      };
     }
     const origin = rotatePoint({ x: item.x, y: item.y }, center, deltaDegrees);
     return {

@@ -8,7 +8,6 @@ import type {
   CanvasTool,
   GeneratorCanvasItem,
   GuideLine,
-  LineCanvasItem,
   ProjectDocument,
 } from '../../document/documentTypes';
 import type { Point, ResizeHandle } from '../interactionGeometry';
@@ -43,12 +42,6 @@ interface PixiCanvasSceneProps {
   beginCropResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   beginGroupResize: (handle: ResizeHandle, pointer: Point, source?: PointerGestureSource) => void;
   beginGroupRotate: (pointer: Point, source?: PointerGestureSource) => void;
-  beginLineHandle: (
-    item: Extract<CanvasItem, { kind: 'line' }>,
-    handle: 'start' | 'end',
-    pointer: Point,
-    source?: PointerGestureSource,
-  ) => void;
   beginPolygonVertexHandle: (
     item: Extract<CanvasItem, { kind: 'polygon' }>,
     vertexIndex: number,
@@ -63,13 +56,13 @@ interface PixiCanvasSceneProps {
   ) => void;
   selectedPolygonVertexIndex: number | null;
   beginResize: (
-    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+    item: Exclude<CanvasItem, GeneratorCanvasItem>,
     handle: ResizeHandle,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
   beginRotate: (
-    item: Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>,
+    item: Exclude<CanvasItem, GeneratorCanvasItem>,
     pointer: Point,
     source?: PointerGestureSource,
   ) => void;
@@ -137,7 +130,6 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       beginCropResize,
       beginGroupResize,
       beginGroupRotate,
-      beginLineHandle,
       beginPolygonVertexHandle,
       beginPolygonEdgeInsert,
       selectedPolygonVertexIndex,
@@ -489,7 +481,6 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
                 beginRotate={beginRotate}
                 beginGroupResize={beginGroupResize}
                 beginGroupRotate={beginGroupRotate}
-                beginLineHandle={beginLineHandle}
                 beginPolygonVertexHandle={beginPolygonVertexHandle}
                 beginPolygonEdgeInsert={beginPolygonEdgeInsert}
                 selectedPolygonVertexIndex={selectedPolygonVertexIndex}

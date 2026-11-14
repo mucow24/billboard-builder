@@ -2,10 +2,8 @@ import {
   buildCreatedItem,
   CREATE_CLICK_THRESHOLD,
   getCreatePreview,
-  getLineHandleRects,
   getShapeHandlePoints,
   solveDragSession,
-  solveLineHandleSession,
   solvePolygonVertexSession,
   solveResizeSession,
   solveRotateSession,
@@ -29,12 +27,11 @@ import type {
   CanvasTool,
   GeneratorCanvasItem,
   GuideLine,
-  LineCanvasItem,
   PolygonCanvasItem,
 } from '../document/documentTypes';
 import { insertPolygonVertex } from '../document/polygonVertices';
 
-export type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
+export type ShapeItem = Exclude<CanvasItem, GeneratorCanvasItem>;
 export type PointerGestureSource = 'stage' | 'overlay';
 
 export interface SelectionFrame {
@@ -48,7 +45,6 @@ interface InteractionSessionBase {
     | 'drag'
     | 'resize'
     | 'rotate'
-    | 'line-handle'
     | 'polygon-vertex'
     | 'marquee'
     | 'group-drag'
@@ -69,7 +65,7 @@ export interface CreateSession extends InteractionSessionBase {
 }
 
 interface ItemSession extends InteractionSessionBase {
-  kind: 'drag' | 'resize' | 'rotate' | 'line-handle' | 'polygon-vertex';
+  kind: 'drag' | 'resize' | 'rotate' | 'polygon-vertex';
   itemId: string;
   originalItem: CanvasItem;
   previewItem: CanvasItem;
@@ -90,12 +86,6 @@ export interface ResizeSession extends ItemSession {
 export interface RotateSession extends ItemSession {
   kind: 'rotate';
   handle: 'rotater';
-}
-
-export interface LineHandleSession extends ItemSession {
-  kind: 'line-handle';
-  handle: 'start' | 'end';
-  pointerOffset: Point;
 }
 
 export interface PolygonVertexSession extends ItemSession {
@@ -146,7 +136,6 @@ export type InteractionSession =
   | DragSession
   | ResizeSession
   | RotateSession
-  | LineHandleSession
   | PolygonVertexSession
   | MarqueeSession
   | GroupDragSession
@@ -282,21 +271,6 @@ export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
   if (item.kind === 'polygon') {
     return {
       vertices: item.vertices,
-      x: item.x,
-      y: item.y,
-      width: item.width,
-      height: item.height,
-      scaleX: 1,
-      scaleY: 1,
-    };
-  }
-
-  if (item.kind === 'line') {
-    return {
-      startX: item.startX,
-      startY: item.startY,
-      endX: item.endX,
-      endY: item.endY,
       x: item.x,
       y: item.y,
       width: item.width,
@@ -510,32 +484,6 @@ export function createRotateSession(
     pointerStart: pointer,
     pointerSource,
     handle: 'rotater',
-    guides: [],
-    snapDisabled: false,
-  };
-}
-
-export function createLineHandleSession(
-  item: LineCanvasItem,
-  handle: 'start' | 'end',
-  pointer: Point,
-  siblingItems: CanvasItem[],
-  pointerSource: PointerGestureSource = 'stage',
-): LineHandleSession {
-  const rect = getLineHandleRects(item)[handle];
-  return {
-    kind: 'line-handle',
-    itemId: item.id,
-    originalItem: item,
-    previewItem: item,
-    siblingItems,
-    pointerStart: pointer,
-    pointerSource,
-    pointerOffset: {
-      x: pointer.x - (rect.x + rect.width / 2),
-      y: pointer.y - (rect.y + rect.height / 2),
-    },
-    handle,
     guides: [],
     snapDisabled: false,
   };
@@ -815,20 +763,6 @@ export function resolveInteractionSession(
         Boolean(currentWithModifiers.shiftConstrain)
       );
       return { ...current, previewItem: next.item, guides: [] };
-    }
-    case 'line-handle': {
-      const next = solveLineHandleSession(
-        current.originalItem as LineCanvasItem,
-        current.handle,
-        pointer,
-        current.pointerOffset,
-        current.siblingItems,
-        stageBounds,
-        !current.snapDisabled,
-        threshold,
-        cache
-      );
-      return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
     }
     case 'polygon-vertex': {
       const next = solvePolygonVertexSession(

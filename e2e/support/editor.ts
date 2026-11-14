@@ -312,7 +312,55 @@ export function createNgonFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * A line as the app saves it: an open polygon with two vertices. The ends are
+ * given as `startX`/`startY`/`endX`/`endY` overrides and become the vertices.
+ */
 export function createLineFixture(overrides: Record<string, unknown> = {}) {
+  const { startX = 160, startY = 160, endX = 400, endY = 184, ...rest } = overrides as {
+    startX?: number;
+    startY?: number;
+    endX?: number;
+    endY?: number;
+  } & Record<string, unknown>;
+  return {
+    id: 'line-item',
+    kind: 'polygon',
+    name: 'Line',
+    x: Math.min(startX, endX),
+    y: Math.min(startY, endY),
+    width: Math.max(1, Math.abs(endX - startX)),
+    height: Math.max(1, Math.abs(endY - startY)),
+    rotation: 0,
+    scaleX: 1,
+    scaleY: 1,
+    zIndex: 2,
+    locked: false,
+    lockAspectRatio: false,
+    hidden: false,
+    opacity: 1,
+    shadow: DEFAULT_SHADOW,
+    fill: '#f97316',
+    secondaryFill: '#0840e9',
+    gradientEnabled: false,
+    gradientAngle: 0,
+    stroke: '#111827ff',
+    strokeWidth: 6,
+    vertices: [
+      { x: startX, y: startY },
+      { x: endX, y: endY },
+    ],
+    closed: false,
+    curveRadius: 0,
+    ...rest,
+  };
+}
+
+/**
+ * The line as documents saved before lines became open polygons hold it. The
+ * app still has to open these, turning each into a two-vertex open polygon.
+ */
+export function createLegacyLineFixture(overrides: Record<string, unknown> = {}) {
   return {
     id: 'line-item',
     kind: 'line',
@@ -338,6 +386,22 @@ export function createLineFixture(overrides: Record<string, unknown> = {}) {
     endY: 184,
     ...overrides,
   };
+}
+
+/** The two ends of a saved line: the first and last vertex of its open polygon. */
+export function savedLineEnds(node: unknown): {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+} {
+  const vertices = (node as { vertices?: Array<{ x: number; y: number }> } | undefined)?.vertices;
+  if (!vertices || vertices.length < 2) {
+    throw new Error(`Expected a saved line with at least two vertices, got ${JSON.stringify(node)}`);
+  }
+  const start = vertices[0];
+  const end = vertices[vertices.length - 1];
+  return { startX: start.x, startY: start.y, endX: end.x, endY: end.y };
 }
 
 export function createPolygonFixture(overrides: Record<string, unknown> = {}) {

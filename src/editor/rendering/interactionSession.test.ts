@@ -519,11 +519,16 @@ describe('interactionSession', () => {
       stageBounds: canvasBounds,
     });
 
-    if (resolved.kind !== 'create' || !resolved.previewItem || resolved.previewItem.kind !== 'line') {
+    if (resolved.kind !== 'create' || !resolved.previewItem || resolved.previewItem.kind !== 'polygon') {
       throw new Error('Expected line create preview.');
     }
-    // Line endpoint should match snapped pointer, not be constrained to 1:1
-    expect(resolved.previewItem.endX).not.toBe(resolved.previewItem.endY);
+    // A line is an open polygon dragged out from its first vertex to its
+    // second, which matches the pointer rather than being constrained to 1:1.
+    expect(resolved.previewItem.closed).toBe(false);
+    expect(resolved.previewItem.vertices).toEqual([
+      { x: 100, y: 100 },
+      { x: 250, y: 180 },
+    ]);
   });
 
   it('constrains group resize to original aspect ratio when shiftConstrain is true', () => {

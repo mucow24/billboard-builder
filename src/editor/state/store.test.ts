@@ -151,10 +151,7 @@ describe('editor command reducer', () => {
 
   it('recomputes line geometry from endpoint updates', () => {
     const item = createLineItem({
-      startX: 10,
-      startY: 20,
-      endX: 110,
-      endY: 60,
+      vertices: [{ x: 10, y: 20 }, { x: 110, y: 60 }],
     });
     const document = {
       ...createDefaultProjectDocument(),
@@ -164,7 +161,7 @@ describe('editor command reducer', () => {
     const nextDocument = applyEditorCommand(document, {
       type: 'update_node',
       itemId: item.id,
-      changes: { endX: 160, endY: 90 },
+      changes: { vertices: [item.vertices[0], { x: 160, y: 90 }] },
     });
     const nextItem = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
@@ -216,12 +213,9 @@ describe('editor command reducer', () => {
     ).not.toThrow();
   });
 
-  it('keeps line stroke width positive and derives line bounds from endpoints', () => {
+  it('keeps line stroke width positive and derives line bounds from its vertices', () => {
     const lineItem = createLineItem({
-      startX: 40,
-      startY: 50,
-      endX: 20,
-      endY: 10,
+      vertices: [{ x: 40, y: 50 }, { x: 20, y: 10 }],
       strokeWidth: 6,
     });
     const document = {
@@ -233,17 +227,18 @@ describe('editor command reducer', () => {
       type: 'update_node',
       itemId: lineItem.id,
       changes: {
-        endX: 5,
-        endY: 0,
-        strokeWidth: 0,
+        vertices: [lineItem.vertices[0], { x: 5, y: 0 }],
+        strokeWidth: -3,
       },
     });
     const nextLine = nextDocument.nodes.flatMap(collectLeafItems)[0];
 
-    expect(nextLine.kind).toBe('line');
-    if (nextLine.kind !== 'line') {
+    // A line is an open polygon.
+    if (nextLine.kind !== 'polygon') {
       throw new Error('Expected normalized line item.');
     }
+    expect(nextLine.closed).toBe(false);
+    // A line is only its stroke, so its width never drops below 1.
     expect(nextLine.strokeWidth).toBe(1);
     expect(nextLine.x).toBe(5);
     expect(nextLine.y).toBe(0);
@@ -369,8 +364,8 @@ describe('editor store history', () => {
   });
 
   it('creates items by kind and can delete the current selection', () => {
-    useEditorStore.getState().setActiveTool('line');
-    useEditorStore.getState().createItemAt('line', 10, 20);
+    useEditorStore.getState().setActiveTool('polygon');
+    useEditorStore.getState().createItemAt('polygon', 10, 20);
     useEditorStore.getState().deleteSelectedNodes();
 
     expect(getEditorState().document.nodes.flatMap(collectLeafItems)).toHaveLength(0);
@@ -504,10 +499,7 @@ describe('editor store history', () => {
       id: 'line',
       x: 10,
       y: 15,
-      startX: 10,
-      startY: 15,
-      endX: 110,
-      endY: 45,
+      vertices: [{ x: 10, y: 15 }, { x: 110, y: 45 }],
     });
     const group = createGroupNode([movable, locked, line], 'Nudge Group');
     group.id = 'group-1';
@@ -534,10 +526,7 @@ describe('editor store history', () => {
       y: 90,
     });
     expect(nextItems.find((item) => item.id === line.id)).toMatchObject({
-      startX: 15,
-      startY: 12,
-      endX: 115,
-      endY: 42,
+      vertices: [{ x: 15, y: 12 }, { x: 115, y: 42 }],
     });
   });
 
@@ -779,6 +768,22 @@ describe('polygon vertex sub-selection', () => {
 
     expect(getPolygon(item.id).vertices).toHaveLength(3);
     expect(getEditorState().document.nodes).toHaveLength(1);
+  });
+
+  it('deletes a vertex of a bent line down to its 2-vertex floor, then no-ops', () => {
+    const item = addSelectedPolygon({ vertices: squareVertices.slice(0, 3), closed: false });
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 1 });
+
+    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(true);
+    expect(getPolygon(item.id).vertices).toEqual([
+      { x: 100, y: 100 },
+      { x: 300, y: 300 },
+    ]);
+
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 0 });
+    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(true);
+    expect(getPolygon(item.id).vertices).toHaveLength(2);
+    expect(getPolygon(item.id).closed).toBe(false);
   });
 
   it('nudges only the selected vertex, and the whole ring otherwise', () => {

@@ -4,6 +4,7 @@ import {
   createGeneratorItem,
   createImageItem,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -14,6 +15,7 @@ import {
   formatDisplayedNumber,
   getGeometrySummary,
   getInspectorHeadingSubtitle,
+  getItemGlyph,
   getLayerPreviewStyle,
   getLayerPrimaryLabel,
   getLayerSecondaryLabel,
@@ -30,16 +32,36 @@ describe('inspectorModel', () => {
       height: 90.123,
     });
     const line = createLineItem({
-      startX: 1.234,
-      startY: 5.678,
-      endX: 9.876,
-      endY: 4.321,
+      vertices: [{ x: 1.234, y: 5.678 }, { x: 9.876, y: 4.321 }],
     });
 
     expect(formatDisplayedNumber(Number.NaN)).toBe('0');
     expect(formatDisplayedNumber(12.345, 1)).toBe('12.3');
     expect(getGeometrySummary(rectangle)).toBe('X 12.3 · Y 67.9 · W 45.7 · H 90.1');
     expect(getGeometrySummary(line)).toBe('X1 1.2 · Y1 5.7 · X2 9.9 · Y2 4.3');
+    // A bent line is still summed up by its two ends.
+    const bent = createLineItem({
+      vertices: [{ x: 1.234, y: 5.678 }, { x: 50, y: 50 }, { x: 9.876, y: 4.321 }],
+    });
+    expect(getGeometrySummary(bent)).toBe('X1 1.2 · Y1 5.7 · X2 9.9 · Y2 4.3');
+  });
+
+  it('labels an open polygon as a line and a closed one as a polygon', () => {
+    const line = createLineItem({ stroke: '#ff0000ff' });
+    const polygon = createPolygonItem({ fill: '#00ff00' });
+
+    expect(getLayerPrimaryLabel(line)).toBe('Line');
+    expect(getLayerPrimaryLabel(polygon)).toBe('Polygon');
+    expect(getLayerPrimaryLabel(createPolygonItem({ closed: false }))).toBe('Line');
+    expect(getItemGlyph(line)).toBe(getItemGlyph(createPolygonItem({ closed: false })));
+    expect(getItemGlyph(line)).not.toBe(getItemGlyph(polygon));
+    // A line has no fill to show: its stroke color on a dark chip.
+    expect(getLayerPreviewStyle(line)).toEqual({
+      background: 'rgba(12, 19, 32, 0.92)',
+      borderColor: 'rgba(147, 168, 201, 0.26)',
+      color: '#ff0000ff',
+    });
+    expect(getLayerPreviewStyle(polygon)).toMatchObject({ background: '#00ff00' });
   });
 
   it('deduplicates system, session, and document fonts by family and kind, then sorts by family', () => {

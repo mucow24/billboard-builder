@@ -9,7 +9,11 @@ import type { FontOption } from '../FontFamilyPicker';
 import { COMMON_BLUR_DESCRIPTORS, COMMON_SHADOW_DESCRIPTORS } from './inspectorFieldHelpers';
 import { createGeneratorDescriptors } from './generatorInspectorDescriptors';
 import { createImageDescriptors } from './imageInspectorDescriptors';
-import { createPolygonDescriptors, createShapeDescriptors } from './shapeInspectorDescriptors';
+import {
+  createLineDescriptors,
+  createPolygonDescriptors,
+  createShapeDescriptors,
+} from './shapeInspectorDescriptors';
 import { createTextDescriptors } from './textInspectorDescriptors';
 import { buildFontOptions } from './inspectorModel';
 
@@ -159,9 +163,12 @@ function getItemFieldDescriptors(
     case 'ngon':
       return [...createShapeDescriptors('ngon'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
     case 'polygon':
-      return [...createPolygonDescriptors(item.closed), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
-    case 'line':
-      return [...createShapeDescriptors('line'), ...COMMON_BLUR_DESCRIPTORS, ...COMMON_SHADOW_DESCRIPTORS];
+      // An open polygon is a line and gets the line's fields.
+      return [
+        ...(item.closed ? createPolygonDescriptors() : createLineDescriptors()),
+        ...COMMON_BLUR_DESCRIPTORS,
+        ...COMMON_SHADOW_DESCRIPTORS,
+      ];
     case 'generator':
       return [...createGeneratorDescriptors(item, environment.canvasSize), ...COMMON_BLUR_DESCRIPTORS];
     default:

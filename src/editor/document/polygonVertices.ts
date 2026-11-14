@@ -4,12 +4,35 @@ import type { PolygonVertex } from './documentTypes';
  * Pure vertex-list operations for freeform polygon items, shared by the
  * document normalizer, editing interactions, and defaults. Vertices are
  * absolute canvas coordinates, in order; `closed` polygons connect the last
- * vertex back to the first.
+ * vertex back to the first. An open polygon is what the app calls a line.
  */
 
-// A polygon never drops below a triangle, so deleting a vertex at the floor is
-// a no-op.
+// A closed polygon never drops below a triangle, so deleting a vertex at the
+// floor is a no-op.
 export const POLYGON_MIN_VERTICES = 3;
+// A line never drops below a single segment.
+export const LINE_MIN_VERTICES = 2;
+
+/** Fewest vertices the shape can have: 3 closed, 2 open. */
+export function polygonMinVertices(closed: boolean): number {
+  return closed ? POLYGON_MIN_VERTICES : LINE_MIN_VERTICES;
+}
+
+/**
+ * A line is an open polygon. Everything that names or labels an item ("Line",
+ * its layer icon, its properties) asks this rather than reading `kind`.
+ */
+export function isLineItem(item: { kind: string; closed?: boolean }): boolean {
+  return item.kind === 'polygon' && item.closed === false;
+}
+
+/** The kind to show for an item: its `kind`, except that open polygons are 'line'. */
+export function getItemDisplayKind<K extends string>(item: {
+  kind: K;
+  closed?: boolean;
+}): K | 'line' {
+  return isLineItem(item) ? 'line' : item.kind;
+}
 
 export function polygonBounds(vertices: PolygonVertex[]): {
   x: number;
@@ -69,12 +92,16 @@ export function insertPolygonVertex(
   return next;
 }
 
-/** Remove a vertex; a no-op at the 3-vertex floor so a polygon never degenerates. */
+/**
+ * Remove a vertex; a no-op at the floor (3 vertices closed, 2 open) so the
+ * shape never degenerates.
+ */
 export function removePolygonVertex(
   vertices: PolygonVertex[],
   index: number,
+  closed = true,
 ): PolygonVertex[] {
-  if (vertices.length <= POLYGON_MIN_VERTICES) return vertices;
+  if (vertices.length <= polygonMinVertices(closed)) return vertices;
   if (index < 0 || index >= vertices.length) return vertices;
   const next = vertices.slice();
   next.splice(index, 1);

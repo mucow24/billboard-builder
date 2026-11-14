@@ -18,7 +18,7 @@ import type {
   GeneratorParams,
   GroupNode,
   ImageCanvasItem,
-  LineCanvasItem,
+  LegacyLineCanvasItem,
   NgonCanvasItem,
   PolygonCanvasItem,
   ProjectDocument,
@@ -26,7 +26,7 @@ import type {
   TextCanvasItem,
 } from './documentTypes';
 import {
-  POLYGON_MIN_VERTICES,
+  polygonMinVertices,
   polygonBounds,
   rectanglePolygonVertices,
 } from './polygonVertices';
@@ -161,7 +161,11 @@ function normalizeGeneratorParams(params: GeneratorParams): GeneratorParams {
   return { ...params, scanlineColor: color, opacity: alpha };
 }
 
-export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
+/**
+ * Normalize one item. Also the single place a line saved in the old format
+ * (start and end point, no fill) becomes a two-vertex open polygon.
+ */
+export function normalizeCanvasItem(item: CanvasItem | LegacyLineCanvasItem): CanvasItem {
   switch (item.kind) {
     case 'text': {
       const normalizedTextItem: TextCanvasItem = {
@@ -299,14 +303,20 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
     }
     case 'polygon': {
       // Vertices are the geometry source of truth: clamp them finite, rebuild
-      // a rectangle ring from the item's box if the list degenerated below the
-      // 3-vertex floor, and re-derive the AABB in x/y/width/height.
-      const fallbackVertices = rectanglePolygonVertices(
-        clampFinite(item.x, 0),
-        clampFinite(item.y, 0),
-        clampDimension(item.width),
-        clampDimension(item.height),
-      );
+      // them from the item's box if the list degenerated below the floor (a
+      // rectangle ring when closed, the box's diagonal when open), and
+      // re-derive the AABB in x/y/width/height.
+      const closed = item.closed !== false;
+      const boxX = clampFinite(item.x, 0);
+      const boxY = clampFinite(item.y, 0);
+      const boxWidth = clampDimension(item.width);
+      const boxHeight = clampDimension(item.height);
+      const fallbackVertices = closed
+        ? rectanglePolygonVertices(boxX, boxY, boxWidth, boxHeight)
+        : [
+            { x: boxX, y: boxY },
+            { x: boxX + boxWidth, y: boxY + boxHeight },
+          ];
       const clampedVertices = (Array.isArray(item.vertices) ? item.vertices : []).map(
         (vertex) => ({
           x: clampFinite(vertex?.x, 0),
@@ -314,7 +324,7 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         }),
       );
       const vertices =
-        clampedVertices.length >= POLYGON_MIN_VERTICES ? clampedVertices : fallbackVertices;
+        clampedVertices.length >= polygonMinVertices(closed) ? clampedVertices : fallbackVertices;
       const normalizedPolygonItem: PolygonCanvasItem = {
         ...item,
         ...normalizeGradientFill(item),
@@ -331,9 +341,11 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
-        strokeWidth: clampFinite(item.strokeWidth, 0, 0),
+        // A line is only its stroke, so it never goes below 1; a closed
+        // polygon can drop its outline entirely.
+        strokeWidth: closed ? clampFinite(item.strokeWidth, 0, 0) : clampDimension(item.strokeWidth),
         vertices,
-        closed: item.closed !== false,
+        closed,
         curveRadius: clampFinite(item.curveRadius ?? 0, 0, 0),
       };
       return normalizedPolygonItem;
@@ -343,13 +355,27 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
       const startY = clampFinite(item.startY, item.y);
       const endX = clampFinite(item.endX, item.x + item.width);
       const endY = clampFinite(item.endY, item.y + item.height);
-      const normalizedLineItem: LineCanvasItem = {
-        ...item,
-        x: Math.min(startX, endX),
-        y: Math.min(startY, endY),
-        width: Math.max(1, Math.abs(endX - startX)),
-        height: Math.max(1, Math.abs(endY - startY)),
-        rotation: clampFinite(item.rotation, 0),
+      // Drop the old endpoint fields; the vertices carry them from here on.
+      const legacyRest: Omit<LegacyLineCanvasItem, 'startX' | 'startY' | 'endX' | 'endY'> &
+        Partial<LegacyLineCanvasItem> = { ...item };
+      delete legacyRest.startX;
+      delete legacyRest.startY;
+      delete legacyRest.endX;
+      delete legacyRest.endY;
+      const vertices = [
+        { x: startX, y: startY },
+        { x: endX, y: endY },
+      ];
+      const normalizedLineItem: PolygonCanvasItem = {
+        ...legacyRest,
+        kind: 'polygon',
+        ...polygonBounds(vertices),
+        // Part of the polygon model, never painted on an open chain.
+        fill: '#f97316',
+        secondaryFill: '#0840e9',
+        gradientEnabled: false,
+        gradientAngle: 0,
+        rotation: 0,
         scaleX: clampFinite(item.scaleX, 1),
         scaleY: clampFinite(item.scaleY, 1),
         zIndex: Math.max(0, Math.trunc(clampFinite(item.zIndex, 0, 0))),
@@ -359,11 +385,10 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
-        startX,
-        startY,
-        endX,
-        endY,
         strokeWidth: clampDimension(item.strokeWidth),
+        vertices,
+        closed: false,
+        curveRadius: 0,
       };
       return normalizedLineItem;
     }

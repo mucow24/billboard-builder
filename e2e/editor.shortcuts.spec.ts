@@ -81,10 +81,7 @@ interface SavedNode {
   kind: string;
   x?: number;
   y?: number;
-  startX?: number;
-  startY?: number;
-  endX?: number;
-  endY?: number;
+  vertices?: Array<{ x: number; y: number }>;
   children?: SavedNode[];
 }
 
@@ -294,10 +291,10 @@ test.describe('editor shortcuts', () => {
       }),
       expect.objectContaining({
         id: 'shortcut-group-line',
-        startX: 221,
-        startY: 265,
-        endX: 431,
-        endY: 323,
+        vertices: [
+          { x: 221, y: 265 },
+          { x: 431, y: 323 },
+        ],
       }),
     ]);
 
@@ -320,10 +317,10 @@ test.describe('editor shortcuts', () => {
       }),
       expect.objectContaining({
         id: expect.any(String),
-        startX: 245,
-        startY: 289,
-        endX: 455,
-        endY: 347,
+        vertices: [
+          { x: 245, y: 289 },
+          { x: 455, y: 347 },
+        ],
       }),
     ]);
 

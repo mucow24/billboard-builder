@@ -5,7 +5,6 @@ import {
   ColorMatrixFilter,
   FillGradient,
   Graphics,
-  Polygon,
   Rectangle,
   Texture,
 } from 'pixi.js';
@@ -21,7 +20,6 @@ import type {
   EllipseCanvasItem,
   GeneratorCanvasItem,
   ImageCanvasItem,
-  LineCanvasItem,
   NgonCanvasItem,
   PolygonCanvasItem,
   RectangleCanvasItem,
@@ -55,29 +53,6 @@ import { registerZoomScaledFilter } from './zoomScaledFilters';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
 const ZERO_PIVOT = { x: 0, y: 0 } as const;
-
-// ---------------------------------------------------------------------------
-// Line hit-area helper — builds a narrow polygon along the line
-// ---------------------------------------------------------------------------
-
-function buildLineHitPolygon(
-  x1: number, y1: number, x2: number, y2: number, strokeWidth: number,
-): Polygon {
-  const pad = Math.max(strokeWidth / 2 + 8, 12);
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.sqrt(dx * dx + dy * dy) || 1;
-  // Perpendicular unit vector
-  const px = (-dy / len) * pad;
-  const py = (dx / len) * pad;
-  // Four corners of a thick line
-  return new Polygon([
-    x1 + px, y1 + py,
-    x2 + px, y2 + py,
-    x2 - px, y2 - py,
-    x1 - px, y1 - py,
-  ]);
-}
 
 // ---------------------------------------------------------------------------
 // Gradient helper
@@ -330,24 +305,13 @@ function drawPolygon(g: Graphics, item: PolygonCanvasItem) {
     g.fill(grad ?? item.fill);
   }
   if (item.strokeWidth > 0 && item.stroke && item.stroke !== 'transparent') {
-    // Round joins keep thin corners clean; round caps match an open chain's
-    // rounded joins at its loose ends.
+    // Round joins keep thin corners clean. A line's ends stay square-cut
+    // (the default butt cap), stopping exactly at its first and last vertex.
     g.stroke({
       color: item.stroke,
       width: item.strokeWidth,
       join: 'round',
-      cap: item.closed ? undefined : 'round',
     });
-  }
-}
-
-function drawLine(g: Graphics, item: LineCanvasItem) {
-  g.clear();
-  const { startX, startY, endX, endY, stroke, strokeWidth } = item;
-  g.moveTo(startX, startY);
-  g.lineTo(endX, endY);
-  if (strokeWidth > 0 && stroke && stroke !== 'transparent') {
-    g.stroke({ color: stroke, width: strokeWidth });
   }
 }
 
@@ -655,9 +619,6 @@ const PixiItemView = memo(function PixiItemView({
         case 'polygon':
           drawPolygon(g, item);
           break;
-        case 'line':
-          drawLine(g, item);
-          break;
         case 'text':
         case 'image':
           // Handled by dedicated components below, not via Graphics draw.
@@ -807,19 +768,9 @@ const PixiItemView = memo(function PixiItemView({
     [canvasWidth, canvasHeight],
   );
 
-  // Memoize line hit polygon unconditionally to satisfy hook ordering rules.
-  // For lines, renderBox is derived from the same startX/Y, endX/Y fields used here,
-  // so renderBox changes iff the line endpoints change. strokeWidth is on LineCanvasItem
-  // only, but we can safely read it when kind === 'line'.
-  const lineHitArea = useMemo(() => {
-    if (item.kind !== 'line') return null;
-    return buildLineHitPolygon(item.startX, item.startY, item.endX, item.endY, item.strokeWidth);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.kind, renderBox.x, renderBox.y, renderBox.width, renderBox.height]);
-
   // Exact hit testing in local space against the straight-edged vertex ring:
   // closed polygons hit on the fill plus the stroke band, open chains hit on a
-  // padded corridor along the stroke (same floor as line hit areas).
+  // padded corridor along the stroke.
   const polygonHitArea = useMemo(() => {
     if (item.kind !== 'polygon') return null;
     const polygon = item as RenderableCanvasItem & { kind: 'polygon' };
@@ -841,21 +792,6 @@ const PixiItemView = memo(function PixiItemView({
         distanceToPolygonEdges({ x, y }, local, false) <= pad,
     };
   }, [item]);
-
-  // Lines use absolute coordinates (startX/startY → endX/endY), no transform.
-  if (item.kind === 'line') {
-    return (
-      <pixiGraphics
-        label={item.id}
-        draw={draw}
-        alpha={item.opacity}
-        filters={itemFilters}
-        eventMode={eventMode}
-        hitArea={lineHitArea!}
-        onMouseDown={handleMouseDown}
-      />
-    );
-  }
 
   // Generators render a full-canvas pattern at origin (different layout from other items).
   if (item.kind === 'generator') {

@@ -623,27 +623,23 @@ describe('polygon descriptors', () => {
     );
   }
 
-  it('shows Closed and Curve radius fields for a polygon', () => {
+  it('shows a Curve radius field, and no Closed checkbox, for a polygon', () => {
     const keys = fieldKeys(createPolygonItem());
-    expect(keys).toContain('closed');
+    expect(keys).not.toContain('closed');
     expect(keys).toContain('curveRadius');
     expect(keys).toContain('stroke');
     expect(keys).toContain('strokeWidth');
   });
 
-  it('offers the gradient fill only while the polygon is closed', () => {
+  it('offers the gradient fill to a polygon but not to a line', () => {
     expect(fieldKeys(createPolygonItem())).toContain('gradientFill');
     expect(fieldKeys(createPolygonItem({ closed: false }))).not.toContain('gradientFill');
   });
 
-  it('maps the Closed checkbox and Curve radius slider onto the model fields', () => {
+  it('maps the Curve radius slider onto the model field', () => {
     const polygon = createPolygonItem({ curveRadius: 12 });
     const sections = buildSelectionInspectorSections([polygon], environment);
     const fields = sections.flatMap((section) => section.fields);
-
-    const closedField = fields.find((field) => field.descriptor.propertyKey === 'closed');
-    expect(closedField?.state.value).toBe(true);
-    expect(closedField?.descriptor.buildChange({ item: polygon }, false as never)).toEqual({ closed: false });
 
     const radiusField = fields.find((field) => field.descriptor.propertyKey === 'curveRadius');
     expect(radiusField?.state.value).toBe(12);
@@ -662,17 +658,89 @@ describe('polygon descriptors', () => {
       'Curve radius',
       'Mirror',
     ]);
-    expect(geometrySection?.fields.map((field) => field.descriptor.propertyKey)).not.toContain(
-      'curveRadius',
-    );
+    // With the Closed checkbox gone, a polygon has no Geometry rows at all.
+    expect(geometrySection).toBeUndefined();
+    expect(sectionKeys).toEqual(['fill', 'stroke', 'polygon', 'blur', 'shadow']);
   });
 
-  it('keeps the Polygon section, without the Fill section, for an open polygon', () => {
-    const sections = buildSelectionInspectorSections([createPolygonItem({ closed: false })], environment);
-    const sectionKeys = sections.map((section) => section.key);
+  it('gives a line Stroke, Line and Geometry sections, with no Fill and no Polygon section', () => {
+    // Any open polygon is a line, whichever tool made it.
+    for (const line of [createLineItem(), createPolygonItem({ closed: false })]) {
+      const sections = buildSelectionInspectorSections([line], environment);
+      const sectionKeys = sections.map((section) => section.key);
+      const labelsOf = (key: string) =>
+        sections.find((section) => section.key === key)?.fields.map((field) => field.descriptor.label);
 
-    expect(sectionKeys).not.toContain('fill');
-    expect(sectionKeys.indexOf('polygon')).toBe(sectionKeys.indexOf('stroke') + 1);
+      expect(sectionKeys).toEqual(['stroke', 'line', 'geometry', 'blur', 'shadow']);
+      expect(sections.find((section) => section.key === 'line')?.label).toBe('Line');
+      expect(labelsOf('stroke')).toEqual(['Color', 'Width']);
+      expect(labelsOf('line')).toEqual(['Curve radius']);
+      expect(labelsOf('geometry')).toEqual(['Start X', 'Start Y', 'End X', 'End Y']);
+      expect(fieldKeys(line)).not.toContain('closed');
+      expect(fieldKeys(line)).not.toContain('mirror');
+    }
+  });
+
+  it("gives a line's Curve radius the same range and mapping as a polygon's", () => {
+    const line = createLineItem({ curveRadius: 12 });
+    const radiusField = buildSelectionInspectorSections([line], environment)
+      .flatMap((section) => section.fields)
+      .find((field) => field.descriptor.propertyKey === 'curveRadius');
+
+    expect(radiusField?.state.value).toBe(12);
+    expect(radiusField?.descriptor).toMatchObject({
+      controlKind: 'number',
+      label: 'Curve radius',
+      sectionKey: 'line',
+      min: 0,
+      max: 500,
+      slider: true,
+      textMax: Infinity,
+    });
+    expect(radiusField?.descriptor).not.toHaveProperty('textMin');
+    expect(radiusField?.descriptor.buildChange({ item: line }, 320 as never)).toEqual({ curveRadius: 320 });
+    expect(radiusField?.descriptor.buildChange({ item: line }, 100000 as never)).toEqual({ curveRadius: 100000 });
+    expect(radiusField?.descriptor.buildChange({ item: line }, -5 as never)).toEqual({ curveRadius: 0 });
+  });
+
+  it("keeps a line's stroke at least 1 pixel wide on the slider", () => {
+    const widthOf = (item: ReturnType<typeof createPolygonItem>) =>
+      buildSelectionInspectorSections([item], environment)
+        .flatMap((section) => section.fields)
+        .find((field) => field.descriptor.propertyKey === 'strokeWidth')?.descriptor;
+
+    expect(widthOf(createLineItem())).toMatchObject({ min: 1, max: 50 });
+    expect(widthOf(createPolygonItem())).toMatchObject({ min: 0, max: 50 });
+  });
+
+  it("maps Start and End onto a line's first and last vertex, however many lie between", () => {
+    const line = createLineItem({
+      vertices: [
+        { x: 10, y: 20 },
+        { x: 60, y: 90 },
+        { x: 110, y: 40 },
+      ],
+    });
+    const fields = buildSelectionInspectorSections([line], environment).flatMap((section) => section.fields);
+    const field = (key: string) => fields.find((entry) => entry.descriptor.propertyKey === key);
+
+    expect(field('startX')?.state.value).toBe(10);
+    expect(field('startY')?.state.value).toBe(20);
+    expect(field('endX')?.state.value).toBe(110);
+    expect(field('endY')?.state.value).toBe(40);
+
+    expect(field('startX')?.descriptor.buildChange({ item: line }, 5 as never)).toEqual({
+      vertices: [{ x: 5, y: 20 }, { x: 60, y: 90 }, { x: 110, y: 40 }],
+    });
+    expect(field('startY')?.descriptor.buildChange({ item: line }, 25 as never)).toEqual({
+      vertices: [{ x: 10, y: 25 }, { x: 60, y: 90 }, { x: 110, y: 40 }],
+    });
+    expect(field('endX')?.descriptor.buildChange({ item: line }, 200 as never)).toEqual({
+      vertices: [{ x: 10, y: 20 }, { x: 60, y: 90 }, { x: 200, y: 40 }],
+    });
+    expect(field('endY')?.descriptor.buildChange({ item: line }, 0 as never)).toEqual({
+      vertices: [{ x: 10, y: 20 }, { x: 60, y: 90 }, { x: 110, y: 0 }],
+    });
   });
 
   it('runs the Curve radius slider from 0 to 500 and takes any typed radius of 0 or more', () => {

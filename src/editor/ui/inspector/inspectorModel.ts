@@ -1,4 +1,5 @@
 import { DEFAULT_FONT_FAMILY, WEB_SAFE_FONTS } from '../../document/documentDefaults';
+import { getItemDisplayKind } from '../../document/polygonVertices';
 import { getGenerator } from '../../generators';
 import type {
   CanvasItem,
@@ -64,8 +65,9 @@ export function getSelectionSummary(selectedItems: CanvasItem[]): SelectionSumma
   };
 }
 
-export function getItemGlyph(kind: CanvasItem['kind']): string {
-  switch (kind) {
+export function getItemGlyph(item: CanvasItem): string {
+  // An open polygon is a line, and is shown as one.
+  switch (getItemDisplayKind(item)) {
     case 'rectangle':
       return '▭';
     case 'ellipse':
@@ -88,7 +90,7 @@ function getItemLabel(item: CanvasItem): string {
 }
 
 export function getLayerPrimaryLabel(item: CanvasItem): string {
-  switch (item.kind) {
+  switch (getItemDisplayKind(item)) {
     case 'rectangle':
       return 'Rectangle';
     case 'ellipse':
@@ -126,7 +128,8 @@ export function getInspectorHeadingSubtitle(item: CanvasItem): string | null {
 }
 
 export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
-  if (item.kind === 'line') {
+  if (item.kind === 'polygon' && !item.closed) {
+    // A line: no fill to show, so its stroke color on a dark chip.
     return {
       background: 'rgba(12, 19, 32, 0.92)',
       borderColor: 'rgba(147, 168, 201, 0.26)',
@@ -173,8 +176,11 @@ export function buildImageAdjustmentsChange(
 }
 
 export function getGeometrySummary(item: CanvasItem): string {
-  if (item.kind === 'line') {
-    return `X1 ${formatDisplayedNumber(item.startX)} · Y1 ${formatDisplayedNumber(item.startY)} · X2 ${formatDisplayedNumber(item.endX)} · Y2 ${formatDisplayedNumber(item.endY)}`;
+  if (item.kind === 'polygon' && !item.closed) {
+    // A line is summed up by its two ends: its first and last vertex.
+    const start = item.vertices[0];
+    const end = item.vertices[item.vertices.length - 1];
+    return `X1 ${formatDisplayedNumber(start.x)} · Y1 ${formatDisplayedNumber(start.y)} · X2 ${formatDisplayedNumber(end.x)} · Y2 ${formatDisplayedNumber(end.y)}`;
   }
   return `X ${formatDisplayedNumber(item.x)} · Y ${formatDisplayedNumber(item.y)} · W ${formatDisplayedNumber(item.width)} · H ${formatDisplayedNumber(item.height)}`;
 }

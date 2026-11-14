@@ -3,7 +3,6 @@ import type {
   EllipseCanvasItem,
   GeneratorCanvasItem,
   ImageCanvasItem,
-  LineCanvasItem,
   NgonCanvasItem,
   PolygonCanvasItem,
   RectangleCanvasItem,
@@ -95,7 +94,8 @@ export function ngonShape(item: NgonCanvasItem, fillAttr: string): string {
 /**
  * Freeform polygon as a `<path>` in local (AABB-relative) space, sharing the
  * renderer's segment builder so canvas and SVG tessellate identically. Open
- * chains are stroke-only (no fill, no closing edge, round caps).
+ * chains (lines) are stroke-only: no fill, no closing edge, and square-cut
+ * ends that stop exactly at the first and last vertex.
  */
 export function polygonShape(item: PolygonCanvasItem, fillAttr: string): string {
   const local = item.vertices.map((v) => ({ x: v.x - item.x, y: v.y - item.y }));
@@ -118,18 +118,8 @@ export function polygonShape(item: PolygonCanvasItem, fillAttr: string): string 
     }
   }
   const fill = item.closed ? fillAttr : 'fill="none"';
-  const caps = item.closed ? ' stroke-linejoin="round"' : ' stroke-linejoin="round" stroke-linecap="round"';
   const stroke = strokeAttr(item);
-  return `<path d="${d}" ${fill}${stroke}${stroke ? caps : ''}/>`;
-}
-
-/** Lines use absolute canvas coordinates and carry their own opacity (no transform wrapper). */
-export function lineShape(item: LineCanvasItem, effectiveOpacity: number, filterAttr = ''): string {
-  const opacity = effectiveOpacity < 1 ? ` opacity="${fmt(effectiveOpacity)}"` : '';
-  return (
-    `<line x1="${fmt(item.startX)}" y1="${fmt(item.startY)}" ` +
-    `x2="${fmt(item.endX)}" y2="${fmt(item.endY)}"${strokeAttr(item)}${opacity}${filterAttr}/>`
-  );
+  return `<path d="${d}" ${fill}${stroke}${stroke ? ' stroke-linejoin="round"' : ''}/>`;
 }
 
 /** A `<linearGradient>` def in the item's local box space, with primary→secondary stops. */

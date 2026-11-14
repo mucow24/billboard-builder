@@ -55,7 +55,11 @@ describe('document defaults', () => {
     expect(ellipseItem.secondaryFill).toBe('#0840e9');
     expect(ellipseItem.gradientEnabled).toBe(false);
     expect(lineItem.strokeWidth).toBeGreaterThan(0);
-    expect(lineItem.endX).toBeGreaterThan(lineItem.startX);
+    // A line is an open polygon that starts with two vertices.
+    expect(lineItem).toMatchObject({ kind: 'polygon', name: 'Line', closed: false, strokeWidth: 6, curveRadius: 0 });
+    expect(lineItem.vertices).toHaveLength(2);
+    expect(lineItem.vertices[1].x).toBeGreaterThan(lineItem.vertices[0].x);
+    expect(lineItem).toMatchObject({ x: lineItem.vertices[0].x, y: lineItem.vertices[0].y, width: 240, height: 24 });
   });
 
   it('defaults blurRadius to zero for all item types', () => {
@@ -104,10 +108,7 @@ describe('document defaults', () => {
     const lineItem = createLineItem({
       x: 10,
       y: 20,
-      startX: 10,
-      startY: 20,
-      endX: 110,
-      endY: 120,
+      vertices: [{ x: 10, y: 20 }, { x: 110, y: 120 }],
     });
     const clonedLine = cloneCanvasNode(lineItem) as typeof lineItem;
 
@@ -118,10 +119,12 @@ describe('document defaults', () => {
     expect(clonedLine.id).not.toBe(lineItem.id);
     expect(clonedLine.x).toBe(lineItem.x + DUPLICATE_ITEM_OFFSET);
     expect(clonedLine.y).toBe(lineItem.y + DUPLICATE_ITEM_OFFSET);
-    expect(clonedLine.startX).toBe(lineItem.startX + DUPLICATE_ITEM_OFFSET);
-    expect(clonedLine.startY).toBe(lineItem.startY + DUPLICATE_ITEM_OFFSET);
-    expect(clonedLine.endX).toBe(lineItem.endX + DUPLICATE_ITEM_OFFSET);
-    expect(clonedLine.endY).toBe(lineItem.endY + DUPLICATE_ITEM_OFFSET);
+    expect(clonedLine.vertices).toEqual(
+      lineItem.vertices.map((vertex) => ({
+        x: vertex.x + DUPLICATE_ITEM_OFFSET,
+        y: vertex.y + DUPLICATE_ITEM_OFFSET,
+      })),
+    );
   });
 
   it('creates a default group node shell', () => {

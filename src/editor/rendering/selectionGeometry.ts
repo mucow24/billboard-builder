@@ -1,4 +1,4 @@
-import type { CanvasItem, LineCanvasItem } from '../document/documentTypes';
+import type { CanvasItem } from '../document/documentTypes';
 
 import { getRenderBox, type Point, type RenderBox } from './transformGeometry';
 
@@ -15,12 +15,6 @@ function rotatePoint(point: Point, center: Point, deltaDegrees: number): Point {
 }
 
 export function getItemSelectionPoints(item: CanvasItem): Point[] {
-  if (item.kind === 'line') {
-    return [
-      { x: item.startX, y: item.startY },
-      { x: item.endX, y: item.endY },
-    ];
-  }
   if (item.kind === 'polygon') {
     return item.vertices.map((vertex) => ({ x: vertex.x, y: vertex.y }));
   }
@@ -41,7 +35,7 @@ export function getItemSelectionPoints(item: CanvasItem): Point[] {
 }
 
 export function getItemAABB(item: CanvasItem): RenderBox {
-  if (item.kind === 'line' || Math.abs(item.rotation) < 0.001) {
+  if (Math.abs(item.rotation) < 0.001) {
     return getRenderBox(item);
   }
   const points = getItemSelectionPoints(item);
@@ -152,26 +146,6 @@ function segmentsIntersect(a1: Point, a2: Point, b1: Point, b2: Point): boolean 
   return false;
 }
 
-function lineIntersectsRect(line: LineCanvasItem, rect: RenderBox): boolean {
-  const start = { x: line.startX, y: line.startY };
-  const end = { x: line.endX, y: line.endY };
-  if (pointInRect(start, rect) || pointInRect(end, rect)) {
-    return true;
-  }
-  const corners = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-    { x: rect.x, y: rect.y + rect.height },
-  ];
-  for (let index = 0; index < corners.length; index += 1) {
-    if (segmentsIntersect(start, end, corners[index], corners[(index + 1) % corners.length])) {
-      return true;
-    }
-  }
-  return false;
-}
-
 function openChainIntersectsRect(vertices: Point[], rect: RenderBox): boolean {
   if (vertices.some((vertex) => pointInRect(vertex, rect))) {
     return true;
@@ -200,10 +174,7 @@ function openChainIntersectsRect(vertices: Point[], rect: RenderBox): boolean {
 }
 
 export function itemIntersectsSelectionRect(item: CanvasItem, rect: RenderBox): boolean {
-  if (item.kind === 'line') {
-    return lineIntersectsRect(item, rect);
-  }
-  // An OPEN polygon has no interior and no closing edge: only stroke-chain
+  // An OPEN polygon (a line) has no interior and no closing edge: only stroke-chain
   // contact counts, so a marquee inside the mouth of a U-shape selects nothing.
   if (item.kind === 'polygon' && !item.closed) {
     return openChainIntersectsRect(getItemSelectionPoints(item), rect);

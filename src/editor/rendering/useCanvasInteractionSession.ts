@@ -19,7 +19,6 @@ import {
   createGroupDragSession,
   createGroupResizeSession,
   createGroupRotateSession,
-  createLineHandleSession,
   createPolygonEdgeInsertSession,
   createPolygonVertexSession,
   createResizeSession,
@@ -51,7 +50,6 @@ import type {
   ImageCanvasItem,
   CanvasTool,
   GuideLine,
-  LineCanvasItem,
   PolygonCanvasItem,
   ProjectDocument,
 } from '../document/documentTypes';
@@ -556,12 +554,17 @@ export function useCanvasInteractionSession({
         // Vertex sub-selection follows massimo's semantics: an edge "+" tap
         // leaves the freshly inserted vertex selected (Delete-ready), and a
         // no-move click on a vertex handle selects that vertex. A real drag
-        // leaves the sub-selection as it was.
+        // leaves the sub-selection as it was. A straight line (two vertices)
+        // never gets one: with nothing to delete down to, Delete and the
+        // arrow keys keep acting on the whole line, as they always have.
         if (resolved.kind === 'polygon-vertex' && onSelectPolygonVertex) {
           const moved =
             Math.hypot(pointer.x - resolved.pointerStart.x, pointer.y - resolved.pointerStart.y) >
             PICKUP_DRAG_THRESHOLD;
-          if (resolved.insertedVertex || !moved) {
+          const preview = resolved.previewItem;
+          const straightLine =
+            preview.kind === 'polygon' && !preview.closed && preview.vertices.length <= 2;
+          if (!straightLine && (resolved.insertedVertex || !moved)) {
             onSelectPolygonVertex({ itemId: resolved.itemId, vertexIndex: resolved.vertexIndex });
           }
         }
@@ -623,7 +626,6 @@ export function useCanvasInteractionSession({
         snapDisabled:
           current.kind === 'create' ||
           current.kind === 'drag' ||
-          current.kind === 'line-handle' ||
           current.kind === 'polygon-vertex' ||
           current.kind === 'group-drag' ||
           current.kind === 'group-resize'
@@ -832,24 +834,6 @@ export function useCanvasInteractionSession({
       updateSession(nextSession);
     }
   }, [activeSelectionFrame, orderedItems, selectedItems, selectedLeafIdSet, selectionLocked, updateSession]);
-
-  const beginLineHandle = useCallback((
-    item: LineCanvasItem,
-    handle: 'start' | 'end',
-    pointer: Point,
-    source: PointerGestureSource = 'stage',
-  ) => {
-    if (item.locked) return;
-    updateSession(
-      createLineHandleSession(
-        item,
-        handle,
-        pointer,
-        orderedItems.filter((entry) => entry.id !== item.id),
-        source,
-      )
-    );
-  }, [orderedItems, updateSession]);
 
   const beginPolygonVertexHandle = useCallback((
     item: PolygonCanvasItem,
@@ -1238,7 +1222,6 @@ export function useCanvasInteractionSession({
     beginCropFullRotate,
     beginCropPan,
     beginCropResize,
-    beginLineHandle,
     beginPolygonEdgeInsert,
     beginPolygonVertexHandle,
     beginResize,

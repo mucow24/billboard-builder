@@ -6,6 +6,15 @@ import {
 import { getRenderBox } from './transformGeometry';
 import type { RenderableCanvasItem } from './renderAdapter';
 
+/** The padded corridor along an open chain's stroke: the Pixi hit area of a line. */
+function pointHitsOpenChainCorridor(
+  item: Extract<RenderableCanvasItem, { kind: 'polygon' }>,
+  point: Point,
+) {
+  const pad = Math.max(item.strokeWidth / 2 + 8, 12);
+  return distanceToPolygonEdges(point, item.vertices, false) <= pad;
+}
+
 export function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point) {
   if (item.kind === 'polygon') {
     // Match the Pixi hit area: closed hits on fill + stroke band, open hits on
@@ -17,16 +26,20 @@ export function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point
         (rim > 0 && distanceToPolygonEdges(point, item.vertices, true) <= rim)
       );
     }
-    const pad = Math.max(item.strokeWidth / 2 + 8, 12);
-    return distanceToPolygonEdges(point, item.vertices, false) <= pad;
-  }
-
-  if (item.kind === 'line') {
-    const left = Math.min(item.startX, item.endX) - Math.max(item.strokeWidth / 2, 8);
-    const right = Math.max(item.startX, item.endX) + Math.max(item.strokeWidth / 2, 8);
-    const top = Math.min(item.startY, item.endY) - Math.max(item.strokeWidth / 2, 8);
-    const bottom = Math.max(item.startY, item.endY) + Math.max(item.strokeWidth / 2, 8);
-    return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+    if (item.vertices.length <= 2) {
+      // A straight line answers for its whole padded box here, as lines always
+      // have: this is what lets a double-click near a thin line inside a group
+      // drill into it. Real clicks use the corridor (pointHitsItemHitRegion).
+      const pad = Math.max(item.strokeWidth / 2, 8);
+      const box = getRenderBox(item);
+      return (
+        point.x >= box.x - pad &&
+        point.x <= box.x + box.width + pad &&
+        point.y >= box.y - pad &&
+        point.y <= box.y + box.height + pad
+      );
+    }
+    return pointHitsOpenChainCorridor(item, point);
   }
 
   const renderBox = getRenderBox(item);
@@ -54,20 +67,12 @@ export function getGroupDescendantAtPoint(
 /**
  * Whether `point` lands on the item's own hit region. Unlike
  * `pointHitsRenderableItem`, lines use the same narrow corridor as their Pixi
- * hit polygon (not their bounding box) and generators cover the whole canvas,
- * so the answer matches what a real click on the item would hit.
+ * hit area (not their bounding box) and generators cover the whole canvas, so
+ * the answer matches what a real click on the item would hit.
  */
 function pointHitsItemHitRegion(item: RenderableCanvasItem, point: Point) {
-  if (item.kind === 'line') {
-    const start = { x: item.startX, y: item.startY };
-    const end = { x: item.endX, y: item.endY };
-    const pad = Math.max(item.strokeWidth / 2 + 8, 12);
-    const length = Math.hypot(end.x - start.x, end.y - start.y) || 1;
-    const along = { x: (end.x - start.x) / length, y: (end.y - start.y) / length };
-    const offset = { x: point.x - start.x, y: point.y - start.y };
-    const alongDistance = offset.x * along.x + offset.y * along.y;
-    const acrossDistance = Math.abs(offset.x * along.y - offset.y * along.x);
-    return alongDistance >= 0 && alongDistance <= length && acrossDistance <= pad;
+  if (item.kind === 'polygon' && !item.closed) {
+    return pointHitsOpenChainCorridor(item, point);
   }
   if (item.kind === 'generator') {
     return point.x >= 0 && point.x <= item.width && point.y >= 0 && point.y <= item.height;

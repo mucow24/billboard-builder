@@ -55,7 +55,8 @@ export interface EditorStoreState {
   dispatch: (command: EditorCommand) => void;
   applyTransaction: (actions: Parameters<typeof createTransactionAction>[0]) => void;
   setActiveTool: (tool: CanvasTool) => void;
-  createItemAt: (kind: Exclude<CanvasLeafKind, 'image' | 'generator'>, x: number, y: number) => void;
+  // 'line' is not a kind of its own: it creates an open polygon.
+  createItemAt: (kind: Exclude<CanvasLeafKind, 'image' | 'generator'> | 'line', x: number, y: number) => void;
   updateSelectedItem: (changes: Partial<CanvasItem>) => void;
   updateSelectedItems: (changesById: Array<{ itemId: string; changes: Partial<CanvasItem> }>) => void;
   updateSelectionItems: (changes: SelectionItemChange) => void;
@@ -302,9 +303,10 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         return false;
       }
       // Clear the sub-selection either way; the removal itself no-ops at the
-      // 3-vertex floor (matching massimo), keeping the polygon selected.
+      // floor (3 vertices for a polygon, matching massimo; 2 for a line),
+      // keeping the item selected.
       get().setSelectedPolygonVertex(null);
-      const vertices = removePolygonVertex(node.vertices, selection.vertexIndex);
+      const vertices = removePolygonVertex(node.vertices, selection.vertexIndex, node.closed);
       if (vertices !== node.vertices) {
         get().dispatch({ type: 'update_node', itemId: node.id, changes: { vertices } });
       }
@@ -345,13 +347,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
                   x: vertex.x + deltaX,
                   y: vertex.y + deltaY,
                 })),
-              }
-            : item.kind === 'line'
-            ? {
-                startX: item.startX + deltaX,
-                startY: item.startY + deltaY,
-                endX: item.endX + deltaX,
-                endY: item.endY + deltaY,
               }
             : {
                 x: item.x + deltaX,

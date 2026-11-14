@@ -24,7 +24,7 @@ describe('CanvasTestHooks', () => {
         beginGroupDrag={vi.fn()}
         beginGroupResize={vi.fn()}
         beginGroupRotate={vi.fn()}
-        beginLineHandle={vi.fn()}
+        beginPolygonVertexHandle={vi.fn()}
         beginResize={vi.fn()}
         beginRotate={vi.fn()}
         getViewportPointerFromClient={vi.fn(() => ({ x: 100, y: 120 }))}
@@ -54,7 +54,7 @@ describe('CanvasTestHooks', () => {
         beginGroupDrag={vi.fn()}
         beginGroupResize={vi.fn()}
         beginGroupRotate={vi.fn()}
-        beginLineHandle={vi.fn()}
+        beginPolygonVertexHandle={vi.fn()}
         beginResize={vi.fn()}
         beginRotate={vi.fn()}
         getViewportPointerFromClient={vi.fn(() => ({ x: 100, y: 120 }))}
@@ -108,7 +108,7 @@ describe('CanvasTestHooks', () => {
         beginGroupDrag={beginGroupDrag}
         beginGroupResize={vi.fn()}
         beginGroupRotate={vi.fn()}
-        beginLineHandle={vi.fn()}
+        beginPolygonVertexHandle={vi.fn()}
         beginResize={beginResize}
         beginRotate={vi.fn()}
         getViewportPointerFromClient={vi.fn((clientX, clientY) => ({ x: clientX, y: clientY }))}
@@ -169,7 +169,7 @@ describe('CanvasTestHooks', () => {
       groupPath: [],
       selectableNodeId: line.id,
     };
-    const beginLineHandle = vi.fn();
+    const beginPolygonVertexHandle = vi.fn();
     const beginGroupResize = vi.fn();
     const beginGroupRotate = vi.fn();
 
@@ -178,7 +178,7 @@ describe('CanvasTestHooks', () => {
         beginGroupDrag={vi.fn()}
         beginGroupResize={beginGroupResize}
         beginGroupRotate={beginGroupRotate}
-        beginLineHandle={beginLineHandle}
+        beginPolygonVertexHandle={beginPolygonVertexHandle}
         beginResize={vi.fn()}
         beginRotate={vi.fn()}
         getViewportPointerFromClient={vi.fn((clientX, clientY) => ({ x: clientX, y: clientY }))}
@@ -190,7 +190,10 @@ describe('CanvasTestHooks', () => {
         marqueeViewportRect={null}
         onTestEvent={vi.fn()}
         selectedItemViewportRect={null}
-        selectedLineHandleRects={{ start: { left: 10, top: 20, width: 16, height: 16 } }}
+        selectedLineHandleRects={{
+          start: { left: 10, top: 20, width: 16, height: 16 },
+          end: { left: 250, top: 44, width: 16, height: 16 },
+        }}
         selectedRenderedItem={renderedLine}
         selectedShapeHandleRects={null}
         session={null}
@@ -206,6 +209,11 @@ describe('CanvasTestHooks', () => {
       clientX: 60,
       clientY: 80,
     });
+    fireEvent.mouseDown(screen.getByTestId('canvas-line-handle-end'), {
+      button: 0,
+      clientX: 100,
+      clientY: 120,
+    });
     fireEvent.mouseDown(screen.getByTestId('canvas-group-handle-middle-right'), {
       button: 0,
       clientX: 220,
@@ -217,7 +225,9 @@ describe('CanvasTestHooks', () => {
       clientY: 40,
     });
 
-    expect(beginLineHandle).toHaveBeenCalledWith(renderedLine, 'start', { x: 30, y: 40 }, 'overlay');
+    // A line's ends are the first and last vertex of its open polygon.
+    expect(beginPolygonVertexHandle).toHaveBeenNthCalledWith(1, renderedLine, 0, { x: 30, y: 40 }, 'overlay');
+    expect(beginPolygonVertexHandle).toHaveBeenNthCalledWith(2, renderedLine, 1, { x: 50, y: 60 }, 'overlay');
     expect(beginGroupResize).toHaveBeenCalledWith('middle-right', { x: 110, y: 70 }, 'overlay');
     expect(beginGroupRotate).toHaveBeenCalledWith({ x: 90, y: 20 }, 'overlay');
   });

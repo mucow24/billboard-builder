@@ -609,7 +609,8 @@ function reduceEditorStateForAction(state: EditorState, action: EditorAction): E
 }
 
 export function createItemForKind(
-  kind: Exclude<CanvasLeafKind, 'image' | 'generator'>,
+  // 'line' is not a kind of its own: it creates an open polygon.
+  kind: Exclude<CanvasLeafKind, 'image' | 'generator'> | 'line',
   x: number,
   y: number
 ): CanvasItem {

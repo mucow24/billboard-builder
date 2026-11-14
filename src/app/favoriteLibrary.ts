@@ -1,4 +1,5 @@
 import { DUPLICATE_ITEM_OFFSET } from '../editor/document/documentDefaults';
+import { isLineItem } from '../editor/document/polygonVertices';
 import { cloneCanvasNode, isGroupNode } from '../editor/document/sceneGraph';
 import type { CanvasNode } from '../editor/document/documentTypes';
 import type { StoredFavorite } from '../editor/persistence/favoriteLibraryService';
@@ -24,9 +25,7 @@ function getSingleNodeFavoriteLabel(node: CanvasNode): string {
     case 'ngon':
       return 'N-gon';
     case 'polygon':
-      return 'Polygon';
-    case 'line':
-      return 'Line';
+      return isLineItem(node) ? 'Line' : 'Polygon';
     case 'text':
       return `Text:${normalizeFavoriteTextContent(node.text)}`;
     case 'image':

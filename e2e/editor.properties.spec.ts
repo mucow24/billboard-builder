@@ -334,8 +334,11 @@ test.describe('editor properties flows', () => {
       expect.objectContaining({
         id: 'properties-line',
         strokeWidth: 9,
-        startX: 150,
-        endY: 590,
+        // Start X and End Y edit the line's first and last vertex.
+        vertices: [
+          { x: 150, y: 520 },
+          { x: 420, y: 590 },
+        ],
       }),
       expect.objectContaining({
         id: 'properties-image',

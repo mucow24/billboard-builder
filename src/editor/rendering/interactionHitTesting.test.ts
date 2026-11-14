@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { getItemsAtPoint, getSelectionCycleTargetAtPoint } from './interactionHitTesting';
+import {
+  getGroupDescendantAtPoint,
+  getItemsAtPoint,
+  getSelectionCycleTargetAtPoint,
+} from './interactionHitTesting';
 import { buildRenderableCanvasItems } from './renderAdapter';
 import {
   createDefaultProjectDocument,
@@ -57,14 +61,14 @@ describe('getItemsAtPoint', () => {
   });
 
   it('hits a diagonal line along its stroke corridor, not across its bounding box', () => {
-    const line = createLineItem({ id: 'line', startX: 0, startY: 0, endX: 200, endY: 200, strokeWidth: 4 });
+    const line = createLineItem({ id: 'line', vertices: [{ x: 0, y: 0 }, { x: 200, y: 200 }], strokeWidth: 4 });
     const items = renderablesFor([line]);
 
     expect(getItemsAtPoint(items, { x: 100, y: 104 }).map((item) => item.id)).toEqual(['line']);
     // Inside the bounding box, far from the stroke.
     expect(getItemsAtPoint(items, { x: 180, y: 20 })).toEqual([]);
-    // Past the end of the line.
-    expect(getItemsAtPoint(items, { x: 206, y: 206 })).toEqual([]);
+    // Past the end of the line, beyond the 12px grab margin around its ends.
+    expect(getItemsAtPoint(items, { x: 215, y: 215 })).toEqual([]);
   });
 
   it('treats a generator as covering the whole canvas', () => {
@@ -73,6 +77,32 @@ describe('getItemsAtPoint', () => {
 
     expect(getItemsAtPoint(items, { x: 790, y: 590 }).map((item) => item.id)).toEqual(['generator']);
     expect(getItemsAtPoint(items, { x: 810, y: 300 })).toEqual([]);
+  });
+});
+
+describe('getGroupDescendantAtPoint', () => {
+  // Drilling into a group is more forgiving than a click: see pointHitsRenderableItem.
+  it('finds a straight line anywhere in its padded box, a bent line only along its stroke', () => {
+    const straight = createLineItem({
+      id: 'straight',
+      vertices: [{ x: 0, y: 0 }, { x: 200, y: 200 }],
+    });
+    const bent = createLineItem({
+      id: 'bent',
+      vertices: [{ x: 400, y: 0 }, { x: 600, y: 200 }, { x: 800, y: 0 }],
+    });
+    const group = { ...createGroupNode([straight, bent]), id: 'group' };
+    const renderables = renderablesFor([group]);
+
+    // Far off the diagonal stroke, inside the straight line's box.
+    expect(getGroupDescendantAtPoint(renderables, 'group', { x: 180, y: 20 })?.id).toBe('straight');
+    // Just outside the box, within its 8px padding.
+    expect(getGroupDescendantAtPoint(renderables, 'group', { x: 205, y: 100 })?.id).toBe('straight');
+    expect(getGroupDescendantAtPoint(renderables, 'group', { x: 220, y: 100 })).toBeNull();
+
+    // Inside the bent line's box but off both strokes: no hit.
+    expect(getGroupDescendantAtPoint(renderables, 'group', { x: 600, y: 40 })).toBeNull();
+    expect(getGroupDescendantAtPoint(renderables, 'group', { x: 500, y: 100 })?.id).toBe('bent');
   });
 });
 
