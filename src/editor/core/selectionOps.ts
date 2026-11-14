@@ -4,13 +4,6 @@ export function toggleSelectionNode(selectedNodeIds: string[], nodeId: string): 
     : [...selectedNodeIds, nodeId];
 }
 
-export function toggleSelectionNodes(selectedNodeIds: string[], nodeIds: string[]): string[] {
-  const toggled = new Set(nodeIds);
-  const retained = selectedNodeIds.filter((id) => !toggled.has(id));
-  const appended = nodeIds.filter((id) => !selectedNodeIds.includes(id));
-  return [...retained, ...appended];
-}
-
 export function normalizeSelectionForNodes(selectedNodeIds: string[], nodes: ReadonlyArray<{ id: string }>): string[] {
   const selectableIds = new Set(nodes.map((node) => node.id));
   const seen = new Set<string>();

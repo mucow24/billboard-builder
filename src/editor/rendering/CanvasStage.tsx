@@ -47,7 +47,6 @@ export function CanvasStage({
   const dispatch = useEditorStore((s) => s.dispatch);
   const selectSingleNode = useEditorStore((s) => s.selectSingleNode);
   const toggleSelectedNode = useEditorStore((s) => s.toggleSelectedNode);
-  const toggleSelectedNodes = useEditorStore((s) => s.toggleSelectedNodes);
   const setActiveTool = useEditorStore((s) => s.setActiveTool);
   const updateSelectedItems = useEditorStore((s) => s.updateSelectedItems);
   const selectedPolygonVertex = useEditorStore((s) => s.editor.session.selectedPolygonVertex);
@@ -63,6 +62,13 @@ export function CanvasStage({
   const onAddItem = useCallback(
     (item: CanvasItem) => {
       dispatch({ type: 'add_node', item });
+    },
+    [dispatch],
+  );
+
+  const onSelectNodes = useCallback(
+    (nodeIds: string[]) => {
+      dispatch({ type: 'select_nodes', nodeIds });
     },
     [dispatch],
   );
@@ -105,6 +111,7 @@ export function CanvasStage({
     renderedSelectedItems = [],
     selectedDocumentItem,
     lastDrilldownSource,
+    marqueeInProgress = false,
     selectedNode,
     selectedRenderedItem,
     selectionLocked = false,
@@ -116,8 +123,8 @@ export function CanvasStage({
     selectedNodeIds,
     onGuidesChange,
     onSelectNode: selectSingleNode,
+    onSelectNodes,
     onToggleSelectNode: toggleSelectedNode,
-    onToggleSelectNodes: toggleSelectedNodes,
     onUpdateItem,
     onUpdateItems: updateSelectedItems,
     onAddItem,
@@ -136,6 +143,11 @@ export function CanvasStage({
   const viewport = viewportState;
 
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
+  // A locked selection can't be transformed, so it gets no handles. A
+  // marquee selects as it is dragged out; until release its selection gets
+  // none either, so handles don't pop in and out under the pointer (or swap
+  // its cursor) mid-drag.
+  const hideTransformHandles = selectionLocked || marqueeInProgress;
   const {
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,
@@ -156,7 +168,7 @@ export function CanvasStage({
     renderedSelectedItems,
     renderedSelectionFrame,
     selectedRenderedItem,
-    selectionLocked,
+    hideTransformHandles,
     session: session as never,
     cropSession: cropSession as never,
     zoom: viewport.zoom,
@@ -224,7 +236,7 @@ export function CanvasStage({
         renderedItems={renderedItems}
         renderedSelectedItems={renderedSelectedItems}
         selectedRenderedItem={selectedRenderedItem}
-        selectionLocked={selectionLocked}
+        hideTransformHandles={hideTransformHandles}
         session={session as never}
         showFocusVeil={showExportBoundsCue}
         showGroupSelection={showGroupInteractionHooks}
