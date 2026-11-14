@@ -26,8 +26,9 @@ const WHEEL_ZOOM_STEP = 1.2;
 const ZOOM_TOOL_CLICK_STEP = WHEEL_ZOOM_STEP ** 2;
 const HUD_ZOOM_STEP = 0.1;
 // A zoom tool press that moves less than this, in viewport pixels along both
-// axes, is a click; one that moves further drags out a box to zoom to.
-export const ZOOM_BOX_MIN_DRAG = 4;
+// axes, is a click. Once it moves further it drags out a box to zoom to for
+// the rest of the press, and a box released smaller than this is dropped.
+const ZOOM_BOX_MIN_DRAG = 4;
 
 interface UseCanvasViewportParams {
   activeTool: CanvasTool;
@@ -44,9 +45,11 @@ interface ZoomDrag {
   start: Point;
   current: Point;
   zoomOut: boolean;
+  // Whether the press has moved ZOOM_BOX_MIN_DRAG yet, which makes it a box.
+  boxing: boolean;
 }
 
-function isZoomBoxDrag({ start, current }: ZoomDrag) {
+function isPastMinDrag({ start, current }: ZoomDrag) {
   return (
     Math.abs(current.x - start.x) >= ZOOM_BOX_MIN_DRAG ||
     Math.abs(current.y - start.y) >= ZOOM_BOX_MIN_DRAG
@@ -322,8 +325,9 @@ export function useCanvasViewport({
 
   // A zoom tool press. Released where it started it zooms one step around
   // that point (out with Alt); dragged, it zooms to the box it drags out.
+  // Alt only changes clicks: a box always zooms to what it frames.
   const startZoomToolGesture = useCallback((pointer: Point, zoomOut: boolean) => {
-    zoomDragRef.current = { start: pointer, current: pointer, zoomOut };
+    zoomDragRef.current = { start: pointer, current: pointer, zoomOut, boxing: false };
     setZoomBox(null);
   }, []);
 
@@ -355,7 +359,10 @@ export function useCanvasViewport({
         return;
       }
       drag.current = pointer;
-      if (isZoomBoxDrag(drag)) {
+      if (!drag.boxing && isPastMinDrag(drag)) {
+        drag.boxing = true;
+      }
+      if (drag.boxing) {
         setZoomBox(rectFromCorners(drag.start, pointer));
       }
     }
@@ -366,11 +373,17 @@ export function useCanvasViewport({
         return;
       }
       drag.current = readPointer(event) ?? drag.current;
+      if (!drag.boxing && isPastMinDrag(drag)) {
+        drag.boxing = true;
+      }
       cancelZoomDrag();
-      if (isZoomBoxDrag(drag)) {
+      if (!drag.boxing) {
+        applyZoomToolClick(drag.start, drag.zoomOut);
+      } else if (isPastMinDrag(drag)) {
         zoomToViewportBox(rectFromCorners(drag.start, drag.current));
       } else {
-        applyZoomToolClick(drag.start, drag.zoomOut);
+        // A box dragged back to almost nothing: dropped, and the tool stays.
+        return;
       }
       onZoomToolGestureEndRef.current?.();
     }
@@ -391,7 +404,7 @@ export function useCanvasViewport({
     zoomToViewportBox,
   ]);
 
-  // Switching tools mid-drag (a hotkey, or Escape) drops the box.
+  // Switching tools mid-drag drops the box.
   useEffect(() => {
     if (activeTool !== 'zoom') {
       cancelZoomDrag();
@@ -422,7 +435,9 @@ export function useCanvasViewport({
 
   const handleStagePointerUp = useCallback(() => {
     if (zoomDragRef.current) {
-      // The window pointerup listener finishes it.
+      // Pixi listens for pointerup on window in the capture phase, so this
+      // runs before this hook's bubble-phase window listener, which then
+      // finishes the gesture.
       return true;
     }
     if (!panDragRef.current) {

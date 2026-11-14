@@ -462,6 +462,34 @@ describe('useCanvasViewport', () => {
       expect(onZoomToolGestureEnd).toHaveBeenCalledTimes(1);
     });
 
+    it('keeps a drag a box once it is one, and drops a box dragged back to almost nothing', () => {
+      const { result, onZoomToolGestureEnd } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 400, y: 300 }, false);
+      });
+      pointer('pointermove', 500, 350);
+      pointer('pointermove', 402, 301);
+      expect(result.current.zoomBox).toEqual({ left: 400, top: 300, width: 2, height: 1 });
+      pointer('pointerup', 402, 301);
+
+      expect(result.current.zoomBox).toBeNull();
+      expect(result.current.zoom).toBe(0.625);
+      expect(result.current.pan).toEqual({ x: 320, y: 40 });
+      expect(onZoomToolGestureEnd).not.toHaveBeenCalled();
+    });
+
+    it('treats a release far from the start as a box even with no move in between', () => {
+      const { result } = renderZoomTool();
+
+      act(() => {
+        result.current.startZoomToolGesture({ x: 600, y: 240 }, false);
+      });
+      pointer('pointerup', 400, 140);
+
+      expect(result.current.zoom).toBe(2.828125);
+    });
+
     it('keeps the box inside the viewport when the pointer leaves it', () => {
       const { result } = renderZoomTool();
 
