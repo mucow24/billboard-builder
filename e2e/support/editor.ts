@@ -372,7 +372,6 @@ export function createPolygonFixture(overrides: Record<string, unknown> = {}) {
     ],
     closed: true,
     curveRadius: 0,
-    mirrorHorizontal: false,
     ...overrides,
   };
 }
@@ -1693,6 +1692,50 @@ export async function captureDownload(page: Page, action: () => Promise<void>) {
     action(),
   ]);
   return download;
+}
+
+export interface ExportedPixel {
+  r: number;
+  g: number;
+  b: number;
+  a: number;
+}
+
+/**
+ * Export > PNG and read the pixel at each canvas point. The export is the only
+ * pixel-accurate readback of what Pixi drew.
+ */
+export async function exportPngPixels(
+  page: Page,
+  points: Array<{ x: number; y: number }>,
+): Promise<ExportedPixel[]> {
+  const download = await captureDownload(page, async () => {
+    await clickToolbarPopoverItem(page, 'Export', 'PNG');
+  });
+  const buffer = await fs.readFile(await download.path());
+  const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+
+  return page.evaluate(
+    async ({ url, samplePoints }) => {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('failed to decode exported png'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+
+      return samplePoints.map(({ x, y }) => {
+        const [r, g, b, a] = ctx.getImageData(x, y, 1, 1).data;
+        return { r, g, b, a };
+      });
+    },
+    { url: dataUrl, samplePoints: points },
+  );
 }
 
 /** Downloads the canvas as it is in the editor (Canvas > Save > To JSON) and reads the file. */

@@ -1,4 +1,5 @@
 import { mirrorPolygonVerticesHorizontally } from '../../document/polygonVertices';
+import { mirrorGradientAngleHorizontally } from '../../rendering/geometry/gradientGeometry';
 import {
   createBooleanField,
   createColorField,
@@ -14,7 +15,7 @@ import {
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
-import { renderMirrorField } from './selectionInspectorRenderers';
+import { renderMirrorActionField } from './selectionInspectorRenderers';
 
 /**
  * Freeform polygon fields. Fill (with gradient) applies only while the polygon
@@ -69,9 +70,8 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
 
       valueType: 'boolean',
     }),
-    // What shapes this polygon in particular gets a section of its own that
-    // starts open, like N-gon's Sides, rather than rows in Geometry, which
-    // starts closed.
+    // Settings only polygons have get a section of their own that starts open,
+    // like N-gon's Sides, rather than rows in Geometry, which starts closed.
     createNumberField({
       buildChange: (_context, nextValue) => ({ curveRadius: Math.max(0, nextValue) }),
       digits: 1,
@@ -92,29 +92,27 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
       valueType: 'number',
     }),
     createCustomField({
-      // The flip is baked into the vertices, so turning Mirror on or off flips
-      // them; a polygon already in the asked-for state (part of a mixed
-      // selection) is left alone.
-      buildChange: ({ item }, nextValue) => {
-        const mirrorHorizontal = Boolean(nextValue);
-        if (item.kind !== 'polygon' || item.mirrorHorizontal === mirrorHorizontal) {
-          return {};
-        }
-        return {
-          mirrorHorizontal,
-          vertices: mirrorPolygonVerticesHorizontally(item.vertices),
-        };
-      },
+      // Like rotating, mirroring rewrites the vertices, so it is a one-click
+      // action with no state: a saved "mirrored" flag would stop meaning
+      // anything after the next rotate or vertex edit. The gradient flips with
+      // the shape, so the result is a true mirror image.
+      buildChange: ({ item }) =>
+        item.kind === 'polygon'
+          ? {
+              vertices: mirrorPolygonVerticesHorizontally(item.vertices),
+              gradientAngle: mirrorGradientAngleHorizontally(item.gradientAngle),
+            }
+          : {},
       fieldOrder: 20,
-      getValue: (item) => item.kind === 'polygon' && item.mirrorHorizontal,
+      getValue: () => null,
       label: 'Mirror',
-      propertyKey: 'mirrorHorizontal',
-      render: renderMirrorField,
+      propertyKey: 'mirror',
+      render: renderMirrorActionField,
       sectionKey: 'polygon',
       sectionLabel: 'Polygon',
       sectionOrder: SECTION_ORDER.polygon,
-      tooltip: 'Flip the polygon left to right, in place. Click again to flip it back.',
-      valueType: 'boolean',
+      tooltip: 'Flip the polygon left to right in place, gradient and all. Click again to flip it back.',
+      valueType: 'custom',
     }),
   ];
 

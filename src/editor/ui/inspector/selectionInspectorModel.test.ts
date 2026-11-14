@@ -696,7 +696,7 @@ describe('polygon descriptors', () => {
     expect(descriptor?.buildChange({ item: polygon }, -5 as never)).toEqual({ curveRadius: 0 });
   });
 
-  it('mirrors the polygon by flipping its vertices left to right, and flips them back', () => {
+  it('mirrors the polygon and its gradient on every click, and a second click flips them back', () => {
     const vertices = [
       { x: 20, y: 10 },
       { x: 120, y: 110 },
@@ -707,37 +707,41 @@ describe('polygon descriptors', () => {
       { x: 20, y: 110 },
       { x: 120, y: 110 },
     ];
-    const polygon = createPolygonItem({ vertices });
+    const polygon = createPolygonItem({ vertices, gradientAngle: 90 });
     const mirrorField = buildSelectionInspectorSections([polygon], environment)
       .flatMap((section) => section.fields)
-      .find((field) => field.descriptor.propertyKey === 'mirrorHorizontal');
+      .find((field) => field.descriptor.propertyKey === 'mirror');
+    const mirror = (item: typeof polygon) =>
+      mirrorField?.descriptor.buildChange({ item }, true as never);
 
     expect(mirrorField?.descriptor.controlKind).toBe('custom');
-    expect(mirrorField?.state.value).toBe(false);
-    expect(mirrorField?.descriptor.buildChange({ item: polygon }, true as never)).toEqual({
-      mirrorHorizontal: true,
-      vertices: flipped,
-    });
-
-    const mirrored = createPolygonItem({ vertices: flipped, mirrorHorizontal: true });
-    expect(mirrorField?.descriptor.getValue(mirrored)).toBe(true);
-    expect(mirrorField?.descriptor.buildChange({ item: mirrored }, false as never)).toEqual({
-      mirrorHorizontal: false,
-      vertices,
-    });
+    const once = mirror(polygon);
+    // 90 runs left to right, so the mirror image runs right to left.
+    expect(once).toEqual({ vertices: flipped, gradientAngle: -90 });
+    expect(mirror({ ...polygon, ...once } as typeof polygon)).toEqual({ vertices, gradientAngle: 90 });
   });
 
-  it('leaves alone a polygon that is already mirrored the way Mirror asks for', () => {
-    // A mixed selection turns Mirror on for every polygon: the ones already
-    // mirrored must not flip back.
-    const plain = createPolygonItem();
-    const mirrored = createPolygonItem({ mirrorHorizontal: true });
-    const mirrorField = buildSelectionInspectorSections([plain, mirrored], environment)
+  it('keeps no mirrored state, so Mirror never shows as mixed', () => {
+    const first = createPolygonItem();
+    const second = createPolygonItem({
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 50, y: 0 },
+        { x: 0, y: 80 },
+      ],
+    });
+    const mirrorField = buildSelectionInspectorSections([first, second], environment)
       .flatMap((section) => section.fields)
-      .find((field) => field.descriptor.propertyKey === 'mirrorHorizontal');
+      .find((field) => field.descriptor.propertyKey === 'mirror');
 
-    expect(mirrorField?.state.isMixed).toBe(true);
-    expect(mirrorField?.descriptor.buildChange({ item: mirrored }, true as never)).toEqual({});
-    expect(mirrorField?.descriptor.buildChange({ item: plain }, false as never)).toEqual({});
+    expect(mirrorField?.state.isMixed).toBe(false);
+    // Each selected polygon flips across the middle of its own box.
+    expect(mirrorField?.descriptor.buildChange({ item: second }, true as never)).toMatchObject({
+      vertices: [
+        { x: 50, y: 0 },
+        { x: 0, y: 0 },
+        { x: 50, y: 80 },
+      ],
+    });
   });
 });

@@ -1,16 +1,13 @@
-import { promises as fs } from 'node:fs';
-
 import { expect, test, type Page } from '@playwright/test';
 
 import {
-  captureDownload,
   clickItem,
-  clickToolbarPopoverItem,
   createPolygonFixture,
   createProjectDocument,
   dragEmptyCanvas,
   dragHandle,
   clickEmptyCanvas,
+  exportPngPixels,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
@@ -326,18 +323,17 @@ test.describe('polygon tool flows', () => {
 
     await clickItem(page, 'polygon-item');
     await openPropertiesTab(page);
+    // A one-click action, not a toggle: there is no pressed state.
     const mirrorButton = page.getByRole('button', { name: 'Mirror' });
-    await expect(mirrorButton).toHaveAttribute('aria-pressed', 'false');
+    await expect(mirrorButton).not.toHaveAttribute('aria-pressed');
 
     await test.step('first click flips it in place', async () => {
       await mirrorButton.click();
-      await expect(mirrorButton).toHaveAttribute('aria-pressed', 'true');
       expect(await exportAndSample(page, points)).toEqual(['other', 'orange']);
 
       const saved = await saveAndReadProject(page);
       expect(saved.nodes).toEqual([
         expect.objectContaining({
-          mirrorHorizontal: true,
           vertices: mirroredTrapezoid,
           x: 200,
           y: 200,
@@ -349,58 +345,65 @@ test.describe('polygon tool flows', () => {
 
     await test.step('second click flips it back', async () => {
       await mirrorButton.click();
-      await expect(mirrorButton).toHaveAttribute('aria-pressed', 'false');
       expect(await exportAndSample(page, points)).toEqual(['orange', 'other']);
 
       const saved = await saveAndReadProject(page);
-      expect(saved.nodes).toEqual([
-        expect.objectContaining({ mirrorHorizontal: false, vertices: trapezoid }),
-      ]);
+      expect(saved.nodes).toEqual([expect.objectContaining({ vertices: trapezoid })]);
     });
 
     await test.step('undo brings the flip back', async () => {
       await page.keyboard.press('ControlOrMeta+z');
-      await expect(mirrorButton).toHaveAttribute('aria-pressed', 'true');
       expect(await exportAndSample(page, points)).toEqual(['other', 'orange']);
     });
   });
+
+  test('Mirror flips the gradient along with the polygon', async ({ page }) => {
+    // The fixture square, orange on the left fading to blue on the right.
+    const points = [
+      { x: 215, y: 320 },
+      { x: 425, y: 320 },
+    ];
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument([
+          createPolygonFixture({ gradientEnabled: true, gradientAngle: 90 }),
+        ]),
+        background: '#ffffffff',
+      },
+      'polygon-mirror-gradient.json',
+    );
+    await expect.poll(async () => (await readStageDebug(page)).renderedItemCount).toBe(1);
+    expect(await exportAndSample(page, points)).toEqual(['orange', 'blue']);
+
+    await clickItem(page, 'polygon-item');
+    await openPropertiesTab(page);
+    await page.getByRole('button', { name: 'Mirror' }).click();
+
+    expect(await exportAndSample(page, points)).toEqual(['blue', 'orange']);
+    await expect(page.getByRole('spinbutton', { name: 'Gradient angle' })).toHaveValue('-90');
+
+    const saved = await saveAndReadProject(page);
+    expect(saved.nodes).toEqual([expect.objectContaining({ gradientAngle: -90 })]);
+  });
 });
 
+type Ink = 'orange' | 'blue' | 'other';
+
 /**
- * Export > PNG and name the colour at each canvas point: the fixture's orange
- * fill, or anything else. The export is the only pixel-accurate readback of
- * what Pixi drew.
+ * Export > PNG and name the colour at each canvas point: mostly the fixture's
+ * orange fill (#f97316), mostly its blue secondary fill (#0840e9), or neither
+ * (the white background).
  */
 async function exportAndSample(
   page: Page,
   points: Array<{ x: number; y: number }>,
-): Promise<Array<'orange' | 'other'>> {
-  const download = await captureDownload(page, async () => {
-    await clickToolbarPopoverItem(page, 'Export', 'PNG');
+): Promise<Ink[]> {
+  return (await exportPngPixels(page, points)).map(({ r, b }) => {
+    if (r > b + 80) return 'orange';
+    if (b > r + 80) return 'blue';
+    return 'other';
   });
-  const buffer = await fs.readFile(await download.path());
-  const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
-
-  return page.evaluate(
-    async ({ url, samplePoints }) => {
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('failed to decode exported png'));
-        img.src = url;
-      });
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0);
-
-      return samplePoints.map(({ x, y }) => {
-        const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
-        // #f97316
-        return r > 200 && g > 70 && g < 160 && b < 80 ? ('orange' as const) : ('other' as const);
-      });
-    },
-    { url: dataUrl, samplePoints: points },
-  );
 }

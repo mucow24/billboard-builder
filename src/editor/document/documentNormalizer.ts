@@ -335,7 +335,6 @@ export function normalizeCanvasItem(item: CanvasItem): CanvasItem {
         vertices,
         closed: item.closed !== false,
         curveRadius: clampFinite(item.curveRadius ?? 0, 0, 0),
-        mirrorHorizontal: Boolean(item.mirrorHorizontal),
       };
       return normalizedPolygonItem;
     }

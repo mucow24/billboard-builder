@@ -265,22 +265,7 @@ describe('document normalizer', () => {
     expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
   });
 
-  it('keeps a mirrored polygon mirrored and leaves its vertices as they are', () => {
-    const vertices = [
-      { x: 150, y: 30 },
-      { x: 50, y: 210 },
-      { x: 150, y: 210 },
-    ];
-    const normalized = normalizeProjectDocument({
-      version: 2,
-      nodes: [createPolygonItem({ vertices, mirrorHorizontal: true })],
-      fonts: [],
-    });
-
-    expect(normalized.nodes[0]).toMatchObject({ mirrorHorizontal: true, vertices });
-  });
-
-  it('re-derives the polygon AABB from its vertices and defaults closed/curveRadius/mirrorHorizontal', () => {
+  it('re-derives the polygon AABB from its vertices and defaults closed/curveRadius', () => {
     const polygon = createPolygonItem({
       vertices: [
         { x: 50, y: 30 },
@@ -297,7 +282,6 @@ describe('document normalizer', () => {
       height: 5,
       closed: undefined,
       curveRadius: undefined,
-      mirrorHorizontal: undefined,
     };
 
     const normalized = normalizeProjectDocument({
@@ -313,7 +297,6 @@ describe('document normalizer', () => {
       height: 180,
       closed: true,
       curveRadius: 0,
-      mirrorHorizontal: false,
       rotation: 0,
     });
   });

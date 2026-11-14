@@ -171,11 +171,6 @@ export interface PolygonCanvasItem extends BaseCanvasItem, GradientFillItem {
   // Corner-rounding radius in canvas units; 0 = sharp corners. Each corner's
   // trim is clamped to half its shorter adjacent edge, so any value is safe.
   curveRadius: number;
-  // State of the inspector's Mirror toggle. Like rotation, the flip itself is
-  // baked into `vertices` (see mirrorPolygonVerticesHorizontally); this only
-  // records that it was applied, so the button shows pressed and a second
-  // click flips the vertices back.
-  mirrorHorizontal: boolean;
 }
 
 export interface LineCanvasItem extends BaseCanvasItem {

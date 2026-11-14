@@ -712,10 +712,16 @@ describe('SelectionInspector', () => {
     expect(screen.getByText('W:')).toHaveAttribute('title', 'Width in pixels.');
   });
 
-  it('opens the Polygon section from the start, with a pressed Mirror button for a mirrored polygon', async () => {
+  it('opens the Polygon section from the start, with a Mirror button that flips the polygon on each click', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();
-    const polygonItem = createPolygonItem({ mirrorHorizontal: true });
+    const polygonItem = createPolygonItem({
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 50, y: 0 },
+        { x: 0, y: 80 },
+      ],
+    });
 
     render(
       <SelectionInspector
@@ -740,12 +746,17 @@ describe('SelectionInspector', () => {
       expect.stringContaining('left to right'),
     );
 
+    // An action, not a toggle: there is no pressed state to report.
     const mirrorButton = screen.getByRole('button', { name: 'Mirror' });
-    expect(mirrorButton).toHaveAttribute('aria-pressed', 'true');
+    expect(mirrorButton).not.toHaveAttribute('aria-pressed');
 
     await user.click(mirrorButton);
     expect(expectLatestChange(onItemChange, polygonItem)).toMatchObject({
-      mirrorHorizontal: false,
+      vertices: [
+        { x: 50, y: 0 },
+        { x: 0, y: 0 },
+        { x: 50, y: 80 },
+      ],
     });
   });
 

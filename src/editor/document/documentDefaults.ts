@@ -198,7 +198,6 @@ export function createPolygonItem(
     vertices: [],
     closed: true,
     curveRadius: 0,
-    mirrorHorizontal: false,
     ...position,
   };
   // Vertices are the geometry source of truth; when the caller passes only a

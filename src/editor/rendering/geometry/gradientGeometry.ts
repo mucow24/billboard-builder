@@ -33,3 +33,13 @@ export function computeGradientEndpoints(
     y1: cy + halfLen * cosA,
   };
 }
+
+/**
+ * The `gradientAngle` that draws the same gradient flipped left to right
+ * across the middle of its box. The gradient runs along (sin a, cos a) (0 is
+ * top to bottom, 90 left to right), so the flip negates the angle.
+ */
+export function mirrorGradientAngleHorizontally(gradientAngle: number): number {
+  // `0 - x` rather than `-x`, so 0 stays 0 instead of becoming -0.
+  return 0 - gradientAngle;
+}
