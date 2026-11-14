@@ -184,3 +184,117 @@ test.describe('PNG export of filtered items', () => {
     }
   });
 });
+
+/** Export > PNG, then read the colour of the file at each point. */
+async function exportAndSample(
+  page: Page,
+  points: Array<{ x: number; y: number }>,
+): Promise<Array<{ r: number; g: number; b: number; a: number }>> {
+  const download = await captureDownload(page, async () => {
+    await clickToolbarPopoverItem(page, 'Export', 'PNG');
+  });
+  const buffer = await fs.readFile(await download.path());
+  const dataUrl = `data:image/png;base64,${buffer.toString('base64')}`;
+
+  return page.evaluate(
+    async ({ url, samplePoints }) => {
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('failed to decode exported png'));
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      return samplePoints.map(({ x, y }) => {
+        const [r, g, b, a] = ctx.getImageData(x, y, 1, 1).data;
+        return { r, g, b, a };
+      });
+    },
+    { url: dataUrl, samplePoints: points },
+  );
+}
+
+test.describe('PNG export of gradient fills', () => {
+  // Pixi mirrors a shape's gradient when its line runs right-and-up or
+  // left-and-down (angles between 90 and 180, and between 270 and 360), so
+  // turning the angle used to swing the gradient back and forth.
+  test('turns a rectangle gradient with its angle through every quadrant', async ({ page }) => {
+    const WIDTH = 200;
+    const HEIGHT = 100;
+    const angles = [0, 30, 45, 90, 120, 135, 180, 210, 225, 270, 300, 315, -45];
+    const boxes = angles.map((angle, index) => ({
+      angle,
+      x: 40 + (index % 4) * 240,
+      y: 40 + Math.floor(index / 4) * 160,
+    }));
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument(
+          boxes.map(({ angle, x, y }, index) =>
+            createRectangleFixture({
+              id: `gradient-${index}`,
+              name: `Gradient ${angle}`,
+              x,
+              y,
+              width: WIDTH,
+              height: HEIGHT,
+              fill: '#ff0000',
+              secondaryFill: '#0000ff',
+              gradientEnabled: true,
+              gradientAngle: angle,
+              zIndex: index,
+            }),
+          ),
+        ),
+        background: '#ffffffff',
+      },
+      'export-gradient-angles.json',
+    );
+    await expect.poll(async () => (await readStageDebug(page)).renderedItemCount).toBe(boxes.length);
+
+    // Near each corner and in the middle, as fractions of the box.
+    const spots = [
+      { fx: 0.1, fy: 0.15 },
+      { fx: 0.9, fy: 0.15 },
+      { fx: 0.1, fy: 0.85 },
+      { fx: 0.9, fy: 0.85 },
+      { fx: 0.5, fy: 0.5 },
+    ];
+    const samples = boxes.flatMap(({ angle, x, y }) =>
+      spots.map(({ fx, fy }) => {
+        const localX = Math.round(fx * WIDTH);
+        const localY = Math.round(fy * HEIGHT);
+        // The gradient runs along (sin a, cos a) through the middle of the
+        // box, and reaches the box's edges: 0 is top to bottom, 90 left to right.
+        const radians = (angle * Math.PI) / 180;
+        const dirX = Math.sin(radians);
+        const dirY = Math.cos(radians);
+        const halfLength = (WIDTH / 2) * Math.abs(dirX) + (HEIGHT / 2) * Math.abs(dirY);
+        // Sampled at the pixel's centre.
+        const along = (localX + 0.5 - WIDTH / 2) * dirX + (localY + 0.5 - HEIGHT / 2) * dirY;
+        return { angle, fx, fy, point: { x: x + localX, y: y + localY }, blueShare: 0.5 + along / (2 * halfLength) };
+      }),
+    );
+
+    const colours = await exportAndSample(
+      page,
+      samples.map(({ point }) => point),
+    );
+
+    samples.forEach(({ angle, fx, fy, blueShare }, index) => {
+      const { r, g, b, a } = colours[index];
+      const where = `angle ${angle} at (${fx}, ${fy})`;
+      expect(a, where).toBe(255);
+      expect(g, where).toBeLessThanOrEqual(8);
+      expect(Math.abs(b - 255 * blueShare), `${where}: blue`).toBeLessThanOrEqual(10);
+      expect(Math.abs(r - 255 * (1 - blueShare)), `${where}: red`).toBeLessThanOrEqual(10);
+    });
+  });
+});
