@@ -330,7 +330,7 @@ test.describe('editor image crop', () => {
 
       await beginCanvasDrag(page, { x: handle.x - 5, y: handle.y });
       await movePointerToCanvasPoint(page, { x: 691, y: handle.y });
-      await expect(page.getByTestId('guide-count')).not.toContainText('Guides: 0');
+      await expect(page.getByTestId('guide-count')).not.toHaveText('0');
       await releasePointer(page);
 
       await clickEmptyCanvas(page, { x: 120, y: 120 });
@@ -359,7 +359,7 @@ test.describe('editor image crop', () => {
         { x: ctrlHandle.x - 5, y: ctrlHandle.y },
         { x: 691, y: ctrlHandle.y },
       );
-      await expect(page.getByTestId('guide-count')).toContainText('Guides: 0');
+      await expect(page.getByTestId('guide-count')).toHaveText('0');
 
       await clickEmptyCanvas(page, { x: 120, y: 120 });
       const ctrlProject = await saveAndReadProject(page);

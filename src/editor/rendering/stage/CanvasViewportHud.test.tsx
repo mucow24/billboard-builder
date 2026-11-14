@@ -11,7 +11,6 @@ function renderHud(zoom = 0.5) {
     <CanvasViewportHud
       canvasHeight={1080}
       canvasWidth={1920}
-      guidesCount={0}
       onFitCanvas={vi.fn()}
       onSetZoom={onSetZoom}
       zoom={nextZoom}
