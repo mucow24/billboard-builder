@@ -705,9 +705,10 @@ describe('SelectionInspector', () => {
     );
 
     expect(screen.getByText('Size:')).toHaveAttribute('title', 'Font size in pixels.');
+    // computeGradientEndpoints: 0 runs top to bottom, 90 left to right.
     expect(screen.getByText('Gradient angle:')).toHaveAttribute(
       'title',
-      expect.stringContaining('Direction of the gradient'),
+      expect.stringContaining('0 runs top to bottom and 90 left to right'),
     );
     expect(screen.getByText('W:')).toHaveAttribute('title', 'Width in pixels.');
   });
