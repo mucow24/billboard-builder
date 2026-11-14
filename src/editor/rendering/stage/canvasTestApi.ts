@@ -19,6 +19,7 @@
 import { useEffect, useRef } from 'react';
 
 import type { CanvasItem } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 import type { ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { Point } from '../transformGeometry';
@@ -320,7 +321,7 @@ export function useCanvasTestApi({
       }
       if (handle === 'line-start' || handle === 'line-end') {
         // A line is an open polygon; its ends are its first and last vertex.
-        if (item.kind !== 'polygon' || item.closed) {
+        if (!isLineItem(item)) {
           throw new Error(
             `__BB_TEST__: handle "${handle}" requires a line item but item "${item.id}" is "${item.kind}"`,
           );

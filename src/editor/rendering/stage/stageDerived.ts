@@ -1,4 +1,5 @@
 import type { CanvasItem } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 import {
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -158,7 +159,7 @@ export function buildStageDerivedState(params: {
       : null;
   // A line is an open polygon; its two ends are its first and last vertex.
   const selectedLine =
-    params.selectedRenderedItem?.kind === 'polygon' && !params.selectedRenderedItem.closed
+    params.selectedRenderedItem && isLineItem(params.selectedRenderedItem)
       ? params.selectedRenderedItem
       : null;
   const selectedLineHandleRects =

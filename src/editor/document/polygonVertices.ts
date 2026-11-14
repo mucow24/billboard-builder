@@ -22,8 +22,23 @@ export function polygonMinVertices(closed: boolean): number {
  * A line is an open polygon. Everything that names or labels an item ("Line",
  * its layer icon, its properties) asks this rather than reading `kind`.
  */
-export function isLineItem(item: { kind: string; closed?: boolean }): boolean {
+export function isLineItem<T extends { kind: string; closed?: boolean }>(
+  item: T,
+): item is T & { kind: 'polygon'; closed: false } {
   return item.kind === 'polygon' && item.closed === false;
+}
+
+/**
+ * A straight line: a line with only its two ends, which is what the Line tool
+ * draws. It keeps the behaviour lines had before they could be bent: no
+ * transform box, no vertex sub-selection (Delete and the arrow keys act on
+ * the whole line), and a padded-box hit area when drilling into a group. Each
+ * of those rules asks this, so they stay in step.
+ */
+export function isStraightLine<
+  T extends { kind: string; closed?: boolean; vertices?: readonly unknown[] },
+>(item: T): item is T & { kind: 'polygon'; closed: false } {
+  return isLineItem(item) && (item.vertices?.length ?? 0) <= LINE_MIN_VERTICES;
 }
 
 /** The kind to show for an item: its `kind`, except that open polygons are 'line'. */

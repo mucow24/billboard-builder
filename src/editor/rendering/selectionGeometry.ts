@@ -1,4 +1,5 @@
 import type { CanvasItem } from '../document/documentTypes';
+import { isLineItem } from '../document/polygonVertices';
 
 import { getRenderBox, type Point, type RenderBox } from './transformGeometry';
 
@@ -176,7 +177,7 @@ function openChainIntersectsRect(vertices: Point[], rect: RenderBox): boolean {
 export function itemIntersectsSelectionRect(item: CanvasItem, rect: RenderBox): boolean {
   // An OPEN polygon (a line) has no interior and no closing edge: only stroke-chain
   // contact counts, so a marquee inside the mouth of a U-shape selects nothing.
-  if (item.kind === 'polygon' && !item.closed) {
+  if (isLineItem(item)) {
     return openChainIntersectsRect(getItemSelectionPoints(item), rect);
   }
   const polygon = getItemSelectionPoints(item);

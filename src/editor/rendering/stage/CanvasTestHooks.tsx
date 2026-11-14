@@ -1,4 +1,5 @@
 import type { CanvasItem, GeneratorCanvasItem, PolygonCanvasItem } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 
 type ShapeItem = Exclude<CanvasItem, GeneratorCanvasItem>;
 import { type Point, type ResizeHandle } from '../interactionGeometry';
@@ -354,11 +355,7 @@ export function CanvasTestHooks({
                 key={`line-handle-${handle}`}
                 data-testid={`canvas-line-handle-${handle}`}
                 onMouseDown={(event) => {
-                  if (
-                    !selectedRenderedItem ||
-                    selectedRenderedItem.kind !== 'polygon' ||
-                    selectedRenderedItem.closed
-                  ) {
+                  if (!selectedRenderedItem || !isLineItem(selectedRenderedItem)) {
                     return;
                   }
                   if (event.button === 1 || spacebarHeld) {

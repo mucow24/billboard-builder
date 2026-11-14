@@ -1,4 +1,5 @@
 import type { CanvasItem } from '../../document/documentTypes';
+import { isStraightLine } from '../../document/polygonVertices';
 import {
   localToStage,
   RESIZE_HANDLE_NAMES,
@@ -86,7 +87,7 @@ export function showsEdgeAddHandle(edgeLength: number, zoom: number, closed: boo
  * Once a line is bent (three or more vertices) it gets the box like a polygon.
  */
 export function hasTransformBox(item: CanvasItem): boolean {
-  return !(item.kind === 'polygon' && !item.closed && item.vertices.length <= 2);
+  return !isStraightLine(item);
 }
 
 export function getShapeOverlayHandlePoints(

@@ -8,6 +8,7 @@ import {
   createTextItem,
 } from '../document/documentDefaults';
 import { normalizeProjectDocument } from '../document/documentNormalizer';
+import { isStraightLine } from '../document/polygonVertices';
 import {
   collectLeafItems,
   getNodeById,
@@ -445,7 +446,9 @@ function reduceInteractionAction(state: EditorState, action: InteractionAction):
 /**
  * Drop a dangling polygon-vertex sub-selection: it survives only while its
  * polygon is still a selected polygon item whose vertex list covers the index
- * (covers deletes, undo/redo, selection changes, and document loads).
+ * (covers deletes, undo/redo, selection changes, and document loads). A
+ * straight line never holds one, so a line that is back to its two ends (an
+ * undone split, a deleted point) loses it here too.
  */
 function reconcilePolygonVertexSelection(state: EditorState): EditorState {
   const selection = state.session.selectedPolygonVertex;
@@ -457,6 +460,7 @@ function reconcilePolygonVertexSelection(state: EditorState): EditorState {
     node !== undefined &&
     !isGroupNode(node) &&
     node.kind === 'polygon' &&
+    !isStraightLine(node) &&
     selection.vertexIndex >= 0 &&
     selection.vertexIndex < node.vertices.length &&
     state.session.selectedNodeIds.includes(selection.itemId);

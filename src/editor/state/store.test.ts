@@ -770,7 +770,7 @@ describe('polygon vertex sub-selection', () => {
     expect(getEditorState().document.nodes).toHaveLength(1);
   });
 
-  it('deletes a vertex of a bent line down to its 2-vertex floor, then no-ops', () => {
+  it('deletes a vertex of a bent line down to its two ends, where it holds no sub-selection', () => {
     const item = addSelectedPolygon({ vertices: squareVertices.slice(0, 3), closed: false });
     useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 1 });
 
@@ -780,10 +780,38 @@ describe('polygon vertex sub-selection', () => {
       { x: 300, y: 300 },
     ]);
 
+    // Straight again: it cannot hold a vertex sub-selection, so Delete is
+    // not swallowed here and falls through to deleting the line.
     useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 0 });
-    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(true);
+    expect(getEditorState().session.selectedPolygonVertex).toBeNull();
+    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(false);
     expect(getPolygon(item.id).vertices).toHaveLength(2);
     expect(getPolygon(item.id).closed).toBe(false);
+  });
+
+  it('drops the sub-selection when undo turns a split line back into a straight one', () => {
+    const ends = [{ x: 100, y: 100 }, { x: 300, y: 100 }];
+    const item = addSelectedPolygon({ vertices: ends, closed: false });
+    useEditorStore.getState().dispatch({
+      type: 'update_node',
+      itemId: item.id,
+      changes: { vertices: [ends[0], { x: 200, y: 180 }, ends[1]] },
+    });
+    useEditorStore.getState().setSelectedPolygonVertex({ itemId: item.id, vertexIndex: 1 });
+    expect(getEditorState().session.selectedPolygonVertex).not.toBeNull();
+
+    useEditorStore.getState().undo();
+
+    // Index 1 still exists (it is now the far end), but a straight line never
+    // keeps a sub-selection.
+    expect(getPolygon(item.id).vertices).toEqual(ends);
+    expect(getEditorState().session.selectedPolygonVertex).toBeNull();
+
+    // So the arrow keys move the whole line, not one end...
+    useEditorStore.getState().nudgeSelectedNodes(5, 7);
+    expect(getPolygon(item.id).vertices).toEqual([{ x: 105, y: 107 }, { x: 305, y: 107 }]);
+    // ...and Delete is left for the line itself.
+    expect(useEditorStore.getState().deleteSelectedPolygonVertex()).toBe(false);
   });
 
   it('nudges only the selected vertex, and the whole ring otherwise', () => {

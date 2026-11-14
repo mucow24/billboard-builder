@@ -5,6 +5,7 @@ import type {
   DocumentFontReference,
   UploadedFont,
 } from '../../document/documentTypes';
+import { isLineItem } from '../../document/polygonVertices';
 import type { FontOption } from '../FontFamilyPicker';
 import { COMMON_BLUR_DESCRIPTORS, COMMON_SHADOW_DESCRIPTORS } from './inspectorFieldHelpers';
 import { createGeneratorDescriptors } from './generatorInspectorDescriptors';
@@ -165,7 +166,7 @@ function getItemFieldDescriptors(
     case 'polygon':
       // An open polygon is a line and gets the line's fields.
       return [
-        ...(item.closed ? createPolygonDescriptors() : createLineDescriptors()),
+        ...(isLineItem(item) ? createLineDescriptors() : createPolygonDescriptors()),
         ...COMMON_BLUR_DESCRIPTORS,
         ...COMMON_SHADOW_DESCRIPTORS,
       ];

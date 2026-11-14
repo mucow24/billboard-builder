@@ -13,6 +13,7 @@ import {
 } from './transformGeometry';
 import {
   buildInteractionCommit,
+  PICKUP_DRAG_THRESHOLD,
   buildRenderedRenderables,
   createCreateSession,
   createDragSession,
@@ -46,6 +47,7 @@ import {
   isCanvasItemNode,
   isGroupNode,
 } from '../document/sceneGraph';
+import { isStraightLine } from '../document/polygonVertices';
 import type {
   CanvasItem,
   ImageCanvasItem,
@@ -105,7 +107,6 @@ interface StageDescendantClickSample {
   button: number;
 }
 
-const PICKUP_DRAG_THRESHOLD = 3;
 const GROUP_DRILL_DOUBLE_CLICK_MS = 500;
 const GROUP_DRILL_DOUBLE_CLICK_MAX_POINTER_DELTA = 6;
 
@@ -529,6 +530,8 @@ export function useCanvasInteractionSession({
     });
 
     switch (commit.kind) {
+      case 'none':
+        return;
       case 'create':
         onAddItem(commit.item);
         onSetActiveTool(commit.nextTool);
@@ -559,10 +562,9 @@ export function useCanvasInteractionSession({
           const moved =
             Math.hypot(pointer.x - resolved.pointerStart.x, pointer.y - resolved.pointerStart.y) >
             PICKUP_DRAG_THRESHOLD;
-          const preview = resolved.previewItem;
-          const straightLine =
-            preview.kind === 'polygon' && !preview.closed && preview.vertices.length <= 2;
-          if (!straightLine && (resolved.insertedVertex || !moved)) {
+          // The reducer drops a sub-selection on a straight line as well; not
+          // asking for one keeps a click on a line's end from touching state.
+          if (!isStraightLine(resolved.previewItem) && (resolved.insertedVertex || !moved)) {
             onSelectPolygonVertex({ itemId: resolved.itemId, vertexIndex: resolved.vertexIndex });
           }
         }

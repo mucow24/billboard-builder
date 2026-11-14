@@ -30,7 +30,7 @@ import type {
   GuideLine,
   PolygonCanvasItem,
 } from '../document/documentTypes';
-import { insertPolygonVertex } from '../document/polygonVertices';
+import { insertPolygonVertex, isLineItem } from '../document/polygonVertices';
 import { flattenVisibleLeafNodes } from '../document/sceneGraph';
 
 export type ShapeItem = Exclude<CanvasItem, GeneratorCanvasItem>;
@@ -145,7 +145,13 @@ export type InteractionSession =
 
 export type SessionWithModifiers = InteractionSession & { shiftConstrain?: boolean };
 
+// Pointer travel (canvas units) up to which a press-and-release on an item or
+// handle is a click rather than a drag.
+export const PICKUP_DRAG_THRESHOLD = 3;
+
 export type InteractionCommit =
+  // The gesture changes nothing (a tap on a line's "+").
+  | { kind: 'none' }
   | { kind: 'create'; item: CanvasItem; nextTool: 'select' }
   | { kind: 'marquee'; nodeIds: string[] }
   | { kind: 'single-item'; itemId: string; changes: Partial<CanvasItem> }
@@ -984,6 +990,23 @@ export function buildInteractionCommit(
       })),
       selectionFrame,
     };
+  }
+
+  // A tap on a line's "+" adds nothing: only dragging it out splits the line.
+  // The "+" sits on the middle of the line, right where a line gets clicked
+  // and grabbed, and a point added there by a stray click or the second click
+  // of a double-click would be invisible (it lies on the line) yet give the
+  // line a transform box and make Delete remove the point instead of the
+  // line. A closed polygon's "+" is on its outline, off its body, so a tap
+  // there still inserts a point (massimo's semantics).
+  if (
+    resolved.kind === 'polygon-vertex' &&
+    resolved.insertedVertex &&
+    isLineItem(resolved.previewItem) &&
+    Math.hypot(pointer.x - resolved.pointerStart.x, pointer.y - resolved.pointerStart.y) <=
+      PICKUP_DRAG_THRESHOLD
+  ) {
+    return { kind: 'none' };
   }
 
   return {

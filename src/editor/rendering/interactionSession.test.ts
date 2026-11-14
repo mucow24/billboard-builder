@@ -193,6 +193,51 @@ describe('interactionSession', () => {
     expect(commit.item).toMatchObject({ kind: 'rectangle', x: 100, y: 120, width: 160, height: 180 });
   });
 
+  describe('edge "+" commits', () => {
+    const lineEnds = [{ x: 100, y: 100 }, { x: 300, y: 100 }];
+    const plus = { x: 200, y: 100 };
+
+    function commitInsert(item: ReturnType<typeof createLineItem>, pointer: { x: number; y: number }) {
+      const session = createPolygonEdgeInsertSession(item, 0, plus, []);
+      if (!session) throw new Error('expected an insert session');
+      const resolved = resolveInteractionSession(
+        { ...session, snapDisabled: true },
+        pointer,
+        { stageBounds: canvasBounds },
+      );
+      return buildInteractionCommit(resolved, { nodes: [item], pointer, canvasBounds });
+    }
+
+    it('adds nothing when a line "+" is tapped, even with a little jitter', () => {
+      const line = createLineItem({ vertices: lineEnds });
+
+      expect(commitInsert(line, plus)).toEqual({ kind: 'none' });
+      expect(commitInsert(line, { x: 202, y: 102 })).toEqual({ kind: 'none' });
+    });
+
+    it('splits a line when its "+" is dragged out', () => {
+      const line = createLineItem({ vertices: lineEnds });
+
+      const commit = commitInsert(line, { x: 220, y: 180 });
+      if (commit.kind !== 'single-item') throw new Error('expected a single-item commit');
+      expect(commit.changes).toMatchObject({
+        vertices: [lineEnds[0], { x: 220, y: 180 }, lineEnds[1]],
+      });
+    });
+
+    it('still inserts a point when a closed polygon "+" is tapped', () => {
+      const polygon = createPolygonItem({
+        vertices: [...lineEnds, { x: 300, y: 300 }, { x: 100, y: 300 }],
+      });
+
+      const commit = commitInsert(polygon, plus);
+      if (commit.kind !== 'single-item') throw new Error('expected a single-item commit');
+      expect(commit.changes).toMatchObject({
+        vertices: [lineEnds[0], plus, lineEnds[1], { x: 300, y: 300 }, { x: 100, y: 300 }],
+      });
+    });
+  });
+
   it('builds marquee commits from hit-tested ordered items', () => {
     const visible = createRectangleItem({ id: 'visible', x: 100, y: 100, width: 60, height: 40 });
     const hidden = createRectangleItem({ id: 'hidden', x: 120, y: 110, width: 60, height: 40, hidden: true });

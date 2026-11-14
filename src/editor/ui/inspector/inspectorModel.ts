@@ -1,5 +1,5 @@
 import { DEFAULT_FONT_FAMILY, WEB_SAFE_FONTS } from '../../document/documentDefaults';
-import { getItemDisplayKind } from '../../document/polygonVertices';
+import { getItemDisplayKind, isLineItem } from '../../document/polygonVertices';
 import { getGenerator } from '../../generators';
 import type {
   CanvasItem,
@@ -128,7 +128,7 @@ export function getInspectorHeadingSubtitle(item: CanvasItem): string | null {
 }
 
 export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
-  if (item.kind === 'polygon' && !item.closed) {
+  if (isLineItem(item)) {
     // A line: no fill to show, so its stroke color on a dark chip.
     return {
       background: 'rgba(12, 19, 32, 0.92)',
@@ -176,7 +176,7 @@ export function buildImageAdjustmentsChange(
 }
 
 export function getGeometrySummary(item: CanvasItem): string {
-  if (item.kind === 'polygon' && !item.closed) {
+  if (isLineItem(item)) {
     // A line is summed up by its two ends: its first and last vertex.
     const start = item.vertices[0];
     const end = item.vertices[item.vertices.length - 1];

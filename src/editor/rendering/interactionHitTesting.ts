@@ -3,6 +3,7 @@ import {
   distanceToPolygonEdges,
   pointInPolygonVertices,
 } from './geometry/polygonGeometry';
+import { isLineItem, isStraightLine } from '../document/polygonVertices';
 import { getRenderBox } from './transformGeometry';
 import type { RenderableCanvasItem } from './renderAdapter';
 
@@ -26,7 +27,7 @@ export function pointHitsRenderableItem(item: RenderableCanvasItem, point: Point
         (rim > 0 && distanceToPolygonEdges(point, item.vertices, true) <= rim)
       );
     }
-    if (item.vertices.length <= 2) {
+    if (isStraightLine(item)) {
       // A straight line answers for its whole padded box here, as lines always
       // have: this is what lets a double-click near a thin line inside a group
       // drill into it. Real clicks use the corridor (pointHitsItemHitRegion).
@@ -71,7 +72,7 @@ export function getGroupDescendantAtPoint(
  * the answer matches what a real click on the item would hit.
  */
 function pointHitsItemHitRegion(item: RenderableCanvasItem, point: Point) {
-  if (item.kind === 'polygon' && !item.closed) {
+  if (isLineItem(item)) {
     return pointHitsOpenChainCorridor(item, point);
   }
   if (item.kind === 'generator') {

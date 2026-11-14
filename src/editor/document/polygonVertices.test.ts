@@ -4,6 +4,7 @@ import {
   getItemDisplayKind,
   insertPolygonVertex,
   isLineItem,
+  isStraightLine,
   mirrorPolygonVerticesHorizontally,
   polygonBounds,
   polygonEdgeCount,
@@ -109,6 +110,16 @@ describe('lines as open polygons', () => {
     // A polygon with no closed flag is closed, as the normalizer treats it.
     expect(isLineItem({ kind: 'polygon' })).toBe(false);
     expect(isLineItem({ kind: 'rectangle' })).toBe(false);
+  });
+
+  it('calls a line straight only while it has just its two ends', () => {
+    const ends = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
+    expect(isStraightLine({ kind: 'polygon', closed: false, vertices: ends })).toBe(true);
+    expect(
+      isStraightLine({ kind: 'polygon', closed: false, vertices: [...ends, { x: 10, y: 10 }] }),
+    ).toBe(false);
+    expect(isStraightLine({ kind: 'polygon', closed: true, vertices: ends })).toBe(false);
+    expect(isStraightLine({ kind: 'rectangle' })).toBe(false);
   });
 
   it("shows an open polygon as 'line' and every other item as its own kind", () => {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
 import type { CanvasItem } from '../../document/documentTypes';
-import { getItemDisplayKind } from '../../document/polygonVertices';
+import { getItemDisplayKind, isLineItem } from '../../document/polygonVertices';
 import {
   getPolygonVertexHandleRects,
   getShapeHandleRects,
@@ -265,7 +265,7 @@ export function useCanvasDebugSnapshot({
       handles: nodeClientRect ? buildHandleDebug(nodeClientRect) : null,
       lineHandleRects:
         // A line's two ends are its first and last vertex.
-        selectedRenderedItem?.kind === 'polygon' && !selectedRenderedItem.closed
+        selectedRenderedItem && isLineItem(selectedRenderedItem)
           ? {
               start: getPolygonVertexHandleRects(selectedRenderedItem)[0],
               end: getPolygonVertexHandleRects(selectedRenderedItem).at(-1)!,
@@ -284,7 +284,7 @@ export function useCanvasDebugSnapshot({
       hasLineHandles: Boolean(selectedLineHandleRects),
       lastDrilldownSource,
       selectedItems: renderedSelectedItems.map((item) =>
-        item.kind === 'polygon' && !item.closed
+        isLineItem(item)
           ? {
               ...getRenderBox(item),
               kind: getItemDisplayKind(item),
@@ -353,7 +353,7 @@ export function useCanvasDebugSnapshot({
       const selectedItems = renderedItems
         .filter((item) => selectedNodeIds.includes(item.id))
         .map((item) => {
-          if (item.kind === 'polygon' && !item.closed) {
+          if (isLineItem(item)) {
             // A line is outlined along its vertices, not around its box.
             return {
               id: item.id,
@@ -430,7 +430,7 @@ export function useCanvasDebugSnapshot({
         sessionHandle:
           session?.kind === 'resize' ||
           session?.kind === 'rotate' ||
-            session?.kind === 'group-resize' ||
+          session?.kind === 'group-resize' ||
           session?.kind === 'group-rotate'
             ? session.handle ?? null
             : null,

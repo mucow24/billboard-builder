@@ -738,19 +738,30 @@ describe('useCanvasInteractionSession', () => {
     });
     expect(onSelectPolygonVertex).toHaveBeenCalledWith({ itemId: 'bent', vertexIndex: 1 });
 
-    // Splitting a straight line with its "+" bends it: the new vertex is selected.
+    // A tap on a straight line's "+" changes nothing: no point, no selection.
     onSelectPolygonVertex.mockClear();
+    vi.mocked(params.onUpdateItem).mockClear();
     act(() => {
       result.current.beginPolygonEdgeInsert(straight, 0, { x: 280, y: 172 });
     });
     act(() => {
       result.current.handleStageMouseUp(makeStageEvent({ x: 280, y: 172 }, 'shape'));
     });
+    expect(params.onUpdateItem).not.toHaveBeenCalled();
+    expect(onSelectPolygonVertex).not.toHaveBeenCalled();
+
+    // Dragging the "+" out splits the line and bends it: the new vertex is selected.
+    act(() => {
+      result.current.beginPolygonEdgeInsert(straight, 0, { x: 280, y: 172 });
+    });
+    act(() => {
+      result.current.handleStageMouseUp(makeStageEvent({ x: 280, y: 240 }, 'shape'));
+    });
     expect(onSelectPolygonVertex).toHaveBeenCalledWith({ itemId: 'straight', vertexIndex: 1 });
     expect(params.onUpdateItem).toHaveBeenLastCalledWith(
       'straight',
       expect.objectContaining({
-        vertices: [{ x: 160, y: 160 }, { x: 280, y: 172 }, { x: 400, y: 184 }],
+        vertices: [{ x: 160, y: 160 }, { x: 280, y: 240 }, { x: 400, y: 184 }],
       })
     );
   });

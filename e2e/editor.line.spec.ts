@@ -175,6 +175,35 @@ test.describe('line flows', () => {
     expect(inside.a).toBe(0);
   });
 
+  test('a click on the + adds no point; only dragging it does', async ({ page }) => {
+    await openFreshEditor(page);
+    await uploadLineFixture(page);
+
+    await clickItem(page, 'line-item');
+    // Tap (no move) on the "+" in the middle of the line.
+    await dragHandle(page, 'line-item', 'polygon-edge-0', 0, 0);
+
+    // Still a straight line: its two end handles and no transform box.
+    const stageDebug = await readStageDebug(page);
+    expect(stageDebug.hasLineHandles).toBe(true);
+    expect(stageDebug.hasShapeHandles).toBe(false);
+
+    let saved = await saveAndReadProject(page);
+    expect(saved.nodes).toEqual([
+      expect.objectContaining({
+        vertices: [
+          { x: 200, y: 300 },
+          { x: 600, y: 300 },
+        ],
+      }),
+    ]);
+
+    // With no point added there is none to select, so Delete removes the line.
+    await page.keyboard.press('Delete');
+    saved = await saveAndReadProject(page);
+    expect(saved.nodes).toEqual([]);
+  });
+
   test('Delete removes the selected point of a bent line, then the line itself', async ({ page }) => {
     await openFreshEditor(page);
     await uploadLineFixture(page, {
