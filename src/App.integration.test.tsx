@@ -45,10 +45,14 @@ vi.mock('pixi-filters', () => ({
 }));
 
 vi.mock('pixi.js', () => ({
+  AlphaFilter: class { constructor() {} },
   BlurFilter: class { constructor() {} },
   ColorMatrixFilter: class { matrix = new Float32Array(20); constructor() { this.matrix[0] = 1; this.matrix[6] = 1; this.matrix[12] = 1; this.matrix[18] = 1; } },
   Container: class {},
   FillGradient: class { constructor() {} },
+  Filter: class { constructor() {} },
+  GlProgram: { from: () => ({}) },
+  GpuProgram: { from: () => ({}) },
   Graphics: class {},
   Polygon: class { constructor() {} },
   Rectangle: class {
@@ -58,6 +62,7 @@ vi.mock('pixi.js', () => ({
   Text: class {},
   Texture: { from: () => ({}), EMPTY: {} },
   TextureSource: { defaultOptions: {} },
+  TexturePool: { getSameSizeTexture: () => ({}), returnTexture: () => {} },
 }));
 
 vi.mock('@pixi/react', () => {
