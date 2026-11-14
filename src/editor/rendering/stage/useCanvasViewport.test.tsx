@@ -148,22 +148,28 @@ describe('useCanvasViewport', () => {
     expect(result.current.getStageCursor(false)).toBe('grab');
   });
 
-  it('fits the canvas beside the overlay panel while the panel is shown', () => {
+  it('fits the canvas clear of the toolbar, the tool palette and the panel while it is shown', () => {
+    const element = (rect: () => DOMRect) => {
+      const node = document.createElement('div');
+      node.getBoundingClientRect = rect;
+      return { current: node };
+    };
     const viewportElement = document.createElement('div');
     viewportElement.getBoundingClientRect = () => domRect(0, 0, 1280, 720);
-    const panelElement = document.createElement('div');
     let panelShown = true;
-    // A display: none panel measures as an empty rect at the origin.
-    panelElement.getBoundingClientRect = () =>
-      panelShown ? domRect(956, 50, 317, 662) : domRect(0, 0, 0, 0);
-    const overlayPanelRef = { current: panelElement };
+    const fitObstructionRefs = {
+      top: element(() => domRect(0, 0, 1280, 50)),
+      left: element(() => domRect(7, 50, 40, 400)),
+      // A display: none panel measures as an empty rect at the origin.
+      right: element(() => (panelShown ? domRect(956, 50, 317, 662) : domRect(0, 0, 0, 0))),
+    };
 
     const { result } = renderHook(() =>
       useCanvasViewport({
         activeTool: 'select',
         canvasHeight: 1024,
         canvasWidth: 1024,
-        overlayPanelRef,
+        fitObstructionRefs,
       }),
     );
 
@@ -174,20 +180,21 @@ describe('useCanvasViewport', () => {
       result.current.fitCanvasToViewport();
     });
 
-    // Fitted into the 956px left of the panel: 0.9 * 720 / 1024 floors to 0.625.
-    expect(result.current.zoom).toBeCloseTo(0.625, 6);
-    expect(result.current.pan).toEqual({ x: 158, y: 40 });
+    // Fitted into x 47..956, y 50..720: 0.9 * 670 / 1024 floors to 0.578125,
+    // so the canvas is 592px square.
+    expect(result.current.zoom).toBeCloseTo(0.578125, 6);
+    expect(result.current.pan).toEqual({ x: Math.round(47 + (909 - 592) / 2), y: 50 + (670 - 592) / 2 });
 
     panelShown = false;
     act(() => {
       result.current.fitCanvasToViewport();
     });
 
-    expect(result.current.zoom).toBeCloseTo(0.625, 6);
-    expect(result.current.pan).toEqual({ x: 320, y: 40 });
+    expect(result.current.zoom).toBeCloseTo(0.578125, 6);
+    expect(result.current.pan).toEqual({ x: Math.round(47 + (1233 - 592) / 2), y: 50 + (670 - 592) / 2 });
   });
 
-  it('fits on startup into the measured viewport, beside the overlay panel', () => {
+  it('fits on startup into the measured viewport, clear of the toolbar, tool palette and panel', () => {
     // A ResizeObserver that reports nothing, as before the first paint.
     vi.stubGlobal(
       'ResizeObserver',
@@ -200,36 +207,49 @@ describe('useCanvasViewport', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
       this: HTMLElement,
     ) {
-      return this.dataset.testid === 'panel' ? domRect(680, 50, 317, 742) : domRect(0, 0, 1000, 800);
+      switch (this.dataset.testid) {
+        case 'toolbar':
+          return domRect(0, 0, 1000, 60);
+        case 'palette':
+          return domRect(8, 60, 40, 400);
+        case 'panel':
+          return domRect(680, 60, 317, 732);
+        default:
+          return domRect(0, 0, 1000, 800);
+      }
     });
 
     let latest: ReturnType<typeof useCanvasViewport> | null = null;
     function Harness() {
-      const overlayPanelRef = useRef<HTMLDivElement | null>(null);
+      const toolbarRef = useRef<HTMLDivElement | null>(null);
+      const paletteRef = useRef<HTMLDivElement | null>(null);
+      const panelRef = useRef<HTMLDivElement | null>(null);
       const viewport = useCanvasViewport({
         activeTool: 'select',
         canvasHeight: 1024,
         canvasWidth: 1024,
-        overlayPanelRef,
+        fitObstructionRefs: { top: toolbarRef, left: paletteRef, right: panelRef },
       });
       latest = viewport;
-      // The panel comes after the stage, as in the app, so its ref is attached
+      // These come after the stage, as in the app, so their refs are attached
       // only after the stage's first layout effects.
       return (
         <>
           <div ref={viewport.viewportRef} />
-          <div ref={overlayPanelRef} data-testid="panel" />
+          <div ref={toolbarRef} data-testid="toolbar" />
+          <div ref={paletteRef} data-testid="palette" />
+          <div ref={panelRef} data-testid="panel" />
         </>
       );
     }
 
     render(<Harness />);
 
-    // 1000x800, not the 1280x720 default, and only the 680px left of the
-    // panel: 0.9 * 680 / 1024 floors to 0.59375.
+    // 1000x800, not the 1280x720 default, and only x 48..680, y 60..800:
+    // 0.9 * 632 / 1024 floors to 0.546875, so the canvas is 560px square.
     expect(latest!.viewportSize).toEqual({ width: 1000, height: 800 });
-    expect(latest!.zoom).toBeCloseTo(0.59375, 6);
-    expect(latest!.pan).toEqual({ x: 36, y: 96 });
+    expect(latest!.zoom).toBeCloseTo(0.546875, 6);
+    expect(latest!.pan).toEqual({ x: 48 + (632 - 560) / 2, y: 60 + (740 - 560) / 2 });
   });
 
   it('aligns fitted and zoomed pan values to device pixels', () => {

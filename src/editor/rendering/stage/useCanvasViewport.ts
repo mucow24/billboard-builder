@@ -15,6 +15,7 @@ import {
   toCanvasPointer,
   toViewportPoint,
   toViewportRect,
+  type FitObstructions,
   type ViewportArea,
 } from './viewportMath';
 
@@ -25,9 +26,16 @@ interface UseCanvasViewportParams {
   activeTool: CanvasTool;
   canvasHeight: number;
   canvasWidth: number;
-  // A panel floating over the viewport's right side (the inspector), which
-  // Fit keeps the canvas clear of while it is shown.
-  overlayPanelRef?: RefObject<HTMLElement | null>;
+  // What floats over the viewport's edges, which Fit keeps the canvas clear of.
+  fitObstructionRefs?: FitObstructionRefs;
+}
+
+// The elements floating over the viewport's top edge (the toolbar), left edge
+// (the tool palette) and right edge (the inspector panel).
+export interface FitObstructionRefs {
+  top?: RefObject<HTMLElement | null>;
+  left?: RefObject<HTMLElement | null>;
+  right?: RefObject<HTMLElement | null>;
 }
 
 type PanUpdate = Point | ((currentPan: Point) => Point);
@@ -36,7 +44,7 @@ export function useCanvasViewport({
   activeTool,
   canvasHeight,
   canvasWidth,
-  overlayPanelRef,
+  fitObstructionRefs,
 }: UseCanvasViewportParams) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
@@ -65,22 +73,30 @@ export function useCanvasViewport({
     });
   }, []);
 
-  // The panel that floats over the viewport's right side, measured when Fit
-  // runs, so the canvas is fitted into the part of the viewport left of it.
-  const getOverlayPanelRect = useCallback((): ViewportArea | null => {
-    const panel = overlayPanelRef?.current;
+  // Read when Fit runs, so a caller may pass a fresh object every render.
+  const fitObstructionRefsRef = useRef(fitObstructionRefs);
+  fitObstructionRefsRef.current = fitObstructionRefs;
+
+  // Measures what floats over the viewport's edges, in viewport coordinates.
+  const measureFitObstructions = useCallback((): FitObstructions => {
     const viewportBounds = viewportRef.current?.getBoundingClientRect();
-    if (!panel || !viewportBounds) {
-      return null;
+    const refs = fitObstructionRefsRef.current;
+    if (!viewportBounds || !refs) {
+      return {};
     }
-    const panelBounds = panel.getBoundingClientRect();
-    return {
-      left: panelBounds.left - viewportBounds.left,
-      top: panelBounds.top - viewportBounds.top,
-      width: panelBounds.width,
-      height: panelBounds.height,
+    const measure = (ref: RefObject<HTMLElement | null> | undefined): ViewportArea | null => {
+      const bounds = ref?.current?.getBoundingClientRect();
+      return bounds
+        ? {
+            left: bounds.left - viewportBounds.left,
+            top: bounds.top - viewportBounds.top,
+            width: bounds.width,
+            height: bounds.height,
+          }
+        : null;
     };
-  }, [overlayPanelRef]);
+    return { top: measure(refs.top), left: measure(refs.left), right: measure(refs.right) };
+  }, []);
 
   const fitCanvasToViewport = useCallback(() => {
     if (viewportSize.width <= 0 || viewportSize.height <= 0) {
@@ -89,13 +105,13 @@ export function useCanvasViewport({
 
     const fit = fitCanvasToArea(
       { width: canvasWidth, height: canvasHeight },
-      getFitArea(viewportSize, getOverlayPanelRect()),
+      getFitArea(viewportSize, measureFitObstructions()),
       getDevicePixelRatio(),
     );
 
     setZoom(fit.zoom);
     setAlignedPan(fit.pan);
-  }, [canvasHeight, canvasWidth, getOverlayPanelRect, setAlignedPan, viewportSize]);
+  }, [canvasHeight, canvasWidth, measureFitObstructions, setAlignedPan, viewportSize]);
 
   const [viewportMeasured, setViewportMeasured] = useState(false);
   useLayoutEffect(() => {
@@ -132,8 +148,9 @@ export function useCanvasViewport({
   }, []);
 
   // Fit once on mount, and once more when the first measurement replaces the
-  // default viewport size. The second fit also sees the overlay panel, whose
-  // ref is attached only after this component's first layout effects.
+  // default viewport size. The second fit also sees the toolbar, tool palette
+  // and inspector panel, which come later in the app and so get their refs
+  // attached only after this component's first layout effects.
   const initialFitRef = useRef<'none' | 'default-size' | 'measured'>('none');
   useLayoutEffect(() => {
     const target = viewportMeasured ? 'measured' : 'default-size';

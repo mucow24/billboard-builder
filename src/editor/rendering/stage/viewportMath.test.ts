@@ -7,6 +7,7 @@ import {
   fitCanvasToArea,
   floorZoomToSeamFriendlyStep,
   getFitArea,
+  MIN_FIT_AREA_HEIGHT,
   MIN_FIT_AREA_WIDTH,
   snapZoomToSeamFriendlyStep,
   toCanvasPointer,
@@ -37,32 +38,66 @@ describe('viewportMath', () => {
     expect(floorZoomToSeamFriendlyStep(0.6328125, 1)).toBe(0.625);
   });
 
-  it('fits into the part of the viewport left of a panel over its right side', () => {
+  const toolbar = { left: 0, top: 0, width: 1280, height: 50 };
+  const toolPalette = { left: 7, top: 50, width: 40, height: 400 };
+  const panel = { left: 956, top: 50, width: 317, height: 662 };
+
+  it('fits below the toolbar, right of the tool palette and left of the panel', () => {
     const viewportSize = { width: 1280, height: 720 };
 
-    expect(getFitArea(viewportSize, null)).toEqual({ left: 0, top: 0, width: 1280, height: 720 });
-    expect(getFitArea(viewportSize, { left: 956, top: 50, width: 317, height: 662 })).toEqual({
+    expect(getFitArea(viewportSize, {})).toEqual({ left: 0, top: 0, width: 1280, height: 720 });
+    expect(getFitArea(viewportSize, { top: toolbar, left: toolPalette, right: panel })).toEqual({
+      left: 47,
+      top: 50,
+      width: 909,
+      height: 670,
+    });
+    expect(getFitArea(viewportSize, { right: panel })).toEqual({ left: 0, top: 0, width: 956, height: 720 });
+  });
+
+  it('ignores what is hidden or outside the viewport', () => {
+    const viewportSize = { width: 1280, height: 720 };
+    // An element with display: none measures as an empty rect at the origin.
+    const hidden = { left: 0, top: 0, width: 0, height: 0 };
+
+    expect(getFitArea(viewportSize, { top: toolbar, left: toolPalette, right: hidden })).toEqual({
+      left: 47,
+      top: 50,
+      width: 1233,
+      height: 670,
+    });
+    expect(getFitArea(viewportSize, { top: hidden, left: hidden, right: hidden })).toEqual({
       left: 0,
       top: 0,
-      width: 956,
+      width: 1280,
+      height: 720,
+    });
+    expect(getFitArea(viewportSize, { right: { ...panel, left: 1300 } })).toEqual({
+      left: 0,
+      top: 0,
+      width: 1280,
       height: 720,
     });
   });
 
-  it('fits into the whole viewport when the panel is hidden, outside it, or leaves too little room', () => {
-    const viewportSize = { width: 1280, height: 720 };
-    const wholeViewport = { left: 0, top: 0, width: 1280, height: 720 };
+  it('ignores the panel when it leaves too little room, and then everything', () => {
+    const narrow = { width: 640, height: 720 };
+    const obstructions = { top: toolbar, left: toolPalette };
 
-    // A display: none panel measures as an empty rect at the origin.
-    expect(getFitArea(viewportSize, { left: 0, top: 0, width: 0, height: 0 })).toEqual(wholeViewport);
-    expect(getFitArea(viewportSize, { left: 1300, top: 50, width: 317, height: 662 })).toEqual(wholeViewport);
-    expect(getFitArea(viewportSize, { left: 956, top: 800, width: 317, height: 662 })).toEqual(wholeViewport);
     expect(
-      getFitArea({ width: 640, height: 720 }, { left: MIN_FIT_AREA_WIDTH - 1, top: 50, width: 317, height: 662 }),
-    ).toEqual({ left: 0, top: 0, width: 640, height: 720 });
+      getFitArea(narrow, { ...obstructions, right: { ...panel, left: 47 + MIN_FIT_AREA_WIDTH } }),
+    ).toEqual({ left: 47, top: 50, width: MIN_FIT_AREA_WIDTH, height: 670 });
     expect(
-      getFitArea({ width: 640, height: 720 }, { left: MIN_FIT_AREA_WIDTH, top: 50, width: 317, height: 662 }),
-    ).toEqual({ left: 0, top: 0, width: MIN_FIT_AREA_WIDTH, height: 720 });
+      getFitArea(narrow, { ...obstructions, right: { ...panel, left: 47 + MIN_FIT_AREA_WIDTH - 1 } }),
+    ).toEqual({ left: 47, top: 50, width: 593, height: 670 });
+
+    const short = { width: 640, height: 50 + MIN_FIT_AREA_HEIGHT - 1 };
+    expect(getFitArea(short, { ...obstructions, right: panel })).toEqual({
+      left: 0,
+      top: 0,
+      width: 640,
+      height: 50 + MIN_FIT_AREA_HEIGHT - 1,
+    });
   });
 
   it('centers the fitted canvas in the area with a margin', () => {

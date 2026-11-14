@@ -97,29 +97,38 @@ test.describe('editor smoke flows', () => {
     expect(nextDebug.viewport.panY).not.toBe(initialPan.y);
   });
 
-  test('fits the canvas beside the open properties panel', async ({ page }) => {
+  test('fits the canvas clear of the toolbar, the tool palette and the open properties panel', async ({ page }) => {
     await openFreshEditor(page);
 
     const [canvasWidth, canvasHeight] = ((await page.getByTestId('canvas-size').textContent()) ?? '')
       .split('x')
       .map((value) => Number(value.trim()));
-    const stageBox = await page.getByTestId('canvas-stage-root').boundingBox();
     const panel = page.locator('.top-toolbar-inspector-panel');
     await expect(panel).toBeVisible();
-    const panelBox = await panel.boundingBox();
-    if (!stageBox || !panelBox) {
-      throw new Error('The stage or the properties panel has no layout box.');
+    const [stageBox, toolbarBox, paletteBox, panelBox] = await Promise.all([
+      page.getByTestId('canvas-stage-root').boundingBox(),
+      page.locator('.overlay-topbar').boundingBox(),
+      page.locator('.overlay-tools').boundingBox(),
+      panel.boundingBox(),
+    ]);
+    if (!stageBox || !toolbarBox || !paletteBox || !panelBox) {
+      throw new Error('The stage, toolbar, tool palette or properties panel has no layout box.');
     }
+    // The room left clear, in stage coordinates.
+    const areaTop = toolbarBox.y + toolbarBox.height - stageBox.y;
+    const areaLeft = paletteBox.x + paletteBox.width - stageBox.x;
     const panelLeft = panelBox.x - stageBox.x;
+    expect(areaTop).toBeGreaterThan(0);
+    expect(areaLeft).toBeGreaterThan(0);
 
     // How far the fitted canvas's sides are from the edges of the room it was
-    // fitted into (the stage, up to `areaRight`).
+    // fitted into (up to `areaRight`).
     async function readFitMargins(areaRight: number) {
       const { viewport } = await readStageDebug(page);
       return {
-        left: viewport.panX,
+        left: viewport.panX - areaLeft,
         right: areaRight - (viewport.panX + canvasWidth * viewport.zoom),
-        top: viewport.panY,
+        top: viewport.panY - areaTop,
         bottom: stageBox!.height - (viewport.panY + canvasHeight * viewport.zoom),
       };
     }
@@ -132,7 +141,7 @@ test.describe('editor smoke flows', () => {
       expect(Math.abs(margins.top - margins.bottom)).toBeLessThan(2);
     }
 
-    // The startup fit keeps the canvas clear of the panel.
+    // The startup fit keeps the canvas clear of all three.
     expectCenteredWithMargin(await readFitMargins(panelLeft));
 
     // So does Fit.
@@ -142,7 +151,8 @@ test.describe('editor smoke flows', () => {
     await expect(page.getByTestId('viewport-zoom')).not.toContainText('Zoom: 100%');
     expectCenteredWithMargin(await readFitMargins(panelLeft));
 
-    // With the panel collapsed, Fit uses the whole stage.
+    // With the panel collapsed, Fit uses the stage's full width right of the
+    // tool palette.
     await page.getByRole('tab', { name: 'Properties' }).click();
     await expect(panel).toBeHidden();
     await page.getByRole('button', { name: 'Fit canvas to viewport' }).click();

@@ -84,33 +84,83 @@ export interface ViewportArea {
   height: number;
 }
 
-// Beside a panel narrower than this, there is too little room to fit the
-// canvas into, so Fit uses the whole viewport instead.
+// Room smaller than this is too little to fit the canvas into: Fit then
+// ignores the right panel, and if that is not enough, everything over the
+// viewport.
 export const MIN_FIT_AREA_WIDTH = 320;
+export const MIN_FIT_AREA_HEIGHT = 240;
 
-// The part of the viewport that Fit shows the canvas in: everything left of a
-// panel floating over the viewport's right side. `panelRect` is in viewport
-// coordinates; null (or an empty rect, as a hidden panel measures) means
-// nothing covers the viewport.
+// What floats over the viewport's edges, in viewport coordinates: a bar along
+// the top (the toolbar), a strip down the left (the tool palette) and a panel
+// down the right (the inspector). A missing or empty rect (as an element with
+// display: none measures) covers nothing.
+export interface FitObstructions {
+  top?: ViewportArea | null;
+  left?: ViewportArea | null;
+  right?: ViewportArea | null;
+}
+
+function coversViewport(
+  rect: ViewportArea | null | undefined,
+  viewportSize: { width: number; height: number },
+): rect is ViewportArea {
+  return (
+    !!rect &&
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.left < viewportSize.width &&
+    rect.left + rect.width > 0 &&
+    rect.top < viewportSize.height &&
+    rect.top + rect.height > 0
+  );
+}
+
+function clipViewport(
+  viewportSize: { width: number; height: number },
+  { top, left, right }: FitObstructions,
+): ViewportArea {
+  let areaTop = 0;
+  let areaLeft = 0;
+  let areaRight = viewportSize.width;
+  if (coversViewport(top, viewportSize)) {
+    areaTop = Math.max(areaTop, top.top + top.height);
+  }
+  if (coversViewport(left, viewportSize)) {
+    areaLeft = Math.max(areaLeft, left.left + left.width);
+  }
+  if (coversViewport(right, viewportSize)) {
+    areaRight = Math.min(areaRight, right.left);
+  }
+
+  return {
+    left: areaLeft,
+    top: areaTop,
+    width: areaRight - areaLeft,
+    height: viewportSize.height - areaTop,
+  };
+}
+
+function isRoomy(area: ViewportArea): boolean {
+  return area.width >= MIN_FIT_AREA_WIDTH && area.height >= MIN_FIT_AREA_HEIGHT;
+}
+
+// The part of the viewport that Fit shows the canvas in: below the toolbar,
+// right of the tool palette and left of the inspector panel.
 export function getFitArea(
   viewportSize: { width: number; height: number },
-  panelRect: ViewportArea | null,
+  obstructions: FitObstructions,
 ): ViewportArea {
-  const wholeViewport = { left: 0, top: 0, width: viewportSize.width, height: viewportSize.height };
-  if (!panelRect || panelRect.width <= 0 || panelRect.height <= 0) {
-    return wholeViewport;
+  const clear = clipViewport(viewportSize, obstructions);
+  if (isRoomy(clear)) {
+    return clear;
   }
 
-  const overlapsViewport =
-    panelRect.left < viewportSize.width &&
-    panelRect.left + panelRect.width > 0 &&
-    panelRect.top < viewportSize.height &&
-    panelRect.top + panelRect.height > 0;
-  if (!overlapsViewport || panelRect.left < MIN_FIT_AREA_WIDTH) {
-    return wholeViewport;
+  const underPanel = clipViewport(viewportSize, { ...obstructions, right: null });
+  if (isRoomy(underPanel)) {
+    return underPanel;
   }
 
-  return { ...wholeViewport, width: panelRect.left };
+  return { left: 0, top: 0, width: viewportSize.width, height: viewportSize.height };
 }
 
 // The zoom and pan that show the whole canvas centered in `area`, with a
