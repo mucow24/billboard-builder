@@ -1,6 +1,9 @@
+import { mirrorPolygonVerticesHorizontally } from '../../document/polygonVertices';
+import { mirrorGradientAngleHorizontally } from '../../rendering/geometry/gradientGeometry';
 import {
   createBooleanField,
   createColorField,
+  createCustomField,
   createDimensionsField,
   createGeometryField,
   createGradientAngleDescriptor,
@@ -12,6 +15,7 @@ import {
   SECTION_ORDER,
 } from './inspectorFieldHelpers';
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
+import { renderMirrorActionField } from './selectionInspectorRenderers';
 
 /**
  * Freeform polygon fields. Fill (with gradient) applies only while the polygon
@@ -66,22 +70,50 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
 
       valueType: 'boolean',
     }),
-    createGeometryField(
-      'curveRadius',
-      'Curve radius',
-      50,
-      (item) => (item.kind === 'polygon' ? item.curveRadius : 0),
-      (_context, nextValue) => ({ curveRadius: Math.max(0, nextValue) }),
-      {
-        digits: 1,
-        max: 250,
-        min: 0,
-        slider: true,
-        step: 1,
-        textMax: Infinity,
-        tooltip: 'How rounded each corner is, in pixels. 0 gives sharp corners.',
-      }
-    ),
+    // Settings only polygons have get a section of their own that starts open,
+    // like N-gon's Sides, rather than rows in Geometry, which starts closed.
+    createNumberField({
+      buildChange: (_context, nextValue) => ({ curveRadius: Math.max(0, nextValue) }),
+      digits: 1,
+      fieldOrder: 10,
+      getValue: (item) => (item.kind === 'polygon' ? item.curveRadius : 0),
+      label: 'Curve radius',
+      max: 500,
+      min: 0,
+      propertyKey: 'curveRadius',
+      sectionKey: 'polygon',
+      sectionLabel: 'Polygon',
+      sectionOrder: SECTION_ORDER.polygon,
+      slider: true,
+      step: 1,
+      textMax: Infinity,
+      tooltip:
+        'Rounds every corner by this many pixels. 0 gives sharp corners. Corners next to a short side round less, as a curve never reaches past the middle of a side.',
+      valueType: 'number',
+    }),
+    createCustomField({
+      // Like rotating, mirroring rewrites the vertices, so it is a one-click
+      // action with no state: a saved "mirrored" flag would stop meaning
+      // anything after the next rotate or vertex edit. The gradient flips with
+      // the shape, so the result is a true mirror image.
+      buildChange: ({ item }) =>
+        item.kind === 'polygon'
+          ? {
+              vertices: mirrorPolygonVerticesHorizontally(item.vertices),
+              gradientAngle: mirrorGradientAngleHorizontally(item.gradientAngle),
+            }
+          : {},
+      fieldOrder: 20,
+      getValue: () => null,
+      label: 'Mirror',
+      propertyKey: 'mirror',
+      render: renderMirrorActionField,
+      sectionKey: 'polygon',
+      sectionLabel: 'Polygon',
+      sectionOrder: SECTION_ORDER.polygon,
+      tooltip: 'Flip the polygon left to right in place, gradient and all. Click again to flip it back.',
+      valueType: 'custom',
+    }),
   ];
 
   if (closed) {

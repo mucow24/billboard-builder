@@ -33,3 +33,46 @@ export function computeGradientEndpoints(
     y1: cy + halfLen * cosA,
   };
 }
+
+/** A 2D affine matrix, in the field layout of a PixiJS `Matrix`. */
+export interface GradientTextureMatrix {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  tx: number;
+  ty: number;
+}
+
+/**
+ * The matrix that lays a gradient strip texture, `textureSize` texels long
+ * with the first colour at texel 0, along the gradient line: texel 0 lands on
+ * (x0, y0) and texel `textureSize` on (x1, y1), for a line in any direction.
+ *
+ * PixiJS builds this matrix itself, but gets it wrong when the line runs
+ * right-and-up or left-and-down: it swaps the endpoints one axis at a time,
+ * which mirrors the gradient instead of reversing it.
+ */
+export function computeGradientTextureMatrix(
+  { x0, y0, x1, y1 }: GradientEndpoints,
+  textureSize: number,
+): GradientTextureMatrix {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const length = Math.hypot(dx, dy);
+  // A zero-length line has no direction; any unit vector keeps the matrix finite.
+  const ux = length > 0 ? dx / length : 1;
+  const uy = length > 0 ? dy / length : 0;
+  const scale = length / textureSize;
+  return { a: ux * scale, b: uy * scale, c: -uy, d: ux, tx: x0, ty: y0 };
+}
+
+/**
+ * The `gradientAngle` that draws the same gradient flipped left to right
+ * across the middle of its box. The gradient runs along (sin a, cos a) (0 is
+ * top to bottom, 90 left to right), so the flip negates the angle.
+ */
+export function mirrorGradientAngleHorizontally(gradientAngle: number): number {
+  // `0 - x` rather than `-x`, so 0 stays 0 instead of becoming -0.
+  return 0 - gradientAngle;
+}

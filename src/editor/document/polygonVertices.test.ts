@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   insertPolygonVertex,
+  mirrorPolygonVerticesHorizontally,
   polygonBounds,
   polygonEdgeCount,
   polygonEdgeMidpoint,
@@ -98,5 +99,53 @@ describe('rectanglePolygonVertices', () => {
 describe('translatePolygonVertices', () => {
   it('shifts every vertex by the delta', () => {
     expect(translatePolygonVertices(SQUARE, 5, -5)[2]).toEqual({ x: 115, y: 105 });
+  });
+});
+
+describe('mirrorPolygonVerticesHorizontally', () => {
+  // A right triangle with its right angle at the bottom left.
+  const TRIANGLE = [
+    { x: 20, y: 10 },
+    { x: 120, y: 110 },
+    { x: 20, y: 110 },
+  ];
+
+  it('flips every vertex left to right across the middle of its bounds, in the same order', () => {
+    expect(mirrorPolygonVerticesHorizontally(TRIANGLE)).toEqual([
+      { x: 120, y: 10 },
+      { x: 20, y: 110 },
+      { x: 120, y: 110 },
+    ]);
+  });
+
+  it('leaves the bounds where they were', () => {
+    expect(polygonBounds(mirrorPolygonVerticesHorizontally(TRIANGLE))).toEqual(
+      polygonBounds(TRIANGLE),
+    );
+  });
+
+  it('flips back to the original when applied twice', () => {
+    expect(mirrorPolygonVerticesHorizontally(mirrorPolygonVerticesHorizontally(TRIANGLE))).toEqual(
+      TRIANGLE,
+    );
+  });
+
+  it('uses the true extent of a sliver narrower than a pixel', () => {
+    // polygonBounds floors the width at 1, which would shift a sliver sideways.
+    const sliver = [
+      { x: 50, y: 0 },
+      { x: 50.25, y: 40 },
+      { x: 50, y: 80 },
+    ];
+    expect(mirrorPolygonVerticesHorizontally(sliver)).toEqual([
+      { x: 50.25, y: 0 },
+      { x: 50, y: 40 },
+      { x: 50.25, y: 80 },
+    ]);
+  });
+
+  it('does not mutate the input', () => {
+    mirrorPolygonVerticesHorizontally(TRIANGLE);
+    expect(TRIANGLE[0]).toEqual({ x: 20, y: 10 });
   });
 });

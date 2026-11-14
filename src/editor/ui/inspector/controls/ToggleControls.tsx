@@ -46,6 +46,40 @@ export function CheckboxInput({
   );
 }
 
+interface ActionButtonInputProps {
+  children: ReactNode;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+  tooltip?: string;
+}
+
+/**
+ * A one-click action laid out like a property, looking like an unpressed
+ * ToggleButtonInput but with no on/off state of its own.
+ */
+export function ActionButtonInput({
+  children,
+  disabled = false,
+  label,
+  onClick,
+  tooltip,
+}: ActionButtonInputProps) {
+  return (
+    <FieldShell label={label} tooltip={tooltip}>
+      <button
+        type="button"
+        aria-label={label}
+        className="inspector-toggle-button"
+        disabled={disabled}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    </FieldShell>
+  );
+}
+
 interface ToggleButtonInputProps {
   active: boolean | null;
   children: ReactNode;

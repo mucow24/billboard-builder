@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   clickItem,
@@ -7,9 +7,11 @@ import {
   dragEmptyCanvas,
   dragHandle,
   clickEmptyCanvas,
+  exportPngPixels,
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
+  readStageDebug,
   saveAndReadProject,
   selectTool,
   uploadProject,
@@ -226,9 +228,11 @@ test.describe('polygon tool flows', () => {
 
     await clickItem(page, 'polygon-item');
     await openPropertiesTab(page);
-    await page.getByRole('button', { name: 'Geometry' }).click();
 
-    await test.step('sets the curve radius', async () => {
+    await test.step('sets the curve radius from the Polygon section, open from the start', async () => {
+      await expect(
+        page.getByTestId('properties-tab-body').getByRole('button', { name: 'Polygon', exact: true }),
+      ).toHaveAttribute('aria-expanded', 'true');
       await page.getByRole('spinbutton', { name: 'Curve radius' }).fill('24');
 
       const saved = await saveAndReadProject(page);
@@ -236,6 +240,38 @@ test.describe('polygon tool flows', () => {
         expect.objectContaining({ curveRadius: 24 }),
       ]);
     });
+
+    await test.step('keeps a typed radius past the end of the slider', async () => {
+      const radius = page.getByRole('spinbutton', { name: 'Curve radius' });
+      const slider = page.getByRole('slider', { name: 'Curve radius' });
+      await expect(slider).toHaveAttribute('max', '500');
+
+      await radius.fill('100000');
+      await radius.press('Enter');
+      await expect(radius).toHaveValue('100000');
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ curveRadius: 100000 }),
+      ]);
+    });
+
+    await test.step('turns a typed negative radius into 0', async () => {
+      const radius = page.getByRole('spinbutton', { name: 'Curve radius' });
+      await radius.fill('-5');
+      await radius.press('Enter');
+      await expect(radius).toHaveValue('0');
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ curveRadius: 0 }),
+      ]);
+
+      await radius.fill('24');
+      await radius.press('Enter');
+    });
+
+    await page.getByRole('button', { name: 'Geometry' }).click();
 
     await test.step('unchecks Closed to open the chain and hides the fill section', async () => {
       await expect(page.getByRole('button', { name: 'Toggle gradient' })).toBeVisible();
@@ -249,4 +285,125 @@ test.describe('polygon tool flows', () => {
       ]);
     });
   });
+
+  test('Mirror flips the polygon left to right, and back on a second click', async ({ page }) => {
+    // A right trapezoid in the fixture box: square corners on the left, the
+    // slanted side on the right. The box centre, where clickItem clicks, is
+    // inside it either way round.
+    const trapezoid = [
+      { x: 200, y: 200 },
+      { x: 320, y: 200 },
+      { x: 440, y: 440 },
+      { x: 200, y: 440 },
+    ];
+    const mirroredTrapezoid = [
+      { x: 440, y: 200 },
+      { x: 320, y: 200 },
+      { x: 200, y: 440 },
+      { x: 440, y: 440 },
+    ];
+    // Just below the top edge: near the left side, and the same distance in
+    // from the right. Only the square corner's side is filled.
+    const points = [
+      { x: 220, y: 230 },
+      { x: 420, y: 230 },
+    ];
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument([createPolygonFixture({ vertices: trapezoid })]),
+        background: '#ffffffff',
+      },
+      'polygon-mirror.json',
+    );
+    await expect.poll(async () => (await readStageDebug(page)).renderedItemCount).toBe(1);
+    expect(await exportAndSample(page, points)).toEqual(['orange', 'other']);
+
+    await clickItem(page, 'polygon-item');
+    await openPropertiesTab(page);
+    // A one-click action, not a toggle: there is no pressed state.
+    const mirrorButton = page.getByRole('button', { name: 'Mirror' });
+    await expect(mirrorButton).not.toHaveAttribute('aria-pressed');
+
+    await test.step('first click flips it in place', async () => {
+      await mirrorButton.click();
+      expect(await exportAndSample(page, points)).toEqual(['other', 'orange']);
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({
+          vertices: mirroredTrapezoid,
+          x: 200,
+          y: 200,
+          width: 240,
+          height: 240,
+        }),
+      ]);
+    });
+
+    await test.step('second click flips it back', async () => {
+      await mirrorButton.click();
+      expect(await exportAndSample(page, points)).toEqual(['orange', 'other']);
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([expect.objectContaining({ vertices: trapezoid })]);
+    });
+
+    await test.step('undo brings the flip back', async () => {
+      await page.keyboard.press('ControlOrMeta+z');
+      expect(await exportAndSample(page, points)).toEqual(['other', 'orange']);
+    });
+  });
+
+  test('Mirror flips the gradient along with the polygon', async ({ page }) => {
+    // The fixture square, orange on the left fading to blue on the right.
+    const points = [
+      { x: 215, y: 320 },
+      { x: 425, y: 320 },
+    ];
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument([
+          createPolygonFixture({ gradientEnabled: true, gradientAngle: 90 }),
+        ]),
+        background: '#ffffffff',
+      },
+      'polygon-mirror-gradient.json',
+    );
+    await expect.poll(async () => (await readStageDebug(page)).renderedItemCount).toBe(1);
+    expect(await exportAndSample(page, points)).toEqual(['orange', 'blue']);
+
+    await clickItem(page, 'polygon-item');
+    await openPropertiesTab(page);
+    await page.getByRole('button', { name: 'Mirror' }).click();
+
+    expect(await exportAndSample(page, points)).toEqual(['blue', 'orange']);
+    await expect(page.getByRole('spinbutton', { name: 'Gradient angle' })).toHaveValue('-90');
+
+    const saved = await saveAndReadProject(page);
+    expect(saved.nodes).toEqual([expect.objectContaining({ gradientAngle: -90 })]);
+  });
 });
+
+type Ink = 'orange' | 'blue' | 'other';
+
+/**
+ * Export > PNG and name the colour at each canvas point: mostly the fixture's
+ * orange fill (#f97316), mostly its blue secondary fill (#0840e9), or neither
+ * (the white background).
+ */
+async function exportAndSample(
+  page: Page,
+  points: Array<{ x: number; y: number }>,
+): Promise<Ink[]> {
+  return (await exportPngPixels(page, points)).map(({ r, b }) => {
+    if (r > b + 80) return 'orange';
+    if (b > r + 80) return 'blue';
+    return 'other';
+  });
+}
