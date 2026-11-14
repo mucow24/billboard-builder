@@ -9,8 +9,10 @@ import {
   alignViewportPanToDevicePixels,
   clampZoom,
   fitCanvasToArea,
+  fitRectToArea,
   getDevicePixelRatio,
   getFitArea,
+  rectFromCorners,
   snapZoomToSeamFriendlyStep,
   toCanvasPointer,
   toViewportPoint,
@@ -19,15 +21,39 @@ import {
   type ViewportArea,
 } from './viewportMath';
 
-const ZOOM_STEP = 1.2;
+const WHEEL_ZOOM_STEP = 1.2;
+// A click with the zoom tool goes two wheel steps.
+const ZOOM_TOOL_CLICK_STEP = WHEEL_ZOOM_STEP ** 2;
 const HUD_ZOOM_STEP = 0.1;
+// A zoom tool press that moves less than this, in viewport pixels along both
+// axes, is a click. Once it moves further it drags out a box to zoom to for
+// the rest of the press, and a box released smaller than this is dropped.
+const ZOOM_BOX_MIN_DRAG = 4;
 
 interface UseCanvasViewportParams {
   activeTool: CanvasTool;
   canvasHeight: number;
   canvasWidth: number;
-  // What floats over the viewport's edges, which Fit keeps the canvas clear of.
+  // What floats over the viewport's edges, which Fit and the zoom tool's box
+  // keep the canvas clear of.
   fitObstructionRefs?: FitObstructionRefs;
+  // Called when a zoom tool click or box has zoomed, not when it is cancelled.
+  onZoomToolGestureEnd?: () => void;
+}
+
+interface ZoomDrag {
+  start: Point;
+  current: Point;
+  zoomOut: boolean;
+  // Whether the press has moved ZOOM_BOX_MIN_DRAG yet, which makes it a box.
+  boxing: boolean;
+}
+
+function isPastMinDrag({ start, current }: ZoomDrag) {
+  return (
+    Math.abs(current.x - start.x) >= ZOOM_BOX_MIN_DRAG ||
+    Math.abs(current.y - start.y) >= ZOOM_BOX_MIN_DRAG
+  );
 }
 
 // The elements floating over the viewport's top edge (the toolbar), left edge
@@ -45,6 +71,7 @@ export function useCanvasViewport({
   canvasHeight,
   canvasWidth,
   fitObstructionRefs,
+  onZoomToolGestureEnd,
 }: UseCanvasViewportParams) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
@@ -53,10 +80,21 @@ export function useCanvasViewport({
   const panDragRef = useRef<{ startPointer: Point; startPan: Point } | null>(null);
   const panRef = useRef(pan);
   const zoomRef = useRef(zoom);
+  // A zoom tool press from pointerdown to pointerup, and the box it has
+  // dragged out so far, in viewport coordinates (null while it is a click).
+  const zoomDragRef = useRef<ZoomDrag | null>(null);
+  const [zoomBox, setZoomBox] = useState<ViewportArea | null>(null);
+  const onZoomToolGestureEndRef = useRef(onZoomToolGestureEnd);
+  onZoomToolGestureEndRef.current = onZoomToolGestureEnd;
+  const cancelZoomDrag = useCallback(() => {
+    zoomDragRef.current = null;
+    setZoomBox(null);
+  }, []);
   const spacebarHeld = useKeyHeld(' ');
   const { modifierKeys } = useModifierKeys({
     onBlur: () => {
       panDragRef.current = null;
+      cancelZoomDrag();
     },
   });
 
@@ -257,10 +295,121 @@ export function useCanvasViewport({
 
   const applyZoomToolClick = useCallback(
     (point: Point, zoomOut: boolean) => {
-      zoomAround(point, zoomRef.current * (zoomOut ? 1 / ZOOM_STEP : ZOOM_STEP));
+      zoomAround(
+        point,
+        zoomRef.current * (zoomOut ? 1 / ZOOM_TOOL_CLICK_STEP : ZOOM_TOOL_CLICK_STEP),
+      );
     },
     [zoomAround],
   );
+
+  // Shows what is under `box`, a rect in viewport coordinates, as large as it
+  // fits clear of the toolbar, the tool palette and the inspector panel.
+  const zoomToViewportBox = useCallback(
+    (box: ViewportArea) => {
+      const corner = toCanvasPointer({ x: box.left, y: box.top }, zoomRef.current, panRef.current);
+      const fit = fitRectToArea(
+        {
+          ...corner,
+          width: box.width / zoomRef.current,
+          height: box.height / zoomRef.current,
+        },
+        getFitArea(viewportSize, measureFitObstructions()),
+        getDevicePixelRatio(),
+      );
+      setZoom(fit.zoom);
+      setAlignedPan(fit.pan);
+    },
+    [measureFitObstructions, setAlignedPan, viewportSize],
+  );
+
+  // A zoom tool press. Released where it started it zooms one step around
+  // that point (out with Alt); dragged, it zooms to the box it drags out.
+  // Alt only changes clicks: a box always zooms to what it frames.
+  const startZoomToolGesture = useCallback((pointer: Point, zoomOut: boolean) => {
+    zoomDragRef.current = { start: pointer, current: pointer, zoomOut, boxing: false };
+    setZoomBox(null);
+  }, []);
+
+  useEffect(() => {
+    // The pointer in viewport coordinates, kept inside the viewport so the box
+    // never reaches past what is on screen.
+    function readPointer(event: PointerEvent): Point | null {
+      const pointer = getViewportPointerFromClient(event.clientX, event.clientY);
+      return (
+        pointer && {
+          x: Math.min(Math.max(pointer.x, 0), viewportSize.width),
+          y: Math.min(Math.max(pointer.y, 0), viewportSize.height),
+        }
+      );
+    }
+
+    function handleWindowPointerMove(event: PointerEvent) {
+      const drag = zoomDragRef.current;
+      if (!drag) {
+        return;
+      }
+      if (event.buttons === 0) {
+        // The release happened where this window could not see it.
+        cancelZoomDrag();
+        return;
+      }
+      const pointer = readPointer(event);
+      if (!pointer) {
+        return;
+      }
+      drag.current = pointer;
+      if (!drag.boxing && isPastMinDrag(drag)) {
+        drag.boxing = true;
+      }
+      if (drag.boxing) {
+        setZoomBox(rectFromCorners(drag.start, pointer));
+      }
+    }
+
+    function handleWindowPointerUp(event: PointerEvent) {
+      const drag = zoomDragRef.current;
+      if (!drag) {
+        return;
+      }
+      drag.current = readPointer(event) ?? drag.current;
+      if (!drag.boxing && isPastMinDrag(drag)) {
+        drag.boxing = true;
+      }
+      cancelZoomDrag();
+      if (!drag.boxing) {
+        applyZoomToolClick(drag.start, drag.zoomOut);
+      } else if (isPastMinDrag(drag)) {
+        zoomToViewportBox(rectFromCorners(drag.start, drag.current));
+      } else {
+        // A box dragged back to almost nothing: dropped, and the tool stays.
+        return;
+      }
+      onZoomToolGestureEndRef.current?.();
+    }
+
+    window.addEventListener('pointermove', handleWindowPointerMove);
+    window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', cancelZoomDrag);
+    return () => {
+      window.removeEventListener('pointermove', handleWindowPointerMove);
+      window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', cancelZoomDrag);
+    };
+  }, [
+    applyZoomToolClick,
+    cancelZoomDrag,
+    getViewportPointerFromClient,
+    viewportSize,
+    zoomToViewportBox,
+  ]);
+
+  // Switching tools mid-drag drops the box.
+  useEffect(() => {
+    if (activeTool !== 'zoom') {
+      cancelZoomDrag();
+    }
+  }, [activeTool, cancelZoomDrag]);
 
   const isPanGesture = useCallback(
     (event: MouseEvent, hasActiveSession: boolean) =>
@@ -275,16 +424,23 @@ export function useCanvasViewport({
         : activeTool === 'pan' || (spacebarHeld && !hasActiveSession)
           ? 'grab'
           : activeTool === 'zoom'
-            ? modifierKeys.altKey
+            ? // A box always zooms in, Alt or not.
+              modifierKeys.altKey && !zoomBox
               ? 'zoom-out'
               : 'zoom-in'
             : activeTool === 'select'
               ? 'default'
               : 'crosshair',
-    [activeTool, modifierKeys.altKey, spacebarHeld],
+    [activeTool, modifierKeys.altKey, spacebarHeld, zoomBox],
   );
 
   const handleStagePointerUp = useCallback(() => {
+    if (zoomDragRef.current) {
+      // Pixi listens for pointerup on window in the capture phase, so this
+      // runs before this hook's bubble-phase window listener, which then
+      // finishes the gesture.
+      return true;
+    }
     if (!panDragRef.current) {
       return false;
     }
@@ -316,7 +472,7 @@ export function useCanvasViewport({
 
   const stableZoomInFromWheel = useCallback(
     (point: Point, deltaY: number) => {
-      const direction = deltaY > 0 ? 1 / ZOOM_STEP : ZOOM_STEP;
+      const direction = deltaY > 0 ? 1 / WHEEL_ZOOM_STEP : WHEEL_ZOOM_STEP;
       zoomAround(point, zoomRef.current * direction);
     },
     [zoomAround],
@@ -324,7 +480,6 @@ export function useCanvasViewport({
 
   return {
     centerPoint,
-    applyZoomToolClick,
     fitCanvasToViewport,
     getViewportPointerFromClient,
     handleStagePointerLeave,
@@ -335,6 +490,7 @@ export function useCanvasViewport({
     getStageCursor,
     spacebarHeld,
     startPanDrag,
+    startZoomToolGesture,
     toCanvasPointer: stableToCanvasPointer,
     toViewportPoint: stableToViewportPoint,
     toViewportRect: stableToViewportRect,
@@ -343,6 +499,7 @@ export function useCanvasViewport({
     viewportSize,
     zoom,
     zoomAround,
+    zoomBox,
     zoomInFromWheel: stableZoomInFromWheel,
     zoomOutFromHudStep: HUD_ZOOM_STEP,
   };

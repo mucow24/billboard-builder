@@ -187,6 +187,16 @@
   backdrop-filter: blur(18px);
 }
 
+/* The box the zoom tool drags out, styled like the selection marquee. */
+.canvas-zoom-box {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  pointer-events: none;
+  border: 1.5px solid #7dd3fc;
+  background: rgba(56, 189, 248, 0.08);
+}
+
 .canvas-hud {
   position: absolute;
   left: 0.18rem;

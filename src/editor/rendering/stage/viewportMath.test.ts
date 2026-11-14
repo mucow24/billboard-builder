@@ -5,10 +5,12 @@ import {
   alignViewportPanToDevicePixels,
   clampZoom,
   fitCanvasToArea,
+  fitRectToArea,
   floorZoomToSeamFriendlyStep,
   getFitArea,
   MIN_FIT_AREA_HEIGHT,
   MIN_FIT_AREA_WIDTH,
+  rectFromCorners,
   snapZoomToSeamFriendlyStep,
   toCanvasPointer,
   toOverlayStyle,
@@ -112,6 +114,47 @@ describe('viewportMath', () => {
     expect(fit.pan.x).toBeCloseTo((956 - 2000 * 0.421875) / 2, 6);
     expect(fit.pan.x + 2000 * fit.zoom).toBeLessThan(956);
     expect(fit.pan.y).toBeCloseTo((720 - 500 * 0.421875) / 2, 6);
+  });
+
+  it('shows a canvas rect as large as it fits in the area, centered and without a margin', () => {
+    const area = { left: 47, top: 50, width: 909, height: 670 };
+
+    // 200x100: the area's width allows 4.545 and its height 6.7, so the width
+    // limits the zoom, which floors to 4.53125.
+    const wide = fitRectToArea({ x: 100, y: 300, width: 200, height: 100 }, area, 1);
+    expect(wide.zoom).toBe(4.53125);
+    expect(wide.pan.x + 100 * wide.zoom).toBeGreaterThanOrEqual(47);
+    expect(wide.pan.x + 300 * wide.zoom).toBeLessThanOrEqual(956);
+    expect(wide.pan.x + 200 * wide.zoom).toBeCloseTo(47 + 909 / 2, 6);
+    expect(wide.pan.y + 350 * wide.zoom).toBeCloseTo(50 + 670 / 2, 6);
+
+    // 100x200: now the height limits it, to 670 / 200 = 3.35, floored.
+    const tall = fitRectToArea({ x: 0, y: 0, width: 100, height: 200 }, area, 1);
+    expect(tall.zoom).toBe(3.34375);
+    expect(tall.pan.y + 200 * tall.zoom).toBeLessThanOrEqual(720);
+
+    // A rect larger than the area zooms out to fit it.
+    expect(fitRectToArea({ x: 0, y: 0, width: 1818, height: 100 }, area, 1).zoom).toBe(0.5);
+  });
+
+  it('zooms no further than the maximum, and a zero-length side does not limit the zoom', () => {
+    const area = { left: 0, top: 0, width: 1000, height: 600 };
+
+    const tiny = fitRectToArea({ x: 10, y: 20, width: 2, height: 2 }, area, 1);
+    expect(tiny.zoom).toBe(16);
+    expect(tiny.pan).toEqual({ x: 500 - 11 * 16, y: 300 - 21 * 16 });
+
+    expect(fitRectToArea({ x: 0, y: 0, width: 100, height: 0 }, area, 1).zoom).toBe(10);
+    expect(fitRectToArea({ x: 0, y: 0, width: 0, height: 0 }, area, 1).zoom).toBe(16);
+  });
+
+  it('spans a rect between two corners in any order', () => {
+    expect(rectFromCorners({ x: 300, y: 50 }, { x: 100, y: 250 })).toEqual({
+      left: 100,
+      top: 50,
+      width: 200,
+      height: 200,
+    });
   });
 
   it('converts points between viewport and canvas spaces', () => {

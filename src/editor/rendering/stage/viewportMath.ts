@@ -170,20 +170,52 @@ export function fitCanvasToArea(
   area: ViewportArea,
   devicePixelRatio: number,
 ): { zoom: number; pan: Point } {
+  return fitRectToArea(
+    {
+      x: 0,
+      y: 0,
+      width: Math.max(canvasSize.width, 1),
+      height: Math.max(canvasSize.height, 1),
+    },
+    area,
+    devicePixelRatio,
+    0.9,
+  );
+}
+
+// The zoom and pan that show `rect`, in canvas coordinates, centered in
+// `area` and as large as fits there, times `scale` (below 1 for a margin): a
+// box dragged with the zoom tool fills the area. A side of zero length puts
+// no limit on the zoom.
+export function fitRectToArea(
+  rect: { x: number; y: number; width: number; height: number },
+  area: ViewportArea,
+  devicePixelRatio: number,
+  scale = 1,
+): { zoom: number; pan: Point } {
+  const zoomForSide = (room: number, length: number) =>
+    length > 0 ? room / length : Number.POSITIVE_INFINITY;
   const requestedZoom = clampZoom(
-    Math.min(
-      area.width / Math.max(canvasSize.width, 1),
-      area.height / Math.max(canvasSize.height, 1),
-    ) * 0.9,
+    Math.min(zoomForSide(area.width, rect.width), zoomForSide(area.height, rect.height)) * scale,
   );
   const zoom = floorZoomToSeamFriendlyStep(requestedZoom, devicePixelRatio);
 
   return {
     zoom,
     pan: {
-      x: area.left + (area.width - canvasSize.width * zoom) / 2,
-      y: area.top + (area.height - canvasSize.height * zoom) / 2,
+      x: area.left + area.width / 2 - (rect.x + rect.width / 2) * zoom,
+      y: area.top + area.height / 2 - (rect.y + rect.height / 2) * zoom,
     },
+  };
+}
+
+// The rectangle spanned by two corners, in any order.
+export function rectFromCorners(a: Point, b: Point): ViewportArea {
+  return {
+    left: Math.min(a.x, b.x),
+    top: Math.min(a.y, b.y),
+    width: Math.abs(b.x - a.x),
+    height: Math.abs(b.y - a.y),
   };
 }
 
