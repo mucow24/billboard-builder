@@ -203,6 +203,11 @@ export interface BandsGeneratorParams {
   stripeContrast: number;
   stripeGlow: number;
   seedOverride: number | null;
+  /**
+   * False only for layers saved before the bands were centered on the item.
+   * Those keep their old layout, so they look the same. Not a setting.
+   */
+  stripeCentered: boolean;
 }
 
 export interface BurstGeneratorParams {

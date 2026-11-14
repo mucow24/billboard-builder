@@ -56,6 +56,9 @@ const BandsGeneratorParamsSchema = z.object({
   stripeContrast: z.number().min(0).max(1),
   stripeGlow: z.number().min(0).max(1),
   seedOverride: z.number().nullable(),
+  // Absent in files saved before the bands were centered; the normalizer then
+  // keeps the layer on its old layout.
+  stripeCentered: z.boolean().optional(),
 });
 
 const BurstGeneratorParamsSchema = z.object({

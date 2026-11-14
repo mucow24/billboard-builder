@@ -457,4 +457,37 @@ describe('document schema', () => {
       opacity: 23 / 255,
     });
   });
+
+  it('opens a file whose diagonal bands were saved before they were centered, on their old layout', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createGeneratorItem('bands', 1024, 1024)];
+    const file = JSON.parse(serializeProjectDocument(document));
+    delete file.nodes[0].generatorParams.stripeCentered;
+    file.nodes[0].generatorParams.stripeOffset = -0.4;
+
+    const parsed = parseProjectDocument(file);
+    const node = parsed.nodes[0];
+    if (node?.kind !== 'generator') {
+      throw new Error('Expected generator node.');
+    }
+
+    expect(node.generatorParams).toMatchObject({
+      generatorType: 'bands',
+      stripeOffset: -0.4,
+      stripeCentered: false,
+    });
+  });
+
+  it('round-trips centered diagonal bands', () => {
+    const document = createDefaultProjectDocument();
+    document.nodes = [createGeneratorItem('bands', 1024, 1024)];
+
+    const parsed = parseProjectDocument(JSON.parse(serializeProjectDocument(document)));
+    const node = parsed.nodes[0];
+    if (node?.kind !== 'generator') {
+      throw new Error('Expected generator node.');
+    }
+
+    expect(node.generatorParams).toMatchObject({ generatorType: 'bands', stripeCentered: true });
+  });
 });
