@@ -25,7 +25,7 @@ import {
   createResizeSession,
   createRotateSession,
   currentSelectionSetSignature,
-  getMarqueeHitIds,
+  getMarqueeSelection,
   resolveInteractionSession,
   type InteractionSession,
   type PointerGestureSource,
@@ -33,7 +33,6 @@ import {
   type SessionWithModifiers,
   type ShapeItem,
 } from './interactionSession';
-import type { RenderableCanvasItem } from './renderAdapter';
 import { useCropSession } from './useCropSession';
 import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInteractionDerivedState';
 import {
@@ -48,7 +47,6 @@ import {
   isCanvasItemNode,
   isGroupNode,
 } from '../document/sceneGraph';
-import { toggleSelectionNodes } from '../core/selectionOps';
 import type {
   CanvasItem,
   ImageCanvasItem,
@@ -98,22 +96,6 @@ interface HandledItemPointerEvent {
   button: number;
   itemId: string;
   selectionNodeId: string;
-}
-
-// A marquee selects as it is dragged out. Which node an item selects depends
-// on the selection (a selected group makes its children selectable), so the
-// marquee keeps the mapping it started with: re-reading it after its own live
-// selection would drill into any group it touched.
-interface MarqueeStart {
-  renderableByLeafId: Map<string, RenderableCanvasItem>;
-  selectedNodeIds: string[];
-  // The selection the marquee last applied, so a move that touches the same
-  // items dispatches nothing.
-  appliedSelectionKey: string;
-}
-
-function getSelectionKey(nodeIds: string[]): string {
-  return nodeIds.join('\u0000');
 }
 
 interface StageDescendantClickSample {
@@ -174,8 +156,7 @@ export function useCanvasInteractionSession({
   const sessionRafRef = useRef<number | null>(null);
   const guidesRef = useRef<GuideLine[]>([]);
   const guidesRafRef = useRef<number | null>(null);
-  const pendingMarqueeRef = useRef<{ pointerStart: Point; toggleMode: boolean } | null>(null);
-  const marqueeStartRef = useRef<MarqueeStart | null>(null);
+  const pendingMarqueeRef = useRef<{ pointerStart: Point } | null>(null);
   const pendingItemGestureRef = useRef<PendingItemGesture | null>(null);
   const lastHandledItemPointerEventRef = useRef<HandledItemPointerEvent | null>(null);
   const lastStageDescendantClickRef = useRef<StageDescendantClickSample | null>(null);
@@ -290,14 +271,18 @@ export function useCanvasInteractionSession({
   const { resolveModifierKeys } = useModifierKeys({ capture: true });
 
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
+    const startsGesture = sessionRef.current === null && nextSession !== null;
     sessionRef.current = nextSession;
-    if (nextSession === null) {
-      // End-of-gesture: flush synchronously so commit is immediate
+    if (nextSession === null || startsGesture) {
+      // A gesture's start and end render at once, in the same batch as
+      // whatever they do to the selection. A marquee's first move can select
+      // items; a frame where those showed without the session would draw
+      // their handles under the box.
       if (sessionRafRef.current !== null) {
         cancelAnimationFrame(sessionRafRef.current);
         sessionRafRef.current = null;
       }
-      setSession(null);
+      setSession(nextSession);
     } else if (sessionRafRef.current === null) {
       // Active gesture: coalesce to one React render per animation frame
       sessionRafRef.current = requestAnimationFrame(() => {
@@ -307,7 +292,7 @@ export function useCanvasInteractionSession({
     }
   }, []);
 
-  const setPendingMarquee = useCallback((nextPending: { pointerStart: Point; toggleMode: boolean } | null) => {
+  const setPendingMarquee = useCallback((nextPending: { pointerStart: Point } | null) => {
     pendingMarqueeRef.current = nextPending;
     setHasPendingMarquee(Boolean(nextPending));
   }, []);
@@ -536,40 +521,11 @@ export function useCanvasInteractionSession({
     startCropSession(item);
   }, [clearPendingItemGesture, clearPendingMarquee, startCropSession, updateGuides, updateSession]);
 
-  const startMarquee = useCallback((): MarqueeStart => {
-    const start = {
-      renderableByLeafId,
-      selectedNodeIds,
-      appliedSelectionKey: getSelectionKey(selectedNodeIds),
-    };
-    marqueeStartRef.current = start;
-    return start;
-  }, [renderableByLeafId, selectedNodeIds]);
-
-  // Selects what the marquee touches: the selectable node behind each hit item
-  // or, in toggle mode, those nodes toggled against the selection the marquee
-  // started from. Runs on every marquee move and once more on release.
-  const applyMarqueeSelection = useCallback((hitIds: string[], toggleMode: boolean) => {
-    const start = marqueeStartRef.current ?? startMarquee();
-    const hitNodeIds = Array.from(
-      new Set(hitIds.map((itemId) => start.renderableByLeafId.get(itemId)?.selectableNodeId ?? itemId)),
-    );
-    const nextSelection = toggleMode
-      ? toggleSelectionNodes(start.selectedNodeIds, hitNodeIds)
-      : hitNodeIds;
-    const nextKey = getSelectionKey(nextSelection);
-    if (nextKey === start.appliedSelectionKey) {
-      return;
-    }
-    start.appliedSelectionKey = nextKey;
-    onSelectNodes(nextSelection);
-  }, [onSelectNodes, startMarquee]);
-
   const finishSession = useCallback((current: InteractionSession, pointer: Point) => {
     const resolved = resolveSession(current, pointer);
     updateGuides([]);
     const commit = buildInteractionCommit(resolved, {
-      orderedItems,
+      nodes: document.nodes,
       pointer,
       canvasBounds: stageBounds,
     });
@@ -580,8 +536,10 @@ export function useCanvasInteractionSession({
         onSetActiveTool(commit.nextTool);
         return;
       case 'marquee':
-        applyMarqueeSelection(commit.hitIds, commit.toggleMode);
-        marqueeStartRef.current = null;
+        // Always, even when the live selection already matches: something
+        // else (Escape, a shortcut) may have changed it during the drag, and
+        // a release leaves exactly what the box touches selected.
+        onSelectNodes(commit.nodeIds);
         return;
       case 'group':
         setSelectionFrame(commit.selectionFrame);
@@ -607,7 +565,7 @@ export function useCanvasInteractionSession({
         }
         return;
     }
-  }, [applyMarqueeSelection, onAddItem, updateGuides, onSetActiveTool, onSelectPolygonVertex, onUpdateItem, onUpdateItems, orderedItems, resolveSession, stageBounds]);
+  }, [document.nodes, onAddItem, updateGuides, onSetActiveTool, onSelectNodes, onSelectPolygonVertex, onUpdateItem, onUpdateItems, resolveSession, stageBounds]);
 
   const commitActiveSession = useCallback((pointer: Point | null) => {
     const current = sessionRef.current;
@@ -650,10 +608,8 @@ export function useCanvasInteractionSession({
           pointerStart: pendingMarqueeRef.current.pointerStart,
           pointerSource: 'stage',
           currentPointer: pointer,
-          toggleMode: pendingMarqueeRef.current.toggleMode,
           guides: [],
         };
-        startMarquee();
       }
       if (!current) {
         return;
@@ -676,17 +632,22 @@ export function useCanvasInteractionSession({
       updateGuides(next.guides);
       updateSession(next);
       if (next.kind === 'marquee') {
-        applyMarqueeSelection(getMarqueeHitIds(next, orderedItems), next.toggleMode);
+        // The selection follows the box while it is dragged; a move that
+        // leaves it touching the same nodes dispatches nothing.
+        const nodeIds = getMarqueeSelection(next, document.nodes);
+        if (currentSelectionSetSignature(nodeIds) !== currentSelectionSetSignature(selectedNodeIds)) {
+          onSelectNodes(nodeIds);
+        }
       }
     },
     [
-      applyMarqueeSelection,
       clearPendingItemGesture,
       clearPendingMarquee,
       createPendingItemSession,
-      orderedItems,
+      document.nodes,
+      onSelectNodes,
       resolveSession,
-      startMarquee,
+      selectedNodeIds,
       updateGuides,
       updateSession,
     ],
@@ -791,6 +752,10 @@ export function useCanvasInteractionSession({
 
   const hasActiveSession = Boolean(session);
   const hasCropInteraction = Boolean(cropSession?.activeInteraction);
+  // From the press on blank canvas until release. Counting the pending press
+  // matters: a marquee's first move can select items in a render where the
+  // session itself has not landed yet, and the pending flag still holds there.
+  const marqueeInProgress = hasPendingMarquee || session?.kind === 'marquee';
 
   useEffect(() => {
     if (!hasActiveSession && !hasPendingMarquee && !hasPendingItemGesture && !hasCropInteraction) {
@@ -1218,10 +1183,6 @@ export function useCanvasInteractionSession({
     }
     if (!pointer || !isCanvasSurface) return;
     clearPendingItemGesture();
-    const modifiers = resolveModifierKeys({
-      ctrlKey: Boolean(nativeEvent.ctrlKey),
-      shiftKey: Boolean(nativeEvent.shiftKey),
-    });
     if (isCreateTool(activeTool)) {
       setLastDrilldownSource(null);
       beginCreate(activeTool, pointer);
@@ -1230,8 +1191,11 @@ export function useCanvasInteractionSession({
     if (activeTool === 'select') {
       setLastDrilldownSource(null);
       updateGuides([]);
+      // Every marquee starts from an empty selection and selects exactly what
+      // it touches, Shift or not: toggling against the existing selection
+      // (CS-10 in docs/canvas-interaction-matrix.md) is not implemented.
       onSelectNode(undefined);
-      setPendingMarquee({ pointerStart: pointer, toggleMode: modifiers.shiftKey });
+      setPendingMarquee({ pointerStart: pointer });
       updateSession(null);
       return;
     }
@@ -1249,7 +1213,6 @@ export function useCanvasInteractionSession({
     getCanvasPointerFromStageEvent,
     updateGuides,
     onSelectNode,
-    resolveModifierKeys,
     renderedItems,
     selectedNodeIds,
     setPendingMarquee,
@@ -1311,6 +1274,7 @@ export function useCanvasInteractionSession({
     renderedSelectionFrame,
     selectedDocumentItem,
     lastDrilldownSource,
+    marqueeInProgress,
     selectedNode,
     selectedRenderedItem,
     selectedItemId,

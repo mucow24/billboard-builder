@@ -26,6 +26,7 @@ import { buildCandidateCache, getResizeSnappedRect, getSnappedRect, SNAP_THRESHO
 import type { RenderableCanvasItem } from './renderAdapter';
 import type {
   CanvasItem,
+  CanvasNode,
   CanvasTool,
   GeneratorCanvasItem,
   GuideLine,
@@ -33,6 +34,7 @@ import type {
   PolygonCanvasItem,
 } from '../document/documentTypes';
 import { insertPolygonVertex } from '../document/polygonVertices';
+import { flattenVisibleLeafNodes } from '../document/sceneGraph';
 
 export type ShapeItem = Exclude<CanvasItem, LineCanvasItem | GeneratorCanvasItem>;
 export type PointerGestureSource = 'stage' | 'overlay';
@@ -111,7 +113,6 @@ export interface PolygonVertexSession extends ItemSession {
 export interface MarqueeSession extends InteractionSessionBase {
   kind: 'marquee';
   currentPointer: Point;
-  toggleMode: boolean;
 }
 
 interface GroupSessionBase extends InteractionSessionBase {
@@ -157,7 +158,7 @@ export type SessionWithModifiers = InteractionSession & { shiftConstrain?: boole
 
 export type InteractionCommit =
   | { kind: 'create'; item: CanvasItem; nextTool: 'select' }
-  | { kind: 'marquee'; hitIds: string[]; toggleMode: boolean }
+  | { kind: 'marquee'; nodeIds: string[] }
   | { kind: 'single-item'; itemId: string; changes: Partial<CanvasItem> }
   | {
       kind: 'group';
@@ -278,12 +279,20 @@ export function getCanvasConstrainedMarqueeRect(
   );
 }
 
-/** The ids of the items a marquee touches, in the order of `orderedItems`. */
-export function getMarqueeHitIds(session: MarqueeSession, orderedItems: CanvasItem[]): string[] {
+/**
+ * The nodes a marquee selects: for each visible, unlocked item it touches,
+ * the top-level node (the item, or its outermost group) in stacking order.
+ * A marquee always starts from an empty selection (the press on blank canvas
+ * clears it), so this never looks at the selection, including the one the
+ * marquee itself makes as it is dragged: a selected group makes its children
+ * selectable, and following that would drill into any group it touched.
+ */
+export function getMarqueeSelection(session: MarqueeSession, nodes: CanvasNode[]): string[] {
   const rect = normalizeRectFromPoints(session.pointerStart, session.currentPointer);
-  return orderedItems
-    .filter((item) => !item.hidden && !item.locked && itemIntersectsSelectionRect(item, rect))
-    .map((item) => item.id);
+  const nodeIds = flattenVisibleLeafNodes(nodes)
+    .filter(({ item }) => !item.hidden && !item.locked && itemIntersectsSelectionRect(item, rect))
+    .map((leaf) => leaf.selectableNodeId);
+  return Array.from(new Set(nodeIds));
 }
 
 export function getCommitChanges(item: CanvasItem): Partial<CanvasItem> {
@@ -967,9 +976,9 @@ export function resolveInteractionSession(
 
 export function buildInteractionCommit(
   resolved: InteractionSession,
-  context: { orderedItems: CanvasItem[]; pointer: Point; canvasBounds: RenderBox }
+  context: { nodes: CanvasNode[]; pointer: Point; canvasBounds: RenderBox }
 ): InteractionCommit {
-  const { orderedItems, pointer } = context;
+  const { nodes, pointer } = context;
 
   if (resolved.kind === 'create') {
     // A click (pointer travel within the threshold) always drops the default
@@ -995,8 +1004,7 @@ export function buildInteractionCommit(
   if (resolved.kind === 'marquee') {
     return {
       kind: 'marquee',
-      hitIds: getMarqueeHitIds(resolved, orderedItems),
-      toggleMode: resolved.toggleMode,
+      nodeIds: getMarqueeSelection(resolved, nodes),
     };
   }
 

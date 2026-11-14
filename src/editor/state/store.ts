@@ -20,7 +20,6 @@ import {
   normalizeSelectionForNodes,
   selectAllNodes as selectAllNodeIds,
   toggleSelectionNode,
-  toggleSelectionNodes,
 } from '../core/selectionOps';
 import {
   cloneCanvasNode,
@@ -64,7 +63,6 @@ export interface EditorStoreState {
   selectSingleNode: (nodeId?: string) => void;
   selectParentNode: () => boolean;
   toggleSelectedNode: (nodeId: string) => void;
-  toggleSelectedNodes: (nodeIds: string[]) => void;
   selectAllNodes: () => void;
   deleteNode: (nodeId: string) => void;
   deleteSelectedNodes: () => void;
@@ -202,13 +200,6 @@ export const useEditorStore = create<EditorStoreState>((set, get) => {
         type: 'select_nodes',
         nodeIds: toggleSelectionNode(get().editor.session.selectedNodeIds, nodeId),
       });
-    },
-    toggleSelectedNodes: (nodeIds) => {
-      const nextSelection = normalizeSelectionForNodes(
-        toggleSelectionNodes(get().editor.session.selectedNodeIds, nodeIds),
-        get().editor.document.nodes
-      );
-      get().dispatch({ type: 'select_nodes', nodeIds: nextSelection });
     },
     selectAllNodes: () => {
       get().dispatch({

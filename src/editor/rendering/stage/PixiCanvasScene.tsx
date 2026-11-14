@@ -101,7 +101,8 @@ interface PixiCanvasSceneProps {
   renderedItems: RenderableCanvasItem[];
   renderedSelectedItems: RenderableCanvasItem[];
   selectedRenderedItem: RenderableCanvasItem | null;
-  selectionLocked: boolean;
+  /** Draw the selection as outlines only: it is locked, or a marquee is still selecting it. */
+  hideTransformHandles: boolean;
   /** Blur and darken the items outside the canvas (canvas focus). */
   showFocusVeil?: boolean;
   session: {
@@ -158,7 +159,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       renderedItems,
       renderedSelectedItems,
       selectedRenderedItem,
-      selectionLocked,
+      hideTransformHandles,
       session,
       showFocusVeil = false,
       showGroupSelection,
@@ -482,7 +483,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
                 selectedRenderedItem={selectedRenderedItem}
                 renderedSelectedItems={renderedSelectedItems}
                 showGroupSelection={showGroupSelection}
-                selectionLocked={selectionLocked}
+                hideTransformHandles={hideTransformHandles}
                 groupOverlayFrame={groupOverlayFrame}
                 zoom={zoom}
                 beginResize={beginResize}

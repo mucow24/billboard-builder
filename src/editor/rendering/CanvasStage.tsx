@@ -111,6 +111,7 @@ export function CanvasStage({
     renderedSelectedItems = [],
     selectedDocumentItem,
     lastDrilldownSource,
+    marqueeInProgress = false,
     selectedNode,
     selectedRenderedItem,
     selectionLocked = false,
@@ -142,10 +143,11 @@ export function CanvasStage({
   const viewport = viewportState;
 
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
-  // A marquee selects as it is dragged out. Until release its selection is
-  // drawn the way a locked one is, as outlines only, so handles don't pop in
-  // and out under the pointer (or swap its cursor) mid-drag.
-  const selectionOutlinesOnly = selectionLocked || session?.kind === 'marquee';
+  // A locked selection can't be transformed, so it gets no handles. A
+  // marquee selects as it is dragged out; until release its selection gets
+  // none either, so handles don't pop in and out under the pointer (or swap
+  // its cursor) mid-drag.
+  const hideTransformHandles = selectionLocked || marqueeInProgress;
   const {
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,
@@ -166,7 +168,7 @@ export function CanvasStage({
     renderedSelectedItems,
     renderedSelectionFrame,
     selectedRenderedItem,
-    selectionLocked: selectionOutlinesOnly,
+    hideTransformHandles,
     session: session as never,
     cropSession: cropSession as never,
     zoom: viewport.zoom,
@@ -234,7 +236,7 @@ export function CanvasStage({
         renderedItems={renderedItems}
         renderedSelectedItems={renderedSelectedItems}
         selectedRenderedItem={selectedRenderedItem}
-        selectionLocked={selectionOutlinesOnly}
+        hideTransformHandles={hideTransformHandles}
         session={session as never}
         showFocusVeil={showExportBoundsCue}
         showGroupSelection={showGroupInteractionHooks}

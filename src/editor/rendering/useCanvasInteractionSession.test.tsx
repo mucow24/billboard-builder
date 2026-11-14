@@ -833,7 +833,7 @@ describe('useCanvasInteractionSession', () => {
     expect(initialParams.onGuidesChange).toHaveBeenCalledWith([]);
   });
 
-  it('toggles marquee hits when shift-selecting across multiple items', () => {
+  it('selects exactly the marquee hits when shift is held (no toggle, CS-10)', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
     const params = createHookParams({
@@ -930,8 +930,58 @@ describe('useCanvasInteractionSession', () => {
         result.current.handleStageMouseUp(makeStageEvent({ x: 240, y: 120 }));
       });
       expect(result.current.session).toBeNull();
-      expect(params.onSelectNodes).toHaveBeenCalledTimes(callsBeforeRelease);
+      // Release always applies the box once more, matching or not.
+      expect(params.onSelectNodes).toHaveBeenCalledTimes(callsBeforeRelease + 1);
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id, second.id]);
       expect(result.current.renderedSelectedItems.map((item) => item.id)).toEqual([first.id, second.id]);
+    });
+
+    it('leaves the box selected on release after the selection was cleared mid-drag', () => {
+      const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+      const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });
+      const { result, params, rerender } = renderWithLiveSelection(createDocument([first, second]));
+
+      act(() => {
+        result.current.handleStageMouseDown(makeStageEvent({ x: 90, y: 90 }));
+      });
+      moveTo(result, { x: 150, y: 120 });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id]);
+
+      // Something else (Escape) clears the selection while the button is down.
+      rerender({ ...params, selectedNodeIds: [] });
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent({ x: 160, y: 125 }));
+      });
+      expect(params.onSelectNodes).toHaveBeenLastCalledWith([first.id]);
+    });
+
+    it('holds the marquee state from the press through its first move, without waiting for a frame', () => {
+      const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
+      const syncRequestAnimationFrame = globalThis.requestAnimationFrame;
+      // Hold frames back, as a browser does until the next paint.
+      vi.stubGlobal('requestAnimationFrame', () => 1);
+      try {
+        const { result } = renderWithLiveSelection(createDocument([first]));
+
+        act(() => {
+          result.current.handleStageMouseDown(makeStageEvent({ x: 90, y: 90 }));
+        });
+        expect(result.current.marqueeInProgress).toBe(true);
+
+        // The first move selects `first`; the session must already be there
+        // so the selection is never drawn with handles under the box.
+        moveTo(result, { x: 150, y: 120 });
+        expect(result.current.session?.kind).toBe('marquee');
+        expect(result.current.marqueeInProgress).toBe(true);
+        expect(result.current.renderedSelectedItems.map((item) => item.id)).toEqual([first.id]);
+
+        act(() => {
+          result.current.handleStageMouseUp(makeStageEvent({ x: 150, y: 120 }));
+        });
+        expect(result.current.marqueeInProgress).toBe(false);
+      } finally {
+        vi.stubGlobal('requestAnimationFrame', syncRequestAnimationFrame);
+      }
     });
 
     it('applies the release point when the last move was missed', () => {
