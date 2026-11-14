@@ -3,6 +3,7 @@ import { Container, Rectangle } from 'pixi.js';
 
 import { configureZoomScaledFilters } from '../stage/zoomScaledFilters';
 import type { CanvasRendererHandle } from './canvasRendererTypes';
+import { extractStraightAlphaCanvas } from './straightAlphaExtract';
 
 /**
  * Create a CanvasRendererHandle backed by a PixiJS Application.
@@ -49,11 +50,11 @@ export function createPixiRendererHandle(
       const restoreViewport = neutralizeAncestorTransforms(exportContainer);
       configureZoomScaledFilters(exportContainer, 1, pixelRatio);
       try {
-        const canvas = app.renderer.extract.canvas({
+        const canvas = extractStraightAlphaCanvas(app.renderer, {
           target: exportContainer,
           frame: new Rectangle(0, 0, contentWidth, contentHeight),
           resolution: pixelRatio,
-        }) as HTMLCanvasElement;
+        });
 
         return canvas.toDataURL(mimeType);
       } finally {
