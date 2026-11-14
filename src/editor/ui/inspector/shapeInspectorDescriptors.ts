@@ -16,9 +16,6 @@ import {
 import type { InspectorFieldDescriptor } from './selectionInspectorModel';
 import { renderMirrorField } from './selectionInspectorRenderers';
 
-/** Largest Curve radius the inspector offers, in pixels. */
-const POLYGON_CURVE_RADIUS_MAX = 500;
-
 /**
  * Freeform polygon fields. Fill (with gradient) applies only while the polygon
  * is closed — an open chain is stroke-only, so the fill section disappears,
@@ -76,14 +73,12 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
     // starts open, like N-gon's Sides, rather than rows in Geometry, which
     // starts closed.
     createNumberField({
-      buildChange: (_context, nextValue) => ({
-        curveRadius: Math.min(POLYGON_CURVE_RADIUS_MAX, Math.max(0, nextValue)),
-      }),
+      buildChange: (_context, nextValue) => ({ curveRadius: Math.max(0, nextValue) }),
       digits: 1,
       fieldOrder: 10,
       getValue: (item) => (item.kind === 'polygon' ? item.curveRadius : 0),
       label: 'Curve radius',
-      max: POLYGON_CURVE_RADIUS_MAX,
+      max: 500,
       min: 0,
       propertyKey: 'curveRadius',
       sectionKey: 'polygon',
@@ -91,8 +86,9 @@ export function createPolygonDescriptors(closed: boolean): InspectorFieldDescrip
       sectionOrder: SECTION_ORDER.polygon,
       slider: true,
       step: 1,
+      textMax: Infinity,
       tooltip:
-        'Rounds every corner by this many pixels, from 0 (sharp corners) to 500. Corners next to a short side round less, as a curve never reaches past the middle of a side.',
+        'Rounds every corner by this many pixels. 0 gives sharp corners. Corners next to a short side round less, as a curve never reaches past the middle of a side.',
       valueType: 'number',
     }),
     createCustomField({

@@ -244,16 +244,30 @@ test.describe('polygon tool flows', () => {
       ]);
     });
 
-    await test.step('caps a typed curve radius at 500', async () => {
+    await test.step('keeps a typed radius past the end of the slider', async () => {
       const radius = page.getByRole('spinbutton', { name: 'Curve radius' });
-      await radius.fill('750');
+      const slider = page.getByRole('slider', { name: 'Curve radius' });
+      await expect(slider).toHaveAttribute('max', '500');
+
+      await radius.fill('100000');
       await radius.press('Enter');
-      await expect(radius).toHaveValue('500');
-      await expect(page.getByRole('slider', { name: 'Curve radius' })).toHaveAttribute('max', '500');
+      await expect(radius).toHaveValue('100000');
 
       const saved = await saveAndReadProject(page);
       expect(saved.nodes).toEqual([
-        expect.objectContaining({ curveRadius: 500 }),
+        expect.objectContaining({ curveRadius: 100000 }),
+      ]);
+    });
+
+    await test.step('turns a typed negative radius into 0', async () => {
+      const radius = page.getByRole('spinbutton', { name: 'Curve radius' });
+      await radius.fill('-5');
+      await radius.press('Enter');
+      await expect(radius).toHaveValue('0');
+
+      const saved = await saveAndReadProject(page);
+      expect(saved.nodes).toEqual([
+        expect.objectContaining({ curveRadius: 0 }),
       ]);
 
       await radius.fill('24');

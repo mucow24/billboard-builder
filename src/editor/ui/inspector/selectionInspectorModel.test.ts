@@ -675,18 +675,23 @@ describe('polygon descriptors', () => {
     expect(sectionKeys.indexOf('polygon')).toBe(sectionKeys.indexOf('stroke') + 1);
   });
 
-  it('limits Curve radius to 0 through 500 pixels, typed or dragged', () => {
+  it('runs the Curve radius slider from 0 to 500 and takes any typed radius of 0 or more', () => {
     const polygon = createPolygonItem();
     const radiusField = buildSelectionInspectorSections([polygon], environment)
       .flatMap((section) => section.fields)
       .find((field) => field.descriptor.propertyKey === 'curveRadius');
     const descriptor = radiusField?.descriptor;
 
-    expect(descriptor).toMatchObject({ controlKind: 'number', min: 0, max: 500, slider: true });
-    // No wider bound for the typed value: the text box clamps to the slider's range.
-    expect(descriptor).not.toHaveProperty('textMax');
+    expect(descriptor).toMatchObject({
+      controlKind: 'number',
+      min: 0,
+      max: 500,
+      slider: true,
+      textMax: Infinity,
+    });
+    // A radius cannot be negative, so the typed value stops at 0.
     expect(descriptor).not.toHaveProperty('textMin');
-    expect(descriptor?.buildChange({ item: polygon }, 750 as never)).toEqual({ curveRadius: 500 });
+    expect(descriptor?.buildChange({ item: polygon }, 100000 as never)).toEqual({ curveRadius: 100000 });
     expect(descriptor?.buildChange({ item: polygon }, 320 as never)).toEqual({ curveRadius: 320 });
     expect(descriptor?.buildChange({ item: polygon }, -5 as never)).toEqual({ curveRadius: 0 });
   });
