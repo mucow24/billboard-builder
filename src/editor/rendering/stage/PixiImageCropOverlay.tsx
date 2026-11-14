@@ -78,6 +78,51 @@ function drawPolyline(g: Graphics, pts: number[], stroke: number, width: number)
   g.stroke({ color: stroke, width });
 }
 
+// ── Image content ──────────────────────────────────────────────────────────
+
+interface PixiImageCropContentProps {
+  fullImageItem: ImageCanvasItem;
+  previewItem: ImageCanvasItem;
+}
+
+/**
+ * The image being cropped: the whole image, dimmed, with the kept area over
+ * it. It is graphic content, drawn with the items (under the canvas-focus
+ * veil); `PixiImageCropOverlay` draws the crop controls above it.
+ */
+export function PixiImageCropContent({ fullImageItem, previewItem }: PixiImageCropContentProps) {
+  const fullRenderBox = getRenderBox(fullImageItem);
+  const previewRenderBox = getRenderBox(previewItem);
+  const fullRotationRad = (fullImageItem.rotation * Math.PI) / 180;
+  const previewRotationRad = (previewItem.rotation * Math.PI) / 180;
+
+  return (
+    <>
+      {/* Dimmed full image (background) */}
+      <pixiContainer
+        x={fullRenderBox.x}
+        y={fullRenderBox.y}
+        rotation={fullRotationRad}
+        alpha={Math.min(1, fullImageItem.opacity * 0.35)}
+        eventMode="none"
+      >
+        <PixiImageContent item={fullImageItem} />
+      </pixiContainer>
+
+      {/* Preview image (active crop area) */}
+      <pixiContainer
+        x={previewRenderBox.x}
+        y={previewRenderBox.y}
+        rotation={previewRotationRad}
+        alpha={previewItem.opacity}
+        eventMode="none"
+      >
+        <PixiImageContent item={previewItem} />
+      </pixiContainer>
+    </>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function PixiImageCropOverlay({
@@ -257,28 +302,6 @@ export function PixiImageCropOverlay({
 
   return (
     <>
-      {/* Dimmed full image (background) */}
-      <pixiContainer
-        x={fullRenderBox.x}
-        y={fullRenderBox.y}
-        rotation={fullRotationRad}
-        alpha={Math.min(1, fullImageItem.opacity * 0.35)}
-        eventMode="none"
-      >
-        <PixiImageContent item={fullImageItem} />
-      </pixiContainer>
-
-      {/* Preview image (active crop area) */}
-      <pixiContainer
-        x={previewRenderBox.x}
-        y={previewRenderBox.y}
-        rotation={previewRotationRad}
-        alpha={previewItem.opacity}
-        eventMode="none"
-      >
-        <PixiImageContent item={previewItem} />
-      </pixiContainer>
-
       {/* Pan area over full image */}
       <pixiContainer
         x={fullRenderBox.x}

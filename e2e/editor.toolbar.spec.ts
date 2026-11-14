@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import {
   canvasPointsToPage,
@@ -20,6 +20,33 @@ import {
   startProjectFileChooser,
   uploadProject,
 } from './support/editor';
+
+// The largest difference in any colour channel between two same-sized PNGs.
+async function maxChannelDifference(page: Page, a: Buffer, b: Buffer): Promise<number> {
+  return page.evaluate(
+    async ([first, second]) => {
+      const decode = async (base64: string) => {
+        const img = new Image();
+        img.src = `data:image/png;base64,${base64}`;
+        await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        return ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      };
+      const [pixelsA, pixelsB] = await Promise.all([decode(first!), decode(second!)]);
+      let max = 0;
+      for (let i = 0; i < pixelsA.length; i++) {
+        if (i % 4 === 3) continue;
+        max = Math.max(max, Math.abs(pixelsA[i]! - pixelsB[i]!));
+      }
+      return max;
+    },
+    [a.toString('base64'), b.toString('base64')],
+  );
+}
 
 test.describe('editor toolbar flows', () => {
   test('renders the top toolbar and opens and closes popovers from the real triggers', async ({ page }) => {
@@ -67,7 +94,7 @@ test.describe('editor toolbar flows', () => {
     await expect(page.getByLabel('Canvas height')).toHaveValue('480');
   });
 
-  test('shows the export-bounds cue on hover and focus without covering the canvas interior', async ({ page }) => {
+  test('shows the export-bounds cue over the items outside the canvas, never over the canvas or the selection', async ({ page }) => {
     await openFreshEditor(page);
     await uploadProject(
       page,
@@ -77,7 +104,7 @@ test.describe('editor toolbar flows', () => {
           x: -180,
           y: 180,
           width: 180,
-          height: 140,
+          height: 400,
           fill: '#f97316',
           stroke: '#ea580cff',
         }),
@@ -87,73 +114,77 @@ test.describe('editor toolbar flows', () => {
 
     const exportButton = page.getByRole('button', { name: 'Export', exact: true });
     const canvasButton = page.getByRole('button', { name: 'Canvas', exact: true });
-    const exportCue = page.getByTestId('export-bounds-cue');
-    const [canvasTopLeft, canvasBottomRight, canvasCenter, offCanvasRectCenter] = await canvasPointsToPage(page, [
-      { x: 0, y: 0 },
-      { x: 1024, y: 1024 },
+    const stageRoot = page.getByTestId('canvas-stage-root');
+    const [canvasCenter, offCanvasRectCenter, canvasLeftEdge, offCanvasHandle] = await canvasPointsToPage(page, [
       { x: 512, y: 512 },
-      { x: -90, y: 250 },
+      { x: -90, y: 380 },
+      // On the canvas's left edge, which the rectangle touches, between its
+      // resize handles there.
+      { x: 0, y: 280 },
+      // The rectangle's middle-left resize handle, outside the canvas.
+      { x: -180, y: 380 },
     ]);
-    // A small patch of the rendered page around a point; 'disabled' finishes
-    // the cue's fade so the patch shows its settled state.
-    const patchAt = (point: { x: number; y: number }) =>
-      page.screenshot({ clip: { x: point.x - 8, y: point.y - 8, width: 16, height: 16 }, animations: 'disabled' });
+    // Either side of the edge, a few screen pixels clear of its antialiasing.
+    const justInsideCanvas = { x: canvasLeftEdge.x + 4, y: canvasLeftEdge.y };
+    const justOutsideCanvas = { x: canvasLeftEdge.x - 4, y: canvasLeftEdge.y };
+    // A patch of the rendered page around a point. The small patches stay
+    // clear of the canvas edge and inside the handle's opaque fill (radius 8
+    // on screen).
+    const patchAt = (point: { x: number; y: number }, half: number) =>
+      page.screenshot({ clip: { x: point.x - half, y: point.y - half, width: half * 2, height: half * 2 } });
+    // The veil fades over a few frames; wait for the picture to settle.
+    const settledPatchAt = async (point: { x: number; y: number }, half = 8) => {
+      let previous = await patchAt(point, half);
+      for (;;) {
+        await page.waitForTimeout(100);
+        const next = await patchAt(point, half);
+        if (next.equals(previous)) return next;
+        previous = next;
+      }
+    };
+    const capture = async () => ({
+      canvasCenter: await settledPatchAt(canvasCenter),
+      offCanvasRect: await settledPatchAt(offCanvasRectCenter),
+      justInside: await settledPatchAt(justInsideCanvas, 1.5),
+      justOutside: await settledPatchAt(justOutsideCanvas, 1.5),
+      handle: await settledPatchAt(offCanvasHandle, 2),
+    });
 
-    await expect(exportCue).not.toHaveClass(/active/);
-    const canvasPatchWithoutCue = await patchAt(canvasCenter);
-    const offCanvasPatchWithoutCue = await patchAt(offCanvasRectCenter);
+    await clickItem(page, 'toolbar-export-off-canvas');
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'inactive');
+    const withoutCue = await capture();
 
     await exportButton.hover();
-    await expect(exportCue).toHaveClass(/active/);
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'active');
+    const withCue = await capture();
 
-    // The veil darkens what lies outside the canvas and leaves the canvas
-    // itself untouched.
-    expect((await patchAt(canvasCenter)).equals(canvasPatchWithoutCue)).toBe(true);
-    expect((await patchAt(offCanvasRectCenter)).equals(offCanvasPatchWithoutCue)).toBe(false);
-
-    // The cue is one veil with the canvas cut out of it by its computed
-    // clip-path (an invalid polygon would compute to 'none'): the hole must be
-    // exactly the canvas, clamped to the stage.
-    const cueBounds = await exportCue.boundingBox();
-    expect(cueBounds).not.toBeNull();
-    const clipPath = await exportCue.evaluate((el) => getComputedStyle(el).clipPath);
-    expect(clipPath).toMatch(/^polygon\(evenodd,/);
-    // The polygon ends with the hole, traced from its top-left corner:
-    // top-left, top-right, bottom-right, bottom-left, top-left.
-    const holePoints = clipPath
-      .slice(clipPath.indexOf('(') + 1, clipPath.lastIndexOf(')'))
-      .split(',')
-      .slice(-5)
-      .map((point) => point.trim().split(/\s+/).map((value) => parseFloat(value)));
-    const hole = {
-      left: holePoints[0]![0]!,
-      top: holePoints[0]![1]!,
-      right: holePoints[2]![0]!,
-      bottom: holePoints[2]![1]!,
-    };
-    const clampX = (x: number) => Math.min(cueBounds!.width, Math.max(0, x - cueBounds!.x));
-    const clampY = (y: number) => Math.min(cueBounds!.height, Math.max(0, y - cueBounds!.y));
-    expect(hole.left).toBeCloseTo(clampX(canvasTopLeft.x), 0);
-    expect(hole.top).toBeCloseTo(clampY(canvasTopLeft.y), 0);
-    expect(hole.right).toBeCloseTo(clampX(canvasBottomRight.x), 0);
-    expect(hole.bottom).toBeCloseTo(clampY(canvasBottomRight.y), 0);
-    expect(hole.right - hole.left).toBeGreaterThan(0);
-    expect(hole.bottom - hole.top).toBeGreaterThan(0);
+    // The veil blurs and darkens the items outside the canvas, stops at the
+    // canvas's edge, and is drawn under the selection handles.
+    // While the veil is up the canvas is drawn through it at the same
+    // resolution, but into a multisampled texture rather than straight to
+    // the screen, which can move an antialiased pixel by a level or three.
+    // A handle is 95% opaque, so the veiled rectangle behind it shifts it a
+    // little; a veil over the handle would darken it by most of its brightness.
+    expect(await maxChannelDifference(page, withCue.offCanvasRect, withoutCue.offCanvasRect)).toBeGreaterThan(60);
+    expect(await maxChannelDifference(page, withCue.justOutside, withoutCue.justOutside)).toBeGreaterThan(60);
+    expect(await maxChannelDifference(page, withCue.justInside, withoutCue.justInside)).toBeLessThanOrEqual(4);
+    expect(await maxChannelDifference(page, withCue.canvasCenter, withoutCue.canvasCenter)).toBeLessThanOrEqual(4);
+    expect(await maxChannelDifference(page, withCue.handle, withoutCue.handle)).toBeLessThanOrEqual(16);
 
     await canvasButton.hover();
-    await expect(exportCue).not.toHaveClass(/active/);
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'inactive');
 
     await exportButton.focus();
-    await expect(exportCue).toHaveClass(/active/);
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'active');
 
     await canvasButton.focus();
-    await expect(exportCue).not.toHaveClass(/active/);
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'inactive');
 
     // Opening the export menu should keep the cue active so users see exactly
     // what the imminent click is going to capture.
     await exportButton.click();
     await expect(page.getByRole('button', { name: 'PNG', exact: true })).toBeVisible();
-    await expect(exportCue).toHaveClass(/active/);
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'active');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'PNG', exact: true })).toHaveCount(0);
   });
@@ -319,29 +350,19 @@ test.describe('editor toolbar flows', () => {
     await openFreshEditor(page);
 
     const focusButton = page.getByRole('button', { name: /Canvas focus/ });
-    const exportCue = page.getByTestId('export-bounds-cue');
+    const stageRoot = page.getByTestId('canvas-stage-root');
 
     await expect(focusButton).toBeVisible();
     await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
-    await expect(exportCue).not.toHaveClass(/active/);
-    await expect(exportCue).toHaveCSS('opacity', '0');
-    await expect(exportCue).toHaveCSS('backdrop-filter', 'blur(0px)');
-
-    // The blur has to ease in with the fade on the veil itself; a fade on an
-    // ancestor would hide the blur until the fade ended.
-    const transitionProperty = await exportCue.evaluate((el) => getComputedStyle(el).transitionProperty);
-    expect(transitionProperty.split(/,\s*/)).toEqual(expect.arrayContaining(['opacity', 'backdrop-filter']));
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'inactive');
 
     await focusButton.click();
     await expect(focusButton).toHaveAttribute('aria-pressed', 'true');
-    await expect(exportCue).toHaveClass(/active/);
-    await expect(exportCue).toHaveCSS('opacity', '1');
-    await expect(exportCue).toHaveCSS('backdrop-filter', 'blur(18px)');
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'active');
 
     await focusButton.click();
     await expect(focusButton).toHaveAttribute('aria-pressed', 'false');
-    await expect(exportCue).not.toHaveClass(/active/);
-    await expect(exportCue).toHaveCSS('backdrop-filter', 'blur(0px)');
+    await expect(stageRoot).toHaveAttribute('data-export-bounds-cue', 'inactive');
   });
 
   test('keeps UI text unselectable while text fields stay selectable', async ({ page }) => {

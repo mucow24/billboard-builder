@@ -18,10 +18,11 @@ import type { CanvasPointerEvent, CanvasRendererHandle } from '../renderer/canva
 import { normalizePixiEvent } from '../renderer/normalizePixiEvent';
 import { createPixiRendererHandle } from '../renderer/pixiRendererHandle';
 
-import { PixiImageCropOverlay } from './PixiImageCropOverlay';
+import { PixiImageCropContent, PixiImageCropOverlay } from './PixiImageCropOverlay';
 import { PixiItemLayer } from './PixiItemLayer';
 import { PixiSelectionOverlay } from './PixiSelectionOverlay';
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
+import { useFocusVeil } from './useFocusVeil';
 
 // Register PixiJS components for @pixi/react's JSX.
 extend({ Container, Graphics, Sprite, Text });
@@ -101,6 +102,8 @@ interface PixiCanvasSceneProps {
   renderedSelectedItems: RenderableCanvasItem[];
   selectedRenderedItem: RenderableCanvasItem | null;
   selectionLocked: boolean;
+  /** Blur and darken the items outside the canvas (canvas focus). */
+  showFocusVeil?: boolean;
   session: {
     kind: string;
     tool?: string;
@@ -157,6 +160,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       selectedRenderedItem,
       selectionLocked,
       session,
+      showFocusVeil = false,
       showGroupSelection,
       size,
       spacebarHeld,
@@ -368,6 +372,23 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       [size.width, size.height],
     );
 
+    // --- Canvas focus veil ----------------------------------------------------
+    // A filter on the content layer only: the overlay layer above it (guides,
+    // marquee, selection and crop controls) is never blurred.
+    const veiledLayerRef = useRef<PixiContainer>(null);
+    useFocusVeil({
+      active: showFocusVeil,
+      canvasRect: {
+        left: viewportPan.x,
+        top: viewportPan.y,
+        right: viewportPan.x + canvasWidth * zoom,
+        bottom: viewportPan.y + canvasHeight * zoom,
+      },
+      layerRef: veiledLayerRef,
+      rendererReady,
+      size,
+    });
+
     return (
       <Application
         ref={appRef}
@@ -395,28 +416,42 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
           onWheel={handleWheel}
           onMouseLeave={handleMouseLeave}
         >
-          {/* Viewport transform group — pan + zoom. */}
-          <pixiContainer x={viewportPan.x} y={viewportPan.y} scale={zoom}>
-            <pixiGraphics label="canvas-backdrop" draw={drawBackdrop} eventMode="none" />
-            <pixiGraphics draw={drawCanvasBorder} eventMode="none" />
-            <pixiGraphics label="canvas-background" draw={drawCanvasBackground} eventMode="none" />
-            <pixiGraphics draw={drawCheckerboard} eventMode="none" />
-            {/* Export container — background + items only (no overlays/guides). */}
-            <pixiContainer ref={exportContainerRef} label="export-content">
-              <pixiGraphics label="canvas-surface" draw={drawBackground} eventMode="none" />
-              <PixiItemLayer
-                activeTool={activeTool}
-                canvasWidth={canvasWidth}
-                canvasHeight={canvasHeight}
-                items={sceneItems}
-                onItemPointerDown={handleItemPointerDown}
-                onItemDoubleClick={handleItemDoubleClick}
-                spacebarHeld={spacebarHeld}
-                startPanDrag={startPanDrag}
-                toCanvasPointer={toCanvasPointer}
-                zoom={zoom}
-              />
+          {/* Graphic content: the canvas and its items. The canvas-focus veil
+              filters this layer. */}
+          <pixiContainer ref={veiledLayerRef} label="veiled-content">
+            {/* Viewport transform group — pan + zoom. */}
+            <pixiContainer x={viewportPan.x} y={viewportPan.y} scale={zoom}>
+              <pixiGraphics label="canvas-backdrop" draw={drawBackdrop} eventMode="none" />
+              <pixiGraphics draw={drawCanvasBorder} eventMode="none" />
+              <pixiGraphics label="canvas-background" draw={drawCanvasBackground} eventMode="none" />
+              <pixiGraphics draw={drawCheckerboard} eventMode="none" />
+              {/* Export container — background + items only (no overlays/guides). */}
+              <pixiContainer ref={exportContainerRef} label="export-content">
+                <pixiGraphics label="canvas-surface" draw={drawBackground} eventMode="none" />
+                <PixiItemLayer
+                  activeTool={activeTool}
+                  canvasWidth={canvasWidth}
+                  canvasHeight={canvasHeight}
+                  items={sceneItems}
+                  onItemPointerDown={handleItemPointerDown}
+                  onItemDoubleClick={handleItemDoubleClick}
+                  spacebarHeld={spacebarHeld}
+                  startPanDrag={startPanDrag}
+                  toCanvasPointer={toCanvasPointer}
+                  zoom={zoom}
+                />
+              </pixiContainer>
+              {/* The image being cropped is content too; its controls are not. */}
+              {cropSession ? (
+                <PixiImageCropContent
+                  fullImageItem={cropSession.fullImageItem}
+                  previewItem={cropSession.previewItem}
+                />
+              ) : null}
             </pixiContainer>
+          </pixiContainer>
+          {/* Editing UI, above the veil: same pan + zoom. */}
+          <pixiContainer label="editor-overlays" x={viewportPan.x} y={viewportPan.y} scale={zoom}>
             {/* Marquee preview */}
             {marqueeRect ? (
               <pixiGraphics label="marquee-preview" draw={drawMarquee} eventMode="none" />

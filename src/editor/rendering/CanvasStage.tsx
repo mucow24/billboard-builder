@@ -1,4 +1,4 @@
-import { useCallback, useState, type CSSProperties } from 'react';
+import { useCallback, useState } from 'react';
 
 import type {
   CanvasItem,
@@ -177,29 +177,15 @@ export function CanvasStage({
     zoomInFromWheel: viewport.zoomInFromWheel,
   });
 
-  const exportCueHoleStyle = toExportCueHoleStyle(
-    viewport.toViewportRect({
-      x: 0,
-      y: 0,
-      width: document.canvas.width,
-      height: document.canvas.height,
-    }),
-    viewport.viewportSize,
-  );
-
   return (
     <div
       className="canvas-stage-screen"
       ref={viewport.viewportRef}
       data-testid="canvas-stage-root"
+      // The veil itself is drawn by the scene, over the items only.
+      data-export-bounds-cue={showExportBoundsCue ? 'active' : 'inactive'}
       style={{ cursor: viewport.getStageCursor(Boolean(session)) }}
     >
-      <div
-        className={showExportBoundsCue ? 'canvas-export-bounds-cue active' : 'canvas-export-bounds-cue'}
-        data-testid="export-bounds-cue"
-        aria-hidden="true"
-        style={exportCueHoleStyle}
-      />
       <CanvasViewportHud
         canvasHeight={document.canvas.height}
         canvasWidth={document.canvas.width}
@@ -241,6 +227,7 @@ export function CanvasStage({
         selectedRenderedItem={selectedRenderedItem}
         selectionLocked={selectionLocked}
         session={session as never}
+        showFocusVeil={showExportBoundsCue}
         showGroupSelection={showGroupInteractionHooks}
         size={viewport.viewportSize}
 
@@ -328,31 +315,6 @@ export function CanvasStage({
       ) : null}
     </div>
   );
-}
-
-// The canvas, clamped to the stage, as the hole that .canvas-export-bounds-cue
-// cuts out of its veil.
-function toExportCueHoleStyle(
-  canvasRect: { left: number; top: number; width: number; height: number },
-  viewportSize: { width: number; height: number },
-): CSSProperties {
-  const viewportWidth = Math.max(0, viewportSize.width);
-  const viewportHeight = Math.max(0, viewportSize.height);
-  const left = clampNumber(canvasRect.left, 0, viewportWidth);
-  const top = clampNumber(canvasRect.top, 0, viewportHeight);
-  const right = Math.max(left, clampNumber(canvasRect.left + canvasRect.width, 0, viewportWidth));
-  const bottom = Math.max(top, clampNumber(canvasRect.top + canvasRect.height, 0, viewportHeight));
-
-  return {
-    '--cue-hole-left': `${left}px`,
-    '--cue-hole-top': `${top}px`,
-    '--cue-hole-right': `${right}px`,
-    '--cue-hole-bottom': `${bottom}px`,
-  } as CSSProperties;
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function CanvasStageDebug({
