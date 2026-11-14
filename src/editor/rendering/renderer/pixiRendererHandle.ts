@@ -2,6 +2,7 @@ import type { ApplicationRef } from '@pixi/react';
 import { Container, Rectangle } from 'pixi.js';
 
 import type { CanvasRendererHandle } from './canvasRendererTypes';
+import { extractStraightAlphaCanvas } from './straightAlphaExtract';
 
 /**
  * Create a CanvasRendererHandle backed by a PixiJS Application.
@@ -36,11 +37,11 @@ export function createPixiRendererHandle(
       const exportContainer = exportContainerRef.current;
       if (!app?.renderer || !exportContainer) return '';
 
-      const canvas = app.renderer.extract.canvas({
+      const canvas = extractStraightAlphaCanvas(app.renderer, {
         target: exportContainer,
         frame: new Rectangle(0, 0, contentWidth, contentHeight),
         resolution: pixelRatio,
-      }) as HTMLCanvasElement;
+      });
 
       return canvas.toDataURL(mimeType);
     },
