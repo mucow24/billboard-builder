@@ -25,6 +25,7 @@ export const SECTION_ORDER = {
   fill: 10,
   stroke: 15,
   ngon: 17,
+  polygon: 18,
   text: 20,
   geometry: 50,
   advancedText: 60,
@@ -275,7 +276,7 @@ export function createGradientAngleDescriptor(): NumberFieldDescriptor {
     textMax: Infinity,
     textMin: -Infinity,
     tooltip:
-      'Direction of the gradient in degrees. 0 runs left to right. Only available while the gradient is on.',
+      'Direction of the gradient in degrees. 0 runs top to bottom and 90 left to right. Only available while the gradient is on.',
     valueType: 'number',
   });
 }

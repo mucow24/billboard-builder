@@ -2,6 +2,7 @@ import type { FontOption } from '../FontFamilyPicker';
 
 import { GradientFillWidget } from './GradientFillWidget';
 import {
+  ActionButtonInput,
   FontPickerInput,
   SegmentedSelectInput,
   ToggleButtonInput,
@@ -66,6 +67,15 @@ export function renderItalicField({ field, onCommit }: CustomFieldRenderProps) {
   );
 }
 
+function renderMirrorGlyph() {
+  return (
+    <span className="inspector-toggle-button-glyph" aria-hidden="true">
+      ↔
+    </span>
+  );
+}
+
+/** The image's Mirror: an on/off toggle, since the flip is applied when drawing. */
 export function renderMirrorField({ field, onCommit }: CustomFieldRenderProps) {
   return (
     <ToggleButtonInput
@@ -76,10 +86,25 @@ export function renderMirrorField({ field, onCommit }: CustomFieldRenderProps) {
       mixed={field.state.isMixed}
       onChange={(nextValue) => onCommit(nextValue)}
     >
-      <span className="inspector-toggle-button-glyph" aria-hidden="true">
-        ↔
-      </span>
+      {renderMirrorGlyph()}
     </ToggleButtonInput>
+  );
+}
+
+/**
+ * The polygon's Mirror: a plain button that flips the shape on every click.
+ * The flip is written into the vertices, so there is no state to show.
+ */
+export function renderMirrorActionField({ field, onCommit }: CustomFieldRenderProps) {
+  return (
+    <ActionButtonInput
+      disabled={field.disabled}
+      label={field.descriptor.label}
+      tooltip={field.descriptor.tooltip}
+      onClick={() => onCommit(true)}
+    >
+      {renderMirrorGlyph()}
+    </ActionButtonInput>
   );
 }
 

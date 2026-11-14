@@ -104,3 +104,21 @@ export function translatePolygonVertices(
 ): PolygonVertex[] {
   return vertices.map((v) => ({ x: v.x + deltaX, y: v.y + deltaY }));
 }
+
+/**
+ * Flip the vertices left to right across the vertical line through the middle
+ * of their bounds, so the shape stays where it was. Vertex order (and so every
+ * vertex and edge index) is kept; applying it twice gives the original back.
+ */
+export function mirrorPolygonVerticesHorizontally(vertices: PolygonVertex[]): PolygonVertex[] {
+  if (vertices.length === 0) return vertices;
+  // The true extent, not polygonBounds: that floors the width at 1, which
+  // would shift a sliver narrower than a pixel sideways.
+  let minX = vertices[0].x;
+  let maxX = vertices[0].x;
+  for (const v of vertices) {
+    minX = Math.min(minX, v.x);
+    maxX = Math.max(maxX, v.x);
+  }
+  return vertices.map((v) => ({ x: minX + maxX - v.x, y: v.y }));
+}

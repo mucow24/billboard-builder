@@ -6,6 +6,7 @@ import {
   createGroupNode,
   createImageItem,
   createLineItem,
+  createPolygonItem,
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
@@ -704,11 +705,60 @@ describe('SelectionInspector', () => {
     );
 
     expect(screen.getByText('Size:')).toHaveAttribute('title', 'Font size in pixels.');
+    // computeGradientEndpoints: 0 runs top to bottom, 90 left to right.
     expect(screen.getByText('Gradient angle:')).toHaveAttribute(
       'title',
-      expect.stringContaining('Direction of the gradient'),
+      expect.stringContaining('0 runs top to bottom and 90 left to right'),
     );
     expect(screen.getByText('W:')).toHaveAttribute('title', 'Width in pixels.');
+  });
+
+  it('opens the Polygon section from the start, with a Mirror button that flips the polygon on each click', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const polygonItem = createPolygonItem({
+      vertices: [
+        { x: 0, y: 0 },
+        { x: 50, y: 0 },
+        { x: 0, y: 80 },
+      ],
+    });
+
+    render(
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={polygonItem}
+        selectedNodeCount={1}
+        selectedItems={[polygonItem]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Polygon' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('slider', { name: 'Curve radius' })).toBeVisible();
+    expect(screen.getByText('Curve radius:')).toHaveAttribute(
+      'title',
+      expect.stringContaining('pixels'),
+    );
+    expect(screen.getByText('Mirror:')).toHaveAttribute(
+      'title',
+      expect.stringContaining('left to right'),
+    );
+
+    // An action, not a toggle: there is no pressed state to report.
+    const mirrorButton = screen.getByRole('button', { name: 'Mirror' });
+    expect(mirrorButton).not.toHaveAttribute('aria-pressed');
+
+    await user.click(mirrorButton);
+    expect(expectLatestChange(onItemChange, polygonItem)).toMatchObject({
+      vertices: [
+        { x: 50, y: 0 },
+        { x: 0, y: 0 },
+        { x: 50, y: 80 },
+      ],
+    });
   });
 
   it('swaps fill colors for text items', async () => {
