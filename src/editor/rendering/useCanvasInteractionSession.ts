@@ -271,13 +271,13 @@ export function useCanvasInteractionSession({
   const { resolveModifierKeys } = useModifierKeys({ capture: true });
 
   const updateSession = useCallback((nextSession: InteractionSession | null) => {
-    const startsGesture = sessionRef.current === null && nextSession !== null;
+    const startsMarquee = sessionRef.current === null && nextSession?.kind === 'marquee';
     sessionRef.current = nextSession;
-    if (nextSession === null || startsGesture) {
-      // A gesture's start and end render at once, in the same batch as
-      // whatever they do to the selection. A marquee's first move can select
-      // items; a frame where those showed without the session would draw
-      // their handles under the box.
+    if (nextSession === null || startsMarquee) {
+      // A gesture's end renders at once, so its commit is immediate. So does
+      // a marquee's start, in the same batch as the selection its first move
+      // can already make: a frame with that selection but no marquee would
+      // draw the selection's handles under the box.
       if (sessionRafRef.current !== null) {
         cancelAnimationFrame(sessionRafRef.current);
         sessionRafRef.current = null;
