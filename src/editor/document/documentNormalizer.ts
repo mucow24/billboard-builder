@@ -149,8 +149,16 @@ function normalizeGradientFill<T extends { fill: string; secondaryFill?: string;
  * Scanlines used to carry their transparency in the color's alpha digits.
  * Opacity is now a setting of its own, so a layer saved without one takes its
  * opacity from that alpha and keeps the color opaque: it looks the same.
+ *
+ * Diagonal bands saved before the bands were centered on the item keep their
+ * old layout, so they look the same too.
  */
 function normalizeGeneratorParams(params: GeneratorParams): GeneratorParams {
+  if (params.generatorType === 'bands') {
+    return typeof params.stripeCentered === 'boolean'
+      ? params
+      : { ...params, stripeCentered: false };
+  }
   if (params.generatorType !== 'scanlines') {
     return params;
   }

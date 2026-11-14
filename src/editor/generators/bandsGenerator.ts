@@ -14,13 +14,31 @@ function drawBands(
   ctx.translate(w / 2, h / 2);
   ctx.rotate((params.stripeAngle * Math.PI) / 180);
   const span = Math.hypot(w, h) * 1.6;
-  const start = -span / 2;
   const nominal = params.stripeThickness;
-  let cursor = start - span * params.stripeOffset;
+  // Every band's width and slant come first, in the order they always have,
+  // so a layer's bands keep their shapes whichever way they are laid out.
+  const bands: { thickness: number; skew: number }[] = [];
   for (let i = 0; i < params.stripeCount; i++) {
     const jitter = (rng() - 0.5) * nominal * params.stripeSpacingJitter * 2;
     const thickness = Math.max(4, nominal + jitter);
     const skew = (rng() - 0.5) * span * params.stripeSkew;
+    bands.push({ thickness, skew });
+  }
+  // Each band slants about one point along its length, where `cursor` is its
+  // left edge and its shadow sits. Centered bands slant about the item's
+  // center line, where they lie side by side with the set centered on the
+  // item, so neither a size nor a skew can move them off it. Layers saved
+  // before that start at the far edge of an area 1.6 times the item's
+  // diagonal and slant about their top ends; they still do, so they look the
+  // same.
+  const pivot = params.stripeCentered ? 0.5 : 0;
+  const start = params.stripeCentered
+    ? -bands.reduce((sum, band) => sum + band.thickness, 0) / 2
+    : -span / 2;
+  let cursor = start - span * params.stripeOffset;
+  for (let i = 0; i < bands.length; i++) {
+    const { thickness, skew } = bands[i];
+    const top = cursor - skew * pivot;
     const t = i / Math.max(1, params.stripeCount - 1);
     const color = mixColor(
       params.bandColorA,
@@ -37,20 +55,20 @@ function drawBands(
       const physicalScale = ctx.getTransform().a;
       ctx.filter = `blur(${Math.max(1, thickness * 0.35) * physicalScale}px)`;
       ctx.beginPath();
-      ctx.moveTo(cursor, -span / 2);
-      ctx.lineTo(cursor + thickness, -span / 2);
-      ctx.lineTo(cursor + thickness + skew, span / 2);
-      ctx.lineTo(cursor + skew, span / 2);
+      ctx.moveTo(top, -span / 2);
+      ctx.lineTo(top + thickness, -span / 2);
+      ctx.lineTo(top + thickness + skew, span / 2);
+      ctx.lineTo(top + skew, span / 2);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
     }
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.moveTo(cursor, -span / 2);
-    ctx.lineTo(cursor + thickness, -span / 2);
-    ctx.lineTo(cursor + thickness + skew, span / 2);
-    ctx.lineTo(cursor + skew, span / 2);
+    ctx.moveTo(top, -span / 2);
+    ctx.lineTo(top + thickness, -span / 2);
+    ctx.lineTo(top + thickness + skew, span / 2);
+    ctx.lineTo(top + skew, span / 2);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = rgba(params.shadowColor, 0.18);
@@ -87,11 +105,12 @@ export const bandsGeneratorSpec: GeneratorSpec<BandsGeneratorParams> = {
       stripeAngle: -20,
       stripeThickness: 56,
       stripeSpacingJitter: 0.32,
-      stripeOffset: 0.1,
+      stripeOffset: 0,
       stripeSkew: 0.28,
       stripeContrast: 0.92,
       stripeGlow: 0.14,
       seedOverride: null,
+      stripeCentered: true,
     };
   },
   draw(ctx, w, h, params, seed) {

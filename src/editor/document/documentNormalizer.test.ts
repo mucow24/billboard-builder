@@ -12,7 +12,7 @@ import {
 import {
   normalizeProjectDocument,
 } from './documentNormalizer';
-import type { GeneratorCanvasItem, ImageCanvasItem } from './documentTypes';
+import type { BandsGeneratorParams, GeneratorCanvasItem, ImageCanvasItem } from './documentTypes';
 import { rgba } from '../generators/colorUtils';
 
 describe('document normalizer', () => {
@@ -527,5 +527,34 @@ describe('document normalizer', () => {
       scanlineColor: '#11223380',
       opacity: 0.4,
     });
+  });
+
+  it('keeps diagonal bands saved before they were centered on their old layout', () => {
+    const bands = createGeneratorItem('bands', 1024, 1024);
+    const { stripeCentered: ignoredStripeCentered, ...savedParams } = {
+      ...bands.generatorParams,
+      stripeOffset: -0.4,
+    } as BandsGeneratorParams;
+    void ignoredStripeCentered;
+
+    const normalized = normalizeProjectDocument({
+      version: 2,
+      nodes: [{ ...bands, generatorParams: savedParams } as unknown as GeneratorCanvasItem],
+      fonts: [],
+    });
+
+    expect((normalized.nodes[0] as GeneratorCanvasItem).generatorParams).toEqual({
+      ...savedParams,
+      stripeCentered: false,
+    });
+  });
+
+  it('leaves the params of centered diagonal bands untouched', () => {
+    const bands = createGeneratorItem('bands', 1024, 1024);
+
+    const normalized = normalizeProjectDocument({ version: 2, nodes: [bands], fonts: [] });
+
+    // The same object, so the layer is not drawn again after every edit.
+    expect((normalized.nodes[0] as GeneratorCanvasItem).generatorParams).toBe(bands.generatorParams);
   });
 });
