@@ -34,8 +34,8 @@ This editor is organized around a small set of ownership boundaries.
 - A two-vertex line is a "straight line" (`isStraightLine`) and keeps the behaviour lines had before they could be bent: no transform box, no vertex sub-selection (enforced in the reducer, so Delete and the arrow keys act on the whole line), and a padded-box hit area when drilling into a group. Every one of those rules goes through `isStraightLine`.
 - Emoji a text's font lacks are drawn from the bundled Noto Emoji (`src/editor/fonts/emojiFallback.ts`), and the canvas, its measurements and SVG export must agree on every character:
   - Anything that lays out, measures or draws a text item's text uses `drawnText(item.text)`, never `item.text` itself.
-  - Every canvas font declaration for a text item comes from `getRenderableCanvasFontDeclaration` (or `textFontFamilies`, which it uses), so it names the emoji fallback after the item's own family.
-  - The fallback's faces are used only for `EMOJI_FALLBACK_UNICODE_RANGE`. SVG export routes characters to the fallback by the same range (`isInEmojiFallbackRange`, through `emojiFallbackOutline`), so the two change together.
+  - Every canvas font declaration for a text item comes from `getRenderableCanvasFontDeclaration` (or `textFontFamilies(family, text)`, which it uses), so it names the emoji fallback after the item's own family, and the keycap family last when the text has a keycap.
+  - The fallback's faces are used only for `EMOJI_FALLBACK_UNICODE_RANGE`, and its keycap faces (`EMOJI_KEYCAP_FAMILY`, the same files) only for `EMOJI_KEYCAP_UNICODE_RANGE`. SVG export routes each item's characters to the fallback by the same ranges (`emojiFallbackRangeOf(text)`, through `emojiFallbackOutline`), so the ranges and that function change together.
 
 ## Document library
 

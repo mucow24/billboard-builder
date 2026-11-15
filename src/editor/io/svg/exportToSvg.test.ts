@@ -168,4 +168,35 @@ describe('exportToSvg', () => {
     expect(afterDigits).toBeDefined();
     expect(afterDigits).toBe(await emojiPath(`SA ${smile}`));
   });
+
+  it('outlines keycaps from the fallback, and decides that item by item within a font variant', async () => {
+    const notoEmoji = loadFont('NotoEmoji-Regular.ttf');
+    const dashEarly = loadFont('DASH-Early.ttf');
+    const loadFallbackFontBytes = vi.fn(async () => ({ kind: 'bundled' as const, bytes: notoEmoji }));
+    const pathsOf = async (items: TextCanvasItem[], ownBytes: ArrayBuffer) => {
+      const { svg } = await exportToSvg(docWith(items), {
+        loadFontBytes: async () => ({ kind: 'bundled' as const, bytes: ownBytes }),
+        loadFallbackFontBytes,
+        measurer: fakeMeasurer,
+        rasterizer: fakeRasterizer,
+      });
+      return [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+    };
+    // DASH Early has neither the 1 nor the keycap mark, nor the 5.
+    const keycap = createTextItem({ id: 'keycap', text: String.fromCodePoint(0x31, 0xfe0f, 0x20e3), fontFamily: 'DASH Early' });
+    const plain = createTextItem({ id: 'plain', text: `5${String.fromCodePoint(0x1f600)}`, fontFamily: 'DASH Early' });
+
+    const together = await pathsOf([keycap, plain], dashEarly);
+    expect(loadFallbackFontBytes).toHaveBeenCalledTimes(1);
+
+    // The keycap comes out as it does when Noto Emoji is the item's own font...
+    const keycapInNoto = await pathsOf([{ ...keycap, fontFamily: 'Noto Emoji' }], notoEmoji);
+    expect(keycapInNoto).toHaveLength(1);
+    expect(together[0]).toBe(keycapInNoto[0]);
+    // ...while in the text without a keycap, the fallback draws the emoji alone,
+    // as it does after letters: the 5 is not drawn from Noto Emoji although an
+    // item of the same font variant has a keycap.
+    const afterLetters = await pathsOf([{ ...plain, text: `S${String.fromCodePoint(0x1f600)}` }], dashEarly);
+    expect(together.at(-1)).toBe(afterLetters.at(-1));
+  });
 });

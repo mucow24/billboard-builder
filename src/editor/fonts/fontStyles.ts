@@ -111,6 +111,6 @@ export function getRenderableCanvasFontDeclaration(item: TextCanvasItem): string
   if (effective.includes('italic')) parts.push('italic');
   if (effective.includes('bold')) parts.push('bold');
   parts.push(`${item.fontSize}px`);
-  parts.push(textFontFamilies(item.fontFamily).map(quoteFontFamily).join(', '));
+  parts.push(textFontFamilies(item.fontFamily, item.text).map(quoteFontFamily).join(', '));
   return parts.join(' ');
 }

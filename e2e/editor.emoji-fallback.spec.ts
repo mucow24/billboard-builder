@@ -31,10 +31,12 @@ const CASES = [
   { id: 'emoji typed with the presentation selector', text: chars(0x2764, 0xfe0f) },
   { id: 'emoji with a skin tone', text: chars(0x1f44d, 0x1f3fd) },
   { id: 'joined sequence', text: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467) },
+  // Barlow has the 1 and the # but not the keycap mark.
+  { id: 'keycaps', text: chars(0x31, 0xfe0f, 0x20e3, 0x23, 0xfe0f, 0x20e3) },
 ];
 
-const FONT_SIZE = 120;
-const ROW = 220;
+const FONT_SIZE = 110;
+const ROW = 200;
 const FILL = '#ff0000';
 
 function buildDocument() {
@@ -53,7 +55,7 @@ function buildDocument() {
         x: 100,
         y: 30 + index * ROW,
         width: 800,
-        height: 180,
+        height: 170,
       }),
     ),
   );
@@ -141,12 +143,13 @@ test.describe('emoji fallback', () => {
             }
           }
 
-          // The same emoji, as the canvas is given it, drawn in Noto Emoji alone.
+          // The same emoji, as the canvas is given it, drawn in Noto Emoji alone
+          // (keycaps in its keycap family).
           const reference = document.createElement('canvas');
           reference.width = width;
           reference.height = row * 2;
           const context = reference.getContext('2d', { willReadFrequently: true })!;
-          context.font = `${fontSize}px "Noto Emoji"`;
+          context.font = `${fontSize}px "Noto Emoji", "Noto Emoji Keycaps"`;
           context.fillStyle = '#ff0000';
           context.fillText(entry.text.split(String.fromCodePoint(0xfe0f)).join(''), 20, row);
           const referencePixels = context.getImageData(0, 0, width, row * 2).data;
@@ -187,8 +190,8 @@ test.describe('emoji fallback', () => {
 
   // Noto Emoji has the space, the digits, "#" and "*", as wide as an emoji. Its
   // face is used for nothing below U+80, so text whose font lacks them, or is
-  // missing, measures as it would without the fallback, and keycaps (a digit and
-  // U+20E3) are not drawn from it.
+  // missing, measures as it would without the fallback. (Text with a keycap also
+  // names the keycap family, which has the digits; see the case above.)
   test('leaves ASCII to the text font or the system, not to Noto Emoji', async ({ page }) => {
     await openFreshEditor(page);
     await waitForBundledFonts(page);
@@ -200,19 +203,16 @@ test.describe('emoji fallback', () => {
         const metrics = context.measureText(text);
         return [Math.round(metrics.width * 10) / 10, metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent];
       };
-      const keycap = `1${String.fromCodePoint(0x20e3)}`;
       const emoji = String.fromCodePoint(0x1f600);
       return {
         missingFont: [measure('"No Such Font", "Noto Emoji"', 'Sale 50 #*'), measure('"No Such Font"', 'Sale 50 #*')],
         fontWithoutDigits: [measure('"DASH Early", "Noto Emoji"', 'SALE 50'), measure('"DASH Early"', 'SALE 50')],
-        keycap: [measure('"Barlow", "Noto Emoji"', keycap), measure('"Barlow"', keycap)],
         emoji: [measure('"Barlow", "Noto Emoji"', emoji), measure('"Noto Emoji"', emoji)],
       };
     });
 
     expect(measured.missingFont[0], 'text in a missing font').toEqual(measured.missingFont[1]);
     expect(measured.fontWithoutDigits[0], 'digits of a font that has none').toEqual(measured.fontWithoutDigits[1]);
-    expect(measured.keycap[0], 'a keycap').toEqual(measured.keycap[1]);
     // The fallback is still used where it is meant to be. (Only the advance: the
     // line metrics are those of the first family, which Noto Emoji alone is not.)
     expect(measured.emoji[0][0], 'an emoji').toBe(measured.emoji[1][0]);

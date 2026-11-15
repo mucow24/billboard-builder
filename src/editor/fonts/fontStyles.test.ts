@@ -124,6 +124,15 @@ describe('fontStyles', () => {
     );
   });
 
+  it('names the keycap family last for text with a keycap', () => {
+    setFontCheck(vi.fn().mockReturnValue(true));
+    const keycap = String.fromCodePoint(0x31, 0xfe0f, 0x20e3);
+
+    expect(
+      getRenderableCanvasFontDeclaration(createTextItem({ fontFamily: 'Barlow', fontSize: 40, text: `Call ${keycap}` })),
+    ).toBe('40px "Barlow", "Noto Emoji", "Noto Emoji Keycaps"');
+  });
+
   it('caches repeated font variant checks for the same family, weight, and style', () => {
     const check = vi.fn().mockReturnValue(true);
     setFontCheck(check);

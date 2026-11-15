@@ -1,6 +1,6 @@
 import type { ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
 import { isCanvasItemNode, visitNodes } from '../../document/sceneGraph';
-import { drawnText, isInEmojiFallbackRange } from '../../fonts/emojiFallback';
+import { drawnText, emojiFallbackRangeOf } from '../../fonts/emojiFallback';
 import { documentToSvg } from './documentToSvg';
 import { emojiFallbackOutline, hasGlyphsFor } from './svgTextGlyphs';
 import { fontVariantKey, resolveOutline, type FontKind } from './fontOutlineProvider';
@@ -56,20 +56,26 @@ export async function exportToSvg(doc: ProjectDocument, deps: ExportToSvgDeps): 
     // only once an item in that variant turns out to lack a character the
     // fallback could be used for.
     if (!outline.ok || !deps.loadFallbackFontBytes || fallbackAsked.has(key)) continue;
-    if (hasGlyphsFor(outline.font, [...drawnText(item.text)].filter(isInEmojiFallbackRange).join(''))) continue;
+    const drawn = drawnText(item.text);
+    if (hasGlyphsFor(outline.font, [...drawn].filter(emojiFallbackRangeOf(drawn)).join(''))) continue;
     fallbackAsked.add(key);
     const { kind, bytes, synthetic } = await deps.loadFallbackFontBytes(item);
     const fallback = resolveOutline(kind, bytes);
     if (fallback.ok) {
-      resolved.set(key, {
-        ...outline,
-        fallback: { font: emojiFallbackOutline(fallback.font), ...(synthetic ? { synthetic } : {}) },
-      });
+      resolved.set(key, { ...outline, fallback: { font: fallback.font, ...(synthetic ? { synthetic } : {}) } });
     }
   }
 
   const fontOutlines: FontOutlineProvider = {
-    getOutlineFont: (item) => resolved.get(fontVariantKey(item)) ?? { ok: false, reason: 'no-bytes' },
+    getOutlineFont: (item) => {
+      const outline = resolved.get(fontVariantKey(item));
+      if (!outline) return { ok: false, reason: 'no-bytes' };
+      if (!outline.ok || !outline.fallback) return outline;
+      // A font variant shares its fallback's bytes, but which characters the
+      // fallback may draw depends on the item's text (see `emojiFallbackRangeOf`).
+      const font = emojiFallbackOutline(outline.fallback.font, drawnText(item.text));
+      return { ...outline, fallback: { ...outline.fallback, font } };
+    },
   };
 
   return documentToSvg(doc, {

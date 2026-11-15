@@ -1,4 +1,4 @@
-import { isInEmojiFallbackRange } from '../../fonts/emojiFallback';
+import { emojiFallbackRangeOf } from '../../fonts/emojiFallback';
 import type { GlyphPathStyle, OutlineFont, SubstituteGlyph, TextSubstitutions } from './svgExportTypes';
 
 /**
@@ -54,11 +54,14 @@ export function hasGlyphsFor(font: OutlineFont, text: string): boolean {
 }
 
 /**
- * `font`, the emoji fallback's, as the canvas uses it: for no character below
- * U+80, whatever glyphs it has (see `EMOJI_FALLBACK_UNICODE_RANGE`).
+ * `font`, the emoji fallback's, as the canvas uses it for `text`: only for the
+ * characters `emojiFallbackRangeOf(text)` lets it draw, whatever glyphs it has.
+ * That is none below U+80, except the characters of keycaps in a text that has
+ * one.
  */
-export function emojiFallbackOutline(font: OutlineFont): OutlineFont {
-  return { ...font, hasGlyph: (ch) => isInEmojiFallbackRange(ch) && (font.hasGlyph?.(ch) ?? true) };
+export function emojiFallbackOutline(font: OutlineFont, text: string): OutlineFont {
+  const inRange = emojiFallbackRangeOf(text);
+  return { ...font, hasGlyph: (ch) => inRange(ch) && (font.hasGlyph?.(ch) ?? true) };
 }
 
 /**

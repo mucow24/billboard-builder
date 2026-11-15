@@ -1,5 +1,10 @@
 import type { UploadedFont } from '../document/documentTypes';
-import { EMOJI_FALLBACK_UNICODE_RANGE, isEmojiFallbackFamily } from './emojiFallback';
+import {
+  EMOJI_FALLBACK_UNICODE_RANGE,
+  EMOJI_KEYCAP_FAMILY,
+  EMOJI_KEYCAP_UNICODE_RANGE,
+  isEmojiFallbackFamily,
+} from './emojiFallback';
 import { announceFontRegistration } from './fontRegistrations';
 import {
   parseFontSourceName,
@@ -35,35 +40,70 @@ function toCssUrl(url: string): string {
   return `url("${escaped}")`;
 }
 
+/** The faces made from one font file. */
+interface LoadedFontFaces {
+  fontFace: FontFace;
+  /**
+   * For a file of the emoji fallback's family, the same file as a face of
+   * `EMOJI_KEYCAP_FAMILY`, unless that one failed to load.
+   */
+  keycapFace?: FontFace;
+}
+
 /**
  * Create the `FontFace` for a font source and wait for it to load. The browser cannot render with it yet.
- * A face of the emoji fallback's family, bundled or uploaded, is used only for the characters the
- * fallback is meant for (`EMOJI_FALLBACK_UNICODE_RANGE`).
+ *
+ * A file of the emoji fallback's family, bundled or uploaded, is used only for the characters the
+ * fallback is meant for (`EMOJI_FALLBACK_UNICODE_RANGE`), and gets a second face for keycaps
+ * (`EMOJI_KEYCAP_FAMILY`). A keycap face that fails to load costs only keycaps.
  */
 async function loadFontFace(
   metadata: ParsedFontMetadata,
   source: ArrayBuffer | string
-): Promise<FontFace> {
-  const fontFace = new FontFace(metadata.family, typeof source === 'string' ? toCssUrl(source) : source, {
-    weight: metadata.weight,
-    style: metadata.style,
-    ...(isEmojiFallbackFamily(metadata.family) ? { unicodeRange: EMOJI_FALLBACK_UNICODE_RANGE } : {}),
+): Promise<LoadedFontFaces> {
+  const fontSource = typeof source === 'string' ? toCssUrl(source) : source;
+  const descriptors: FontFaceDescriptors = { weight: metadata.weight, style: metadata.style };
+  if (!isEmojiFallbackFamily(metadata.family)) {
+    const fontFace = new FontFace(metadata.family, fontSource, descriptors);
+    await fontFace.load();
+    return { fontFace };
+  }
+
+  const fontFace = new FontFace(metadata.family, fontSource, {
+    ...descriptors,
+    unicodeRange: EMOJI_FALLBACK_UNICODE_RANGE,
   });
-  await fontFace.load();
-  return fontFace;
+  const keycapFace = new FontFace(EMOJI_KEYCAP_FAMILY, fontSource, {
+    ...descriptors,
+    unicodeRange: EMOJI_KEYCAP_UNICODE_RANGE,
+  });
+  const [, keycapLoaded] = await Promise.all([
+    fontFace.load(),
+    keycapFace.load().then(
+      () => true,
+      (reason) => {
+        console.warn('Skipping the keycap face of an emoji font that failed to load.', reason);
+        return false;
+      }
+    ),
+  ]);
+  return keycapLoaded ? { fontFace, keycapFace } : { fontFace };
 }
 
 /**
- * Add a loaded face to `document.fonts`, which is what lets text render with it,
- * and remember its file. The order of these calls matters: among faces with the
+ * Add a file's loaded faces to `document.fonts`, which is what lets text render with them,
+ * and remember the file. The order of these calls matters: among faces with the
  * same family, weight and style, text renders with the one added last.
+ *
+ * Only the file's own face is remembered, so a keycap face is never listed as a font.
  */
 function registerFontFace(
-  fontFace: FontFace,
+  { fontFace, keycapFace }: LoadedFontFaces,
   metadata: ParsedFontMetadata,
   kind: UploadedFont['kind']
 ): UploadedFont {
   document.fonts.add(fontFace);
+  if (keycapFace) document.fonts.add(keycapFace);
   const font: UploadedFont = {
     family: metadata.family,
     sourceName: metadata.sourceName,
@@ -106,8 +146,8 @@ export function listRegisteredFonts(): UploadedFont[] {
 
 export async function registerFontFile(file: File): Promise<UploadedFont> {
   const metadata = parseFontSourceName(file.name);
-  const fontFace = await loadFontFace(metadata, await file.arrayBuffer());
-  return registerFontFace(fontFace, metadata, 'uploaded');
+  const faces = await loadFontFace(metadata, await file.arrayBuffer());
+  return registerFontFace(faces, metadata, 'uploaded');
 }
 
 export async function registerUploadedFontBytes(
@@ -169,9 +209,9 @@ export function loadFontEntriesInStages(
       const variant = JSON.stringify([metadata.family, metadata.weight, metadata.style]);
       const earlierRegistrations = registrationsByVariant.get(variant) ?? [];
       const registration = (async () => {
-        const fontFace = await loadFontFace(metadata, entry.url);
+        const faces = await loadFontFace(metadata, entry.url);
         await Promise.allSettled(earlierRegistrations);
-        return registerFontFace(fontFace, metadata, 'bundled');
+        return registerFontFace(faces, metadata, 'bundled');
       })();
       registrationsByVariant.set(variant, [...earlierRegistrations, registration]);
       const settled = registration.then(
