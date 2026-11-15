@@ -1,8 +1,9 @@
 import type { CanvasItem, PolygonCanvasItem } from '../document/documentTypes';
 import { polygonBounds } from '../document/polygonVertices';
 
+import { scaleImageSourceTransform } from './imagePresentation';
 import { getItemSelectionPoints } from './selectionGeometry';
-import type { Point, RenderBox } from './transformGeometry';
+import { getRenderBox, type Point, type RenderBox } from './transformGeometry';
 
 interface ResizeFrameAxes {
   origin: Point;
@@ -38,6 +39,25 @@ function mapPolygonItem(
 ): PolygonCanvasItem {
   const vertices = item.vertices.map((vertex) => mapPoint(vertex));
   return { ...item, vertices, ...polygonBounds(vertices), scaleX: 1, scaleY: 1 };
+}
+
+// An image draws its source through sourceTransform, which lives in the item's
+// own frame, so a resize must scale it along with the box or the bounds grow
+// while the graphic stays at its old size. Single-item resize does the same
+// (interactionGeometry's applyShapeFrame).
+function withImageSourceScaledToFrame(original: CanvasItem, resized: CanvasItem): CanvasItem {
+  if (original.kind !== 'image' || resized.kind !== 'image') {
+    return resized;
+  }
+  const before = getRenderBox(original);
+  return {
+    ...resized,
+    sourceTransform: scaleImageSourceTransform(
+      original.sourceTransform,
+      resized.width / Math.max(before.width, 1),
+      resized.height / Math.max(before.height, 1),
+    ),
+  };
 }
 
 function normalizeRect(rect: RenderBox): RenderBox {
@@ -343,7 +363,7 @@ function buildAxisAlignedGroupResizePreviews(
     const width = Math.max(1, Math.hypot(topRight.x - topLeft.x, topRight.y - topLeft.y));
     const height = Math.max(1, Math.hypot(bottomLeft.x - topLeft.x, bottomLeft.y - topLeft.y));
     const rotation = (Math.atan2(topRight.y - topLeft.y, topRight.x - topLeft.x) * 180) / Math.PI;
-    return {
+    return withImageSourceScaledToFrame(item, {
       ...item,
       x: topLeft.x,
       y: topLeft.y,
@@ -352,7 +372,7 @@ function buildAxisAlignedGroupResizePreviews(
       rotation,
       scaleX: 1,
       scaleY: 1,
-    };
+    });
   });
 }
 
@@ -378,7 +398,7 @@ export function buildGroupResizePreviews(
     const mappedPoints = getItemSelectionPoints(item).map((point) =>
       mapPointBetweenResizeFrames(point, fromAxes, toAxes)
     ) as [Point, Point, Point, Point];
-    return rebuildShapeItemFromCorners(item, mappedPoints);
+    return withImageSourceScaledToFrame(item, rebuildShapeItemFromCorners(item, mappedPoints));
   });
 }
 
