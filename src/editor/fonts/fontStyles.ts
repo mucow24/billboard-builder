@@ -1,4 +1,5 @@
 import type { TextCanvasItem } from '../document/documentTypes';
+import { textFontFamilies } from './emojiFallback';
 import { subscribeToFontRegistrations } from './fontRegistrations';
 
 export type CombinedFontStyle = 'normal' | 'bold' | 'italic' | 'bold italic';
@@ -99,12 +100,17 @@ export function getRenderableCombinedFontStyle(item: TextCanvasItem): CombinedFo
   return 'normal';
 }
 
+/**
+ * The canvas `font` that `item` is drawn with: its renderable style, its size,
+ * and its family followed by the emoji fallback (see `textFontFamilies`), the
+ * same font Pixi draws it with.
+ */
 export function getRenderableCanvasFontDeclaration(item: TextCanvasItem): string {
   const effective = getRenderableCombinedFontStyle(item);
   const parts: string[] = [];
   if (effective.includes('italic')) parts.push('italic');
   if (effective.includes('bold')) parts.push('bold');
   parts.push(`${item.fontSize}px`);
-  parts.push(quoteFontFamily(item.fontFamily));
+  parts.push(textFontFamilies(item.fontFamily).map(quoteFontFamily).join(', '));
   return parts.join(' ');
 }

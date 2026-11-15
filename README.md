@@ -69,6 +69,10 @@ Place `.ttf`, `.otf`, `.woff`, or `.woff2` files in `src/assets/fonts/`. The app
 
 Users can also upload fonts at runtime through the editor UI. Uploaded fonts are persisted in local storage.
 
+### Emoji
+
+Emoji that a text's font does not have are drawn from the bundled Noto Emoji (`NotoEmoji-Regular.ttf`), a black-and-white emoji font, instead of the system's colour emoji font, so they take the text's fill, gradient, shadow and outline and export to SVG like any glyph. The same goes for the digits, `#` and `*` in a font that lacks them, which Noto Emoji has as the bases of keycaps. See `src/editor/fonts/emojiFallback.ts`.
+
 ## Testing
 
 ### Unit tests

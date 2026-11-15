@@ -1,0 +1,186 @@
+import fs from 'node:fs/promises';
+
+import { expect, test } from '@playwright/test';
+
+import {
+  captureDownload,
+  clickToolbarPopoverItem,
+  createProjectDocument,
+  createTextFixture,
+  openFreshEditor,
+  readDownloadedSvg,
+  uploadProject,
+  waitForBundledFonts,
+} from './support/editor';
+
+/**
+ * Emoji that the font of a text layer lacks are drawn from the bundled Noto
+ * Emoji, a black-and-white font, in the layer's own fill, rather than from the
+ * system's colour emoji font. That holds for emoji typed with the emoji
+ * presentation selector (U+FE0F) too, which on its own makes Chromium go to a
+ * colour font whatever the text names. SVG export outlines them the same way.
+ *
+ * Export > PNG is the canvas as Pixi drew it, so the checks read that.
+ */
+
+const chars = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+
+const CASES = [
+  { id: 'emoji', text: chars(0x1f600) },
+  { id: 'emoji typed with the presentation selector', text: chars(0x2764, 0xfe0f) },
+  { id: 'keycap', text: chars(0x31, 0xfe0f, 0x20e3) },
+  { id: 'joined sequence', text: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467) },
+];
+
+const FONT_SIZE = 120;
+const ROW = 220;
+const FILL = '#ff0000';
+
+function buildDocument() {
+  return createProjectDocument(
+    CASES.map((entry, index) =>
+      createTextFixture({
+        id: `emoji-case-${index}`,
+        name: entry.id,
+        zIndex: index + 1,
+        text: entry.text,
+        // Barlow has none of these emoji.
+        fontFamily: 'Barlow',
+        fontSize: FONT_SIZE,
+        fill: FILL,
+        secondaryFill: FILL,
+        x: 100,
+        y: 30 + index * ROW,
+        width: 800,
+        height: 180,
+      }),
+    ),
+  );
+}
+
+interface CellReport {
+  id: string;
+  /** Opaque pixels of the canvas that are not the fill colour: a colour emoji has many. */
+  offColour: number;
+  /** Ink of the canvas, of the exported SVG, and of the emoji drawn in Noto Emoji alone (sum of alpha). */
+  canvasInk: number;
+  svgInk: number;
+  notoInk: number;
+  /** Where the ink of the exported SVG is centred, less where the canvas's is, in px. */
+  svgOffset: { x: number; y: number };
+}
+
+test.describe('emoji fallback', () => {
+  test('draws emoji the font lacks from Noto Emoji in the text colour, on the canvas and in SVG', async ({
+    page,
+  }) => {
+    await openFreshEditor(page);
+    await uploadProject(page, buildDocument());
+    await waitForBundledFonts(page);
+
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = await fs.readFile(await pngDownload.path());
+    const svgDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'SVG');
+    });
+    const svg = await readDownloadedSvg(svgDownload);
+
+    const reports: CellReport[] = await page.evaluate(
+      async ({ pngBase64, svgText, cases, row, fontSize }) => {
+        const decode = async (src: string) => {
+          const image = new Image();
+          image.src = src;
+          await image.decode();
+          return image;
+        };
+        const pixelsOf = (image: HTMLImageElement, width: number, height: number) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext('2d', { willReadFrequently: true })!;
+          context.drawImage(image, 0, 0, width, height);
+          return context.getImageData(0, 0, width, height).data;
+        };
+
+        const pngImage = await decode(`data:image/png;base64,${pngBase64}`);
+        const width = pngImage.naturalWidth;
+        const height = pngImage.naturalHeight;
+        const canvasPixels = pixelsOf(pngImage, width, height);
+        const svgPixels = pixelsOf(
+          await decode(URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }))),
+          width,
+          height,
+        );
+
+        return cases.map((entry, index) => {
+          const top = index * row + 10;
+          const bottom = Math.min(height, top + row);
+          let offColour = 0;
+          const ink = { canvas: 0, svg: 0 };
+          const centre = { canvas: { x: 0, y: 0 }, svg: { x: 0, y: 0 } };
+          for (let y = top; y < bottom; y += 1) {
+            for (let x = 0; x < width; x += 1) {
+              const at = (y * width + x) * 4;
+              const canvasAlpha = canvasPixels[at + 3] / 255;
+              const svgAlpha = svgPixels[at + 3] / 255;
+              ink.canvas += canvasAlpha;
+              ink.svg += svgAlpha;
+              centre.canvas.x += canvasAlpha * x;
+              centre.canvas.y += canvasAlpha * y;
+              centre.svg.x += svgAlpha * x;
+              centre.svg.y += svgAlpha * y;
+              if (
+                canvasPixels[at + 3] >= 192 &&
+                (canvasPixels[at] < 200 || canvasPixels[at + 1] > 60 || canvasPixels[at + 2] > 60)
+              ) {
+                offColour += 1;
+              }
+            }
+          }
+
+          // The same emoji, as the canvas is given it, drawn in Noto Emoji alone.
+          const reference = document.createElement('canvas');
+          reference.width = width;
+          reference.height = row * 2;
+          const context = reference.getContext('2d', { willReadFrequently: true })!;
+          context.font = `${fontSize}px "Noto Emoji"`;
+          context.fillStyle = '#ff0000';
+          context.fillText(entry.text.split(String.fromCodePoint(0xfe0f)).join(''), 20, row);
+          const referencePixels = context.getImageData(0, 0, width, row * 2).data;
+          let notoInk = 0;
+          for (let at = 3; at < referencePixels.length; at += 4) notoInk += referencePixels[at] / 255;
+
+          return {
+            id: entry.id,
+            offColour,
+            canvasInk: Math.round(ink.canvas),
+            svgInk: Math.round(ink.svg),
+            notoInk: Math.round(notoInk),
+            svgOffset: {
+              x: centre.svg.x / ink.svg - centre.canvas.x / ink.canvas,
+              y: centre.svg.y / ink.svg - centre.canvas.y / ink.canvas,
+            },
+          };
+        });
+      },
+      { pngBase64: png.toString('base64'), svgText: svg, cases: CASES, row: ROW, fontSize: FONT_SIZE },
+    );
+
+    for (const report of reports) {
+      expect(report.offColour, `${report.id}: canvas pixels not in the fill colour`).toBe(0);
+      expect(report.canvasInk, `${report.id}: canvas ink`).toBeGreaterThan(500);
+      expect(
+        Math.abs(report.canvasInk - report.notoInk) / report.notoInk,
+        `${report.id}: canvas ink ${report.canvasInk} against Noto Emoji's ${report.notoInk}`,
+      ).toBeLessThan(0.1);
+      expect(
+        Math.abs(report.svgInk - report.canvasInk) / report.canvasInk,
+        `${report.id}: SVG ink ${report.svgInk} against the canvas's ${report.canvasInk}`,
+      ).toBeLessThan(0.1);
+      expect(Math.abs(report.svgOffset.x), `${report.id}: SVG ink left or right of the canvas's`).toBeLessThan(1.5);
+      expect(Math.abs(report.svgOffset.y), `${report.id}: SVG ink above or below the canvas's`).toBeLessThan(1.5);
+    }
+  });
+});

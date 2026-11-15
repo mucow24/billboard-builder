@@ -113,7 +113,15 @@ describe('fontStyles', () => {
     const check = vi.fn().mockReturnValue(true);
     setFontCheck(check);
 
-    expect(getRenderableCanvasFontDeclaration(item)).toBe('italic bold 72px "Poster Sans"');
+    expect(getRenderableCanvasFontDeclaration(item)).toBe('italic bold 72px "Poster Sans", "Noto Emoji"');
+  });
+
+  it('names the emoji fallback only once for text set in it', () => {
+    setFontCheck(vi.fn().mockReturnValue(true));
+
+    expect(getRenderableCanvasFontDeclaration(createTextItem({ fontFamily: 'Noto Emoji', fontSize: 40 }))).toBe(
+      '40px "Noto Emoji"',
+    );
   });
 
   it('caches repeated font variant checks for the same family, weight, and style', () => {

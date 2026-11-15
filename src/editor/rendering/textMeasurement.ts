@@ -1,3 +1,4 @@
+import { drawnText } from '../fonts/emojiFallback';
 import { getRenderableCanvasFontDeclaration } from '../fonts/fontStyles';
 import type { TextCanvasItem } from '../document/documentTypes';
 
@@ -36,7 +37,7 @@ function splitAfterHyphens(token: string): string[] {
 }
 
 /**
- * Word-wrap `item.text` into lines (each a list of tokens) using the same
+ * Word-wrap `item.text`, as it is drawn (`drawnText`), into lines (each a list of tokens) using the same
  * tokenization and wrap rule Pixi renders with. `measure` returns a token's width
  * EXCLUDING letterSpacing; this function adds letterSpacing internally so callers
  * (height measurement here, glyph positioning in the SVG exporter) stay in lockstep
@@ -51,7 +52,7 @@ export function layoutWrappedText(
     measure(token) + Math.max(token.length - 1, 0) * item.letterSpacing;
 
   const lines: string[][] = [];
-  for (const paragraph of item.text.split('\n')) {
+  for (const paragraph of drawnText(item.text).split('\n')) {
     if (paragraph.length === 0) {
       lines.push([]);
       continue;
@@ -94,7 +95,7 @@ export function measureWordWrappedTextHeight(
   const safeWidth = getTextContentWidth(item, width);
   const verticalPadding = item.padding.top + item.padding.bottom;
   const fallbackLineHeight = Math.ceil(item.fontSize * item.lineHeight);
-  const paragraphs = item.text.split('\n');
+  const paragraphs = drawnText(item.text).split('\n');
   const isJsdom =
     typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
   const context =

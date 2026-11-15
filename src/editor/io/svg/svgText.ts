@@ -3,15 +3,22 @@ import { getRenderBox } from '../../rendering/transformGeometry';
 import { layoutWrappedText } from '../../rendering/textMeasurement';
 import { toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
-import { glyphsPath, lineSubstitutions } from './svgTextGlyphs';
+import { glyphsPath, lineGlyphs } from './svgTextGlyphs';
 import {
   TEXT_SHADOW_BLUR_TO_STDDEV,
   gradientOrSolidFill,
   itemFilterDef,
   wrapItem,
 } from './svgPrimitives';
-import type { SvgExportDeps, SvgExportWarning, TextMeasurer } from './svgExportTypes';
-import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor } from './syntheticFontStyle';
+import type {
+  GlyphPathStyle,
+  OutlineFont,
+  SvgExportDeps,
+  SvgExportWarning,
+  SyntheticFontStyle,
+  TextMeasurer,
+} from './svgExportTypes';
+import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor, type SyntheticBold } from './syntheticFontStyle';
 
 /**
  * Serialize a text item as glyph outlines (`<path>`). Layout — wrap, glyph
@@ -23,6 +30,11 @@ import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor } from './syntheticFontStyle'
  * Bold and italic that the font file lacks, and the browser therefore fakes on
  * the canvas, are faked here the same way (see syntheticFontStyle): italic by
  * leaning the outlines, bold by a stroke or by smeared copies of them.
+ *
+ * Characters the item's font has no glyph for, and the emoji fallback has, are
+ * outlined from the fallback (`lookup.fallback`, see `lineGlyphs`), as the canvas
+ * draws them. Their bold and italic are faked by what the fallback lacks, in a
+ * path of their own.
  */
 export function textSvg(
   item: TextCanvasItem,
@@ -42,14 +54,6 @@ export function textSvg(
     });
     return '';
   }
-  const font = lookup.font;
-  const slant = lookup.synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0;
-  const bold = lookup.synthetic?.bold ? syntheticBoldFor(item, item.text, deps.measurer) : null;
-  // A smeared glyph is drawn once at each of these distances right of its pen position.
-  const penOffsets = bold?.kind === 'smear' ? bold.offsets : [0];
-  // Stroked outlines need their contours closed, or the stroke has gaps.
-  const glyphStyle = { slant, closed: bold?.kind === 'stroke' };
-
   const box = getRenderBox(item);
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
   const measure = (text: string) => deps.measurer.measureWidth(item, text);
@@ -69,7 +73,21 @@ export function textSvg(
   }
 
   const firstBaseline = deps.measurer.firstBaseline(item);
-  const glyphPaths: string[] = [];
+
+  // What is drawn at each character of each line, and from which font: the
+  // item's own, or the emoji fallback for what its own font lacks. Each font has
+  // its own glyph group, as the browser fakes bold and italic for each apart.
+  const drawnGlyphs = lines.map((line) =>
+    lineGlyphs(lookup.font, lookup.fallback?.font, line.text, item.letterSpacing),
+  );
+  const textFrom = (fallback: boolean) =>
+    lines
+      .flatMap((line, lineIndex) => [...line.text].filter((_, index) => drawnGlyphs[lineIndex][index].fallback === fallback))
+      .join('');
+  const own = glyphGroup(item, lookup.font, lookup.synthetic, textFrom(false), deps.measurer);
+  const fallback = lookup.fallback
+    ? glyphGroup(item, lookup.fallback.font, lookup.fallback.synthetic, textFrom(true), deps.measurer)
+    : null;
 
   // Pixi aligns lines inside the box, or inside the widest line when one does not
   // fit the box (`alignWidth` in `CanvasTextGenerator._renderTextToCanvas`): the
@@ -94,39 +112,69 @@ export function textSvg(
     inkLeft = Math.min(inkLeft, lineLeft);
     inkRight = Math.max(inkRight, lineLeft + line.width);
 
-    // Ligatures and other glyphs the font puts in place of characters; see svgTextGlyphs.
-    const substitutions = lineSubstitutions(font, line.text, item.letterSpacing);
-    kernedOffsets(line.text, line.advance, measure).forEach(({ ch, offset }, index) => {
+    // Ligatures and other glyphs the fonts put in place of characters; see svgTextGlyphs.
+    kernedOffsets(line.text, line.advance, measure).forEach(({ offset }, index) => {
+      const { fallback: fromFallback, drawn } = drawnGlyphs[lineIndex][index];
+      const group = fromFallback && fallback ? fallback : own;
       const penX = lineLeft + offset + index * item.letterSpacing;
-      for (const penOffset of penOffsets) {
-        const path = glyphsPath(
-          font,
-          substitutions?.[index] ?? ch,
-          item.fontSize,
-          penX + penOffset,
-          baselineY,
-          glyphStyle,
-        );
-        if (path) glyphPaths.push(path);
+      for (const penOffset of group.penOffsets) {
+        const path = glyphsPath(group.font, drawn, item.fontSize, penX + penOffset, baselineY, group.glyphStyle);
+        if (path) group.paths.push(path);
       }
     });
   });
 
-  if (glyphPaths.length === 0) return '';
+  const groups = [own, ...(fallback ? [fallback] : [])].filter((group) => group.paths.length > 0);
+  if (groups.length === 0) return '';
 
   const fillAttr = gradientOrSolidFill(item, defs, box.width, box.height);
-  const d = glyphPaths.join(' ');
-  let pathEl = `<path d="${d}" ${fillAttr}/>`;
-  if (bold?.kind === 'stroke') {
+  const pathEls = groups.map((group) => {
+    const d = group.paths.join(' ');
+    if (group.bold?.kind !== 'stroke') return `<path d="${d}" ${fillAttr}/>`;
     // Room around the lines for ink that leaves them, the stroke included.
     const room = item.fontSize;
     const top = Math.min(0, textTop) - room;
     const bottom = Math.max(box.height, textTop + measuredHeight) + room;
     const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
-    pathEl = strokedBoldPath(item, d, fillAttr, bold.width, area, defs);
-  }
+    const maskId = group === own ? `bold-${item.id}` : `bold-${item.id}-fallback`;
+    return strokedBoldPath(item, d, fillAttr, group.bold.width, area, defs, maskId);
+  });
   const filterAttr = pushTextFilter(item, defs);
-  return wrapItem(item, effectiveOpacity, pathEl, filterAttr);
+  return wrapItem(item, effectiveOpacity, pathEls.join(''), filterAttr);
+}
+
+/** The glyphs of a text item that one font draws, and how the browser fakes bold and italic with it. */
+interface GlyphGroup {
+  font: OutlineFont;
+  /** Faked bold, when the browser fakes it with this font. */
+  bold: SyntheticBold | null;
+  /** A smeared glyph is drawn once at each of these distances right of its pen position. */
+  penOffsets: readonly number[];
+  glyphStyle: GlyphPathStyle;
+  /** The SVG path data of the glyphs, as they are drawn. */
+  paths: string[];
+}
+
+/**
+ * The glyph group of `font`, which draws the characters `text` of `item`, with
+ * `synthetic` as what the browser fakes when it draws them.
+ */
+function glyphGroup(
+  item: TextCanvasItem,
+  font: OutlineFont,
+  synthetic: SyntheticFontStyle | undefined,
+  text: string,
+  measurer: TextMeasurer,
+): GlyphGroup {
+  const bold = synthetic?.bold ? syntheticBoldFor(item, text, measurer) : null;
+  return {
+    font,
+    bold,
+    penOffsets: bold?.kind === 'smear' ? bold.offsets : [0],
+    // Stroked outlines need their contours closed, or the stroke has gaps.
+    glyphStyle: { slant: synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0, closed: bold?.kind === 'stroke' },
+    paths: [],
+  };
 }
 
 /**
@@ -153,6 +201,8 @@ function strokedBoldPath(
   strokeWidth: number,
   area: { x: number; y: number; width: number; height: number },
   defs: string[],
+  /** The id of the mask, where one is needed: unique in the document. */
+  id: string,
 ): string {
   const outline = ` stroke-width="${fmt(strokeWidth)}" stroke-linejoin="miter" stroke-miterlimit="4"`;
 
@@ -167,7 +217,6 @@ function strokedBoldPath(
     return `<path d="${d}" ${fillAttr} ${fillAttr.replace('fill=', 'stroke=')}${outline}/>`;
   }
 
-  const id = `bold-${item.id}`;
   const rect = `x="${fmt(area.x)}" y="${fmt(area.y)}" width="${fmt(area.width)}" height="${fmt(area.height)}"`;
   defs.push(
     `<mask id="${id}" maskUnits="userSpaceOnUse" ${rect}>` +

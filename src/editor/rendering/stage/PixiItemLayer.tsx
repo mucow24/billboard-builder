@@ -26,7 +26,8 @@ import type {
   RectangleCanvasItem,
   TextCanvasItem,
 } from '../../document/documentTypes';
-import { getFontRegistrationCount, subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
+import { drawnText, getTextFontRegistrationCount, textFontFamilies } from '../../fonts/emojiFallback';
+import { subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
 import { computeGradientEndpoints, computeGradientTextureMatrix } from '../geometry/gradientGeometry';
@@ -154,7 +155,9 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
   }
 
   const layoutStyle = {
-    fontFamily: item.fontFamily,
+    // The item's family, then the emoji fallback for emoji it does not have.
+    // A new array each time: Pixi quotes the names in place.
+    fontFamily: textFontFamilies(item.fontFamily),
     fontSize: item.fontSize,
     fontWeight,
     fontStyle,
@@ -174,7 +177,8 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
   // the text (Pixi widens the texture only by the length of the shadow's offset,
   // to the right and downwards). `padding` adds room on all four sides and
   // Pixi shifts the quad back by as much, so the text itself stays where it is.
-  const inkRoom = measureTextRasterPadding(item.text, layoutStyle);
+  const text = drawnText(item.text);
+  const inkRoom = measureTextRasterPadding(text, layoutStyle);
 
   // Clamp so the resulting texture, the text plus that room on both sides,
   // stays under the GPU's MAX_TEXTURE_SIZE — past the cap, glyphs go soft
@@ -207,6 +211,7 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
     : item.fill;
 
   return {
+    text,
     style: { ...layoutStyle, fill, padding },
     resolution,
     textX,
@@ -231,17 +236,19 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
   // the saved canvas is shown, a missing font imported later). Nothing about
   // the item changes when the file arrives, so follow the family instead: a
   // registration re-renders this layer, and every render measures, lays out
-  // and rasterises the text anew. Layers in other families are left alone.
-  useSyncExternalStore(subscribeToFontRegistrations, () => getFontRegistrationCount(item.fontFamily));
+  // and rasterises the text anew. Layers in other families are left alone. The
+  // emoji fallback counts as one of every layer's families: the text may have
+  // characters only it can draw.
+  useSyncExternalStore(subscribeToFontRegistrations, () => getTextFontRegistrationCount(item.fontFamily));
 
   // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
   // When zoom > 1 the texture is magnified and turns blurry, so scale
   // resolution with zoom to keep glyphs sharp on zoom-in.
   const requestedResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
-  const { style, resolution, textX, textY } = buildTextStyleProps(item, requestedResolution);
+  const { text, style, resolution, textX, textY } = buildTextStyleProps(item, requestedResolution);
   return (
     <pixiText
-      text={item.text}
+      text={text}
       style={style}
       x={textX}
       y={textY}

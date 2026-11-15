@@ -9,7 +9,7 @@ import {
 } from '../../document/documentDefaults';
 import type { ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
 import { fakeMeasurer, fakeRasterizer } from '../../../test/svgExportFakes';
-import { exportToSvg } from './exportToSvg';
+import { exportToSvg, type FontBytes } from './exportToSvg';
 
 function loadFont(file: string): ArrayBuffer {
   const buf = readFileSync(resolve('src/assets/fonts', file));
@@ -86,5 +86,44 @@ describe('exportToSvg', () => {
     ].map((match) => match[1]);
     expect(new Set([regularPath, boldPath, italicPath]).size).toBe(3);
     expect(regularAgainPath).toBe(regularPath);
+  });
+
+  it('outlines emoji the font lacks from the emoji fallback, asked once per font variant that needs it', async () => {
+    const barlow = loadFont('Barlow-Regular.ttf');
+    const notoEmoji = loadFont('NotoEmoji-Regular.ttf');
+    const loadFontBytes = vi.fn(async () => ({ kind: 'bundled' as const, bytes: barlow }));
+    const loadFallbackFontBytes = vi.fn<(item: TextCanvasItem) => Promise<FontBytes>>(async () => ({
+      kind: 'bundled',
+      bytes: notoEmoji,
+    }));
+    const smile = String.fromCodePoint(0x1f600);
+
+    const { svg, warnings } = await exportToSvg(
+      docWith([
+        createTextItem({ id: 'letters', text: 'Hello', fontFamily: 'Barlow' }),
+        createTextItem({ id: 'emoji', text: `Hi ${smile}`, fontFamily: 'Barlow' }),
+        createTextItem({ id: 'emoji-again', text: smile, fontFamily: 'Barlow' }),
+      ]),
+      { loadFontBytes, loadFallbackFontBytes, measurer: fakeMeasurer, rasterizer: fakeRasterizer },
+    );
+
+    expect(warnings).toEqual([]);
+    expect(loadFallbackFontBytes).toHaveBeenCalledTimes(1);
+    expect(loadFallbackFontBytes.mock.calls[0][0]).toMatchObject({ id: 'emoji' });
+    // "Hello" in one path; "Hi" and its emoji in two; the lone emoji in one.
+    expect([...svg.matchAll(/<path d="/g)]).toHaveLength(4);
+  });
+
+  it('does not ask for the fallback when the font has every character', async () => {
+    const loadFallbackFontBytes = vi.fn(async () => ({ kind: 'system' as const, bytes: null }));
+
+    await exportToSvg(docWith([createTextItem({ text: 'Hello 123 #*', fontFamily: 'Barlow' })]), {
+      loadFontBytes: async () => ({ kind: 'bundled' as const, bytes: loadFont('Barlow-Regular.ttf') }),
+      loadFallbackFontBytes,
+      measurer: fakeMeasurer,
+      rasterizer: fakeRasterizer,
+    });
+
+    expect(loadFallbackFontBytes).not.toHaveBeenCalled();
   });
 });

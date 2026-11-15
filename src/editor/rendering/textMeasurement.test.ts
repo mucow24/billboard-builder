@@ -36,6 +36,21 @@ describe('layoutWrappedText', () => {
       ['a-', ' ', 'b', ' ', '-', ' ', 'c'],
     ]);
   });
+
+  // The canvas is given the text without them (see `drawnText`), so the lines
+  // are measured and drawn without them too.
+  it('lays out the text without emoji presentation selectors', () => {
+    const heart = String.fromCodePoint(0x2764);
+    const selector = String.fromCodePoint(0xfe0f);
+    const measured: string[] = [];
+    const laidOut = layoutWrappedText(createTextItem({ text: `I ${heart}${selector} NY` }), 1000, (token) => {
+      measured.push(token);
+      return token.length;
+    });
+
+    expect(laidOut).toEqual([['I', ' ', heart, ' ', 'NY']]);
+    expect(measured.join('')).not.toContain(selector);
+  });
 });
 
 describe('text measurement', () => {
