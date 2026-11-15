@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   EMOJI_FALLBACK_FAMILY,
+  EMOJI_FALLBACK_UNICODE_RANGE,
   drawnText,
   getTextFontRegistrationCount,
   hasEmojiCharacter,
+  isInEmojiFallbackRange,
   textFontFamilies,
 } from './emojiFallback';
 import { announceFontRegistration } from './fontRegistrations';
@@ -39,6 +41,16 @@ describe('emojiFallback', () => {
 
     announceFontRegistration(EMOJI_FALLBACK_FAMILY);
     expect(getTextFontRegistrationCount('Emoji Fallback Test Family')).not.toBe(afterOwn);
+  });
+
+  it('is used for no ASCII character', () => {
+    expect(EMOJI_FALLBACK_UNICODE_RANGE).toBe('U+80-10FFFF');
+    for (const ch of [' ', '0', '9', '#', '*', 'A', String.fromCharCode(0x7f)]) {
+      expect(isInEmojiFallbackRange(ch), JSON.stringify(ch)).toBe(false);
+    }
+    for (const ch of [chars(0x80), chars(0xa9), chars(0x2764), chars(0x20e3), chars(0x200d), GRINNING_FACE]) {
+      expect(isInEmojiFallbackRange(ch), JSON.stringify(ch)).toBe(true);
+    }
   });
 
   it('tells text with emoji from text without', () => {

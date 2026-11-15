@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createDefaultProjectDocument, createTextItem } from '../../document/documentDefaults';
 import type { TextCanvasItem } from '../../document/documentTypes';
-import { makeSvgDeps } from '../../../test/svgExportFakes';
+import { fakeMeasurer, makeSvgDeps } from '../../../test/svgExportFakes';
 import { documentToSvg } from './documentToSvg';
 import type {
   FallbackOutline,
@@ -10,6 +10,7 @@ import type {
   OutlineFont,
   SubstituteGlyph,
   SyntheticFontStyle,
+  TextMeasurer,
   TextSubstitutions,
 } from './svgExportTypes';
 
@@ -25,6 +26,8 @@ const MAN = chars(0x1f468);
 const WOMAN = chars(0x1f469);
 const ZWJ = chars(0x200d);
 const KEYCAP = chars(0x20e3);
+const POINTING_UP = chars(0x261d); // one UTF-16 unit: 10px
+const MEDIUM_SKIN = chars(0x1f3fd);
 const FAMILY_GLYPH = 70;
 
 interface GlyphCall {
@@ -32,7 +35,10 @@ interface GlyphCall {
   style?: GlyphPathStyle;
 }
 
-/** The text's own font: every character below U+2000, which takes in the digits but not the keycap mark. */
+/**
+ * The text's own font: every character below U+2000, which takes in the digits
+ * but not the keycap mark, and the index pointing up, without its skin tones.
+ */
 function ownFont(calls: GlyphCall[] = []): OutlineFont {
   return {
     unitsPerEm: 1000,
@@ -40,13 +46,13 @@ function ownFont(calls: GlyphCall[] = []): OutlineFont {
       calls.push({ glyph, style });
       return glyph === ' ' ? null : `M${penX} ${baselineY}h10v-10h-10Z`;
     },
-    hasGlyph: (ch: string) => (ch.codePointAt(0) ?? 0) < 0x2000,
+    hasGlyph: (ch: string) => (ch.codePointAt(0) ?? 0) < 0x2000 || ch === POINTING_UP,
   };
 }
 
 /**
- * The emoji fallback: everything from U+2000 on, the digits as keycap bases, and
- * a family glyph for man + joiner + woman.
+ * The emoji fallback: everything from U+2000 on, so no digit (the bundled one is
+ * used for nothing below U+80), and a family glyph for man + joiner + woman.
  */
 function fallbackFont(calls: GlyphCall[] = [], asked: string[] = []): OutlineFont {
   return {
@@ -57,7 +63,7 @@ function fallbackFont(calls: GlyphCall[] = [], asked: string[] = []): OutlineFon
       const width = typeof glyph === 'number' ? glyph : 20;
       return `M${penX} ${baselineY}h${width}v-10h-${width}Z`;
     },
-    hasGlyph: (ch: string) => (ch.codePointAt(0) ?? 0) >= 0x2000 || /[0-9]/.test(ch),
+    hasGlyph: (ch: string) => (ch.codePointAt(0) ?? 0) >= 0x2000,
     substitutions(text): TextSubstitutions | null {
       asked.push(text);
       const list = [...text];
@@ -79,6 +85,7 @@ function fallbackFont(calls: GlyphCall[] = [], asked: string[] = []): OutlineFon
 function exportText(
   overrides: Partial<TextCanvasItem>,
   fonts: { own?: OutlineFont; synthetic?: SyntheticFontStyle; fallback?: FallbackOutline | null } = {},
+  measurer: TextMeasurer = fakeMeasurer,
 ): string {
   const doc = { ...createDefaultProjectDocument(), nodes: [createTextItem({ id: 'text', ...overrides })] };
   const font = fonts.own ?? ownFont();
@@ -86,6 +93,7 @@ function exportText(
   return documentToSvg(
     doc,
     makeSvgDeps({
+      measurer,
       fontOutlines: {
         getOutlineFont: () => ({
           ok: true,
@@ -155,16 +163,28 @@ describe('svgText with the emoji fallback', () => {
     ]);
   });
 
-  it('draws a whole grapheme from the fallback when the item font lacks part of it, as a keycap', () => {
-    const svg = exportText({ ...left, text: `1${KEYCAP} 1` });
+  it('draws a whole grapheme from the fallback when the item font lacks part of it, as a hand with a skin tone', () => {
+    const svg = exportText({ ...left, text: `${POINTING_UP}${MEDIUM_SKIN} ${POINTING_UP}` });
 
     expect(pathElements(svg).map((path) => path.boxes)).toEqual([
-      // The lone 1 stays in the item font.
-      [[30, 10]],
-      // The keycap's 1 and its mark.
+      // The lone hand stays in the item font: hand (10) + skin tone (20) + space (10).
+      [[40, 10]],
+      // The first hand and its skin tone.
       [
         [0, 20],
         [10, 20],
+      ],
+    ]);
+  });
+
+  it('keeps a grapheme in the item font when the fallback lacks part of it too, as a keycap', () => {
+    const svg = exportText({ ...left, text: `1${KEYCAP} 1` });
+
+    expect(pathElements(svg).map((path) => path.boxes)).toEqual([
+      [
+        [0, 10],
+        [10, 10],
+        [30, 10],
       ],
     ]);
   });
@@ -177,6 +197,25 @@ describe('svgText with the emoji fallback', () => {
     const [own, fallback] = pathElements(svg);
 
     expect(own.attributes).not.toContain('stroke');
+    expect(fallback.attributes).toContain('stroke="#ff0000"');
+  });
+
+  it('tells how the fallback fakes bold from a whole grapheme it draws, not the part the item font has', () => {
+    // The item font has a real bold, which is wider: measured alone, the hand
+    // would come out wider in bold and look like Firefox's smeared bold.
+    const syntheticBoldAdvance = vi.fn((_item: TextCanvasItem, sample: string) => (sample === POINTING_UP ? 0.29 : 0));
+    const svg = exportText(
+      { ...left, text: `${POINTING_UP}${MEDIUM_SKIN}`, fontWeight: 'bold', fill: '#ff0000' },
+      { fallback: { font: fallbackFont(), synthetic: { bold: true, italic: false } } },
+      { ...fakeMeasurer, syntheticBoldAdvance },
+    );
+
+    expect(syntheticBoldAdvance).toHaveBeenCalledWith(expect.anything(), `${POINTING_UP}${MEDIUM_SKIN}`);
+    const [fallback] = pathElements(svg);
+    expect(fallback.boxes).toEqual([
+      [0, 20],
+      [10, 20],
+    ]);
     expect(fallback.attributes).toContain('stroke="#ff0000"');
   });
 

@@ -18,7 +18,8 @@ import {
  * Emoji, a black-and-white font, in the layer's own fill, rather than from the
  * system's colour emoji font. That holds for emoji typed with the emoji
  * presentation selector (U+FE0F) too, which on its own makes Chromium go to a
- * colour font whatever the text names. SVG export outlines them the same way.
+ * colour font whatever the text names, and for emoji with a skin tone and
+ * joined sequences. SVG export outlines them the same way.
  *
  * Export > PNG is the canvas as Pixi drew it, so the checks read that.
  */
@@ -28,7 +29,7 @@ const chars = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
 const CASES = [
   { id: 'emoji', text: chars(0x1f600) },
   { id: 'emoji typed with the presentation selector', text: chars(0x2764, 0xfe0f) },
-  { id: 'keycap', text: chars(0x31, 0xfe0f, 0x20e3) },
+  { id: 'emoji with a skin tone', text: chars(0x1f44d, 0x1f3fd) },
   { id: 'joined sequence', text: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467) },
 ];
 
@@ -182,5 +183,38 @@ test.describe('emoji fallback', () => {
       expect(Math.abs(report.svgOffset.x), `${report.id}: SVG ink left or right of the canvas's`).toBeLessThan(1.5);
       expect(Math.abs(report.svgOffset.y), `${report.id}: SVG ink above or below the canvas's`).toBeLessThan(1.5);
     }
+  });
+
+  // Noto Emoji has the space, the digits, "#" and "*", as wide as an emoji. Its
+  // face is used for nothing below U+80, so text whose font lacks them, or is
+  // missing, measures as it would without the fallback, and keycaps (a digit and
+  // U+20E3) are not drawn from it.
+  test('leaves ASCII to the text font or the system, not to Noto Emoji', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForBundledFonts(page);
+
+    const measured = await page.evaluate(() => {
+      const context = document.createElement('canvas').getContext('2d')!;
+      const measure = (families: string, text: string) => {
+        context.font = `72px ${families}`;
+        const metrics = context.measureText(text);
+        return [Math.round(metrics.width * 10) / 10, metrics.fontBoundingBoxAscent, metrics.fontBoundingBoxDescent];
+      };
+      const keycap = `1${String.fromCodePoint(0x20e3)}`;
+      const emoji = String.fromCodePoint(0x1f600);
+      return {
+        missingFont: [measure('"No Such Font", "Noto Emoji"', 'Sale 50 #*'), measure('"No Such Font"', 'Sale 50 #*')],
+        fontWithoutDigits: [measure('"DASH Early", "Noto Emoji"', 'SALE 50'), measure('"DASH Early"', 'SALE 50')],
+        keycap: [measure('"Barlow", "Noto Emoji"', keycap), measure('"Barlow"', keycap)],
+        emoji: [measure('"Barlow", "Noto Emoji"', emoji), measure('"Noto Emoji"', emoji)],
+      };
+    });
+
+    expect(measured.missingFont[0], 'text in a missing font').toEqual(measured.missingFont[1]);
+    expect(measured.fontWithoutDigits[0], 'digits of a font that has none').toEqual(measured.fontWithoutDigits[1]);
+    expect(measured.keycap[0], 'a keycap').toEqual(measured.keycap[1]);
+    // The fallback is still used where it is meant to be. (Only the advance: the
+    // line metrics are those of the first family, which Noto Emoji alone is not.)
+    expect(measured.emoji[0][0], 'an emoji').toBe(measured.emoji[1][0]);
   });
 });

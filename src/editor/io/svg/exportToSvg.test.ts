@@ -126,4 +126,46 @@ describe('exportToSvg', () => {
 
     expect(loadFallbackFontBytes).not.toHaveBeenCalled();
   });
+
+  it('does not ask for the fallback for line breaks, nor for ASCII the font lacks, which it never draws', async () => {
+    const loadFallbackFontBytes = vi.fn(async () => ({ kind: 'system' as const, bytes: null }));
+
+    await exportToSvg(
+      docWith([
+        // Barlow has no glyph for a line break, as most fonts have none.
+        createTextItem({ id: 'lines', text: 'Two\nlines\r\nhere', fontFamily: 'Barlow' }),
+        // DASH Early has no digits.
+        createTextItem({ id: 'digits', text: 'SALE 50', fontFamily: 'DASH Early' }),
+      ]),
+      {
+        loadFontBytes: async (item) => ({
+          kind: 'bundled' as const,
+          bytes: loadFont(item.fontFamily === 'Barlow' ? 'Barlow-Regular.ttf' : 'DASH-Early.ttf'),
+        }),
+        loadFallbackFontBytes,
+        measurer: fakeMeasurer,
+        rasterizer: fakeRasterizer,
+      },
+    );
+
+    expect(loadFallbackFontBytes).not.toHaveBeenCalled();
+  });
+
+  it('outlines ASCII the font lacks from the font, never from the fallback', async () => {
+    const smile = String.fromCodePoint(0x1f600);
+    // The emoji's path, the last one, for text whose font lacks its first two characters or has them.
+    const emojiPath = async (text: string) => {
+      const { svg } = await exportToSvg(docWith([createTextItem({ id: 'text', text, fontFamily: 'DASH Early' })]), {
+        loadFontBytes: async () => ({ kind: 'bundled' as const, bytes: loadFont('DASH-Early.ttf') }),
+        loadFallbackFontBytes: async () => ({ kind: 'bundled' as const, bytes: loadFont('NotoEmoji-Regular.ttf') }),
+        measurer: fakeMeasurer,
+        rasterizer: fakeRasterizer,
+      });
+      return [...svg.matchAll(/<path d="([^"]+)"/g)].at(-1)?.[1];
+    };
+
+    const afterDigits = await emojiPath(`50 ${smile}`);
+    expect(afterDigits).toBeDefined();
+    expect(afterDigits).toBe(await emojiPath(`SA ${smile}`));
+  });
 });

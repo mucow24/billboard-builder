@@ -71,7 +71,7 @@ Users can also upload fonts at runtime through the editor UI. Uploaded fonts are
 
 ### Emoji
 
-Emoji that a text's font does not have are drawn from the bundled Noto Emoji (`NotoEmoji-Regular.ttf`), a black-and-white emoji font, instead of the system's colour emoji font, so they take the text's fill, gradient, shadow and outline and export to SVG like any glyph. The same goes for the digits, `#` and `*` in a font that lacks them, which Noto Emoji has as the bases of keycaps. See `src/editor/fonts/emojiFallback.ts`.
+Emoji that a text's font does not have are drawn from the bundled Noto Emoji (`NotoEmoji-Regular.ttf`), a black-and-white emoji font, instead of the system's colour emoji font, so they take the text's fill, gradient, shadow and outline and export to SVG like any glyph. Noto Emoji is used for no ASCII character: its space, digits, `#` and `*` are as wide as an emoji, so a font that lacks them gets them from the system as before. Keycaps (such as 1️⃣) are not drawn from Noto Emoji either, as they start with a digit. See `src/editor/fonts/emojiFallback.ts`.
 
 ## Testing
 

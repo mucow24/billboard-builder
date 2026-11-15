@@ -1,8 +1,8 @@
 import type { ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
 import { isCanvasItemNode, visitNodes } from '../../document/sceneGraph';
-import { drawnText } from '../../fonts/emojiFallback';
+import { drawnText, isInEmojiFallbackRange } from '../../fonts/emojiFallback';
 import { documentToSvg } from './documentToSvg';
-import { hasGlyphsFor } from './svgTextGlyphs';
+import { emojiFallbackOutline, hasGlyphsFor } from './svgTextGlyphs';
 import { fontVariantKey, resolveOutline, type FontKind } from './fontOutlineProvider';
 import type {
   FontOutlineProvider,
@@ -53,14 +53,18 @@ export async function exportToSvg(doc: ProjectDocument, deps: ExportToSvgDeps): 
     }
 
     // The fallback is resolved per font variant, as the item's own font is, and
-    // only once an item in that variant turns out to need it.
+    // only once an item in that variant turns out to lack a character the
+    // fallback could be used for.
     if (!outline.ok || !deps.loadFallbackFontBytes || fallbackAsked.has(key)) continue;
-    if (hasGlyphsFor(outline.font, drawnText(item.text))) continue;
+    if (hasGlyphsFor(outline.font, [...drawnText(item.text)].filter(isInEmojiFallbackRange).join(''))) continue;
     fallbackAsked.add(key);
     const { kind, bytes, synthetic } = await deps.loadFallbackFontBytes(item);
     const fallback = resolveOutline(kind, bytes);
     if (fallback.ok) {
-      resolved.set(key, { ...outline, fallback: { font: fallback.font, ...(synthetic ? { synthetic } : {}) } });
+      resolved.set(key, {
+        ...outline,
+        fallback: { font: emojiFallbackOutline(fallback.font), ...(synthetic ? { synthetic } : {}) },
+      });
     }
   }
 

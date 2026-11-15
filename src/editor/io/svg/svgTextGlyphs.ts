@@ -1,3 +1,4 @@
+import { isInEmojiFallbackRange } from '../../fonts/emojiFallback';
 import type { GlyphPathStyle, OutlineFont, SubstituteGlyph, TextSubstitutions } from './svgExportTypes';
 
 /**
@@ -5,7 +6,7 @@ import type { GlyphPathStyle, OutlineFont, SubstituteGlyph, TextSubstitutions } 
  * (`CanvasTextMetrics.graphemeSegmenter`): into what a reader sees as one
  * character, where the browser can tell, into code points otherwise.
  */
-function graphemes(text: string): string[] {
+export function graphemes(text: string): string[] {
   if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
     return [...new Intl.Segmenter().segment(text)].map((part) => part.segment);
   }
@@ -40,21 +41,33 @@ export function lineSubstitutions(font: OutlineFont, line: string, letterSpacing
   return any ? entries : null;
 }
 
-/** Characters that are never drawn, so a font needs no glyph for them. */
-const DEFAULT_IGNORABLE = /\p{Default_Ignorable_Code_Point}/u;
+/**
+ * Characters that are never drawn, so a font needs no glyph for them: the
+ * default ignorables (joiners, variation selectors) and the control characters,
+ * such as the line breaks of a text, which most fonts have no glyph for.
+ */
+const NOT_DRAWN = /[\p{Default_Ignorable_Code_Point}\p{Cc}]/u;
 
 /** Whether `font` has a glyph for every character of `text` that is drawn at all. */
 export function hasGlyphsFor(font: OutlineFont, text: string): boolean {
-  return [...text].every((ch) => DEFAULT_IGNORABLE.test(ch) || (font.hasGlyph?.(ch) ?? true));
+  return [...text].every((ch) => NOT_DRAWN.test(ch) || (font.hasGlyph?.(ch) ?? true));
+}
+
+/**
+ * `font`, the emoji fallback's, as the canvas uses it: for no character below
+ * U+80, whatever glyphs it has (see `EMOJI_FALLBACK_UNICODE_RANGE`).
+ */
+export function emojiFallbackOutline(font: OutlineFont): OutlineFont {
+  return { ...font, hasGlyph: (ch) => isInEmojiFallbackRange(ch) && (font.hasGlyph?.(ch) ?? true) };
 }
 
 /**
  * Whether the browser draws `piece` (one grapheme) from the fallback font rather
  * than from `font`: when `font` lacks a glyph for any of its characters and the
  * fallback has them all. The browser chooses a font for a whole grapheme, so a
- * keycap (a digit and U+20E3) comes from the fallback even with a font that has
- * the digit. Where neither has them all, the system draws it; the export cannot,
- * and keeps it in `font`.
+ * hand with a skin tone comes from the fallback even with a font that has the
+ * hand. Where neither has them all, the system draws it; the export cannot, and
+ * keeps it in `font`.
  */
 function drawnFromFallback(font: OutlineFont, fallback: OutlineFont, piece: string): boolean {
   return !hasGlyphsFor(font, piece) && hasGlyphsFor(fallback, piece);

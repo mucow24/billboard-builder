@@ -32,6 +32,10 @@ This editor is organized around a small set of ownership boundaries.
 - A line is not a kind of its own: it is a `kind: 'polygon'` item with `closed: false` (`isLineItem` in `src/editor/document/polygonVertices.ts`). The Line tool creates one with two vertices; anything that names or labels an item asks `getItemDisplayKind`, which reports `'line'` for it.
 - The old saved shape of a line (`kind: 'line'` with `startX`/`startY`/`endX`/`endY`) is still accepted by the schema and is converted to an open polygon in exactly one place, `documentNormalizer.ts`. Nothing past normalization ever sees it.
 - A two-vertex line is a "straight line" (`isStraightLine`) and keeps the behaviour lines had before they could be bent: no transform box, no vertex sub-selection (enforced in the reducer, so Delete and the arrow keys act on the whole line), and a padded-box hit area when drilling into a group. Every one of those rules goes through `isStraightLine`.
+- Emoji a text's font lacks are drawn from the bundled Noto Emoji (`src/editor/fonts/emojiFallback.ts`), and the canvas, its measurements and SVG export must agree on every character:
+  - Anything that lays out, measures or draws a text item's text uses `drawnText(item.text)`, never `item.text` itself.
+  - Every canvas font declaration for a text item comes from `getRenderableCanvasFontDeclaration` (or `textFontFamilies`, which it uses), so it names the emoji fallback after the item's own family.
+  - The fallback's faces are used only for `EMOJI_FALLBACK_UNICODE_RANGE`. SVG export routes characters to the fallback by the same range (`isInEmojiFallbackRange`, through `emojiFallbackOutline`), so the two change together.
 
 ## Document library
 
