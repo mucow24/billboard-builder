@@ -8,6 +8,7 @@ import type {
   TextCanvasItem,
   UploadedFont,
 } from '../../document/documentTypes';
+import { isEmojiFallbackFamily } from '../../fonts/emojiFallback';
 import type { FontOption } from '../FontFamilyPicker';
 
 export interface SelectionSummary {
@@ -23,6 +24,15 @@ export function formatDisplayedNumber(value: number, digits = 1): string {
   return Number(value.toFixed(digits)).toString();
 }
 
+/**
+ * The fonts the font picker lists: the web-safe ones, every font file
+ * available, and the fonts the document refers to.
+ *
+ * The emoji fallback's files are left out. Every text falls back to it already,
+ * and picked as a text's own font it would draw no ASCII character (see
+ * `EMOJI_FALLBACK_UNICODE_RANGE`): the letters would come from the browser's
+ * default font. A document that refers to it still lists it.
+ */
 export function buildFontOptions(
   availableFonts: UploadedFont[],
   fonts: DocumentFontReference[],
@@ -33,7 +43,7 @@ export function buildFontOptions(
       sourceName: family,
       kind: 'system' as const,
     })),
-    ...availableFonts.map((font) => ({
+    ...availableFonts.filter((font) => !isEmojiFallbackFamily(font.family)).map((font) => ({
       family: font.family,
       sourceName: font.sourceName,
       kind: font.kind,

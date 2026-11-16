@@ -8,6 +8,7 @@ import {
   createRectangleItem,
   createTextItem,
 } from '../../document/documentDefaults';
+import type { UploadedFont } from '../../document/documentTypes';
 
 import {
   buildFontOptions,
@@ -110,6 +111,26 @@ describe('inspectorModel', () => {
       'Verdana',
       'Zulu Display',
     ]);
+  });
+
+  it('leaves the emoji fallback out of the available fonts, but not out of the document\'s', () => {
+    const notoEmoji: UploadedFont = {
+      family: 'Noto Emoji',
+      sourceName: 'NotoEmoji-Regular.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'bundled',
+    };
+    const barlow: UploadedFont = { ...notoEmoji, family: 'Barlow', sourceName: 'Barlow-Regular.ttf' };
+
+    const families = (options: ReturnType<typeof buildFontOptions>) => options.map((font) => font.family);
+    expect(families(buildFontOptions([notoEmoji, barlow], []))).not.toContain('Noto Emoji');
+    expect(families(buildFontOptions([notoEmoji, barlow], []))).toContain('Barlow');
+    expect(
+      families(
+        buildFontOptions([notoEmoji], [{ family: 'Noto Emoji', sourceName: 'NotoEmoji-Regular.ttf', kind: 'bundled' }]),
+      ),
+    ).toContain('Noto Emoji');
   });
 
   it('lists a family once however many of its files are available or referenced by the document', () => {

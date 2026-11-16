@@ -9,7 +9,7 @@ import {
 } from '../../document/documentDefaults';
 import type { ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
 import { fakeMeasurer, fakeRasterizer } from '../../../test/svgExportFakes';
-import { exportToSvg } from './exportToSvg';
+import { exportToSvg, type FontBytes } from './exportToSvg';
 
 function loadFont(file: string): ArrayBuffer {
   const buf = readFileSync(resolve('src/assets/fonts', file));
@@ -86,5 +86,106 @@ describe('exportToSvg', () => {
     ].map((match) => match[1]);
     expect(new Set([regularPath, boldPath, italicPath]).size).toBe(3);
     expect(regularAgainPath).toBe(regularPath);
+  });
+
+  it('outlines emoji the font lacks from the emoji fallback, asked once per font variant that needs it', async () => {
+    const barlow = loadFont('Barlow-Regular.ttf');
+    const notoEmoji = loadFont('NotoEmoji-Regular.ttf');
+    const loadFontBytes = vi.fn(async () => ({ kind: 'bundled' as const, bytes: barlow }));
+    const loadFallbackFontBytes = vi.fn<(item: TextCanvasItem) => Promise<FontBytes>>(async () => ({
+      kind: 'bundled',
+      bytes: notoEmoji,
+    }));
+    const smile = String.fromCodePoint(0x1f600);
+
+    const { svg, warnings } = await exportToSvg(
+      docWith([
+        createTextItem({ id: 'letters', text: 'Hello', fontFamily: 'Barlow' }),
+        createTextItem({ id: 'emoji', text: `Hi ${smile}`, fontFamily: 'Barlow' }),
+        createTextItem({ id: 'emoji-again', text: smile, fontFamily: 'Barlow' }),
+      ]),
+      { loadFontBytes, loadFallbackFontBytes, measurer: fakeMeasurer, rasterizer: fakeRasterizer },
+    );
+
+    expect(warnings).toEqual([]);
+    expect(loadFallbackFontBytes).toHaveBeenCalledTimes(1);
+    expect(loadFallbackFontBytes.mock.calls[0][0]).toMatchObject({ id: 'emoji' });
+    // "Hello" in one path; "Hi" and its emoji in two; the lone emoji in one.
+    expect([...svg.matchAll(/<path d="/g)]).toHaveLength(4);
+  });
+
+  it('does not ask for the fallback when the font has every character', async () => {
+    const loadFallbackFontBytes = vi.fn(async () => ({ kind: 'system' as const, bytes: null }));
+
+    await exportToSvg(docWith([createTextItem({ text: 'Hello 123 #*', fontFamily: 'Barlow' })]), {
+      loadFontBytes: async () => ({ kind: 'bundled' as const, bytes: loadFont('Barlow-Regular.ttf') }),
+      loadFallbackFontBytes,
+      measurer: fakeMeasurer,
+      rasterizer: fakeRasterizer,
+    });
+
+    expect(loadFallbackFontBytes).not.toHaveBeenCalled();
+  });
+
+  it('does not ask for the fallback for line breaks, nor for ASCII the font lacks, which it never draws', async () => {
+    const loadFallbackFontBytes = vi.fn(async () => ({ kind: 'system' as const, bytes: null }));
+
+    await exportToSvg(
+      docWith([
+        // Barlow has no glyph for a line break, as most fonts have none.
+        createTextItem({ id: 'lines', text: 'Two\nlines\r\nhere', fontFamily: 'Barlow' }),
+        // DASH Early has no digits.
+        createTextItem({ id: 'digits', text: 'SALE 50', fontFamily: 'DASH Early' }),
+      ]),
+      {
+        loadFontBytes: async (item) => ({
+          kind: 'bundled' as const,
+          bytes: loadFont(item.fontFamily === 'Barlow' ? 'Barlow-Regular.ttf' : 'DASH-Early.ttf'),
+        }),
+        loadFallbackFontBytes,
+        measurer: fakeMeasurer,
+        rasterizer: fakeRasterizer,
+      },
+    );
+
+    expect(loadFallbackFontBytes).not.toHaveBeenCalled();
+  });
+
+  it('outlines ASCII the font lacks from the font, never from the fallback', async () => {
+    const smile = String.fromCodePoint(0x1f600);
+    // The emoji's path, the last one, for text whose font lacks its first two characters or has them.
+    const emojiPath = async (text: string) => {
+      const { svg } = await exportToSvg(docWith([createTextItem({ id: 'text', text, fontFamily: 'DASH Early' })]), {
+        loadFontBytes: async () => ({ kind: 'bundled' as const, bytes: loadFont('DASH-Early.ttf') }),
+        loadFallbackFontBytes: async () => ({ kind: 'bundled' as const, bytes: loadFont('NotoEmoji-Regular.ttf') }),
+        measurer: fakeMeasurer,
+        rasterizer: fakeRasterizer,
+      });
+      return [...svg.matchAll(/<path d="([^"]+)"/g)].at(-1)?.[1];
+    };
+
+    const afterDigits = await emojiPath(`50 ${smile}`);
+    expect(afterDigits).toBeDefined();
+    expect(afterDigits).toBe(await emojiPath(`SA ${smile}`));
+  });
+
+  it('outlines a keycap as the keycap glyph of Noto Emoji', async () => {
+    const notoEmoji = loadFont('NotoEmoji-Regular.ttf');
+    const paths = async (fontFamily: string, bytes: ArrayBuffer) => {
+      const item = createTextItem({ id: 'keycap', text: String.fromCodePoint(0x31, 0xfe0f, 0x20e3), fontFamily });
+      const { svg } = await exportToSvg(docWith([item]), {
+        loadFontBytes: async () => ({ kind: 'bundled' as const, bytes }),
+        loadFallbackFontBytes: async () => ({ kind: 'bundled' as const, bytes: notoEmoji }),
+        measurer: fakeMeasurer,
+        rasterizer: fakeRasterizer,
+      });
+      return [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]);
+    };
+
+    // Barlow has the 1 but not the keycap mark: the keycap comes from the
+    // fallback, as it does when Noto Emoji is the text's own font.
+    const inBarlow = await paths('Barlow', loadFont('Barlow-Regular.ttf'));
+    expect(inBarlow).toHaveLength(1);
+    expect(inBarlow).toEqual(await paths('Noto Emoji', notoEmoji));
   });
 });

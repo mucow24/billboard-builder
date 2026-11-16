@@ -30,6 +30,7 @@ export function parseOutlineFont(bytes: ArrayBuffer): OutlineFont | null {
   return {
     unitsPerEm: font.unitsPerEm,
     substitutions: createTextSubstitutions(font),
+    hasGlyph: (ch: string) => font.hasChar(ch),
     // `ch` is a character, or the index of a glyph `substitutions` named.
     // `style.slant` is the lean of faked italic. Both leans are about the baseline,
     // so together they are their sum.

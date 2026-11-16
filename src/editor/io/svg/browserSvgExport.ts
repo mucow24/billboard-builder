@@ -2,7 +2,7 @@ import type { ProjectDocument } from '../../document/documentTypes';
 import { getBundledFontUrl, listRegisteredFonts } from '../../fonts/browserFontLoader';
 import { defaultUploadedFontPersistenceService } from '../../persistence/uploadedFontPersistenceService';
 import { createCanvasTextMeasurer } from './canvasTextMeasurer';
-import { createDocumentFontLoader } from './documentFontBytes';
+import { createDocumentFontLoader, createFallbackFontLoader, type FontByteLoaders } from './documentFontBytes';
 import { createGeneratorRasterizer } from './generatorRasterizer';
 import { exportToSvg } from './exportToSvg';
 import type { SvgExportResult } from './svgExportTypes';
@@ -14,7 +14,8 @@ import type { SvgExportResult } from './svgExportTypes';
  * the SVG and any block+warn warnings.
  */
 export function runSvgExport(doc: ProjectDocument): Promise<SvgExportResult> {
-  const loadFontBytes = createDocumentFontLoader(doc, listRegisteredFonts(), {
+  const registeredFonts = listRegisteredFonts();
+  const loaders: FontByteLoaders = {
     loadBundledBytes: async (sourceName) => {
       const url = getBundledFontUrl(sourceName);
       if (!url) return null;
@@ -25,10 +26,11 @@ export function runSvgExport(doc: ProjectDocument): Promise<SvgExportResult> {
       const [record] = await defaultUploadedFontPersistenceService.loadByReferences([ref]);
       return record?.bytes ?? null;
     },
-  });
+  };
 
   return exportToSvg(doc, {
-    loadFontBytes,
+    loadFontBytes: createDocumentFontLoader(doc, registeredFonts, loaders),
+    loadFallbackFontBytes: createFallbackFontLoader(registeredFonts, loaders),
     measurer: createCanvasTextMeasurer(),
     rasterizer: createGeneratorRasterizer(),
   });

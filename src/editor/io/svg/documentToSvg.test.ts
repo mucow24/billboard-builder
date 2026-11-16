@@ -311,6 +311,47 @@ describe('documentToSvg — text outlines (font available)', () => {
     expect(positions.map((p) => p.penX)).toEqual([0, 15]);
   });
 
+  // Pixi adds letter spacing once per grapheme. An emoji with a skin tone is
+  // two code points (four UTF-16 units, 40px to the fake measurer) but one
+  // grapheme, so it gets one spacing and its parts no spacing between them.
+  it('adds letterSpacing once per grapheme, an emoji with a skin tone being one', () => {
+    const thumbsUpMediumSkin = String.fromCodePoint(0x1f44d, 0x1f3fd);
+    const positions = glyphPositions(
+      svgOf([
+        createTextItem({
+          text: `A${thumbsUpMediumSkin}B`,
+          letterSpacing: 5,
+          align: 'left',
+          width: 320,
+          padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        }),
+      ]),
+    );
+    // A at 0; the thumb 10px and one spacing on; its skin tone 20px further,
+    // with no spacing of its own; B after the whole emoji and a second spacing.
+    expect(positions.map((p) => p.penX)).toEqual([0, 15, 35, 60]);
+  });
+
+  it('centres a letter-spaced line on its width counted in graphemes, a family of joined emoji being one', () => {
+    const family = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
+    const positions = glyphPositions(
+      svgOf([
+        createTextItem({
+          text: `${family}AB`,
+          letterSpacing: 5,
+          align: 'center',
+          width: 320,
+          padding: { top: 0, right: 0, bottom: 0, left: 0 },
+        }),
+      ]),
+    );
+    // 100px of text (ten UTF-16 units) and two spacings between three
+    // graphemes: 110px, centred in 320px, so it starts at 105.
+    expect(positions[0].penX).toBe(105);
+    // B, the last glyph, starts 10px before the line's end.
+    expect(positions.at(-1)?.penX).toBe(105 + 110 - 10);
+  });
+
   it('wraps to a new line at the content width', () => {
     const positions = glyphPositions(
       svgOf([

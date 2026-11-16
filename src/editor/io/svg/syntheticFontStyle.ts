@@ -1,5 +1,6 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import type { TextMeasurer } from './svgExportTypes';
+import { graphemes } from '../../rendering/graphemes';
 
 /**
  * Bold and italic that the browser fakes, reproduced for the SVG export.
@@ -81,15 +82,21 @@ const SMEAR_DETECTION_PX = 0.01;
 /**
  * How the browser fakes bold for `item`, told from what it measures rather than
  * from which browser it is: a character that is wider in faked bold than in the
- * regular weight is being smeared, by that difference. `text` is the item's
- * text; a character out of it is measured so that the font has a glyph for it.
+ * regular weight is being smeared, by that difference. `text` is the text drawn
+ * with the font in question; a grapheme out of it is measured so that the font
+ * has a glyph for it.
+ *
+ * A whole grapheme, because the browser picks the font for a grapheme as a
+ * whole: a hand with a skin tone comes from the emoji fallback even when the
+ * text's font has the hand, and measuring the hand alone would measure the
+ * text's font instead, and its real bold.
  */
 export function syntheticBoldFor(
   item: TextCanvasItem,
   text: string,
   measurer: TextMeasurer,
 ): SyntheticBold {
-  const sample = [...text].find((ch) => ch.trim().length > 0);
+  const sample = graphemes(text).find((piece) => piece.trim().length > 0);
   const smear = sample ? (measurer.syntheticBoldAdvance?.(item, sample) ?? 0) : 0;
   return smear > SMEAR_DETECTION_PX
     ? { kind: 'smear', offsets: smearOffsets(smear, item.fontSize) }

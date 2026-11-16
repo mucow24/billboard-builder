@@ -111,6 +111,20 @@ describe('runEditorStartup', () => {
     ]);
   });
 
+  it('asks for the emoji fallback first too when the text of the saved canvas has emoji', async () => {
+    const savedCanvas = savedCanvasSetIn('Barlow', 'Arial');
+    savedCanvas.nodes = savedCanvas.nodes.map((node) =>
+      node.id === 'saved-text-1' && node.kind === 'text'
+        ? { ...node, text: `Grand opening ${String.fromCodePoint(0x1f389)}` }
+        : node,
+    );
+    const startup = startStartup();
+    startup.savedCanvas.resolve(savedCanvas);
+    await settle();
+
+    expect(startup.events[0]).toBe('load bundled fonts, first: Barlow, Arial, Noto Emoji');
+  });
+
   it('puts the saved canvas in the editor only once its bundled and uploaded fonts are registered', async () => {
     const startup = startStartup();
     startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));

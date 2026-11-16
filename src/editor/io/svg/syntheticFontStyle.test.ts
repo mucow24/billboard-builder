@@ -58,10 +58,17 @@ describe('syntheticBoldFor', () => {
     expect(syntheticBoldFor(item, 'AB', fakeMeasurer)).toEqual({ kind: 'stroke', width: 3 });
   });
 
-  it('measures the first character of the text that draws something', () => {
+  it('measures the first grapheme of the text that draws something', () => {
     const syntheticBoldAdvance = vi.fn(() => 0);
     syntheticBoldFor(item, ' \n AB', { ...fakeMeasurer, syntheticBoldAdvance });
     expect(syntheticBoldAdvance).toHaveBeenCalledWith(item, 'A');
+  });
+
+  it('measures a grapheme whole, as the browser picks its font for it as a whole', () => {
+    const syntheticBoldAdvance = vi.fn(() => 0);
+    const handWithSkinTone = String.fromCodePoint(0x261d, 0x1f3fd);
+    syntheticBoldFor(item, ` ${handWithSkinTone}A`, { ...fakeMeasurer, syntheticBoldAdvance });
+    expect(syntheticBoldAdvance).toHaveBeenCalledWith(item, handWithSkinTone);
   });
 
   it('is a stroke for a text with nothing to draw, without measuring', () => {

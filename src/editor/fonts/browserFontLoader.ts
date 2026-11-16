@@ -1,4 +1,5 @@
 import type { UploadedFont } from '../document/documentTypes';
+import { EMOJI_FALLBACK_UNICODE_RANGE, isEmojiFallbackFamily } from './emojiFallback';
 import { announceFontRegistration } from './fontRegistrations';
 import {
   parseFontSourceName,
@@ -34,7 +35,11 @@ function toCssUrl(url: string): string {
   return `url("${escaped}")`;
 }
 
-/** Create the `FontFace` for a font source and wait for it to load. The browser cannot render with it yet. */
+/**
+ * Create the `FontFace` for a font source and wait for it to load. The browser cannot render with it yet.
+ * A face of the emoji fallback's family, bundled or uploaded, is used only for the characters the
+ * fallback is meant for (`EMOJI_FALLBACK_UNICODE_RANGE`).
+ */
 async function loadFontFace(
   metadata: ParsedFontMetadata,
   source: ArrayBuffer | string
@@ -42,6 +47,7 @@ async function loadFontFace(
   const fontFace = new FontFace(metadata.family, typeof source === 'string' ? toCssUrl(source) : source, {
     weight: metadata.weight,
     style: metadata.style,
+    ...(isEmojiFallbackFamily(metadata.family) ? { unicodeRange: EMOJI_FALLBACK_UNICODE_RANGE } : {}),
   });
   await fontFace.load();
   return fontFace;
