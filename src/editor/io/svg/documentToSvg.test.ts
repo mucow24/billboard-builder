@@ -535,6 +535,16 @@ describe('documentToSvg — text line alignment', () => {
         expect(pens).toEqual([line, line]);
       },
     );
+
+    // The canvas keeps "AAAA BBBB" on one line only where the box has room for
+    // all of it as drawn: nine characters and eight letter spacings, 106px. The
+    // export kept it on one line down to 102px.
+    it('wraps a letter-spaced line where the canvas does', () => {
+      const lineCount = (width: number) =>
+        pensByLine({ text: 'AAAA BBBB', letterSpacing: 2, width, padding: noPadding }).length;
+      expect(lineCount(106)).toBe(1);
+      expect(lineCount(105)).toBe(2);
+    });
   });
 
   describe('spaces at the ends of a line', () => {

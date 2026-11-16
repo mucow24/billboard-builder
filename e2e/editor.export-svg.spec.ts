@@ -629,6 +629,74 @@ test.describe('SVG export', () => {
     expect(across.overlap).toBeGreaterThan(0.7);
   });
 
+  // Regression: the exporter laid letter-spaced text out on fewer lines than the
+  // canvas. Pixi wraps a line once it is wider than the box as drawn, letter
+  // spacing between all its characters included; the layout counted the spacing
+  // inside each word only and so fitted a line up to one spacing per word or
+  // space too wide. "Wrap these words" in Albertus at 48px with letter spacing
+  // 10 is 511px wide as drawn: the canvas wraps it in any narrower box, the
+  // export kept one line down to 471px. Where Pixi wraps shows only in a real
+  // browser, and the reference is the canvas itself (Export > PNG).
+  test('wraps letter-spaced text where the canvas does', async ({ page }) => {
+    await openFreshEditor(page);
+    // The bundled fonts have to be in first: see the kerning test above.
+    await waitForBundledFonts(page);
+
+    const fontSize = 48;
+    // The text fixture's line height is 1.1 x the font size.
+    const lineHeight = fontSize * 1.1;
+    const box = { x: 20, y: 30, width: 490, height: Math.ceil(2 * lineHeight) };
+    const doc = {
+      ...createProjectDocument([
+        createTextFixture({
+          ...box,
+          id: 'letter-spaced',
+          name: 'letter-spaced',
+          text: 'Wrap these words',
+          fontFamily: 'Albertus MT Std',
+          fontSize,
+          letterSpacing: 10,
+          zIndex: 1,
+        }),
+      ]),
+      fonts: [{ family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' }],
+    };
+    await uploadProject(page, doc, 'letter-spaced-text.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    // Each line compared across more than the box, where an unwrapped line ends.
+    const lineBoxes = [0, 1].map((line) => ({
+      name: `line ${line + 1}`,
+      x: box.x,
+      y: box.y + line * lineHeight,
+      width: 700,
+      height: lineHeight,
+    }));
+    const [inBox, ...lines] = await compareInkWithCanvas(page, svg, png, doc.canvas.width, [box, ...lineBoxes]);
+
+    expect(lines).toHaveLength(lineBoxes.length);
+    lines.forEach((line, index) => {
+      const { name } = lineBoxes[index];
+      // The canvas wrapped the text: it drew both lines, inside the box.
+      expect(line.canvas.pixels, name).toBeGreaterThan(300);
+      expect(line.canvas.right, name).toBeLessThan(inBox.boxRight);
+      // The export drew the same lines: "Wrap these" and "words". Before the fix
+      // its first line ran on to "words", and its second was empty.
+      expect(Math.abs(line.exported.left - line.canvas.left), name).toBeLessThanOrEqual(2);
+      expect(Math.abs(line.exported.right - line.canvas.right), name).toBeLessThanOrEqual(2);
+      expect(line.overlap, name).toBeGreaterThan(0.7);
+    });
+  });
+
   // Regression: the exporter aligned centred and right-aligned lines by another
   // width than the canvas does, so they ended up beside the canvas lines.
   //  - It measured a wrapped line together with the space it wraps at, which Pixi

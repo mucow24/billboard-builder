@@ -14,18 +14,44 @@ describe('layoutWrappedText', () => {
     expect(lines('alpha beta gamma', 110)).toEqual(['alpha beta ', 'gamma']);
   });
 
+  const spacedLines = (text: string, letterSpacing: number, contentWidth: number) =>
+    layoutWrappedText(createTextItem({ text, letterSpacing }), contentWidth, (token) => token.length * 10).map(
+      (tokens) => tokens.join(''),
+    );
+
   // Pixi adds letter spacing once per grapheme of a word. A family of joined
   // emoji is eight UTF-16 units but one grapheme: 80px here, with no spacing.
   it('counts the letter spacing of a word in graphemes', () => {
     const family = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
-    const spacedLines = (text: string, contentWidth: number) =>
-      layoutWrappedText(createTextItem({ text, letterSpacing: 10 }), contentWidth, (token) => token.length * 10).map(
-        (tokens) => tokens.join(''),
-      );
 
-    // "familyA" is 90px and one spacing, the space 10px, the family 80px: 190px.
-    expect(spacedLines(`${family}A ${family}`, 190)).toEqual([`${family}A ${family}`]);
-    expect(spacedLines(`${family}A ${family}`, 189)).toEqual([`${family}A `, family]);
+    // "familyA" is 90px, the space 10px, the family 80px, and the line's four
+    // graphemes have three spacings between them: 210px.
+    expect(spacedLines(`${family}A ${family}`, 10, 210)).toEqual([`${family}A ${family}`]);
+    expect(spacedLines(`${family}A ${family}`, 10, 209)).toEqual([`${family}A `, family]);
+  });
+
+  // Pixi lets a line run as wide as it is drawn: its characters plus the letter
+  // spacing between every two of them, the ones on either side of a space too.
+  // Counting the spacing inside each word only, the layout fitted lines up to one
+  // spacing per word or space too wide: here "alpha beta gamma" stayed on one
+  // line down to 270px, where the canvas wrapped it below 310px.
+  it('fits a letter-spaced line as wide as the canvas draws it', () => {
+    // 160px of characters and 15 spacings between 16 characters.
+    expect(spacedLines('alpha beta gamma', 10, 310)).toEqual(['alpha beta gamma']);
+    expect(spacedLines('alpha beta gamma', 10, 309)).toEqual(['alpha beta ', 'gamma']);
+  });
+
+  it('counts the letter spacing after every space of a run', () => {
+    // 70px of characters and 6 spacings between 7 characters.
+    expect(spacedLines('ab   cd', 10, 130)).toEqual(['ab   cd']);
+    expect(spacedLines('ab   cd', 10, 129)).toEqual(['ab   ', 'cd']);
+  });
+
+  // Negative spacing pulls the characters together, and a line fits sooner.
+  it('fits a line with negative letter spacing as wide as the canvas draws it', () => {
+    // 160px of characters less 15 spacings of 2px.
+    expect(spacedLines('alpha beta gamma', -2, 130)).toEqual(['alpha beta gamma']);
+    expect(spacedLines('alpha beta gamma', -2, 129)).toEqual(['alpha beta ', 'gamma']);
   });
 
   // Pixi ends a line after a hyphen or dash inside a word. Without this the

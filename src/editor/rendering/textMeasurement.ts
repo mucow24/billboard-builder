@@ -49,9 +49,14 @@ export function layoutWrappedText(
   contentWidth: number,
   measure: (text: string) => number,
 ): string[][] {
-  // Pixi adds letter spacing once per grapheme (see `graphemes`).
+  // Pixi (`wordWrap` in pixi.js `scene/text/canvas/utils`) counts a token's
+  // letter spacing once per grapheme (see `graphemes`), after its last one too,
+  // and lets a line run to the wrap width plus one letter spacing. A line then
+  // fits when its width with spacing between all its graphemes does, across the
+  // tokens as well as inside them.
   const measureToken = (token: string): number =>
-    measure(token) + Math.max(graphemes(token).length - 1, 0) * item.letterSpacing;
+    measure(token) + graphemes(token).length * item.letterSpacing;
+  const maxLineWidth = contentWidth + item.letterSpacing;
 
   const lines: string[][] = [];
   for (const paragraph of drawnText(item.text).split('\n')) {
@@ -71,7 +76,7 @@ export function layoutWrappedText(
       const tokenWidth = measureToken(token);
       const isWhitespace = /^\s/.test(token);
 
-      if (!isWhitespace && hasContent && currentWidth + tokenWidth > contentWidth) {
+      if (!isWhitespace && hasContent && currentWidth + tokenWidth > maxLineWidth) {
         lines.push(current);
         current = [token];
         currentWidth = tokenWidth;
