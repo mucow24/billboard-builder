@@ -14,6 +14,20 @@ describe('layoutWrappedText', () => {
     expect(lines('alpha beta gamma', 110)).toEqual(['alpha beta ', 'gamma']);
   });
 
+  // Pixi adds letter spacing once per grapheme of a word. A family of joined
+  // emoji is eight UTF-16 units but one grapheme: 80px here, with no spacing.
+  it('counts the letter spacing of a word in graphemes', () => {
+    const family = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
+    const spacedLines = (text: string, contentWidth: number) =>
+      layoutWrappedText(createTextItem({ text, letterSpacing: 10 }), contentWidth, (token) => token.length * 10).map(
+        (tokens) => tokens.join(''),
+      );
+
+    // "familyA" is 90px and one spacing, the space 10px, the family 80px: 190px.
+    expect(spacedLines(`${family}A ${family}`, 190)).toEqual([`${family}A ${family}`]);
+    expect(spacedLines(`${family}A ${family}`, 189)).toEqual([`${family}A `, family]);
+  });
+
   // Pixi ends a line after a hyphen or dash inside a word. Without this the
   // canvas showed "Double-" / "click to" / "edit" where two lines were counted.
   it('wraps after a hyphen inside a word, as the canvas does', () => {

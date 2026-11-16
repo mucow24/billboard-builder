@@ -1,4 +1,5 @@
 import { drawnText } from '../fonts/emojiFallback';
+import { graphemes } from './graphemes';
 import { getRenderableCanvasFontDeclaration } from '../fonts/fontStyles';
 import type { TextCanvasItem } from '../document/documentTypes';
 
@@ -48,8 +49,9 @@ export function layoutWrappedText(
   contentWidth: number,
   measure: (text: string) => number,
 ): string[][] {
+  // Pixi adds letter spacing once per grapheme (see `graphemes`).
   const measureToken = (token: string): number =>
-    measure(token) + Math.max(token.length - 1, 0) * item.letterSpacing;
+    measure(token) + Math.max(graphemes(token).length - 1, 0) * item.letterSpacing;
 
   const lines: string[][] = [];
   for (const paragraph of drawnText(item.text).split('\n')) {

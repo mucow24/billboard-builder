@@ -37,6 +37,8 @@ This editor is organized around a small set of ownership boundaries.
   - Every canvas font declaration for a text item comes from `getRenderableCanvasFontDeclaration` (or `textFontFamilies`, which it uses), so it names the emoji fallback after the item's own family.
   - The fallback's faces are used only for `EMOJI_FALLBACK_UNICODE_RANGE`. SVG export routes characters to the fallback by the same range (`isInEmojiFallbackRange`, through `emojiFallbackOutline`), so the two change together.
   - Keycaps are drawn as private-use characters (`KEYCAP_BASES`, `FIRST_KEYCAP_CODE_POINT`), which the bundled Noto Emoji maps to its keycap glyphs because `scripts/patch-noto-emoji-keycaps.py` patched its cmap. The script and the constants number them the same way; `emojiKeycapFont.test.ts` checks the bundled file against the constants.
+  - Letter spacing is counted per grapheme (`rendering/graphemes.ts`), as Pixi counts it: an emoji with a skin tone, a flag or a family of joined emoji is one grapheme.
+  - Known limit: Firefox draws an emoji with a skin tone from the system's colour emoji font whatever the text names, so there the canvas and SVG export disagree on it.
 
 ## Document library
 

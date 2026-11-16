@@ -15,6 +15,13 @@ import { getFontRegistrationCount } from './fontRegistrations';
  * every ASCII character a font lacks falls back as before, as does every other
  * character Noto Emoji does not have. Keycaps, which start with an ASCII
  * character, reach it as private-use characters (see `KEYCAP_BASES`).
+ *
+ * Known limit, Firefox: it still draws an emoji followed by a skin tone (such
+ * as U+1F44D U+1F3FD) from the system's colour emoji font, at a different
+ * width, although the text names Noto Emoji and Noto Emoji has the sequence
+ * (Firefox 146; Chromium 145 and WebKit 26 draw it from Noto Emoji). There,
+ * such emoji stay in colour on the canvas, and SVG export, which outlines Noto
+ * Emoji's glyph, does not match them.
  */
 export const EMOJI_FALLBACK_FAMILY = 'Noto Emoji';
 
@@ -24,8 +31,9 @@ export function isEmojiFallbackFamily(family: string): boolean {
 }
 
 /**
- * The characters the emoji fallback's faces are used for, as a CSS
- * `unicode-range`: none in ASCII (below U+80).
+ * The first character the emoji fallback's faces are used for, so that they
+ * are used for none in ASCII (below U+80). Their CSS `unicode-range` is
+ * `EMOJI_FALLBACK_UNICODE_RANGE`, made from this.
  *
  * Noto Emoji has the space, the digits, "#" and "*", as the bases of keycaps,
  * and draws them as wide as an emoji (an advance of 1.27 em). Without the range
@@ -41,10 +49,10 @@ export function isEmojiFallbackFamily(family: string): boolean {
  * SVG export routes characters to the fallback by the same range
  * (`isInEmojiFallbackRange`), so the two must change together.
  */
-export const EMOJI_FALLBACK_UNICODE_RANGE = 'U+80-10FFFF';
-
-/** The first code point of `EMOJI_FALLBACK_UNICODE_RANGE`. */
 const FIRST_EMOJI_FALLBACK_CODE_POINT = 0x80;
+
+/** See `FIRST_EMOJI_FALLBACK_CODE_POINT`: everything from there to the last code point. */
+export const EMOJI_FALLBACK_UNICODE_RANGE = `U+${FIRST_EMOJI_FALLBACK_CODE_POINT.toString(16).toUpperCase()}-10FFFF`;
 
 /** Whether the emoji fallback is used for `ch` (one character) at all: see `EMOJI_FALLBACK_UNICODE_RANGE`. */
 export function isInEmojiFallbackRange(ch: string): boolean {
@@ -92,8 +100,8 @@ const KEYCAP_MARK = String.fromCodePoint(0x20e3);
 
 /**
  * The bases of keycaps, in the order of the private-use characters they are
- * drawn as: U+F0000 (`FIRST_KEYCAP_CODE_POINT`) for "0" up to U+F0009 for "9",
- * then U+F000A for "#" and U+F000B for "*".
+ * drawn as: U+100000 (`FIRST_KEYCAP_CODE_POINT`) for "0" up to U+100009 for
+ * "9", then U+10000A for "#" and U+10000B for "*".
  *
  * A keycap is its base, usually U+FE0F, and U+20E3, which Noto Emoji joins into
  * one glyph. The base is ASCII, though, which the emoji fallback is never used
@@ -103,15 +111,17 @@ const KEYCAP_MARK = String.fromCodePoint(0x20e3);
  * glyphs: `scripts/patch-noto-emoji-keycaps.py` added them to its cmap, with
  * this numbering (`emojiKeycapFont.test.ts` checks the two agree).
  *
- * They are in Supplementary Private Use Area-A, which fonts hardly ever use, so
- * the text's own font is unlikely to have glyphs of its own for them. A Noto
- * Emoji that was not patched (one a user uploads in place of the bundled file)
- * has none, and keycaps then come out as missing glyphs.
+ * The browser asks the text's own font for them first, so they must be
+ * characters fonts leave alone. They are at the start of Supplementary Private
+ * Use Area-B, which no bundled font uses. (Area-A is not safe: Nerd Fonts put
+ * their Material Design icons from U+F0001 on.) A Noto Emoji that was not
+ * patched (one a user uploads in place of the bundled file) has none of them,
+ * and keycaps then come out as missing glyphs.
  */
 export const KEYCAP_BASES = '0123456789#*';
 
 /** The private-use character the first of `KEYCAP_BASES` is drawn as. */
-export const FIRST_KEYCAP_CODE_POINT = 0xf0000;
+export const FIRST_KEYCAP_CODE_POINT = 0x100000;
 
 /** `text` with each keycap (a base and U+20E3, no selector) as its private-use character (see `KEYCAP_BASES`). */
 function keycapsAsPrivateCharacters(text: string): string {
@@ -146,6 +156,9 @@ function keycapsAsPrivateCharacters(text: string): string {
  *
  * Keycaps (1 U+FE0F U+20E3) lose it too, before they become private-use
  * characters, so a keycap typed with or without it comes out the same.
+ *
+ * Firefox draws an emoji with a skin tone in colour all the same (see
+ * `EMOJI_FALLBACK_FAMILY`); nothing here changes that.
  */
 export function drawnText(text: string): string {
   const withoutSelectors = text.includes(EMOJI_PRESENTATION_SELECTOR)

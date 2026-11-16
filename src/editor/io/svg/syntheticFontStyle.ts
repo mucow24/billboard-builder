@@ -1,6 +1,6 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import type { TextMeasurer } from './svgExportTypes';
-import { graphemes } from './svgTextGlyphs';
+import { graphemes } from '../../rendering/graphemes';
 
 /**
  * Bold and italic that the browser fakes, reproduced for the SVG export.

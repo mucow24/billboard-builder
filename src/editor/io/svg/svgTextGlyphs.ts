@@ -1,17 +1,6 @@
 import { isInEmojiFallbackRange } from '../../fonts/emojiFallback';
+import { graphemes } from '../../rendering/graphemes';
 import type { GlyphPathStyle, OutlineFont, SubstituteGlyph, TextSubstitutions } from './svgExportTypes';
-
-/**
- * Split a text the way Pixi does before it draws character by character
- * (`CanvasTextMetrics.graphemeSegmenter`): into what a reader sees as one
- * character, where the browser can tell, into code points otherwise.
- */
-export function graphemes(text: string): string[] {
-  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
-    return [...new Intl.Segmenter().segment(text)].map((part) => part.segment);
-  }
-  return [...text];
-}
 
 /**
  * The glyphs a font substitutes in a line, as the canvas draws that line: one

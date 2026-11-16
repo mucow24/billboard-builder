@@ -74,20 +74,20 @@ describe('emojiFallback', () => {
 
   it('draws each keycap as one private-use character, typed with the selector or without', () => {
     expect(KEYCAP_BASES).toBe('0123456789#*');
-    expect(FIRST_KEYCAP_CODE_POINT).toBe(0xf0000);
+    expect(FIRST_KEYCAP_CODE_POINT).toBe(0x100000);
 
-    expect(drawnText(KEYCAP_ONE)).toBe(chars(0xf0001));
-    expect(drawnText(chars(0x31, 0x20e3))).toBe(chars(0xf0001));
+    expect(drawnText(KEYCAP_ONE)).toBe(chars(0x100001));
+    expect(drawnText(chars(0x31, 0x20e3))).toBe(chars(0x100001));
     const allKeycaps = [...KEYCAP_BASES].map((base) => `${base}${chars(0xfe0f, 0x20e3)}`).join('');
-    expect(drawnText(allKeycaps)).toBe(chars(...[...KEYCAP_BASES].map((_, index) => 0xf0000 + index)));
-    expect(drawnText(`Call ${KEYCAP_ONE} or 555-0100`)).toBe(`Call ${chars(0xf0001)} or 555-0100`);
+    expect(drawnText(allKeycaps)).toBe(chars(...[...KEYCAP_BASES].map((_, index) => 0x100000 + index)));
+    expect(drawnText(`Call ${KEYCAP_ONE} or 555-0100`)).toBe(`Call ${chars(0x100001)} or 555-0100`);
   });
 
   it('leaves the keycap mark alone after anything but a digit, "#" or "*"', () => {
     const mark = chars(0x20e3);
     expect(drawnText(`A${mark}`)).toBe(`A${mark}`);
     expect(drawnText(`${mark}1`)).toBe(`${mark}1`);
-    expect(drawnText(`1${mark}${mark}`)).toBe(`${chars(0xf0001)}${mark}`);
+    expect(drawnText(`1${mark}${mark}`)).toBe(`${chars(0x100001)}${mark}`);
   });
 
   it('keeps every other character, the text presentation selector and joiners included', () => {

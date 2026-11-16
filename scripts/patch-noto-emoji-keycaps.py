@@ -1,34 +1,44 @@
-"""Give Noto Emoji's keycap glyphs private code points of their own.
+"""Make the bundled Noto Emoji: a fixed regular weight, with keycap characters.
 
-Noto Emoji draws a keycap (a digit, "#" or "*" followed by U+20E3) with a
-ligature: the two characters together become one keycap glyph. The app keeps
-Noto Emoji off ASCII characters (see EMOJI_FALLBACK_UNICODE_RANGE in
-src/editor/fonts/emojiFallback.ts), so it can never reach the digit that starts
-a keycap. Instead, the app swaps each keycap for one private-use character
-before drawing (drawnText), and this script maps those characters straight to
-the keycap glyphs in the font's cmap. Nothing else in the font changes.
+Two changes to Google's Noto Emoji (google/fonts ofl/notoemoji/
+NotoEmoji[wght].ttf):
 
-The code points must match EMOJI_KEYCAP_CODE_POINTS in emojiFallback.ts:
-U+F0000 + the base's index in KEYCAP_BASES. A unit test
-(src/editor/fonts/emojiKeycapFont.test.ts) checks the bundled font against it.
+1. A fixed weight of 400. The file is a variable font (weights 300 to 700),
+   but the app registers it at weight 400 only and fakes bold, so the
+   weight-variation data is never used. Instancing at 400, the font's default,
+   keeps the very outlines in use and halves the file.
+
+2. Keycap characters. Noto Emoji draws a keycap (a digit, "#" or "*" followed
+   by U+20E3) with a ligature: the two characters together become one keycap
+   glyph. The app keeps Noto Emoji off ASCII characters (see
+   EMOJI_FALLBACK_UNICODE_RANGE in src/editor/fonts/emojiFallback.ts), so it
+   can never reach the digit that starts a keycap. Instead, the app swaps each
+   keycap for one private-use character before drawing (drawnText), and this
+   script maps those characters straight to the keycap glyphs in the font's
+   cmap.
+
+The code points must match KEYCAP_BASES and FIRST_KEYCAP_CODE_POINT in
+emojiFallback.ts: U+100000 + the base's index in KEYCAP_BASES. A unit test
+(src/editor/fonts/emojiKeycapFont.test.ts) checks the bundled font against them.
 
 Usage, with fontTools installed (pip install fonttools):
 
     python scripts/patch-noto-emoji-keycaps.py [INPUT] [OUTPUT]
 
 INPUT defaults to src/assets/fonts/NotoEmoji-Regular.ttf and OUTPUT to INPUT.
-Run it on a fresh copy of Noto Emoji (google/fonts ofl/notoemoji/
-NotoEmoji[wght].ttf) whenever the bundled file is updated. Running it on an
-already patched file changes nothing.
+Run it on a fresh copy of Google's file whenever the bundled one is updated.
+Running it on its own output changes nothing.
 """
 
 import sys
 
 from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
 
 KEYCAP_BASES = "0123456789#*"
-FIRST_KEYCAP_CODE_POINT = 0xF0000
+FIRST_KEYCAP_CODE_POINT = 0x100000
 KEYCAP_MARK = 0x20E3
+REGULAR_WEIGHT = 400
 
 
 def keycap_glyphs(font):
@@ -56,10 +66,17 @@ def keycap_glyphs(font):
 def main():
     source = sys.argv[1] if len(sys.argv) > 1 else "src/assets/fonts/NotoEmoji-Regular.ttf"
     target = sys.argv[2] if len(sys.argv) > 2 else source
-    # The ligatures are read from a copy of their own, so that only the cmap of
-    # the font that is saved is decompiled and written anew.
+    # The ligatures are read from a copy of their own, so that a font that
+    # already has a fixed weight only has its cmap decompiled and written anew.
     glyphs = keycap_glyphs(TTFont(source))
     font = TTFont(source, recalcTimestamp=False)
+
+    if "fvar" in font:
+        axes = {axis.axisTag: axis for axis in font["fvar"].axes}
+        if set(axes) != {"wght"} or axes["wght"].defaultValue != REGULAR_WEIGHT:
+            sys.exit(f"Expected a variable font with only a wght axis defaulting to {REGULAR_WEIGHT}.")
+        font = instantiateVariableFont(font, {"wght": REGULAR_WEIGHT})
+        print(f"Fixed the weight at {REGULAR_WEIGHT}.")
 
     patched = 0
     for table in font["cmap"].tables:

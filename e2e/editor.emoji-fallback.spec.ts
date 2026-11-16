@@ -41,7 +41,7 @@ const CASES = [
     drawn: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467),
   },
   // Barlow has the 1 and the # but not the keycap mark.
-  { id: 'keycaps', text: chars(0x31, 0xfe0f, 0x20e3, 0x23, 0xfe0f, 0x20e3), drawn: chars(0xf0001, 0xf000a) },
+  { id: 'keycaps', text: chars(0x31, 0xfe0f, 0x20e3, 0x23, 0xfe0f, 0x20e3), drawn: chars(0x100001, 0x10000a) },
 ];
 
 const FONT_SIZE = 110;
@@ -194,6 +194,97 @@ test.describe('emoji fallback', () => {
       expect(Math.abs(report.svgOffset.x), `${report.id}: SVG ink left or right of the canvas's`).toBeLessThan(1.5);
       expect(Math.abs(report.svgOffset.y), `${report.id}: SVG ink above or below the canvas's`).toBeLessThan(1.5);
     }
+  });
+
+  // Pixi adds letter spacing once per grapheme, and an emoji with a skin tone or
+  // a family of joined emoji is one grapheme of several code points. SVG export
+  // has to space them the same, and centre the line on the same width.
+  test('places letter-spaced emoji in SVG where the canvas has them', async ({ page }) => {
+    const thumbsUpMediumSkin = chars(0x1f44d, 0x1f3fd);
+    const family = chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([
+        createTextFixture({
+          id: 'spaced-emoji',
+          name: 'spaced emoji',
+          zIndex: 1,
+          text: `A${thumbsUpMediumSkin}B${family}C`,
+          fontFamily: 'Barlow',
+          fontSize: 80,
+          letterSpacing: 24,
+          align: 'center',
+          fill: FILL,
+          secondaryFill: FILL,
+          x: 40,
+          y: 300,
+          width: 940,
+          height: 160,
+        }),
+      ]),
+    );
+    await waitForBundledFonts(page);
+
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = await fs.readFile(await pngDownload.path());
+    const svgDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'SVG');
+    });
+    const svg = await readDownloadedSvg(svgDownload);
+
+    const { canvas, svg: exported } = await page.evaluate(
+      async ({ pngBase64, svgText }) => {
+        const decode = async (src: string) => {
+          const image = new Image();
+          image.src = src;
+          await image.decode();
+          return image;
+        };
+        const pngImage = await decode(`data:image/png;base64,${pngBase64}`);
+        const svgImage = await decode(URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' })));
+        const width = pngImage.naturalWidth;
+        const height = pngImage.naturalHeight;
+        // Ink (sum of alpha), where it is centred, and where it starts and ends.
+        const inkOf = (image: HTMLImageElement) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext('2d', { willReadFrequently: true })!;
+          context.drawImage(image, 0, 0, width, height);
+          const data = context.getImageData(0, 0, width, height).data;
+          let ink = 0;
+          let x = 0;
+          let y = 0;
+          let left = width;
+          let right = 0;
+          for (let at = 3; at < data.length; at += 4) {
+            const alpha = data[at] / 255;
+            if (alpha === 0) continue;
+            const pixel = (at - 3) / 4;
+            ink += alpha;
+            x += alpha * (pixel % width);
+            y += alpha * Math.floor(pixel / width);
+            if (alpha > 0.5) {
+              left = Math.min(left, pixel % width);
+              right = Math.max(right, pixel % width);
+            }
+          }
+          return { ink, x: x / ink, y: y / ink, left, right };
+        };
+        return { canvas: inkOf(pngImage), svg: inkOf(svgImage) };
+      },
+      { pngBase64: png.toString('base64'), svgText: svg },
+    );
+
+    expect(canvas.ink, 'canvas ink').toBeGreaterThan(1000);
+    expect(Math.abs(exported.ink - canvas.ink) / canvas.ink, 'SVG ink against the canvas').toBeLessThan(0.1);
+    expect(Math.abs(exported.x - canvas.x), 'SVG ink left or right of the canvas').toBeLessThan(1.5);
+    expect(Math.abs(exported.y - canvas.y), 'SVG ink above or below the canvas').toBeLessThan(1.5);
+    expect(Math.abs(exported.left - canvas.left), 'where the line starts').toBeLessThanOrEqual(2);
+    expect(Math.abs(exported.right - canvas.right), 'where the line ends').toBeLessThanOrEqual(2);
   });
 
   // Noto Emoji has the space, the digits, "#" and "*", as wide as an emoji. Its

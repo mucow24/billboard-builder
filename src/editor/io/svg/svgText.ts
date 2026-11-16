@@ -1,5 +1,6 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { getRenderBox } from '../../rendering/transformGeometry';
+import { graphemeIndexOfCodePoints, graphemes } from '../../rendering/graphemes';
 import { layoutWrappedText } from '../../rendering/textMeasurement';
 import { toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
@@ -112,11 +113,14 @@ export function textSvg(
     inkLeft = Math.min(inkLeft, lineLeft);
     inkRight = Math.max(inkRight, lineLeft + line.width);
 
+    // Pixi adds letter spacing once per grapheme, so every code point of one
+    // gets as much of it as the grapheme's first.
+    const spacingsBefore = graphemeIndexOfCodePoints(line.text);
     // Ligatures and other glyphs the fonts put in place of characters; see svgTextGlyphs.
     kernedOffsets(line.text, line.advance, measure).forEach(({ offset }, index) => {
       const { fallback: fromFallback, drawn } = drawnGlyphs[lineIndex][index];
       const group = fromFallback && fallback ? fallback : own;
-      const penX = lineLeft + offset + index * item.letterSpacing;
+      const penX = lineLeft + offset + spacingsBefore[index] * item.letterSpacing;
       for (const penOffset of group.penOffsets) {
         const path = glyphsPath(group.font, drawn, item.fontSize, penX + penOffset, baselineY, group.glyphStyle);
         if (path) group.paths.push(path);
@@ -283,7 +287,7 @@ function drawnLine(laidOutText: string, item: TextCanvasItem, measurer: TextMeas
   const text = withoutTrailingSpaces(laidOutText);
   const advance = measurer.measureWidth(item, text);
   const ink = measurer.measureInkWidth?.(item, text) ?? 0;
-  const spacing = Math.max(text.length - 1, 0) * item.letterSpacing;
+  const spacing = Math.max(graphemes(text).length - 1, 0) * item.letterSpacing;
   return { text, advance, width: Math.max(advance, ink) + spacing };
 }
 
