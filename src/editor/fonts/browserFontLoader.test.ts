@@ -29,9 +29,6 @@ class MockFontFace {
     if (this.family.includes('Broken')) {
       throw new Error('Failed to load font');
     }
-    if (this.family === 'Noto Emoji Keycaps' && String(this.source).includes('/keycaps-fail/')) {
-      throw new Error('Failed to load font');
-    }
     if (typeof this.source === 'string' && this.source.includes('/deferred/')) {
       const source = this.source;
       await new Promise<void>((finish, fail) => pendingLoads.set(source, { finish, fail }));
@@ -153,10 +150,10 @@ describe('browser font loader', () => {
       bytes: new Uint8Array([1]).buffer,
     });
 
-    const added = vi
+    const rangeByFamily = vi
       .mocked(document.fonts.add)
-      .mock.calls.map(([fontFace]) => fontFace as unknown as MockFontFace);
-    const rangeByFamily = added.map((fontFace) => [fontFace.family, fontFace.descriptors?.unicodeRange]);
+      .mock.calls.map(([fontFace]) => fontFace as unknown as MockFontFace)
+      .map((fontFace) => [fontFace.family, fontFace.descriptors?.unicodeRange]);
     expect(rangeByFamily).toEqual(
       expect.arrayContaining([
         ['Noto Emoji', 'U+80-10FFFF'],
@@ -164,36 +161,6 @@ describe('browser font loader', () => {
         ['noto emoji', 'U+80-10FFFF'],
       ]),
     );
-    // Each emoji font file is also added as a face for keycaps, from the same source.
-    const keycapFaces = added.filter((fontFace) => fontFace.family === 'Noto Emoji Keycaps');
-    expect(keycapFaces.map((fontFace) => fontFace.descriptors)).toEqual([
-      { weight: '400', style: 'normal', unicodeRange: 'U+23, U+2A, U+30-39, U+20E3' },
-      { weight: '400', style: 'normal', unicodeRange: 'U+23, U+2A, U+30-39, U+20E3' },
-    ]);
-    expect(keycapFaces.map((fontFace) => fontFace.source)).toEqual([
-      'url("/fonts/NotoEmoji-Regular.ttf")',
-      expect.any(ArrayBuffer),
-    ]);
-  });
-
-  it('keeps an emoji font whose keycap face fails to load, without the keycap face', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const fonts = await loadFontEntries([
-        ['../../assets/fonts/NotoEmoji-Regular.ttf', '/fonts/keycaps-fail/NotoEmoji-Regular.ttf'],
-      ]);
-
-      expect(fonts.map((font) => font.family)).toEqual(['Noto Emoji']);
-      expect(
-        vi.mocked(document.fonts.add).mock.calls.map(([fontFace]) => (fontFace as unknown as MockFontFace).family),
-      ).toEqual(['Noto Emoji']);
-      expect(warnSpy).toHaveBeenCalledWith(
-        'Skipping the keycap face of an emoji font that failed to load.',
-        expect.any(Error),
-      );
-    } finally {
-      warnSpy.mockRestore();
-    }
   });
 
   it('registers uploaded font files with uploaded provenance', async () => {
@@ -525,15 +492,6 @@ describe('browser font loader', () => {
         { family: 'Poster', sourceName: 'Poster Bold.otf', weight: '700', style: 'normal', kind: 'bundled' },
         { family: 'Poster', sourceName: 'Poster Book.otf', weight: '400', style: 'normal', kind: 'bundled' },
         { family: 'Poster', sourceName: 'Poster Regular.ttf', weight: '400', style: 'normal', kind: 'bundled' },
-      ]);
-    });
-
-    it('lists an emoji font file once, without its keycap face', async () => {
-      await loadFontEntries([['../../assets/fonts/NotoEmoji-Regular.ttf', '/fonts/NotoEmoji-Regular.ttf']]);
-
-      expect([...document.fonts].map((fontFace) => fontFace.family)).toEqual(['Noto Emoji', 'Noto Emoji Keycaps']);
-      expect(listRegisteredFonts()).toEqual([
-        { family: 'Noto Emoji', sourceName: 'NotoEmoji-Regular.ttf', weight: '400', style: 'normal', kind: 'bundled' },
       ]);
     });
 

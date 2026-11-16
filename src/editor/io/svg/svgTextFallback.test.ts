@@ -26,6 +26,7 @@ const MAN = chars(0x1f468);
 const WOMAN = chars(0x1f469);
 const ZWJ = chars(0x200d);
 const KEYCAP = chars(0x20e3);
+const ENCLOSING_CIRCLE = chars(0x20dd);
 const POINTING_UP = chars(0x261d); // one UTF-16 unit: 10px
 const MEDIUM_SKIN = chars(0x1f3fd);
 const FAMILY_GLYPH = 70;
@@ -177,8 +178,9 @@ describe('svgText with the emoji fallback', () => {
     ]);
   });
 
-  it('keeps a grapheme in the item font when the fallback lacks part of it too, as a keycap', () => {
-    const svg = exportText({ ...left, text: `1${KEYCAP} 1` });
+  it('keeps a grapheme in the item font when the fallback lacks part of it too', () => {
+    // A with an enclosing circle: the fallback has the circle but not the A.
+    const svg = exportText({ ...left, text: `A${ENCLOSING_CIRCLE} A` });
 
     expect(pathElements(svg).map((path) => path.boxes)).toEqual([
       [
@@ -186,6 +188,16 @@ describe('svgText with the emoji fallback', () => {
         [10, 10],
         [30, 10],
       ],
+    ]);
+  });
+
+  it('draws a keycap from the fallback as the one private-use character the canvas is given', () => {
+    const svg = exportText({ ...left, text: `1${KEYCAP} 1` });
+
+    expect(pathElements(svg).map((path) => path.boxes)).toEqual([
+      // The lone 1, after the keycap's character (two UTF-16 units) and the space.
+      [[30, 10]],
+      [[0, 20]],
     ]);
   });
 

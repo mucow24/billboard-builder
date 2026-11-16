@@ -26,13 +26,22 @@ import {
 
 const chars = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
 
+/**
+ * `drawn` is the text as the canvas is given it, which the reference is drawn
+ * from: without U+FE0F, and with keycaps as the private-use characters the
+ * bundled Noto Emoji maps to its keycap glyphs (see `drawnText`).
+ */
 const CASES = [
-  { id: 'emoji', text: chars(0x1f600) },
-  { id: 'emoji typed with the presentation selector', text: chars(0x2764, 0xfe0f) },
-  { id: 'emoji with a skin tone', text: chars(0x1f44d, 0x1f3fd) },
-  { id: 'joined sequence', text: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467) },
+  { id: 'emoji', text: chars(0x1f600), drawn: chars(0x1f600) },
+  { id: 'emoji typed with the presentation selector', text: chars(0x2764, 0xfe0f), drawn: chars(0x2764) },
+  { id: 'emoji with a skin tone', text: chars(0x1f44d, 0x1f3fd), drawn: chars(0x1f44d, 0x1f3fd) },
+  {
+    id: 'joined sequence',
+    text: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467),
+    drawn: chars(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467),
+  },
   // Barlow has the 1 and the # but not the keycap mark.
-  { id: 'keycaps', text: chars(0x31, 0xfe0f, 0x20e3, 0x23, 0xfe0f, 0x20e3) },
+  { id: 'keycaps', text: chars(0x31, 0xfe0f, 0x20e3, 0x23, 0xfe0f, 0x20e3), drawn: chars(0xf0001, 0xf000a) },
 ];
 
 const FONT_SIZE = 110;
@@ -143,15 +152,14 @@ test.describe('emoji fallback', () => {
             }
           }
 
-          // The same emoji, as the canvas is given it, drawn in Noto Emoji alone
-          // (keycaps in its keycap family).
+          // The same emoji, as the canvas is given it, drawn in Noto Emoji alone.
           const reference = document.createElement('canvas');
           reference.width = width;
           reference.height = row * 2;
           const context = reference.getContext('2d', { willReadFrequently: true })!;
-          context.font = `${fontSize}px "Noto Emoji", "Noto Emoji Keycaps"`;
+          context.font = `${fontSize}px "Noto Emoji"`;
           context.fillStyle = '#ff0000';
-          context.fillText(entry.text.split(String.fromCodePoint(0xfe0f)).join(''), 20, row);
+          context.fillText(entry.drawn, 20, row);
           const referencePixels = context.getImageData(0, 0, width, row * 2).data;
           let notoInk = 0;
           for (let at = 3; at < referencePixels.length; at += 4) notoInk += referencePixels[at] / 255;
@@ -190,8 +198,8 @@ test.describe('emoji fallback', () => {
 
   // Noto Emoji has the space, the digits, "#" and "*", as wide as an emoji. Its
   // face is used for nothing below U+80, so text whose font lacks them, or is
-  // missing, measures as it would without the fallback. (Text with a keycap also
-  // names the keycap family, which has the digits; see the case above.)
+  // missing, measures as it would without the fallback. (Keycaps reach it as
+  // private-use characters; see the case above.)
   test('leaves ASCII to the text font or the system, not to Noto Emoji', async ({ page }) => {
     await openFreshEditor(page);
     await waitForBundledFonts(page);

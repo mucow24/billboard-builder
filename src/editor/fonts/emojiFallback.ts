@@ -14,8 +14,7 @@ import { getFontRegistrationCount } from './fontRegistrations';
  * used for no character below U+80 (see `EMOJI_FALLBACK_UNICODE_RANGE`), so
  * every ASCII character a font lacks falls back as before, as does every other
  * character Noto Emoji does not have. Keycaps, which start with an ASCII
- * character, come from the same file under a family of their own
- * (`EMOJI_KEYCAP_FAMILY`).
+ * character, reach it as private-use characters (see `KEYCAP_BASES`).
  */
 export const EMOJI_FALLBACK_FAMILY = 'Noto Emoji';
 
@@ -36,11 +35,11 @@ export function isEmojiFallbackFamily(family: string): boolean {
  * the one whose metrics set its line height, which the browser takes to be the
  * first font that is used for the space.
  *
- * That leaves out the bases of keycaps (a digit, "#" or "*" with U+20E3 after
- * it), which `EMOJI_KEYCAP_FAMILY` is for.
+ * That leaves out the base of a keycap (a digit, "#" or "*" before U+20E3),
+ * so keycaps are drawn as characters of their own: see `KEYCAP_BASES`.
  *
- * SVG export routes characters to the fallback by the same ranges
- * (`emojiFallbackRangeOf`), so the two must change together.
+ * SVG export routes characters to the fallback by the same range
+ * (`isInEmojiFallbackRange`), so the two must change together.
  */
 export const EMOJI_FALLBACK_UNICODE_RANGE = 'U+80-10FFFF';
 
@@ -53,76 +52,21 @@ export function isInEmojiFallbackRange(ch: string): boolean {
 }
 
 /**
- * A second family for the emoji fallback's files, used for keycaps alone: a
- * digit, "#" or "*" followed by U+20E3 (the combining enclosing keycap). Its
- * faces cover just those characters (`EMOJI_KEYCAP_UNICODE_RANGE`), so Noto
- * Emoji can draw a keycap whole although `EMOJI_FALLBACK_UNICODE_RANGE` keeps
- * the keycap's base out of the fallback's own faces. The browser picks one font
- * for the base and its mark together, and this is the one that has both.
- *
- * Text names this family only when it has a keycap (`textFontFamilies`). A
- * unicode-range cannot tell a keycap's digit from any other, so in such a text,
- * every digit, "#" and "*" its own font lacks comes from Noto Emoji too, as wide
- * as an emoji, and so do those of such a text in a missing font. Text without a
- * keycap is not affected.
- *
- * The loader adds a face of this family beside every face of the fallback's
- * family, without recording it as a font file, so the picker never lists it.
+ * The families text set in `family` is drawn with, in the order the browser
+ * tries them for each character: its own, then the emoji fallback.
  */
-export const EMOJI_KEYCAP_FAMILY = 'Noto Emoji Keycaps';
-
-/** The characters of keycaps, as the CSS `unicode-range` of the `EMOJI_KEYCAP_FAMILY` faces. */
-export const EMOJI_KEYCAP_UNICODE_RANGE = 'U+23, U+2A, U+30-39, U+20E3';
-
-/** U+20E3 COMBINING ENCLOSING KEYCAP, the mark that makes the character before it a keycap. */
-const KEYCAP_MARK = 0x20e3;
-
-/** Whether `ch` (one character) is in `EMOJI_KEYCAP_UNICODE_RANGE`. */
-function isKeycapCharacter(ch: string): boolean {
-  const codePoint = ch.codePointAt(0) ?? 0;
-  return (
-    codePoint === 0x23 ||
-    codePoint === 0x2a ||
-    (codePoint >= 0x30 && codePoint <= 0x39) ||
-    codePoint === KEYCAP_MARK
-  );
-}
-
-/** Whether `text` has a keycap, and so names `EMOJI_KEYCAP_FAMILY` (see there). */
-export function hasKeycap(text: string): boolean {
-  return text.includes(String.fromCodePoint(KEYCAP_MARK));
-}
-
-/**
- * Which characters of `text` the emoji fallback may draw, as the canvas has
- * it: those in `EMOJI_FALLBACK_UNICODE_RANGE`, and in a text with a keycap
- * those in `EMOJI_KEYCAP_UNICODE_RANGE` too. SVG export routes characters by
- * this.
- */
-export function emojiFallbackRangeOf(text: string): (ch: string) => boolean {
-  const keycaps = hasKeycap(text);
-  return (ch) => isInEmojiFallbackRange(ch) || (keycaps && isKeycapCharacter(ch));
-}
-
-/**
- * The families `text` set in `family` is drawn with, in the order the browser
- * tries them for each character: its own, then the emoji fallback, then, when
- * the text has a keycap, the keycap family (see `EMOJI_KEYCAP_FAMILY`).
- */
-export function textFontFamilies(family: string, text: string): string[] {
-  const families = isEmojiFallbackFamily(family) ? [family] : [family, EMOJI_FALLBACK_FAMILY];
-  return hasKeycap(text) ? [...families, EMOJI_KEYCAP_FAMILY] : families;
+export function textFontFamilies(family: string): string[] {
+  return isEmojiFallbackFamily(family) ? [family] : [family, EMOJI_FALLBACK_FAMILY];
 }
 
 /**
  * How many faces have been registered for the families text set in `family` is
  * drawn with (see `getFontRegistrationCount`). It changes whenever what the
  * browser draws such text with may have changed: when a file of its own family
- * arrives, and when the emoji fallback does. (Keycap faces join the browser's
- * font set together with the fallback's own, so its announcements cover them.)
+ * arrives, and when the emoji fallback does.
  */
 export function getTextFontRegistrationCount(family: string): number {
-  return textFontFamilies(family, '').reduce((count, member) => count + getFontRegistrationCount(member), 0);
+  return textFontFamilies(family).reduce((count, member) => count + getFontRegistrationCount(member), 0);
 }
 
 /**
@@ -143,10 +87,53 @@ export function hasEmojiCharacter(text: string): boolean {
 /** U+FE0F VARIATION SELECTOR-16, which asks for a character's emoji (colour) form. */
 const EMOJI_PRESENTATION_SELECTOR = String.fromCodePoint(0xfe0f);
 
+/** U+20E3 COMBINING ENCLOSING KEYCAP, which makes the character before it a keycap. */
+const KEYCAP_MARK = String.fromCodePoint(0x20e3);
+
+/**
+ * The bases of keycaps, in the order of the private-use characters they are
+ * drawn as: U+F0000 (`FIRST_KEYCAP_CODE_POINT`) for "0" up to U+F0009 for "9",
+ * then U+F000A for "#" and U+F000B for "*".
+ *
+ * A keycap is its base, usually U+FE0F, and U+20E3, which Noto Emoji joins into
+ * one glyph. The base is ASCII, though, which the emoji fallback is never used
+ * for (`EMOJI_FALLBACK_UNICODE_RANGE`), so the fallback could not draw the
+ * keycap. `drawnText` therefore swaps each keycap for one private-use
+ * character, and the bundled Noto Emoji maps those straight to its keycap
+ * glyphs: `scripts/patch-noto-emoji-keycaps.py` added them to its cmap, with
+ * this numbering (`emojiKeycapFont.test.ts` checks the two agree).
+ *
+ * They are in Supplementary Private Use Area-A, which fonts hardly ever use, so
+ * the text's own font is unlikely to have glyphs of its own for them. A Noto
+ * Emoji that was not patched (one a user uploads in place of the bundled file)
+ * has none, and keycaps then come out as missing glyphs.
+ */
+export const KEYCAP_BASES = '0123456789#*';
+
+/** The private-use character the first of `KEYCAP_BASES` is drawn as. */
+export const FIRST_KEYCAP_CODE_POINT = 0xf0000;
+
+/** `text` with each keycap (a base and U+20E3, no selector) as its private-use character (see `KEYCAP_BASES`). */
+function keycapsAsPrivateCharacters(text: string): string {
+  const chars = [...text];
+  const drawn: string[] = [];
+  for (let index = 0; index < chars.length; index += 1) {
+    const base = KEYCAP_BASES.indexOf(chars[index]);
+    if (base >= 0 && chars[index + 1] === KEYCAP_MARK) {
+      drawn.push(String.fromCodePoint(FIRST_KEYCAP_CODE_POINT + base));
+      index += 1;
+    } else {
+      drawn.push(chars[index]);
+    }
+  }
+  return drawn.join('');
+}
+
 /**
  * `text` as the canvas is given it: without emoji presentation selectors
- * (U+FE0F). Everything that lays out, measures or draws a text item's text goes
- * through this, so that all of them see the same characters.
+ * (U+FE0F), and with each keycap as one private-use character (see
+ * `KEYCAP_BASES`). Everything that lays out, measures or draws a text item's
+ * text goes through this, so that all of them see the same characters.
  *
  * The selector asks for an emoji in colour, and Chromium honours it by drawing
  * the emoji from a colour emoji font of the system's, passing over every family
@@ -157,9 +144,12 @@ const EMOJI_PRESENTATION_SELECTOR = String.fromCodePoint(0xfe0f);
  * other character. The selector draws nothing itself, and Noto Emoji joins the
  * sequences it is part of just the same without it (measured in Chromium 156).
  *
- * Keycaps (1 U+FE0F U+20E3) lose it too, and come from Noto Emoji through
- * `EMOJI_KEYCAP_FAMILY`.
+ * Keycaps (1 U+FE0F U+20E3) lose it too, before they become private-use
+ * characters, so a keycap typed with or without it comes out the same.
  */
 export function drawnText(text: string): string {
-  return text.includes(EMOJI_PRESENTATION_SELECTOR) ? text.split(EMOJI_PRESENTATION_SELECTOR).join('') : text;
+  const withoutSelectors = text.includes(EMOJI_PRESENTATION_SELECTOR)
+    ? text.split(EMOJI_PRESENTATION_SELECTOR).join('')
+    : text;
+  return withoutSelectors.includes(KEYCAP_MARK) ? keycapsAsPrivateCharacters(withoutSelectors) : withoutSelectors;
 }

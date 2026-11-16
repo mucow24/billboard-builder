@@ -3,13 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   EMOJI_FALLBACK_FAMILY,
   EMOJI_FALLBACK_UNICODE_RANGE,
-  EMOJI_KEYCAP_FAMILY,
-  EMOJI_KEYCAP_UNICODE_RANGE,
+  FIRST_KEYCAP_CODE_POINT,
+  KEYCAP_BASES,
   drawnText,
-  emojiFallbackRangeOf,
   getTextFontRegistrationCount,
   hasEmojiCharacter,
-  hasKeycap,
   isInEmojiFallbackRange,
   textFontFamilies,
 } from './emojiFallback';
@@ -25,53 +23,12 @@ const RAINBOW_FLAG = chars(0x1f3f3, 0xfe0f, 0x200d, 0x1f308);
 describe('emojiFallback', () => {
   it('draws text in its own family, then in Noto Emoji', () => {
     expect(EMOJI_FALLBACK_FAMILY).toBe('Noto Emoji');
-    expect(textFontFamilies('Barlow', `Sale 50 ${GRINNING_FACE}`)).toEqual(['Barlow', 'Noto Emoji']);
+    expect(textFontFamilies('Barlow')).toEqual(['Barlow', 'Noto Emoji']);
   });
 
   it('does not name Noto Emoji twice for text set in it, whatever its case', () => {
-    expect(textFontFamilies('Noto Emoji', GRINNING_FACE)).toEqual(['Noto Emoji']);
-    expect(textFontFamilies(' noto emoji ', GRINNING_FACE)).toEqual([' noto emoji ']);
-  });
-
-  it('names the keycap family last, and only for text with a keycap', () => {
-    expect(EMOJI_KEYCAP_FAMILY).toBe('Noto Emoji Keycaps');
-    expect(textFontFamilies('Barlow', `Call ${KEYCAP_ONE}`)).toEqual(['Barlow', 'Noto Emoji', 'Noto Emoji Keycaps']);
-    // Typed without the presentation selector, or as drawn.
-    expect(textFontFamilies('Barlow', drawnText(KEYCAP_ONE))).toEqual(['Barlow', 'Noto Emoji', 'Noto Emoji Keycaps']);
-    expect(textFontFamilies('Noto Emoji', KEYCAP_ONE)).toEqual(['Noto Emoji', 'Noto Emoji Keycaps']);
-    expect(hasKeycap('Call 1 #* now')).toBe(false);
-  });
-
-  it('lets the fallback draw the characters of keycaps only in text with a keycap', () => {
-    const plain = emojiFallbackRangeOf('Sale 50');
-    const withKeycap = emojiFallbackRangeOf(`Sale 50 ${KEYCAP_ONE}`);
-
-    for (const ch of ['0', '5', '9', '#', '*']) {
-      expect(plain(ch), JSON.stringify(ch)).toBe(false);
-      expect(withKeycap(ch), JSON.stringify(ch)).toBe(true);
-    }
-    for (const ch of [' ', 'A', '/', ':', '+']) {
-      expect(withKeycap(ch), JSON.stringify(ch)).toBe(false);
-    }
-    for (const ch of [chars(0x20e3), GRINNING_FACE]) {
-      expect(plain(ch), JSON.stringify(ch)).toBe(true);
-      expect(withKeycap(ch), JSON.stringify(ch)).toBe(true);
-    }
-  });
-
-  it('routes ASCII in a text with a keycap exactly as the keycap faces\' unicode-range has it', () => {
-    // Every code point the CSS range names, from its "U+X" and "U+X-Y" parts.
-    const inCssRange = new Set<number>();
-    for (const part of EMOJI_KEYCAP_UNICODE_RANGE.split(',')) {
-      const [first, last = first] = part.trim().replace(/^U\+/, '').split('-').map((hex) => parseInt(hex, 16));
-      for (let codePoint = first; codePoint <= last; codePoint += 1) inCssRange.add(codePoint);
-    }
-    expect(inCssRange.has(0x20e3)).toBe(true);
-
-    const withKeycap = emojiFallbackRangeOf(KEYCAP_ONE);
-    for (let codePoint = 0; codePoint < 0x80; codePoint += 1) {
-      expect(withKeycap(chars(codePoint)), `U+${codePoint.toString(16)}`).toBe(inCssRange.has(codePoint));
-    }
+    expect(textFontFamilies('Noto Emoji')).toEqual(['Noto Emoji']);
+    expect(textFontFamilies(' noto emoji ')).toEqual([' noto emoji ']);
   });
 
   it('gives a new registration count when the family or the fallback gets a face, and only then', () => {
@@ -112,8 +69,25 @@ describe('emojiFallback', () => {
 
   it('leaves the emoji presentation selector out of the text it draws', () => {
     expect(drawnText(`I ${RED_HEART} NY`)).toBe(`I ${chars(0x2764)} NY`);
-    expect(drawnText(KEYCAP_ONE)).toBe(chars(0x31, 0x20e3));
     expect(drawnText(RAINBOW_FLAG)).toBe(chars(0x1f3f3, 0x200d, 0x1f308));
+  });
+
+  it('draws each keycap as one private-use character, typed with the selector or without', () => {
+    expect(KEYCAP_BASES).toBe('0123456789#*');
+    expect(FIRST_KEYCAP_CODE_POINT).toBe(0xf0000);
+
+    expect(drawnText(KEYCAP_ONE)).toBe(chars(0xf0001));
+    expect(drawnText(chars(0x31, 0x20e3))).toBe(chars(0xf0001));
+    const allKeycaps = [...KEYCAP_BASES].map((base) => `${base}${chars(0xfe0f, 0x20e3)}`).join('');
+    expect(drawnText(allKeycaps)).toBe(chars(...[...KEYCAP_BASES].map((_, index) => 0xf0000 + index)));
+    expect(drawnText(`Call ${KEYCAP_ONE} or 555-0100`)).toBe(`Call ${chars(0xf0001)} or 555-0100`);
+  });
+
+  it('leaves the keycap mark alone after anything but a digit, "#" or "*"', () => {
+    const mark = chars(0x20e3);
+    expect(drawnText(`A${mark}`)).toBe(`A${mark}`);
+    expect(drawnText(`${mark}1`)).toBe(`${mark}1`);
+    expect(drawnText(`1${mark}${mark}`)).toBe(`${chars(0xf0001)}${mark}`);
   });
 
   it('keeps every other character, the text presentation selector and joiners included', () => {

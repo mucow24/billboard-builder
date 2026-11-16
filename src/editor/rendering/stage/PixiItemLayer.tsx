@@ -155,10 +155,9 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
   }
 
   const layoutStyle = {
-    // The item's family, then the emoji fallback for emoji it does not have
-    // (and its keycap family, when the text has a keycap).
+    // The item's family, then the emoji fallback for emoji it does not have.
     // A new array each time: Pixi quotes the names in place.
-    fontFamily: textFontFamilies(item.fontFamily, item.text),
+    fontFamily: textFontFamilies(item.fontFamily),
     fontSize: item.fontSize,
     fontWeight,
     fontStyle,
