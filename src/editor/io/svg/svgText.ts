@@ -1,17 +1,23 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
+import { parseRichText } from '../../document/richText';
+import type { RichTextRun } from '../../document/richText';
+import { computeGradientEndpoints } from '../../rendering/geometry/gradientGeometry';
+import { layoutRichText } from '../../rendering/richTextLayout';
 import { getRenderBox } from '../../rendering/transformGeometry';
-import { layoutWrappedText } from '../../rendering/textMeasurement';
-import { toSvgPaint } from './svgColor';
+import { layoutWrappedText, richTextRunItem } from '../../rendering/textMeasurement';
+import { paintAttrs, toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
 import { glyphsPath, lineSubstitutions } from './svgTextGlyphs';
 import {
   TEXT_SHADOW_BLUR_TO_STDDEV,
   gradientOrSolidFill,
   itemFilterDef,
+  linearGradientDef,
   wrapItem,
 } from './svgPrimitives';
-import type { SvgExportDeps, SvgExportWarning, TextMeasurer } from './svgExportTypes';
+import type { OutlineFont, SvgExportDeps, SvgExportWarning, TextMeasurer } from './svgExportTypes';
 import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor } from './syntheticFontStyle';
+import type { SyntheticBold } from './syntheticFontStyle';
 
 /**
  * Serialize a text item as glyph outlines (`<path>`). Layout — wrap, glyph
@@ -31,6 +37,10 @@ export function textSvg(
   defs: string[],
   warnings: SvgExportWarning[],
 ): string {
+  // Text with tags has a layout of its own; text without is untouched by them.
+  const rich = parseRichText(item.text);
+  if (rich.hasMarkup) return richTextSvg(item, rich.runs, effectiveOpacity, deps, defs, warnings);
+
   const lookup = deps.fontOutlines.getOutlineFont(item);
   if (!lookup.ok) {
     warnings.push({
@@ -147,7 +157,7 @@ export function textSvg(
  * the outlines would avoid that, at the cost of a path-offsetting dependency.
  */
 function strokedBoldPath(
-  item: TextCanvasItem,
+  item: { id: string; fill: string; secondaryFill: string },
   d: string,
   fillAttr: string,
   strokeWidth: number,
@@ -174,6 +184,171 @@ function strokedBoldPath(
       `<path d="${d}" fill="#fff" stroke="#fff"${outline}/></mask>`,
   );
   return `<rect ${rect} ${fillAttr} mask="url(#${id})"/>`;
+}
+
+/**
+ * Serialize a text item with tags (see `document/richText`): one `<path>` of
+ * glyph outlines for each fragment, a piece of one run on one line.
+ *
+ * The fragments and their positions come from `layoutRichText`, the layout the
+ * canvas draws from, measured here with the same measurer. Each fragment is
+ * outlined from the font file of its own weight and style, with bold and italic
+ * faked where that file lacks them, and filled with its run's paint: a colour,
+ * a gradient across the fragment's own box, or else the item's fill. One filter
+ * around them all casts the shadow, so no fragment's shadow falls on another.
+ */
+function richTextSvg(
+  item: TextCanvasItem,
+  runs: RichTextRun[],
+  effectiveOpacity: number,
+  deps: SvgExportDeps,
+  defs: string[],
+  warnings: SvgExportWarning[],
+): string {
+  interface RunFont {
+    item: TextCanvasItem;
+    font: OutlineFont;
+    slant: number;
+    bold: SyntheticBold | null;
+  }
+  const runFonts = new Map<RichTextRun, RunFont>();
+  for (const run of runs) {
+    const runItem = richTextRunItem(item, run);
+    const lookup = deps.fontOutlines.getOutlineFont(runItem);
+    if (!lookup.ok) {
+      warnings.push({
+        kind: 'unvectorizable-text',
+        itemId: item.id,
+        itemName: item.name,
+        fontFamily: item.fontFamily,
+        reason: lookup.reason,
+      });
+      return '';
+    }
+    runFonts.set(run, {
+      item: runItem,
+      font: lookup.font,
+      slant: lookup.synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0,
+      bold: lookup.synthetic?.bold ? syntheticBoldFor(runItem, run.text, deps.measurer) : null,
+    });
+  }
+  const fontOf = (run: RichTextRun): RunFont => runFonts.get(run) as RunFont;
+
+  const box = getRenderBox(item);
+  const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
+  const contentHeight = box.height - item.padding.top - item.padding.bottom;
+  const lineHeight = item.fontSize * item.lineHeight;
+
+  const lines = layoutRichText(runs, contentWidth, item.letterSpacing, (text, run) =>
+    deps.measurer.measureWidth(fontOf(run).item, text),
+  );
+  const textHeight = lines.length * lineHeight;
+  let textTop = item.padding.top;
+  if (item.verticalAlign === 'middle') {
+    textTop += Math.max(0, (contentHeight - textHeight) / 2);
+  } else if (item.verticalAlign === 'bottom') {
+    textTop += Math.max(0, contentHeight - textHeight);
+  }
+  const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
+  // Every fragment stands on the baseline of the item's own font.
+  const firstBaseline = deps.measurer.firstBaseline(item);
+
+  // The item's own fill, defined once however many fragments take it.
+  let itemFill: string | null = null;
+  const itemFillAttr = () => (itemFill ??= gradientOrSolidFill(item, defs, box.width, box.height));
+
+  const elements: string[] = [];
+  lines.forEach((line, lineIndex) => {
+    const lineTop = textTop + lineIndex * lineHeight;
+    const baselineY = lineTop + firstBaseline;
+    let lineLeft = item.padding.left;
+    if (item.align === 'center') lineLeft += (alignWidth - line.width) / 2;
+    else if (item.align === 'right') lineLeft += alignWidth - line.width;
+
+    for (const fragment of line.fragments) {
+      const { item: runItem, font, slant, bold } = fontOf(fragment.run);
+      const measure = (text: string) => deps.measurer.measureWidth(runItem, text);
+      const penOffsets = bold?.kind === 'smear' ? bold.offsets : [0];
+      const glyphStyle = { slant, closed: bold?.kind === 'stroke' };
+      const left = lineLeft + fragment.x;
+
+      // Glyphs are placed and joined inside a fragment as they are in a line of
+      // plain text; the canvas draws each fragment as a text of its own.
+      const glyphPaths: string[] = [];
+      const substitutions = lineSubstitutions(font, fragment.text, item.letterSpacing);
+      kernedOffsets(fragment.text, measure(fragment.text), measure).forEach(({ ch, offset }, index) => {
+        const penX = left + offset + index * item.letterSpacing;
+        for (const penOffset of penOffsets) {
+          const path = glyphsPath(
+            font,
+            substitutions?.[index] ?? ch,
+            item.fontSize,
+            penX + penOffset,
+            baselineY,
+            glyphStyle,
+          );
+          if (path) glyphPaths.push(path);
+        }
+      });
+      if (glyphPaths.length === 0) continue;
+
+      const fragmentId = `${item.id}-${elements.length}`;
+      const paint = fragment.run.paint;
+      let fillAttr: string;
+      let colours: { fill: string; secondaryFill: string } = item;
+      // Across the fragment's own box: its width, and its line box from top to bottom.
+      const endpoints =
+        paint?.kind === 'gradient'
+          ? computeGradientEndpoints(
+              { gradientEnabled: true, gradientAngle: paint.angle },
+              fragment.width,
+              lineHeight,
+            )
+          : null;
+      if (paint?.kind === 'gradient' && endpoints) {
+        const id = `grad-${fragmentId}`;
+        defs.push(
+          linearGradientDef(
+            id,
+            {
+              x0: endpoints.x0 + left,
+              y0: endpoints.y0 + lineTop,
+              x1: endpoints.x1 + left,
+              y1: endpoints.y1 + lineTop,
+            },
+            paint.start,
+            paint.end,
+          ),
+        );
+        fillAttr = `fill="url(#${id})"`;
+        colours = { fill: paint.start, secondaryFill: paint.end };
+      } else if (paint) {
+        const color = paint.kind === 'color' ? paint.color : paint.start;
+        fillAttr = paintAttrs('fill', color);
+        colours = { fill: color, secondaryFill: color };
+      } else {
+        fillAttr = itemFillAttr();
+      }
+
+      const d = glyphPaths.join(' ');
+      if (bold?.kind === 'stroke') {
+        // Room around the fragment for ink that leaves it, the stroke included.
+        const room = item.fontSize;
+        const area = {
+          x: left - room,
+          y: lineTop - room,
+          width: fragment.width + 2 * room,
+          height: lineHeight + 2 * room,
+        };
+        elements.push(strokedBoldPath({ id: fragmentId, ...colours }, d, fillAttr, bold.width, area, defs));
+      } else {
+        elements.push(`<path d="${d}" ${fillAttr}/>`);
+      }
+    }
+  });
+
+  if (elements.length === 0) return '';
+  return wrapItem(item, effectiveOpacity, elements.join(''), pushTextFilter(item, defs));
 }
 
 /** One line of a text item, as the canvas draws it. */

@@ -20,6 +20,7 @@ import type {
   CanvasTool,
   EllipseCanvasItem,
   GeneratorCanvasItem,
+  GradientFillItem,
   ImageCanvasItem,
   NgonCanvasItem,
   PolygonCanvasItem,
@@ -40,9 +41,15 @@ import { brightnessContrastMatrix, tintMatrix } from '../geometry/colorAdjustmen
 import { getImageNodePresentation } from '../imagePresentation';
 import type { Point } from '../interactionGeometry';
 import type { RenderableCanvasItem } from '../renderAdapter';
+import { parseRichText } from '../../document/richText';
+import type { RichTextRun } from '../../document/richText';
 import { snapOffsetToTexels } from '../textBaseline';
 import { snapPaddingToTexels } from '../textInkOverhang';
-import { measureWordWrappedTextHeight } from '../textMeasurement';
+import {
+  layoutRichTextRuns,
+  measureWordWrappedTextHeight,
+  richTextRunItem,
+} from '../textMeasurement';
 import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
 import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
@@ -76,7 +83,7 @@ const GRADIENT_TEXTURE_SIZE = 256;
  * so its gradient has to be moved back by both to stay on the box.
  */
 function buildPixiGradient(
-  item: GradientCapable,
+  item: GradientFillItem,
   width: number,
   height: number,
   origin: Point = { x: 0, y: 0 },
@@ -215,6 +222,170 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
 }
 
 // ---------------------------------------------------------------------------
+// Rich text: one Pixi text per fragment
+// ---------------------------------------------------------------------------
+
+let richTextMeasuringContext: CanvasRenderingContext2D | null | undefined;
+
+function getRichTextMeasuringContext(): CanvasRenderingContext2D | null {
+  if (richTextMeasuringContext === undefined) {
+    // jsdom has no 2D context and logs an error when asked for one.
+    const isJsdom = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
+    richTextMeasuringContext =
+      typeof document !== 'undefined' && !isJsdom
+        ? document.createElement('canvas').getContext('2d')
+        : null;
+  }
+  return richTextMeasuringContext;
+}
+
+/**
+ * The Pixi texts that draw a text item with tags: one per fragment, a piece of
+ * one run on one line (see `richTextLayout`). Null where there is no canvas to
+ * measure with.
+ *
+ * Pixi can draw tagged text itself (`tagStyles`), but not this: its tag parser
+ * has no way to show a "<" ahead of a tag, and it shifts a gradient by the
+ * position of every run. A text per fragment has neither problem. Each takes
+ * its position from the layout, its baseline from the item's own font so that
+ * bold and regular stand on one line, and the same care for ink and texels as
+ * plain text (see `buildTextStyleProps`).
+ *
+ * A drop shadow is drawn as texts of its own, all of them under all of the
+ * fragments, so that no fragment's shadow falls on top of its neighbour. Such a
+ * text is the fragment with a fill that shows nothing: Pixi draws the shadow of
+ * a text whatever its fill.
+ */
+function buildRichTextFragments(
+  item: TextCanvasItem,
+  runs: RichTextRun[],
+  requestedResolution: number,
+) {
+  const context = getRichTextMeasuringContext();
+  if (!context) return null;
+
+  const renderBox = getRenderBox(item);
+  const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
+  const contentHeight = renderBox.height - item.padding.top - item.padding.bottom;
+  const lineHeight = item.fontSize * item.lineHeight;
+
+  const lines = layoutRichTextRuns(item, runs, contentWidth, context);
+  const textHeight = lines.length * lineHeight;
+  let textTop = item.padding.top;
+  if (item.verticalAlign === 'middle') {
+    textTop += Math.max(0, (contentHeight - textHeight) / 2);
+  } else if (item.verticalAlign === 'bottom') {
+    textTop += Math.max(0, contentHeight - textHeight);
+  }
+  // As in plain text: lines align inside the box, or inside the widest line
+  // when that does not fit the box.
+  const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
+
+  const s = item.shadow;
+  const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
+  const dropShadow = hasShadow
+    ? {
+        alpha: s.opacity,
+        angle: Math.atan2(s.offsetY, s.offsetX),
+        blur: s.blur,
+        color: s.color,
+        distance: Math.sqrt(s.offsetX * s.offsetX + s.offsetY * s.offsetY),
+      }
+    : undefined;
+
+  const fragments = lines.flatMap((line, lineIndex) => {
+    let lineLeft = item.padding.left;
+    if (item.align === 'center') lineLeft += (alignWidth - line.width) / 2;
+    else if (item.align === 'right') lineLeft += alignWidth - line.width;
+    const lineTop = textTop + lineIndex * lineHeight;
+    return line.fragments.map((fragment, fragmentIndex) => ({
+      fragment,
+      key: `${lineIndex}:${fragmentIndex}`,
+      left: lineLeft + fragment.x,
+      lineTop,
+    }));
+  });
+
+  type PlacedFragment = (typeof fragments)[number];
+
+  /** The Pixi text of a fragment: its shadow alone, or the fragment itself without one. */
+  const pixiTextOf = ({ fragment, key, left, lineTop }: PlacedFragment, part: 'shadow' | 'fill') => {
+    const runItem = richTextRunItem(item, fragment.run);
+    const effectiveStyle = getRenderableCombinedFontStyle(runItem);
+    const layoutStyle = {
+      fontFamily: item.fontFamily,
+      fontSize: item.fontSize,
+      fontWeight: effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const),
+      fontStyle: effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const),
+      letterSpacing: item.letterSpacing,
+      lineHeight,
+      wordWrap: false,
+      whiteSpace: 'pre' as const,
+      ...(part === 'shadow' && dropShadow ? { dropShadow } : {}),
+    };
+
+    const inkRoom = measureTextRasterPadding(fragment.text, layoutStyle);
+    const resolution = clampRasterResolution(
+      requestedResolution,
+      Math.max(fragment.width, lineHeight, 1) + inkRoom * 2,
+      getMaxTextureSize(),
+    );
+    const padding = snapPaddingToTexels(inkRoom, resolution);
+
+    // `item` gives the baseline wanted, `layoutStyle` where Pixi draws this
+    // fragment's font: the difference moves the fragment onto the shared line.
+    const x = snapOffsetToTexels(left, resolution);
+    const shift = snapOffsetToTexels(measureTextBaselineShift(item, layoutStyle), resolution);
+    const y = lineTop + shift;
+
+    const paint = fragment.run.paint;
+    let fill: FillGradient | string = item.fill;
+    if (part === 'shadow') {
+      fill = '#00000000';
+    } else if (paint?.kind === 'color') {
+      fill = paint.color;
+    } else if (paint?.kind === 'gradient') {
+      // Across the fragment's own box, as a layer's gradient runs across the
+      // layer's: the fragment's width, and its line box from top to bottom.
+      fill =
+        buildPixiGradient(
+          {
+            fill: paint.start,
+            secondaryFill: paint.end,
+            gradientEnabled: true,
+            gradientAngle: paint.angle,
+          },
+          fragment.width,
+          lineHeight,
+          // The line box starts `shift` above the fragment's texture.
+          { x: padding, y: padding - shift },
+        ) ?? paint.start;
+    } else if (item.gradientEnabled) {
+      // Across the item's box, which starts this far into the fragment's texture.
+      fill =
+        buildPixiGradient(item, renderBox.width, renderBox.height, {
+          x: padding - x,
+          y: padding - y,
+        }) ?? item.fill;
+    }
+
+    return {
+      key: `${part}:${key}`,
+      text: fragment.text,
+      style: { ...layoutStyle, fill, padding },
+      resolution,
+      x,
+      y,
+    };
+  };
+
+  return [
+    ...(dropShadow ? fragments.map((placed) => pixiTextOf(placed, 'shadow')) : []),
+    ...fragments.map((placed) => pixiTextOf(placed, 'fill')),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Text content component (redraws when the text's font arrives)
 // ---------------------------------------------------------------------------
 
@@ -238,6 +409,30 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
   // When zoom > 1 the texture is magnified and turns blurry, so scale
   // resolution with zoom to keep glyphs sharp on zoom-in.
   const requestedResolution = Math.max(1, zoom) * (window.devicePixelRatio || 1);
+
+  // Text with tags is drawn fragment by fragment; text without is untouched by them.
+  const rich = parseRichText(item.text);
+  const fragments = rich.hasMarkup
+    ? buildRichTextFragments(item, rich.runs, requestedResolution)
+    : null;
+  if (fragments) {
+    return (
+      <>
+        {fragments.map((fragment) => (
+          <pixiText
+            key={fragment.key}
+            text={fragment.text}
+            style={fragment.style}
+            x={fragment.x}
+            y={fragment.y}
+            resolution={fragment.resolution}
+            eventMode="none"
+          />
+        ))}
+      </>
+    );
+  }
+
   const { style, resolution, textX, textY } = buildTextStyleProps(item, requestedResolution);
   return (
     <pixiText

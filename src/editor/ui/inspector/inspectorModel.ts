@@ -1,5 +1,6 @@
 import { DEFAULT_FONT_FAMILY, WEB_SAFE_FONTS } from '../../document/documentDefaults';
 import { getItemDisplayKind, isLineItem } from '../../document/polygonVertices';
+import { parseRichText } from '../../document/richText';
 import { getGenerator } from '../../generators';
 import type {
   CanvasItem,
@@ -110,7 +111,7 @@ export function getLayerPrimaryLabel(item: CanvasItem): string {
 
 export function getLayerSecondaryLabel(item: CanvasItem): string | null {
   if (item.kind === 'text') {
-    const compactText = item.text.trim().replace(/\s+/g, ' ');
+    const compactText = parseRichText(item.text).plain.trim().replace(/\s+/g, ' ');
     const snippet = compactText.slice(0, 28);
     return snippet ? `“${snippet}${compactText.length > 28 ? '…' : ''}”` : 'Empty text';
   }
