@@ -6,39 +6,10 @@ import { parseRichText } from '../document/richText';
 import type { RichTextRun } from '../document/richText';
 import { layoutRichText } from './richTextLayout';
 import type { RichTextLine } from './richTextLayout';
+import { splitAfterHyphens } from './textLineBreaking';
 
 function getTextContentWidth(item: TextCanvasItem, width: number): number {
   return Math.max(1, width - item.padding.left - item.padding.right);
-}
-
-/**
- * The characters Pixi may break a line after, by character code
- * (`BREAK_AFTER_CHARS` in pixi.js `scene/text/canvas/utils/textTokenization`).
- */
-const BREAK_AFTER_CHARS = new Set([
-  0x002d, // hyphen-minus
-  0x2010, // hyphen
-  0x2013, // en dash
-  0x2014, // em dash
-  0x00ad, // soft hyphen
-]);
-
-/**
- * Split a word into the pieces Pixi wraps separately: after each hyphen or dash
- * that has more of the word behind it. "Double-click" is "Double-" and "click",
- * so a line can end at the hyphen.
- */
-function splitAfterHyphens(token: string): string[] {
-  const pieces: string[] = [];
-  let start = 0;
-  for (let index = 0; index < token.length - 1; index += 1) {
-    if (BREAK_AFTER_CHARS.has(token.charCodeAt(index))) {
-      pieces.push(token.slice(start, index + 1));
-      start = index + 1;
-    }
-  }
-  pieces.push(token.slice(start));
-  return pieces;
 }
 
 /**

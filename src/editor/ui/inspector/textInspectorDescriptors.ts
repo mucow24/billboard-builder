@@ -59,7 +59,11 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       fieldOrder: 10,
       getValue: (item) => (item.kind === 'text' ? item.text : ''),
       label: 'Text content',
-      tooltip: 'The words shown in this text box. Press Enter to start a new line.',
+      tooltip:
+        'The words shown in this text box. Press Enter to start a new line. ' +
+        'Tags style part of the text: <b>bold</b>, <i>italic</i>, <color=red>colour</color>, ' +
+        '<gradient start=red end=blue angle=90>gradient</gradient>. ' +
+        'Text inside <noparse> and </noparse> is shown as typed.',
       multiline: true,
       propertyKey: 'text',
       sectionKey: 'text',

@@ -3,12 +3,14 @@ import { parseRichText } from '../../document/richText';
 import type { RichTextRun } from '../../document/richText';
 import { computeGradientEndpoints } from '../../rendering/geometry/gradientGeometry';
 import { layoutRichText } from '../../rendering/richTextLayout';
+import { alignedLineLeft, textBlockTop, withoutTrailingSpaces } from '../../rendering/textLineBreaking';
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { graphemeIndexOfCodePoints, graphemes } from '../../rendering/graphemes';
 import { drawnRichTextRuns, layoutWrappedText, richTextRunItem } from '../../rendering/textMeasurement';
 import { paintAttrs, toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
 import { glyphsPath, lineGlyphs } from './svgTextGlyphs';
+import type { DrawnGlyphs } from './svgTextGlyphs';
 import {
   TEXT_SHADOW_BLUR_TO_STDDEV,
   gradientOrSolidFill,
@@ -54,17 +56,8 @@ export function textSvg(
   const rich = parseRichText(item.text);
   if (rich.hasMarkup) return richTextSvg(item, rich.runs, effectiveOpacity, deps, defs, warnings);
 
-  const lookup = deps.fontOutlines.getOutlineFont(item);
-  if (!lookup.ok) {
-    warnings.push({
-      kind: 'unvectorizable-text',
-      itemId: item.id,
-      itemName: item.name,
-      fontFamily: item.fontFamily,
-      reason: lookup.reason,
-    });
-    return '';
-  }
+  const lookup = outlineFontOf(item, item, deps, warnings);
+  if (!lookup) return '';
   const box = getRenderBox(item);
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
   const measure = (text: string) => deps.measurer.measureWidth(item, text);
@@ -74,35 +67,19 @@ export function textSvg(
   );
   const lineHeight = item.fontSize * item.lineHeight;
   const measuredHeight = lines.length * lineHeight;
-  const contentHeight = box.height - item.padding.top - item.padding.bottom;
-
-  let textTop = item.padding.top;
-  if (item.verticalAlign === 'middle') {
-    textTop += Math.max(0, (contentHeight - measuredHeight) / 2);
-  } else if (item.verticalAlign === 'bottom') {
-    textTop += Math.max(0, contentHeight - measuredHeight);
-  }
-
+  const textTop = textBlockTop(item, box.height, measuredHeight);
   const firstBaseline = deps.measurer.firstBaseline(item);
 
   // What is drawn at each character of each line, and from which font: the
   // item's own, or the emoji fallback for what its own font lacks. Each font has
   // its own glyph group, as the browser fakes bold and italic for each apart.
-  const drawnGlyphs = lines.map((line) =>
-    lineGlyphs(lookup.font, lookup.fallback?.font, line.text, item.letterSpacing),
-  );
-  const textFrom = (fallback: boolean) =>
-    lines
-      .flatMap((line, lineIndex) => [...line.text].filter((_, index) => drawnGlyphs[lineIndex][index].fallback === fallback))
-      .join('');
-  const own = glyphGroup(item, lookup.font, lookup.synthetic, textFrom(false), deps.measurer);
-  const fallback = lookup.fallback
-    ? glyphGroup(item, lookup.fallback.font, lookup.fallback.synthetic, textFrom(true), deps.measurer)
-    : null;
+  const shapedLines = lines.map((line) => ({
+    text: line.text,
+    advance: line.advance,
+    glyphs: lineGlyphs(lookup.font, lookup.fallback?.font, line.text, item.letterSpacing),
+  }));
+  const groups = glyphGroups(item, lookup, shapedLines, deps.measurer);
 
-  // Pixi aligns lines inside the box, or inside the widest line when one does not
-  // fit the box (`alignWidth` in `CanvasTextGenerator._renderTextToCanvas`): the
-  // widest line then starts at the box's left edge whatever the alignment.
   const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
   // The lines' left and right ends, with the box's own included.
   let inkLeft = 0;
@@ -112,49 +89,48 @@ export function textSvg(
     if (line.text.length === 0) return;
 
     const baselineY = textTop + lineIndex * lineHeight + firstBaseline;
-
-    let lineLeft = item.padding.left;
-    if (item.align === 'center') {
-      lineLeft += (alignWidth - line.width) / 2;
-    } else if (item.align === 'right') {
-      lineLeft += alignWidth - line.width;
-    }
-
+    const lineLeft = alignedLineLeft(item, alignWidth, line.width);
     inkLeft = Math.min(inkLeft, lineLeft);
     inkRight = Math.max(inkRight, lineLeft + line.width);
-
-    // Pixi adds letter spacing once per grapheme, so every code point of one
-    // gets as much of it as the grapheme's first.
-    const spacingsBefore = graphemeIndexOfCodePoints(line.text);
-    // Ligatures and other glyphs the fonts put in place of characters; see svgTextGlyphs.
-    kernedOffsets(line.text, line.advance, measure).forEach(({ offset }, index) => {
-      const { fallback: fromFallback, drawn } = drawnGlyphs[lineIndex][index];
-      const group = fromFallback && fallback ? fallback : own;
-      const penX = lineLeft + offset + spacingsBefore[index] * item.letterSpacing;
-      for (const penOffset of group.penOffsets) {
-        const path = glyphsPath(group.font, drawn, item.fontSize, penX + penOffset, baselineY, group.glyphStyle);
-        if (path) group.paths.push(path);
-      }
-    });
+    placeGlyphs(item, shapedLines[lineIndex], lineLeft, baselineY, groups, measure);
   });
 
-  const groups = [own, ...(fallback ? [fallback] : [])].filter((group) => group.paths.length > 0);
-  if (groups.length === 0) return '';
+  if (!hasGlyphPaths(groups)) return '';
 
   const fillAttr = gradientOrSolidFill(item, defs, box.width, box.height);
-  const pathEls = groups.map((group) => {
-    const d = group.paths.join(' ');
-    if (group.bold?.kind !== 'stroke') return `<path d="${d}" ${fillAttr}/>`;
-    // Room around the lines for ink that leaves them, the stroke included.
-    const room = item.fontSize;
-    const top = Math.min(0, textTop) - room;
-    const bottom = Math.max(box.height, textTop + measuredHeight) + room;
-    const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
-    const maskId = group === own ? `bold-${item.id}` : `bold-${item.id}-fallback`;
-    return strokedBoldPath(item, d, fillAttr, group.bold.width, area, defs, maskId);
-  });
+  // Room around the lines for ink that leaves them, the stroke included.
+  const room = item.fontSize;
+  const top = Math.min(0, textTop) - room;
+  const bottom = Math.max(box.height, textTop + measuredHeight) + room;
+  const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
+  const pathEls = glyphGroupElements(groups, item, fillAttr, area, defs, `bold-${item.id}`);
   const filterAttr = pushTextFilter(item, defs);
   return wrapItem(item, effectiveOpacity, pathEls.join(''), filterAttr);
+}
+
+type OutlineFonts = Extract<OutlineResult, { ok: true }>;
+
+/**
+ * The outline fonts `fontItem` is drawn with: `item`, or `item` in the style of
+ * one of its rich text runs. Null when there are none, with a warning recorded
+ * against `item` (the controller then blocks the export).
+ */
+function outlineFontOf(
+  item: TextCanvasItem,
+  fontItem: TextCanvasItem,
+  deps: SvgExportDeps,
+  warnings: SvgExportWarning[],
+): OutlineFonts | null {
+  const lookup = deps.fontOutlines.getOutlineFont(fontItem);
+  if (lookup.ok) return lookup;
+  warnings.push({
+    kind: 'unvectorizable-text',
+    itemId: item.id,
+    itemName: item.name,
+    fontFamily: item.fontFamily,
+    reason: lookup.reason,
+  });
+  return null;
 }
 
 /** The glyphs of a text item that one font draws, and how the browser fakes bold and italic with it. */
@@ -191,6 +167,99 @@ function glyphGroup(
   };
 }
 
+/** A line of text, or a fragment of one, with what the canvas draws at each of its characters (`lineGlyphs`). */
+interface ShapedLine {
+  /** Without the spaces the canvas takes off its end. */
+  text: string;
+  /** Measured width of `text`: kerning included, letter spacing left out. */
+  advance: number;
+  glyphs: DrawnGlyphs[];
+}
+
+/** The glyph groups of a text: its own font's, and the emoji fallback's where it has one. */
+interface GlyphGroups {
+  own: GlyphGroup;
+  fallback: GlyphGroup | null;
+}
+
+/**
+ * The glyph groups that draw `lines` with the fonts of `lookup`, each told how
+ * the browser fakes bold and italic for `fontItem` from the characters it draws.
+ */
+function glyphGroups(
+  fontItem: TextCanvasItem,
+  lookup: OutlineFonts,
+  lines: readonly ShapedLine[],
+  measurer: TextMeasurer,
+): GlyphGroups {
+  const textFrom = (fallback: boolean) =>
+    lines
+      .flatMap(({ text, glyphs }) => [...text].filter((_, index) => glyphs[index].fallback === fallback))
+      .join('');
+  return {
+    own: glyphGroup(fontItem, lookup.font, lookup.synthetic, textFrom(false), measurer),
+    fallback: lookup.fallback
+      ? glyphGroup(fontItem, lookup.fallback.font, lookup.fallback.synthetic, textFrom(true), measurer)
+      : null,
+  };
+}
+
+/**
+ * Add the glyphs of `line` to their groups, the line starting at `left` on the
+ * baseline `baselineY`. Each character goes where the canvas draws it (see
+ * `kernedOffsets`); `measure` is the width of a text in the line's font.
+ */
+function placeGlyphs(
+  item: Pick<TextCanvasItem, 'fontSize' | 'letterSpacing'>,
+  line: ShapedLine,
+  left: number,
+  baselineY: number,
+  groups: GlyphGroups,
+  measure: (text: string) => number,
+): void {
+  // Pixi adds letter spacing once per grapheme, so every code point of one
+  // gets as much of it as the grapheme's first.
+  const spacingsBefore = graphemeIndexOfCodePoints(line.text);
+  // Ligatures and other glyphs the fonts put in place of characters; see svgTextGlyphs.
+  kernedOffsets(line.text, line.advance, measure).forEach(({ offset }, index) => {
+    const { fallback: fromFallback, drawn } = line.glyphs[index];
+    const group = fromFallback && groups.fallback ? groups.fallback : groups.own;
+    const penX = left + offset + spacingsBefore[index] * item.letterSpacing;
+    for (const penOffset of group.penOffsets) {
+      const path = glyphsPath(group.font, drawn, item.fontSize, penX + penOffset, baselineY, group.glyphStyle);
+      if (path) group.paths.push(path);
+    }
+  });
+}
+
+function hasGlyphPaths(groups: GlyphGroups): boolean {
+  return groups.own.paths.length > 0 || (groups.fallback?.paths.length ?? 0) > 0;
+}
+
+/**
+ * The elements that draw the glyph groups, the text's own font first: a `<path>`
+ * each, grown into faked bold where the group fakes it by a stroke (see
+ * `strokedBoldPath`). `fillAttr` paints them, with the colours of `paint`;
+ * `area` has to contain all of their ink; `maskId` is unique in the document.
+ */
+function glyphGroupElements(
+  groups: GlyphGroups,
+  paint: { fill: string; secondaryFill: string },
+  fillAttr: string,
+  area: { x: number; y: number; width: number; height: number },
+  defs: string[],
+  maskId: string,
+): string[] {
+  return [groups.own, ...(groups.fallback ? [groups.fallback] : [])]
+    .filter((group) => group.paths.length > 0)
+    .map((group) => {
+      const d = group.paths.join(' ');
+      if (group.bold?.kind !== 'stroke') return `<path d="${d}" ${fillAttr}/>`;
+      const id = group === groups.own ? maskId : `${maskId}-fallback`;
+      return strokedBoldPath(paint, d, fillAttr, group.bold.width, area, defs, id);
+    });
+}
+
 /**
  * The glyph outlines `d` grown into faked bold: filled, and stroked `strokeWidth`
  * wide in the same paint. Mitered joins (limit 4) are what the browser's own
@@ -209,7 +278,7 @@ function glyphGroup(
  * the outlines would avoid that, at the cost of a path-offsetting dependency.
  */
 function strokedBoldPath(
-  item: { id: string; fill: string; secondaryFill: string },
+  paint: { fill: string; secondaryFill: string },
   d: string,
   fillAttr: string,
   strokeWidth: number,
@@ -221,12 +290,12 @@ function strokedBoldPath(
   const outline = ` stroke-width="${fmt(strokeWidth)}" stroke-linejoin="miter" stroke-miterlimit="4"`;
 
   if (!fillAttr.startsWith('fill="url(')) {
-    const { hex, alpha } = toSvgPaint(item.fill);
+    const { hex, alpha } = toSvgPaint(paint.fill);
     const opacity = alpha < 1 ? ` opacity="${fmt(alpha)}"` : '';
     return `<path d="${d}" fill="${hex}" stroke="${hex}"${outline}${opacity}/>`;
   }
 
-  const opaque = toSvgPaint(item.fill).alpha >= 1 && toSvgPaint(item.secondaryFill).alpha >= 1;
+  const opaque = toSvgPaint(paint.fill).alpha >= 1 && toSvgPaint(paint.secondaryFill).alpha >= 1;
   if (opaque) {
     return `<path d="${d}" ${fillAttr} ${fillAttr.replace('fill=', 'stroke=')}${outline}/>`;
   }
@@ -240,15 +309,16 @@ function strokedBoldPath(
 }
 
 /**
- * Serialize a text item with tags (see `document/richText`): one `<path>` of
- * glyph outlines for each fragment, a piece of one run on one line.
+ * Serialize a text item with tags (see `document/richText`): the glyph outlines
+ * of each fragment, a piece of one run on one line, as elements of their own.
  *
  * The fragments and their positions come from `layoutRichText`, the layout the
- * canvas draws from, measured here with the same measurer. Each fragment is
- * outlined from the font file of its own weight and style, with bold and italic
- * faked where that file lacks them, and filled with its run's paint: a colour,
- * a gradient across the fragment's own box, or else the item's fill. One filter
- * around them all casts the shadow, so no fragment's shadow falls on another.
+ * canvas draws from, measured here with the same measurer. A fragment is drawn
+ * as a line of plain text is (`placeGlyphs`, `glyphGroupElements`), with the
+ * fonts of its run's own weight and style, and filled with its run's paint: a
+ * colour, a gradient across the fragment's own box, or else the item's fill.
+ * One filter around them all casts the shadow, so no fragment's shadow falls on
+ * another.
  */
 function richTextSvg(
   item: TextCanvasItem,
@@ -263,41 +333,25 @@ function richTextSvg(
 
   interface RunFont {
     item: TextCanvasItem;
-    lookup: Extract<OutlineResult, { ok: true }>;
+    lookup: OutlineFonts;
   }
   const runFonts = new Map<RichTextRun, RunFont>();
   for (const run of runs) {
     const runItem = richTextRunItem(item, run);
-    const lookup = deps.fontOutlines.getOutlineFont(runItem);
-    if (!lookup.ok) {
-      warnings.push({
-        kind: 'unvectorizable-text',
-        itemId: item.id,
-        itemName: item.name,
-        fontFamily: item.fontFamily,
-        reason: lookup.reason,
-      });
-      return '';
-    }
+    const lookup = outlineFontOf(item, runItem, deps, warnings);
+    if (!lookup) return '';
     runFonts.set(run, { item: runItem, lookup });
   }
   const fontOf = (run: RichTextRun): RunFont => runFonts.get(run) as RunFont;
 
   const box = getRenderBox(item);
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
-  const contentHeight = box.height - item.padding.top - item.padding.bottom;
   const lineHeight = item.fontSize * item.lineHeight;
 
   const lines = layoutRichText(runs, contentWidth, item.letterSpacing, (text, run) =>
     deps.measurer.measureWidth(fontOf(run).item, text),
   );
-  const textHeight = lines.length * lineHeight;
-  let textTop = item.padding.top;
-  if (item.verticalAlign === 'middle') {
-    textTop += Math.max(0, (contentHeight - textHeight) / 2);
-  } else if (item.verticalAlign === 'bottom') {
-    textTop += Math.max(0, contentHeight - textHeight);
-  }
+  const textTop = textBlockTop(item, box.height, lines.length * lineHeight);
   const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
   // Every fragment stands on the baseline of the item's own font.
   const firstBaseline = deps.measurer.firstBaseline(item);
@@ -311,38 +365,22 @@ function richTextSvg(
   let written = 0;
   lines.forEach((line, lineIndex) => {
     const lineTop = textTop + lineIndex * lineHeight;
-    const baselineY = lineTop + firstBaseline;
-    let lineLeft = item.padding.left;
-    if (item.align === 'center') lineLeft += (alignWidth - line.width) / 2;
-    else if (item.align === 'right') lineLeft += alignWidth - line.width;
+    const lineLeft = alignedLineLeft(item, alignWidth, line.width);
 
     for (const fragment of line.fragments) {
       const { item: runItem, lookup } = fontOf(fragment.run);
       const measure = (text: string) => deps.measurer.measureWidth(runItem, text);
       const left = lineLeft + fragment.x;
 
-      // Glyphs are chosen, placed and joined inside a fragment as they are in a
-      // line of plain text, the emoji fallback included (see `textSvg`); the
-      // canvas draws each fragment as a text of its own.
-      const drawnGlyphs = lineGlyphs(lookup.font, lookup.fallback?.font, fragment.text, item.letterSpacing);
-      const textFrom = (fallback: boolean) =>
-        [...fragment.text].filter((_, index) => drawnGlyphs[index].fallback === fallback).join('');
-      const own = glyphGroup(runItem, lookup.font, lookup.synthetic, textFrom(false), deps.measurer);
-      const fallback = lookup.fallback
-        ? glyphGroup(runItem, lookup.fallback.font, lookup.fallback.synthetic, textFrom(true), deps.measurer)
-        : null;
-      const spacingsBefore = graphemeIndexOfCodePoints(fragment.text);
-      kernedOffsets(fragment.text, measure(fragment.text), measure).forEach(({ offset }, index) => {
-        const { fallback: fromFallback, drawn } = drawnGlyphs[index];
-        const group = fromFallback && fallback ? fallback : own;
-        const penX = left + offset + spacingsBefore[index] * item.letterSpacing;
-        for (const penOffset of group.penOffsets) {
-          const path = glyphsPath(group.font, drawn, item.fontSize, penX + penOffset, baselineY, group.glyphStyle);
-          if (path) group.paths.push(path);
-        }
-      });
-      const groups = [own, ...(fallback ? [fallback] : [])].filter((group) => group.paths.length > 0);
-      if (groups.length === 0) continue;
+      // The canvas draws each fragment as a text of its own.
+      const shaped: ShapedLine = {
+        text: fragment.text,
+        advance: measure(fragment.text),
+        glyphs: lineGlyphs(lookup.font, lookup.fallback?.font, fragment.text, item.letterSpacing),
+      };
+      const groups = glyphGroups(runItem, lookup, [shaped], deps.measurer);
+      placeGlyphs(item, shaped, left, lineTop + firstBaseline, groups, measure);
+      if (!hasGlyphPaths(groups)) continue;
 
       const fragmentId = `${item.id}-${written}`;
       written += 1;
@@ -383,25 +421,15 @@ function richTextSvg(
         fillAttr = itemFillAttr();
       }
 
-      for (const group of groups) {
-        const d = group.paths.join(' ');
-        if (group.bold?.kind !== 'stroke') {
-          elements.push(`<path d="${d}" ${fillAttr}/>`);
-          continue;
-        }
-        // Room around the fragment for ink that leaves it, the stroke included.
-        const room = item.fontSize;
-        const area = {
-          x: left - room,
-          y: lineTop - room,
-          width: fragment.width + 2 * room,
-          height: lineHeight + 2 * room,
-        };
-        const maskId = group === own ? `bold-${fragmentId}` : `bold-${fragmentId}-fallback`;
-        elements.push(
-          strokedBoldPath({ id: fragmentId, ...colours }, d, fillAttr, group.bold.width, area, defs, maskId),
-        );
-      }
+      // Room around the fragment for ink that leaves it, the stroke included.
+      const room = item.fontSize;
+      const area = {
+        x: left - room,
+        y: lineTop - room,
+        width: fragment.width + 2 * room,
+        height: lineHeight + 2 * room,
+      };
+      elements.push(...glyphGroupElements(groups, colours, fillAttr, area, defs, `bold-${fragmentId}`));
     }
   });
 
@@ -417,35 +445,6 @@ interface DrawnLine {
   advance: number;
   /** The width the canvas aligns the line by. */
   width: number;
-}
-
-/**
- * The spaces Pixi takes off the end of a line, by character code: the characters
- * it breaks lines at (`BREAKING_SPACES` in pixi.js
- * `scene/text/canvas/utils/textTokenization`). No-break spaces (U+00A0, U+2007,
- * U+202F) are not among them, so they stay on the line and keep their width.
- */
-const BREAKING_SPACES = new Set([
-  0x0009, // tab
-  0x0020, // space
-  0x2000, // en quad
-  0x2001, // em quad
-  0x2002, // en space
-  0x2003, // em space
-  0x2004, // three-per-em space
-  0x2005, // four-per-em space
-  0x2006, // six-per-em space
-  0x2008, // punctuation space
-  0x2009, // thin space
-  0x200a, // hair space
-  0x205f, // medium mathematical space
-  0x3000, // ideographic space
-]);
-
-function withoutTrailingSpaces(text: string): string {
-  let end = text.length;
-  while (end > 0 && BREAKING_SPACES.has(text.charCodeAt(end - 1))) end -= 1;
-  return text.slice(0, end);
 }
 
 /**

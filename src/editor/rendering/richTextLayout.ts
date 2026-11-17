@@ -2,16 +2,25 @@
  * Layout of rich text (see `document/richText`): which pieces of which runs go
  * on which line, and where along the line each piece starts.
  *
- * A piece of one run on one line is a fragment. The canvas draws each fragment
- * as a text of its own, placed by the numbers worked out here, so this layout
- * is what rich text looks like; there is no other renderer for it to agree
- * with. Text without tags is not laid out here.
+ * A piece of one run on one line is a fragment. The canvas, auto-height and the
+ * SVG export all place fragments by the numbers worked out here. Text without
+ * tags is not laid out here: Pixi wraps it.
  *
- * Words wrap as they do in plain text: at spaces, and after a hyphen or dash.
- * A word that changes style part-way ("un<b>believable</b>") stays in one piece.
+ * The wrap rule must stay equal to Pixi's (`wordWrap` in pixi.js
+ * `scene/text/canvas/utils`), so that adding a tag to a text does not re-wrap
+ * it on the canvas. Pixi gives every token an advance of its width plus one
+ * letter spacing per grapheme, and starts a new line when the advances on the
+ * line come to more than the wrap width plus one letter spacing. Tokens are
+ * runs of spaces and runs of anything else, split again after a hyphen or dash
+ * (`textLineBreaking`); a line never starts a new one for a space, and the
+ * spaces a line ends in are taken off it.
+ *
+ * One thing is added to Pixi's rule: a word that changes style part-way
+ * ("un<b>believable</b>") is several tokens here, and stays in one piece.
  */
 import type { RichTextRun } from '../document/richText';
 import { graphemes } from './graphemes';
+import { BREAK_AFTER_CHARS, splitAfterHyphens, withoutTrailingSpaces } from './textLineBreaking';
 
 export interface RichTextFragment {
   text: string;
@@ -32,34 +41,12 @@ export interface RichTextLine {
 /** Width of `text` set in the style of `run`, letter spacing left out. */
 export type RichTextMeasure = (text: string, run: RichTextRun) => number;
 
-/** Characters a line may break after (as in plain text; see `textMeasurement`). */
-const BREAK_AFTER_CHARS = new Set([0x002d, 0x2010, 0x2013, 0x2014, 0x00ad]);
-
-/** The spaces taken off the end of a line (as in plain text; see `io/svg/svgText`). */
-const BREAKING_SPACES = new Set([
-  0x0009, 0x0020, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2008, 0x2009, 0x200a,
-  0x205f, 0x3000,
-]);
-
 interface Token {
   text: string;
   run: RichTextRun;
   isSpace: boolean;
   /** Part of the same word as the token before it: no line break between the two. */
   joined: boolean;
-}
-
-function splitAfterHyphens(word: string): string[] {
-  const pieces: string[] = [];
-  let start = 0;
-  for (let index = 0; index < word.length - 1; index += 1) {
-    if (BREAK_AFTER_CHARS.has(word.charCodeAt(index))) {
-      pieces.push(word.slice(start, index + 1));
-      start = index + 1;
-    }
-  }
-  pieces.push(word.slice(start));
-  return pieces;
 }
 
 function tokenize(pieces: { text: string; run: RichTextRun }[]): Token[] {
@@ -84,12 +71,6 @@ function tokenize(pieces: { text: string; run: RichTextRun }[]): Token[] {
     }
   }
   return tokens;
-}
-
-function withoutTrailingSpaces(text: string): string {
-  let end = text.length;
-  while (end > 0 && BREAKING_SPACES.has(text.charCodeAt(end - 1))) end -= 1;
-  return text.slice(0, end);
 }
 
 /** The runs cut at line breaks: one list of pieces per paragraph. */

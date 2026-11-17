@@ -4,10 +4,13 @@ import { expect, test } from '@playwright/test';
 
 import {
   captureDownload,
+  clickItem,
   clickToolbarPopoverItem,
   createProjectDocument,
   createTextFixture,
+  dragHandle,
   openFreshEditor,
+  readRenderSnapshot,
   uploadProject,
   waitForBundledFonts,
 } from './support/editor';
@@ -417,5 +420,135 @@ test.describe('rich text on the canvas', () => {
       expect.soft(row.stray, `${id}: ink in one picture with none near it in the other`).toBe(0);
       expect.soft(row.colourOffBy, `${id}: colour differs between the pictures`).toBeLessThanOrEqual(16);
     });
+  });
+
+  // Tags that change no widths (a colour) must leave a text where it is and as
+  // tall as it is: the same words with and without them, side by side.
+  const WORDS = 'HHHH HH HHHHHH HHH HHHHH HH';
+  const COLOURED = '<color=#ffffff>HHHH</color> HH <color=#ffffff>HHHHHH HHH</color> HHHHH <color=#ffffff>HH</color>';
+
+  test('gives tagged text the height the same text has without tags when it is resized', async ({ page }) => {
+    const layer = (id: string, text: string, y: number) =>
+      createTextFixture({ id, name: id, text, fontFamily: 'Barlow', fontSize: 40, x: 60, y, width: 640, height: 50 });
+
+    await openFreshEditor(page);
+    await waitForBundledFonts(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument([layer('plain', WORDS, 40), { ...layer('tagged', COLOURED, 420), zIndex: 2 }]),
+        canvas: { width: CANVAS_WIDTH, height: 800 },
+      },
+      'rich-text-height.json',
+    );
+
+    // Narrowing a text box makes it as tall as its wrapped lines need.
+    const resized: Record<string, { width: number; height: number }> = {};
+    for (const id of ['plain', 'tagged']) {
+      await clickItem(page, id);
+      await dragHandle(page, id, 'middle-right', -420, 0);
+      const { geometry } = (await readRenderSnapshot(page)).selectedItems[0];
+      resized[id] = { width: Math.round(geometry.width), height: geometry.height };
+    }
+
+    expect(resized.plain.width, 'both boxes were narrowed alike').toBe(resized.tagged.width);
+    expect(resized.plain.height, 'the plain text wrapped onto several lines').toBeGreaterThan(3 * 44);
+    expect(resized.tagged.height).toBe(resized.plain.height);
+  });
+
+  test('aligns centred and right-aligned tagged lines where the same text sits without tags', async ({ page }, testInfo) => {
+    const rows = [
+      { align: 'center', text: WORDS },
+      { align: 'center', text: COLOURED },
+      { align: 'right', text: WORDS },
+      { align: 'right', text: COLOURED },
+    ];
+    await openFreshEditor(page);
+    await waitForBundledFonts(page);
+    await uploadProject(
+      page,
+      {
+        ...createProjectDocument(
+          rows.map((row, index) =>
+            createTextFixture({
+              id: `aligned-${index}`,
+              name: `aligned-${index}`,
+              zIndex: index + 1,
+              text: row.text,
+              align: row.align,
+              fontFamily: 'Barlow',
+              fontSize: 40,
+              x: BOX.x,
+              y: rowTop(index) + 10,
+              width: 330,
+              height: ROW_HEIGHT - 20,
+            }),
+          ),
+        ),
+        canvas: { width: CANVAS_WIDTH, height: rows.length * ROW_HEIGHT },
+      },
+      'rich-text-align.json',
+    );
+    const download = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = await fs.readFile(await download.path());
+    await fs.writeFile(testInfo.outputPath('rich-text-align.png'), png);
+
+    // Per row, the left and right ends of the ink on every pixel row that has any.
+    const ends = await page.evaluate(
+      async ({ pngBase64, rowCount, width }) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${pngBase64}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true })!;
+        context.drawImage(image, 0, 0);
+        const scale = canvas.width / width;
+        const rowHeight = canvas.height / rowCount;
+        return Array.from({ length: rowCount }, (_, row) => {
+          const { data } = context.getImageData(0, Math.round(row * rowHeight), canvas.width, Math.round(rowHeight));
+          const lines: Array<[number, number] | null> = [];
+          for (let y = 0; y < Math.round(rowHeight); y += 1) {
+            let left = -1;
+            let right = -1;
+            for (let x = 0; x < canvas.width; x += 1) {
+              if (data[(y * canvas.width + x) * 4 + 3] > 127) {
+                if (left < 0) left = x;
+                right = x;
+              }
+            }
+            lines.push(left < 0 ? null : [left / scale, right / scale]);
+          }
+          return lines;
+        });
+      },
+      { pngBase64: png.toString('base64'), rowCount: rows.length, width: CANVAS_WIDTH },
+    );
+
+    for (const [plain, tagged] of [
+      [0, 1],
+      [2, 3],
+    ]) {
+      const align = rows[plain].align;
+      let inkRows = 0;
+      let furthest = 0;
+      ends[plain].forEach((plainEnds, y) => {
+        const taggedEnds = ends[tagged][y];
+        if (!plainEnds && !taggedEnds) return;
+        inkRows += 1;
+        // Ink on a pixel row of one picture only is a line break in another place.
+        if (!plainEnds || !taggedEnds) {
+          furthest = Infinity;
+          return;
+        }
+        furthest = Math.max(furthest, Math.abs(plainEnds[0] - taggedEnds[0]), Math.abs(plainEnds[1] - taggedEnds[1]));
+      });
+      // Two lines of capitals at least.
+      expect.soft(inkRows, `${align}: pixel rows with ink`).toBeGreaterThan(40);
+      expect.soft(furthest, `${align}: furthest a line end is from where it is without tags, in px`).toBeLessThanOrEqual(2);
+    }
   });
 });

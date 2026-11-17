@@ -45,6 +45,7 @@ import type { RenderableCanvasItem } from '../renderAdapter';
 import { parseRichText } from '../../document/richText';
 import type { RichTextRun } from '../../document/richText';
 import { snapOffsetToTexels } from '../textBaseline';
+import { alignedLineLeft, textBlockTop } from '../textLineBreaking';
 import { snapPaddingToTexels } from '../textInkOverhang';
 import {
   layoutRichTextRuns,
@@ -57,7 +58,7 @@ import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
 import { measureTextBaselineShift } from './textBaselineShift';
-import { measureTextRasterPadding } from './textRasterPadding';
+import { getTextMeasuringContext, measureTextRasterPadding } from './textRasterPadding';
 import { registerZoomScaledFilter } from './zoomScaledFilters';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
@@ -125,22 +126,11 @@ function buildPixiGradient(
 // Text style builder
 // ---------------------------------------------------------------------------
 
-/**
- * The Pixi text style, position and raster resolution of a text item.
- * `requestedResolution` is the resolution the current zoom calls for.
- */
-function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) {
-  const effectiveStyle = getRenderableCombinedFontStyle(item);
-  const fontWeight = effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const);
-  const fontStyle = effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const);
-
-  const renderBox = getRenderBox(item);
-  const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
-
-  // Convert app shadow model (offsetX/Y) → PixiJS dropShadow (angle+distance).
+/** The drop shadow of a text item as Pixi's text style has it (angle and distance), or undefined without one. */
+function pixiDropShadowOf(item: TextCanvasItem) {
   const s = item.shadow;
   const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
-  const dropShadow = hasShadow
+  return hasShadow
     ? {
         alpha: s.opacity,
         angle: Math.atan2(s.offsetY, s.offsetX),
@@ -149,27 +139,43 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
         distance: Math.sqrt(s.offsetX * s.offsetX + s.offsetY * s.offsetY),
       }
     : undefined;
+}
 
-  // Vertical alignment offset.
-  const contentHeight = renderBox.height - item.padding.top - item.padding.bottom;
-  const measuredHeight =
-    measureWordWrappedTextHeight(item, renderBox.width) - item.padding.top - item.padding.bottom;
-  let textY = item.padding.top;
-  if (item.verticalAlign === 'middle') {
-    textY += Math.max(0, (contentHeight - measuredHeight) / 2);
-  } else if (item.verticalAlign === 'bottom') {
-    textY += Math.max(0, contentHeight - measuredHeight);
-  }
-
-  const layoutStyle = {
+/**
+ * The font of a text item as Pixi's text style has it: `item` itself, or `item`
+ * in the style of one of its rich text runs.
+ */
+function pixiFontStyleOf(item: TextCanvasItem) {
+  const effectiveStyle = getRenderableCombinedFontStyle(item);
+  return {
     // The item's family, then the emoji fallback for emoji it does not have.
     // A new array each time: Pixi quotes the names in place.
     fontFamily: textFontFamilies(item.fontFamily),
     fontSize: item.fontSize,
-    fontWeight,
-    fontStyle,
+    fontWeight: effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const),
+    fontStyle: effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const),
     letterSpacing: item.letterSpacing,
     lineHeight: item.fontSize * item.lineHeight,
+  };
+}
+
+/**
+ * The Pixi text style, position and raster resolution of a text item.
+ * `requestedResolution` is the resolution the current zoom calls for.
+ */
+function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) {
+  const renderBox = getRenderBox(item);
+  const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
+
+  const dropShadow = pixiDropShadowOf(item);
+
+  // Vertical alignment offset.
+  const measuredHeight =
+    measureWordWrappedTextHeight(item, renderBox.width) - item.padding.top - item.padding.bottom;
+  let textY = textBlockTop(item, renderBox.height, measuredHeight);
+
+  const layoutStyle = {
+    ...pixiFontStyleOf(item),
     wordWrap: true,
     wordWrapWidth: contentWidth,
     align: item.align as 'left' | 'center' | 'right',
@@ -230,20 +236,6 @@ function buildTextStyleProps(item: TextCanvasItem, requestedResolution: number) 
 // Rich text: one Pixi text per fragment
 // ---------------------------------------------------------------------------
 
-let richTextMeasuringContext: CanvasRenderingContext2D | null | undefined;
-
-function getRichTextMeasuringContext(): CanvasRenderingContext2D | null {
-  if (richTextMeasuringContext === undefined) {
-    // jsdom has no 2D context and logs an error when asked for one.
-    const isJsdom = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
-    richTextMeasuringContext =
-      typeof document !== 'undefined' && !isJsdom
-        ? document.createElement('canvas').getContext('2d')
-        : null;
-  }
-  return richTextMeasuringContext;
-}
-
 /**
  * The Pixi texts that draw a text item with tags: one per fragment, a piece of
  * one run on one line (see `richTextLayout`). Null where there is no canvas to
@@ -266,42 +258,23 @@ function buildRichTextFragments(
   runs: RichTextRun[],
   requestedResolution: number,
 ) {
-  const context = getRichTextMeasuringContext();
+  const context = getTextMeasuringContext();
   if (!context) return null;
 
   const renderBox = getRenderBox(item);
   const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
-  const contentHeight = renderBox.height - item.padding.top - item.padding.bottom;
   const lineHeight = item.fontSize * item.lineHeight;
 
   const lines = layoutRichTextRuns(item, runs, contentWidth, context);
-  const textHeight = lines.length * lineHeight;
-  let textTop = item.padding.top;
-  if (item.verticalAlign === 'middle') {
-    textTop += Math.max(0, (contentHeight - textHeight) / 2);
-  } else if (item.verticalAlign === 'bottom') {
-    textTop += Math.max(0, contentHeight - textHeight);
-  }
+  const textTop = textBlockTop(item, renderBox.height, lines.length * lineHeight);
   // As in plain text: lines align inside the box, or inside the widest line
   // when that does not fit the box.
   const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
 
-  const s = item.shadow;
-  const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
-  const dropShadow = hasShadow
-    ? {
-        alpha: s.opacity,
-        angle: Math.atan2(s.offsetY, s.offsetX),
-        blur: s.blur,
-        color: s.color,
-        distance: Math.sqrt(s.offsetX * s.offsetX + s.offsetY * s.offsetY),
-      }
-    : undefined;
+  const dropShadow = pixiDropShadowOf(item);
 
   const fragments = lines.flatMap((line, lineIndex) => {
-    let lineLeft = item.padding.left;
-    if (item.align === 'center') lineLeft += (alignWidth - line.width) / 2;
-    else if (item.align === 'right') lineLeft += alignWidth - line.width;
+    const lineLeft = alignedLineLeft(item, alignWidth, line.width);
     const lineTop = textTop + lineIndex * lineHeight;
     return line.fragments.map((fragment, fragmentIndex) => ({
       fragment,
@@ -315,16 +288,8 @@ function buildRichTextFragments(
 
   /** The Pixi text of a fragment: its shadow alone, or the fragment itself without one. */
   const pixiTextOf = ({ fragment, key, left, lineTop }: PlacedFragment, part: 'shadow' | 'fill') => {
-    const runItem = richTextRunItem(item, fragment.run);
-    const effectiveStyle = getRenderableCombinedFontStyle(runItem);
     const layoutStyle = {
-      // The item's family, then the emoji fallback, as for plain text.
-      fontFamily: textFontFamilies(item.fontFamily),
-      fontSize: item.fontSize,
-      fontWeight: effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const),
-      fontStyle: effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const),
-      letterSpacing: item.letterSpacing,
-      lineHeight,
+      ...pixiFontStyleOf(richTextRunItem(item, fragment.run)),
       wordWrap: false,
       whiteSpace: 'pre' as const,
       ...(part === 'shadow' && dropShadow ? { dropShadow } : {}),

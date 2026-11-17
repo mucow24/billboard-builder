@@ -62,6 +62,23 @@ describe('layoutRichText', () => {
     ]);
   });
 
+  // Tags that change no widths must not move a line break: the wrap rule is
+  // Pixi's whether a line is one run or several.
+  it.each([0, 3, -1])('breaks lines the same with and without colour tags at letter spacing %d', (letterSpacing) => {
+    const words = 'aaaa bb cccccc d eee-ffff gg  hhh iiiiiiiii jj';
+    const tagged =
+      '<color=#f00>aaaa</color> bb <color=#0f0>cccccc d</color> eee-<color=#00f>ffff gg</color>  hhh <color=#f00>iiiiiiiii</color> jj';
+    const linesOf = (text: string, width: number) =>
+      layoutRichText(parseRichText(text).runs, width, letterSpacing, measure).map((line) => ({
+        text: line.fragments.map((fragment) => fragment.text).join(''),
+        width: line.width,
+      }));
+
+    for (let width = 30; width <= 480; width += 7) {
+      expect(linesOf(tagged, width), `at width ${width}`).toEqual(linesOf(words, width));
+    }
+  });
+
   it('lets a word wider than the box overflow on a line of its own', () => {
     expect(layout('a bbbbbbbb c', 50)).toEqual([
       { width: 10, fragments: [['a', 0, 10]] },
