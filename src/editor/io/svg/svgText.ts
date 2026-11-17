@@ -61,8 +61,9 @@ export function textSvg(
   const box = getRenderBox(item);
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
   const measure = (text: string) => deps.measurer.measureWidth(item, text);
+  const widths = (text: string) => ({ advance: measure(text), ink: deps.measurer.measureInkWidth?.(item, text) ?? 0 });
 
-  const lines = layoutWrappedText(item, contentWidth, measure).map((tokens) =>
+  const lines = layoutWrappedText(item, contentWidth, widths).map((tokens) =>
     drawnLine(tokens.join(''), item, deps.measurer),
   );
   const lineHeight = item.fontSize * item.lineHeight;
@@ -348,9 +349,13 @@ function richTextSvg(
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
   const lineHeight = item.fontSize * item.lineHeight;
 
-  const lines = layoutRichText(runs, contentWidth, item.letterSpacing, (text, run) =>
-    deps.measurer.measureWidth(fontOf(run).item, text),
-  );
+  const lines = layoutRichText(runs, contentWidth, item.letterSpacing, (text, run) => {
+    const runItem = fontOf(run).item;
+    return {
+      advance: deps.measurer.measureWidth(runItem, text),
+      ink: deps.measurer.measureInkWidth?.(runItem, text) ?? 0,
+    };
+  });
   const textTop = textBlockTop(item, box.height, lines.length * lineHeight);
   const alignWidth = Math.max(contentWidth, ...lines.map((line) => line.width));
   // Every fragment stands on the baseline of the item's own font.
@@ -451,8 +456,8 @@ interface DrawnLine {
  * Turn a line as `layoutWrappedText` laid it out into the line the canvas draws
  * and aligns.
  *
- * `layoutWrappedText` keeps the space a line wraps at on that line, along with
- * any spaces the text has before a line break or at its end. Pixi (`wordWrap` in
+ * A line from `layoutWrappedText` can end in spaces: the one it wraps at, and
+ * any the text has before a line break or at its end. Pixi (`wordWrap` in
  * pixi.js `scene/text/canvas/utils`) takes the spaces off the end of every line
  * before it measures and draws it. Spaces at the start of a paragraph stay: the
  * canvas text style sets `whiteSpace: 'pre'`, under which Pixi keeps them.

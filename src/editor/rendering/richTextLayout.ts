@@ -6,21 +6,25 @@
  * SVG export all place fragments by the numbers worked out here. Text without
  * tags is not laid out here: Pixi wraps it.
  *
- * The wrap rule must stay equal to Pixi's (`wordWrap` in pixi.js
- * `scene/text/canvas/utils`), so that adding a tag to a text does not re-wrap
- * it on the canvas. Pixi gives every token an advance of its width plus one
- * letter spacing per grapheme, and starts a new line when the advances on the
- * line come to more than the wrap width plus one letter spacing. Tokens are
- * runs of spaces and runs of anything else, split again after a hyphen or dash
- * (`textLineBreaking`); a line never starts a new one for a space, and the
- * spaces a line ends in are taken off it.
- *
- * One thing is added to Pixi's rule: a word that changes style part-way
- * ("un<b>believable</b>") is several tokens here, and stays in one piece.
+ * Lines break where they would if the text had no tags, so that tagging a text
+ * does not re-wrap it: the text of all the runs together is cut into Pixi's
+ * tokens (`tokenizeLikePixi`) and broken into lines by the same port of Pixi's
+ * `wordWrap` that breaks plain text (`breakLinesLikePixi`), with the same blank
+ * line after a line break that ends the text (`withBlankLastParagraph`). A token
+ * that spans runs, such as a word that changes style part-way
+ * ("un<b>believable</b>"), stays in one piece, as the word would.
  */
 import type { RichTextRun } from '../document/richText';
 import { graphemes } from './graphemes';
-import { BREAK_AFTER_CHARS, splitAfterHyphens, withoutTrailingSpaces } from './textLineBreaking';
+import {
+  breakLinesLikePixi,
+  pixiTokenKind,
+  pixiTokenWidth,
+  tokenizeLikePixi,
+  withBlankLastParagraph,
+  withoutTrailingSpaces,
+} from './textLineBreaking';
+import type { TextWidths } from './textLineBreaking';
 
 export interface RichTextFragment {
   text: string;
@@ -38,51 +42,66 @@ export interface RichTextLine {
   width: number;
 }
 
-/** Width of `text` set in the style of `run`, letter spacing left out. */
-export type RichTextMeasure = (text: string, run: RichTextRun) => number;
+/** Both widths of `text` set in the style of `run`, letter spacing left out. */
+export type RichTextMeasure = (text: string, run: RichTextRun) => TextWidths;
 
-interface Token {
+/** Some of the text of one run. */
+interface Piece {
   text: string;
   run: RichTextRun;
-  isSpace: boolean;
-  /** Part of the same word as the token before it: no line break between the two. */
-  joined: boolean;
 }
 
-function tokenize(pieces: { text: string; run: RichTextRun }[]): Token[] {
+/** One of Pixi's tokens, cut where the runs it spans meet. */
+interface Token {
+  text: string;
+  pieces: Piece[];
+}
+
+/**
+ * The text of `runs`, cut into the tokens Pixi would cut it into if it had no
+ * tags: the tokens of the whole text, each split into the pieces of the runs it
+ * spans.
+ */
+function tokenizeRuns(runs: RichTextRun[]): Token[] {
   const tokens: Token[] = [];
-  for (const piece of pieces) {
-    let firstOfPiece = true;
-    for (const chunk of piece.text.match(/\s+|\S+/g) ?? []) {
-      const isSpace = /^\s/.test(chunk);
-      for (const text of isSpace ? [chunk] : splitAfterHyphens(chunk)) {
-        const previous = tokens[tokens.length - 1];
-        // Only a change of style can leave two tokens in one word; within a
-        // run they are apart because of a space or a hyphen.
-        const joined =
-          firstOfPiece &&
-          !isSpace &&
-          previous !== undefined &&
-          !previous.isSpace &&
-          !BREAK_AFTER_CHARS.has(previous.text.charCodeAt(previous.text.length - 1));
-        tokens.push({ text, run: piece.run, isSpace, joined });
-        firstOfPiece = false;
+  let runIndex = 0;
+  let offsetInRun = 0;
+  for (const text of tokenizeLikePixi(runs.map((run) => run.text).join(''))) {
+    const pieces: Piece[] = [];
+    let rest = text.length;
+    while (rest > 0) {
+      const run = runs[runIndex];
+      const take = Math.min(rest, run.text.length - offsetInRun);
+      if (take > 0) pieces.push({ text: run.text.slice(offsetInRun, offsetInRun + take), run });
+      rest -= take;
+      offsetInRun += take;
+      if (offsetInRun === run.text.length) {
+        runIndex += 1;
+        offsetInRun = 0;
       }
     }
+    tokens.push({ text, pieces });
   }
   return tokens;
 }
 
-/** The runs cut at line breaks: one list of pieces per paragraph. */
-function splitParagraphs(runs: RichTextRun[]): { text: string; run: RichTextRun }[][] {
-  const paragraphs: { text: string; run: RichTextRun }[][] = [[]];
-  for (const run of runs) {
-    run.text.split('\n').forEach((text, index) => {
-      if (index > 0) paragraphs.push([]);
-      if (text.length > 0) paragraphs[paragraphs.length - 1].push({ text, run });
-    });
+/**
+ * Whether two runs are set in the same font. Only bold and italic pick a run's
+ * font (`richTextRunItem` in `textMeasurement`); colours and gradients do not.
+ */
+function sameFont(a: RichTextRun, b: RichTextRun): boolean {
+  return a.bold === b.bold && a.italic === b.italic;
+}
+
+/** Neighbouring pieces of one run, or of runs in one font, joined. */
+function joinPieces(pieces: Piece[], belongTogether: (a: RichTextRun, b: RichTextRun) => boolean): Piece[] {
+  const joined: Piece[] = [];
+  for (const piece of pieces) {
+    const last = joined[joined.length - 1];
+    if (last && belongTogether(last.run, piece.run)) last.text += piece.text;
+    else joined.push({ ...piece });
   }
-  return paragraphs;
+  return joined;
 }
 
 export function layoutRichText(
@@ -91,21 +110,32 @@ export function layoutRichText(
   letterSpacing: number,
   measure: RichTextMeasure,
 ): RichTextLine[] {
-  // A token's advance: its width, with letter spacing after every character
-  // (every grapheme, as Pixi counts them: see `graphemes`). A line of tokens is
-  // then as wide as their advances less one letter spacing.
-  const advanceOf = (token: Token): number =>
-    measure(token.text, token.run) + graphemes(token.text).length * letterSpacing;
+  // How much of a line a token takes up. A token in one font is measured as a
+  // whole, exactly as Pixi measures it in text without tags, so tags that change
+  // only the colour move no line break. One that changes font part-way is drawn
+  // as several texts: each but the last takes up its advance, letter spacing
+  // after each grapheme included, and the last what Pixi gives a token.
+  const widthOf = (token: Token): number => {
+    const parts = joinPieces(token.pieces, sameFont);
+    return parts.reduce((total, { text, run }, index) => {
+      const widths = measure(text, run);
+      const count = graphemes(text).length;
+      return (
+        total +
+        (index === parts.length - 1
+          ? pixiTokenWidth(widths, count, letterSpacing)
+          : widths.advance + count * letterSpacing)
+      );
+    }, 0);
+  };
 
   const toLine = (tokens: Token[]): RichTextLine => {
-    // Neighbouring tokens of one run become one fragment, measured as a whole,
+    // Neighbouring pieces of one run become one fragment, measured as a whole,
     // so letters kern inside it as they do when it is drawn.
-    const merged: { text: string; run: RichTextRun }[] = [];
-    for (const token of tokens) {
-      const last = merged[merged.length - 1];
-      if (last && last.run === token.run) last.text += token.text;
-      else merged.push({ text: token.text, run: token.run });
-    }
+    const merged = joinPieces(
+      tokens.flatMap((token) => token.pieces),
+      (a, b) => a === b,
+    );
     // The spaces a line ends in are not part of it.
     while (merged.length > 0) {
       const last = merged[merged.length - 1];
@@ -117,37 +147,19 @@ export function layoutRichText(
     const fragments: RichTextFragment[] = [];
     let x = 0;
     for (const { text, run } of merged) {
-      const width = measure(text, run) + Math.max(graphemes(text).length - 1, 0) * letterSpacing;
+      const width = measure(text, run).advance + Math.max(graphemes(text).length - 1, 0) * letterSpacing;
       fragments.push({ text, run, x, width });
       x += width + letterSpacing;
     }
     return { fragments, width: fragments.length > 0 ? x - letterSpacing : 0 };
   };
 
-  const lines: RichTextLine[] = [];
-  for (const pieces of splitParagraphs(runs)) {
-    const tokens = tokenize(pieces);
-    let current: Token[] = [];
-    let currentAdvance = 0;
-
-    for (let index = 0; index < tokens.length; ) {
-      // A word and the tokens joined to it.
-      let end = index + 1;
-      while (end < tokens.length && tokens[end].joined) end += 1;
-      const word = tokens.slice(index, end);
-      const wordAdvance = word.reduce((total, token) => total + advanceOf(token), 0);
-
-      const overflows = currentAdvance + wordAdvance - letterSpacing > contentWidth;
-      if (!word[0].isSpace && current.length > 0 && overflows) {
-        lines.push(toLine(current));
-        current = [];
-        currentAdvance = 0;
-      }
-      current.push(...word);
-      currentAdvance += wordAdvance;
-      index = end;
-    }
-    lines.push(toLine(current));
-  }
-  return lines;
+  const wrap = breakLinesLikePixi(
+    tokenizeRuns(runs),
+    contentWidth,
+    letterSpacing,
+    (token) => pixiTokenKind(token.text),
+    widthOf,
+  );
+  return withBlankLastParagraph(wrap).map(toLine);
 }

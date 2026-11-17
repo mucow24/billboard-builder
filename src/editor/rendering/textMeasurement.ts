@@ -6,63 +6,91 @@ import { parseRichText } from '../document/richText';
 import type { RichTextRun } from '../document/richText';
 import { layoutRichText } from './richTextLayout';
 import type { RichTextLine } from './richTextLayout';
-import { splitAfterHyphens } from './textLineBreaking';
+import {
+  breakLinesLikePixi,
+  pixiTokenKind,
+  pixiTokenWidth,
+  tokenizeLikePixi,
+  withBlankLastParagraph,
+} from './textLineBreaking';
+import type { PixiWrap, TextWidths } from './textLineBreaking';
 
 function getTextContentWidth(item: TextCanvasItem, width: number): number {
   return Math.max(1, width - item.padding.left - item.padding.right);
 }
 
 /**
- * Word-wrap `item.text`, as it is drawn (`drawnText`), into lines (each a list of tokens) using the same
- * tokenization and wrap rule Pixi renders with. `measure` returns a token's width
- * EXCLUDING letterSpacing; this function adds letterSpacing internally so callers
- * (height measurement here, glyph positioning in the SVG exporter) stay in lockstep
- * with Pixi's wrap boundaries.
+ * Width of the ink of a measured text, the way Pixi's
+ * `CanvasTextMetrics._measureText` works it out: how far the ink reaches left of
+ * the pen (`actualBoundingBoxLeft`, negative when the ink starts right of the
+ * pen) plus how far it reaches right of it. A bound the browser does not report
+ * counts as 0. Pure so it can be unit-tested without a canvas.
+ */
+export function inkWidthOf(
+  metrics: Pick<TextMetrics, 'actualBoundingBoxLeft' | 'actualBoundingBoxRight'>,
+): number {
+  const left = Number.isFinite(metrics.actualBoundingBoxLeft) ? metrics.actualBoundingBoxLeft : 0;
+  const right = Number.isFinite(metrics.actualBoundingBoxRight) ? metrics.actualBoundingBoxRight : 0;
+  return left + right;
+}
+
+/** Both widths of a text that Pixi wraps it by, from a 2D canvas set to its font. */
+function canvasTextWidths(context: CanvasRenderingContext2D, text: string): TextWidths {
+  const metrics = context.measureText(text);
+  return { advance: metrics.width, ink: inkWidthOf(metrics) };
+}
+
+/**
+ * Break `item.text`, as it is drawn (`drawnText`), into the lines the canvas
+ * draws, each a list of tokens: Pixi's tokens (`tokenizeLikePixi`) broken into
+ * lines by the port of its `wordWrap` (`breakLinesLikePixi`). The app lays text
+ * out with `layoutWrappedText`, which builds on this.
+ *
+ * `measure` gives the advance and the ink width of a token, letter spacing left
+ * out; `pixiTokenWidth` turns them into the room the token takes up.
+ */
+export function wrapLikePixi(
+  item: TextCanvasItem,
+  contentWidth: number,
+  measure: (text: string) => TextWidths,
+): PixiWrap {
+  const { letterSpacing } = item;
+  // Pixi measures each distinct token once (`CanvasTextMetrics.getFromCache`).
+  const tokenWidths = new Map<string, number>();
+  const widthOf = (token: string): number => {
+    let width = tokenWidths.get(token);
+    if (width === undefined) {
+      width = pixiTokenWidth(measure(token), graphemes(token).length, letterSpacing);
+      tokenWidths.set(token, width);
+    }
+    return width;
+  };
+  return breakLinesLikePixi(
+    tokenizeLikePixi(drawnText(item.text)),
+    contentWidth,
+    letterSpacing,
+    pixiTokenKind,
+    widthOf,
+  );
+}
+
+/**
+ * Break `item.text` into the lines the app lays it out in, each a list of
+ * tokens: the lines the canvas draws (`wrapLikePixi`, which see for `measure`),
+ * and a blank line after a line break that ends the text
+ * (`withBlankLastParagraph`). The canvas (through the height) and SVG export
+ * (through these lines) place the text by the same count.
+ *
+ * Everything that is not Pixi itself, the measured height and SVG export,
+ * breaks text without tags into lines through this function; text with tags
+ * goes through `layoutRichText`, which breaks lines by the same rule.
  */
 export function layoutWrappedText(
   item: TextCanvasItem,
   contentWidth: number,
-  measure: (text: string) => number,
+  measure: (text: string) => TextWidths,
 ): string[][] {
-  // Pixi adds letter spacing once per grapheme (see `graphemes`).
-  const measureToken = (token: string): number =>
-    measure(token) + Math.max(graphemes(token).length - 1, 0) * item.letterSpacing;
-
-  const lines: string[][] = [];
-  for (const paragraph of drawnText(item.text).split('\n')) {
-    if (paragraph.length === 0) {
-      lines.push([]);
-      continue;
-    }
-
-    // Runs of whitespace and runs of non-whitespace, so consecutive spaces are
-    // preserved (matches Pixi `whiteSpace: 'pre-wrap'`).
-    const tokens = (paragraph.match(/\s+|\S+/g) ?? []).flatMap(splitAfterHyphens);
-    let current: string[] = [];
-    let currentWidth = 0;
-    let hasContent = false;
-
-    for (const token of tokens) {
-      const tokenWidth = measureToken(token);
-      const isWhitespace = /^\s/.test(token);
-
-      if (!isWhitespace && hasContent && currentWidth + tokenWidth > contentWidth) {
-        lines.push(current);
-        current = [token];
-        currentWidth = tokenWidth;
-        hasContent = true;
-        continue;
-      }
-
-      current.push(token);
-      currentWidth += tokenWidth;
-      hasContent = true;
-    }
-
-    if (hasContent) lines.push(current);
-  }
-
-  return lines;
+  return withBlankLastParagraph(wrapLikePixi(item, contentWidth, measure));
 }
 
 /** `item` in the style of one of its rich text runs: bold and italic where a tag asks for them. */
@@ -108,7 +136,7 @@ export function layoutRichTextRuns(
       fonts.set(run, font);
     }
     context.font = font;
-    return context.measureText(text).width;
+    return canvasTextWidths(context, text);
   });
 }
 
@@ -120,7 +148,6 @@ export function measureWordWrappedTextHeight(
   const verticalPadding = item.padding.top + item.padding.bottom;
   const fallbackLineHeight = Math.ceil(item.fontSize * item.lineHeight);
   const rich = parseRichText(item.text);
-  const paragraphs = drawnText(rich.plain).split('\n');
   const isJsdom =
     typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
   const context =
@@ -129,6 +156,10 @@ export function measureWordWrappedTextHeight(
       : null;
 
   if (!context) {
+    // A rough estimate where there is no canvas to measure with: its paragraphs,
+    // split where the canvas starts a new line, at least a line each, the one
+    // after a line break that ends the text included (see `withBlankLastParagraph`).
+    const paragraphs = drawnText(rich.plain).split(/\r\n|\r|\n/);
     const estimatedCharsPerLine = Math.max(
       1,
       Math.floor(safeWidth / (item.fontSize * 0.6))
@@ -144,7 +175,7 @@ export function measureWordWrappedTextHeight(
   const measuringContext = context;
   const lineCount = rich.hasMarkup
     ? layoutRichTextRuns(item, rich.runs, safeWidth, measuringContext).length
-    : layoutWrappedText(item, safeWidth, (text) => measuringContext.measureText(text).width).length;
+    : layoutWrappedText(item, safeWidth, (text) => canvasTextWidths(measuringContext, text)).length;
 
   return Math.max(1, Math.ceil(verticalPadding + lineCount * item.fontSize * item.lineHeight));
 }

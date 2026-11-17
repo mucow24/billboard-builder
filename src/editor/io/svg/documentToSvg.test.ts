@@ -535,6 +535,16 @@ describe('documentToSvg — text line alignment', () => {
         expect(pens).toEqual([line, line]);
       },
     );
+
+    // The canvas keeps "AAAA BBBB" on one line only where the box has room for
+    // all of it as drawn: nine characters and eight letter spacings, 106px. The
+    // export kept it on one line down to 102px.
+    it('wraps a letter-spaced line where the canvas does', () => {
+      const lineCount = (width: number) =>
+        pensByLine({ text: 'AAAA BBBB', letterSpacing: 2, width, padding: noPadding }).length;
+      expect(lineCount(106)).toBe(1);
+      expect(lineCount(105)).toBe(2);
+    });
   });
 
   describe('spaces at the ends of a line', () => {
@@ -548,6 +558,37 @@ describe('documentToSvg — text line alignment', () => {
         [150, 160],
         [150, 160],
       ]);
+    });
+
+    // Pixi breaks a line at a carriage return as at a line feed, and at the two
+    // together once. The export broke at line feeds only, so it ran "AB" and "CD"
+    // into one line after a lone carriage return, and measured the carriage
+    // return of a CRLF break as part of the line, which put "AB" 10px short of
+    // the box edge here.
+    it('breaks lines at carriage returns, and keeps them off the line', () => {
+      const CR = String.fromCharCode(13);
+      const LF = String.fromCharCode(10);
+      const twoLines = [
+        [300, 310],
+        [300, 310],
+      ];
+      expect(pensByLine({ text: `AB${CR}CD`, align: 'right' })).toEqual(twoLines);
+      expect(pensByLine({ text: `AB${CR}${LF}CD`, align: 'right' })).toEqual(twoLines);
+    });
+
+    // A line break at the end of the text leaves a blank line after it, which
+    // the canvas places the text by too (through the measured height): the text
+    // sits half a line higher when centred and a line higher at the bottom.
+    it('places text that ends in a line break as if a blank line followed it', () => {
+      const LF = String.fromCharCode(10);
+      const CR = String.fromCharCode(13);
+      const lineHeight = 42 * 1.1;
+      const baseline = (text: string, verticalAlign: 'middle' | 'bottom') =>
+        glyphPositions(svgOf([createTextItem({ text, verticalAlign, height: 300 })]))[0].baselineY;
+      for (const ending of [LF, CR, `${CR}${LF}`]) {
+        expect(baseline(`AB${ending}`, 'middle')).toBeCloseTo(baseline('AB', 'middle') - lineHeight / 2);
+        expect(baseline(`AB${ending}`, 'bottom')).toBeCloseTo(baseline('AB', 'bottom') - lineHeight);
+      }
     });
 
     it('keeps the spaces a line starts with as part of the line', () => {
@@ -643,6 +684,15 @@ describe('documentToSvg — text line alignment', () => {
       expect(pensByLine({ text: 'ABf', align: 'right', letterSpacing: 5 }, leaningMeasurer)).toEqual([
         [276, 291, 306],
       ]);
+    });
+
+    // Pixi wraps by the same width: "ABf ABf" advances 70px, but each "ABf" has
+    // 34px of ink, so the line is 78px wide to Pixi.
+    it('wraps a line by the ink of its words where that is wider than their advance', () => {
+      const lineCount = (width: number) =>
+        pensByLine({ text: 'ABf ABf', width, padding: noPadding }, leaningMeasurer).length;
+      expect(lineCount(78)).toBe(1);
+      expect(lineCount(77)).toBe(2);
     });
 
     it('measures the ink of the line without its trailing spaces', () => {
