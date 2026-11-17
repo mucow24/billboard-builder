@@ -69,6 +69,20 @@ Place `.ttf`, `.otf`, `.woff`, or `.woff2` files in `src/assets/fonts/`. The app
 
 Users can also upload fonts at runtime through the editor UI. Uploaded fonts are persisted in local storage.
 
+### Rich text
+
+Part of a text layer's text can be styled with tags typed into the text itself:
+
+| Tag | Effect |
+|---|---|
+| `<b>…</b>` | Bold |
+| `<i>…</i>` | Italic |
+| `<color=red>…</color>` | Solid colour: `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` or a CSS colour name |
+| `<gradient start=red end=blue angle=90>…</gradient>` | Gradient across the tagged text, starting over on each line; `angle` is optional and 0 (top to bottom) by default |
+| `<noparse>…</noparse>` | Shown as typed, tags included |
+
+Tag names ignore case. Tags may nest and overlap; a closing tag closes only its own tag, and a tag left open runs to the end of the text. Anything that is not one of these tags, well formed, is ordinary text (`a < b`, `<3`). Tagged text exports to PNG and SVG as it looks on the canvas. See `src/editor/document/richText.ts`.
+
 ### Emoji
 
 Emoji that a text's font does not have are drawn from the bundled Noto Emoji (`NotoEmoji-Regular.ttf`), a black-and-white emoji font, instead of the system's colour emoji font, so they take the text's fill, gradient, shadow and outline and export to SVG like any glyph. Noto Emoji is used for no ASCII character: its space, digits, `#` and `*` are as wide as an emoji, so a font that lacks them gets them from the system as before. Keycaps (such as 1️⃣) start with a digit, `#` or `*`, so they reach Noto Emoji another way: before drawing, each keycap is swapped for a private-use character (U+100000 to U+10000B), which the bundled font maps straight to its keycap picture. See `src/editor/fonts/emojiFallback.ts`.

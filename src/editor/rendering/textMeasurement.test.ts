@@ -2,8 +2,8 @@ import { NEWLINE_MATCH_REGEX, wordWrap, type ICanvas, type TextStyle } from 'pix
 import { describe, expect, it, vi } from 'vitest';
 
 import { graphemes } from './graphemes';
+import { BREAKING_SPACES } from './textLineBreaking';
 import {
-  BREAKING_SPACES,
   inkWidthOf,
   layoutWrappedText,
   measureWordWrappedTextHeight,

@@ -648,9 +648,15 @@ test.describe('SVG export', () => {
   //    of its own, and the line break then ends a still empty line, so the
   //    canvas shows an empty line before "AND"; the layout drew "AND" right
   //    under the word.
+  // Text with tags is laid out by the app and drawn a fragment at a time. Its
+  // lines broke by a rule of their own, so tagging a text could re-wrap it: at
+  // a no-break space, a carriage return, a leaning last letter and a line break
+  // after a word wider than the box it broke otherwise than the same text
+  // without tags. Beside each layer stands its text with colour tags, which
+  // change no widths, and must break into the same lines.
   // Where Pixi wraps shows only in a real browser, and the reference is the
   // canvas itself (Export > PNG). Lines are compared one by one, each across
-  // more than its box, where an unwrapped line ends.
+  // its half of the canvas, more than its box, where an unwrapped line ends.
   test('wraps text where the canvas does', async ({ page }) => {
     await openFreshEditor(page);
     // The bundled fonts have to be in first: see the kerning test above.
@@ -660,9 +666,14 @@ test.describe('SVG export', () => {
     const noBreakSpace = String.fromCharCode(0xa0);
     const carriageReturn = String.fromCharCode(13);
     const lineFeed = String.fromCharCode(10);
+    // The text fixture's own fill, so a tag changes no pixel either.
+    const tag = (text: string) => `<color=#ffffff>${text}</color>`;
     type Layer = {
       id: string;
       fontSize: number;
+      text: string;
+      /** `text` with tags. */
+      tagged: string;
       y: number;
       lines: number;
       /** The lines, counted from 0, on which the canvas draws nothing. */
@@ -670,52 +681,91 @@ test.describe('SVG export', () => {
       [property: string]: unknown;
     };
     const layers: Layer[] = [
-      { id: 'letter-spaced', ...albertus, text: 'Wrap these words', letterSpacing: 10, y: 30, width: 490, lines: 2 },
+      {
+        id: 'letter-spaced',
+        ...albertus,
+        text: 'Wrap these words',
+        tagged: `Wrap ${tag('these')} words`,
+        letterSpacing: 10,
+        y: 30,
+        width: 490,
+        lines: 2,
+      },
       // "alpha beta" alone is wider than the box; the canvas lets it overflow.
-      { id: 'no-break-space', ...albertus, text: `alpha${noBreakSpace}beta gamma`, y: 170, width: 160, lines: 2 },
+      {
+        id: 'no-break-space',
+        ...albertus,
+        text: `alpha${noBreakSpace}beta gamma`,
+        tagged: `alpha${tag(noBreakSpace)}beta gamma`,
+        y: 170,
+        width: 160,
+        lines: 2,
+      },
       {
         id: 'leaning',
         fontFamily: 'Instrument Serif',
         fontStyle: 'italic',
         fontSize: 120,
         text: 'Jazz Jazz',
+        tagged: `Jazz ${tag('Jazz')}`,
         y: 320,
         width: 398,
         lines: 2,
       },
-      { id: 'carriage-return', ...albertus, text: `alpha${carriageReturn}beta`, y: 620, width: 490, lines: 2 },
+      {
+        id: 'carriage-return',
+        ...albertus,
+        text: `alpha${carriageReturn}beta`,
+        tagged: `alpha${tag(carriageReturn)}beta`,
+        y: 620,
+        width: 490,
+        lines: 2,
+      },
       // Capitals, so that nothing of the first line reaches into the empty one.
       {
         id: 'oversized-word',
         ...albertus,
         text: `OVERSIZED${lineFeed}AND`,
+        tagged: `${tag('OVERSIZED')}${lineFeed}AND`,
         y: 760,
         width: 150,
         lines: 3,
         emptyLines: [1],
       },
     ];
-    const prepared = layers.map(({ lines, emptyLines = [], ...layer }, index) => {
-      // The text fixture's line height is 1.1 x the font size.
-      const lineHeight = layer.fontSize * 1.1;
-      return {
-        fixture: createTextFixture({
-          ...layer,
-          name: layer.id,
-          x: 20,
-          height: Math.ceil(lines * lineHeight),
-          zIndex: index + 1,
-        }),
-        lineBoxes: Array.from({ length: lines }, (_, line) => ({
-          name: `${layer.id}, line ${line + 1}`,
-          empty: emptyLines.includes(line),
-          x: 20,
-          y: layer.y + line * lineHeight,
-          width: 900,
-          height: lineHeight,
-        })),
-      };
-    });
+    // Each layer in the left half of the canvas, its text with tags in the right.
+    const columns = [
+      { x: 20, tagged: false },
+      { x: 520, tagged: true },
+    ];
+    const prepared = columns.flatMap((column, columnIndex) =>
+      layers.map(({ lines, emptyLines = [], tagged, ...layer }, index) => {
+        const id = column.tagged ? `${layer.id}-tagged` : layer.id;
+        // The text fixture's line height is 1.1 x the font size.
+        const lineHeight = layer.fontSize * 1.1;
+        return {
+          fixture: createTextFixture({
+            ...layer,
+            id,
+            name: id,
+            text: column.tagged ? tagged : layer.text,
+            x: column.x,
+            height: Math.ceil(lines * lineHeight),
+            zIndex: columnIndex * layers.length + index + 1,
+          }),
+          lineBoxes: Array.from({ length: lines }, (_, line) => ({
+            name: `${id}, line ${line + 1}`,
+            empty: emptyLines.includes(line),
+            x: column.x,
+            y: layer.y + line * lineHeight,
+            // Short of the next column: an italic "J" there reaches 10px and
+            // more left of its layer.
+            width: 450,
+            height: lineHeight,
+          })),
+        };
+      }),
+    );
     const doc = {
       ...createProjectDocument(prepared.map(({ fixture }) => fixture)),
       fonts: [
@@ -757,6 +807,19 @@ test.describe('SVG export', () => {
       expect(Math.abs(line.exported.left - line.canvas.left), name).toBeLessThanOrEqual(2);
       expect(Math.abs(line.exported.right - line.canvas.right), name).toBeLessThanOrEqual(2);
       expect(line.overlap, name).toBeGreaterThan(0.7);
+    });
+
+    // The text with tags broke into the same lines as without: each of its
+    // lines starts and ends where its twin does, from the right of its column.
+    // Before the fix, the no-break space ended its first line at "alpha", and
+    // the leaning one kept "Jazz Jazz" on one line.
+    const half = compared.length / 2;
+    compared.slice(half).forEach((line, index) => {
+      const { name, empty } = lineBoxes[half + index];
+      if (empty) return;
+      const twin = compared[index];
+      expect(Math.abs(line.canvas.left - line.boxRight - (twin.canvas.left - twin.boxRight)), name).toBeLessThanOrEqual(2);
+      expect(Math.abs(line.canvas.right - line.boxRight - (twin.canvas.right - twin.boxRight)), name).toBeLessThanOrEqual(2);
     });
   });
 

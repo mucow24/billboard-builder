@@ -184,6 +184,13 @@ describe('inspectorModel', () => {
 
     expect(getLayerPrimaryLabel(backItem)).toBe('Rectangle');
     expect(getLayerSecondaryLabel(frontItem)).toContain('Headline goes here');
+    // Rich text tags are not part of what the text says.
+    expect(
+      getLayerSecondaryLabel({
+        ...frontItem,
+        text: '<b>Big</b> <color=red>sale</color> <noparse><b></noparse> 1 < 2',
+      } as typeof frontItem),
+    ).toBe('“Big sale <b> 1 < 2”');
     expect(getLayerPreviewStyle(backItem)).toEqual({
       background: '#ff0000ff',
       borderColor: '#ff0000ff',

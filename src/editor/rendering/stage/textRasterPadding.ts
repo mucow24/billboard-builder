@@ -16,7 +16,12 @@ const paddingCache = new Map<string, number>();
 
 let measuringContext: CanvasRenderingContext2D | null | undefined;
 
-function getMeasuringContext(): CanvasRenderingContext2D | null {
+/**
+ * The 2D canvas context text is measured with here and by the rich text layout
+ * of the canvas (`PixiItemLayer`): null where there is none (jsdom). Whoever
+ * measures with it sets its font first.
+ */
+export function getTextMeasuringContext(): CanvasRenderingContext2D | null {
   if (measuringContext === undefined) {
     // jsdom has no 2D context and logs an error when asked for one.
     const isJsdom = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
@@ -47,7 +52,7 @@ const finiteOrZero = (value: number | undefined): number =>
  * where the ink falls.
  */
 export function measureTextRasterPadding(text: string, style: TextStyleOptions): number {
-  const context = getMeasuringContext();
+  const context = getTextMeasuringContext();
   if (!context) return 0;
 
   const textStyle = new TextStyle({ ...style, padding: 0 });
