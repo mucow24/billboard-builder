@@ -39,6 +39,10 @@ This editor is organized around a small set of ownership boundaries.
   - Keycaps are drawn as private-use characters (`KEYCAP_BASES`, `FIRST_KEYCAP_CODE_POINT`), which the bundled Noto Emoji maps to its keycap glyphs because `scripts/patch-noto-emoji-keycaps.py` patched its cmap. The script and the constants number them the same way; `emojiKeycapFont.test.ts` checks the bundled file against the constants.
   - Letter spacing is counted per grapheme (`rendering/graphemes.ts`), as Pixi counts it: an emoji with a skin tone, a flag or a family of joined emoji is one grapheme.
   - Known limit: Firefox draws an emoji with a skin tone from the system's colour emoji font whatever the text names, so there the canvas and SVG export disagree on it.
+- Where a text item's lines break is decided in one place, `layoutWrappedText` (`src/editor/rendering/textMeasurement.ts`), for everything that is not Pixi itself: the measured text height (vertical alignment, the smallest box height) and SVG export.
+  - It is a port of Pixi's `wordWrap` for the style `PixiItemLayer` draws text with: `whiteSpace: 'pre'`, no `breakWords`. A word is as wide as the larger of its advance and its ink width, plus one letter spacing per grapheme.
+  - Callers hand it both widths (`TextWidths`) and nothing else; they do not add letter spacing or pick the larger width themselves.
+  - Changing that style, or upgrading Pixi, means the comparison test in `textMeasurement.test.ts`, which runs `layoutWrappedText` and Pixi's own `wordWrap` on the same random texts, must still pass.
 
 ## Document library
 

@@ -1,7 +1,97 @@
+import { NEWLINE_MATCH_REGEX, wordWrap, type ICanvas, type TextStyle } from 'pixi.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { inkWidthOf, layoutWrappedText, measureWordWrappedTextHeight } from './textMeasurement';
+import { graphemes } from './graphemes';
+import { BREAKING_SPACES, inkWidthOf, layoutWrappedText, measureWordWrappedTextHeight } from './textMeasurement';
 import { createTextItem } from '../document/documentDefaults';
+
+// `layoutWrappedText` is a port of Pixi's `wordWrap`, for the style PixiItemLayer
+// draws text with (`whiteSpace: 'pre'`, no `breakWords`). Run both on the same
+// few thousand random texts, measured with the same fake font, and expect the
+// same lines. This catches a difference in the port, a change of that style
+// that the port does not follow, and a change in `wordWrap` on a Pixi upgrade.
+describe("layoutWrappedText against Pixi's own wordWrap", () => {
+  const code = (value: number) => String.fromCharCode(value);
+  // Advance widths of a fake font by character; 10px for any other.
+  const advances = new Map([
+    ['a', 10],
+    ['f', 9],
+    ['W', 18],
+    ['-', 6],
+    [' ', 5],
+    [code(0x00a0), 5], // no-break space
+    [code(0x0009), 20], // tab
+    [code(0x2009), 2], // thin space
+  ]);
+  const advance = (text: string) => [...text].reduce((sum, char) => sum + (advances.get(char) ?? 10), 0);
+  // Its ink: none for spaces; an "f" at the end leans 6px past its advance;
+  // other glyphs start 1px after the pen, except a "W", which starts at it.
+  const ink = (text: string) =>
+    text.trim().length === 0 ? 0 : advance(text) + (text.endsWith('f') ? 6 : 0) - (text.startsWith('W') ? 0 : 1);
+
+  // How Pixi measures a token for `wordWrap`: `CanvasTextMetrics._measureText`,
+  // without the browser's own letter spacing.
+  const pixiMeasure = (text: string, letterSpacing: number) => {
+    let advanceWidth = advance(text);
+    let inkWidth = ink(text);
+    if (advanceWidth > 0) {
+      const between = (graphemes(text).length - 1) * letterSpacing;
+      advanceWidth += between;
+      inkWidth += between;
+    }
+    return Math.max(advanceWidth, inkWidth);
+  };
+  const pixiLines = (text: string, wrapWidth: number, letterSpacing: number) =>
+    wordWrap(
+      text,
+      { letterSpacing, whiteSpace: 'pre', wordWrapWidth: wrapWidth, breakWords: false, _fontString: '' } as unknown as TextStyle,
+      { getContext: () => ({ font: '' }) } as unknown as ICanvas,
+      pixiMeasure,
+      (_token, breakWords) => breakWords,
+      () => true,
+      graphemes,
+    ).split(NEWLINE_MATCH_REGEX);
+
+  // Pixi takes the spaces off the end of each line; the port leaves that to its callers.
+  const trimRight = (line: string) => {
+    let end = line.length;
+    while (end > 0 && BREAKING_SPACES.has(line.charCodeAt(end - 1))) end -= 1;
+    return line.slice(0, end);
+  };
+  const portLines = (text: string, wrapWidth: number, letterSpacing: number) =>
+    layoutWrappedText(createTextItem({ text, letterSpacing }), wrapWidth, (token) => ({
+      advance: advance(token),
+      ink: ink(token),
+    })).map((tokens) => trimRight(tokens.join('')));
+
+  it('breaks random texts into the lines Pixi breaks them into', () => {
+    // Words, hyphens, the spaces Pixi breaks at and one it does not, line feeds
+    // and carriage returns; "a" and the space more often than the rest.
+    const alphabet = ['a', 'a', 'a', 'f', 'W', '-', ' ', ' ', code(0x0009), code(0x2009), code(0x00a0), code(0x000a), code(0x000d)];
+    let seed = 20261117;
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+    const pick = <T,>(values: readonly T[]) => values[Math.floor(random() * values.length)];
+
+    const mismatches: { text: string; wrapWidth: number; letterSpacing: number; pixi: string[]; port: string[] }[] = [];
+    for (let run = 0; run < 4000; run += 1) {
+      const length = 1 + Math.floor(random() * 25);
+      const text = Array.from({ length }, () => pick(alphabet)).join('');
+      const wrapWidth = 20 + Math.floor(random() * 121);
+      const letterSpacing = pick([0, 3, -2, 8]);
+      const pixi = pixiLines(text, wrapWidth, letterSpacing);
+      const port = portLines(text, wrapWidth, letterSpacing);
+      if (pixi.length !== port.length || pixi.some((line, index) => line !== port[index])) {
+        mismatches.push({ text, wrapWidth, letterSpacing, pixi, port });
+      }
+    }
+
+    expect(mismatches.slice(0, 3)).toEqual([]);
+    expect(mismatches).toHaveLength(0);
+  });
+});
 
 // Mirrors Pixi's CanvasTextMetrics._measureText: `boundsWidth =
 // actualBoundingBoxRight + actualBoundingBoxLeft`, each counted as 0 when the
@@ -26,19 +116,18 @@ describe('inkWidthOf', () => {
 });
 
 describe('layoutWrappedText', () => {
-  // 10px a character, so widths can be read off the text.
+  // 10px a character, so widths can be read off the text, and ink no wider.
+  const tenPerCharacter = (token: string) => ({ advance: token.length * 10, ink: 0 });
   const lines = (text: string, contentWidth: number) =>
-    layoutWrappedText(createTextItem({ text }), contentWidth, (token) => token.length * 10).map(
-      (tokens) => tokens.join(''),
-    );
+    layoutWrappedText(createTextItem({ text }), contentWidth, tenPerCharacter).map((tokens) => tokens.join(''));
 
   it('wraps at spaces', () => {
     expect(lines('alpha beta gamma', 110)).toEqual(['alpha beta ', 'gamma']);
   });
 
   const spacedLines = (text: string, letterSpacing: number, contentWidth: number) =>
-    layoutWrappedText(createTextItem({ text, letterSpacing }), contentWidth, (token) => token.length * 10).map(
-      (tokens) => tokens.join(''),
+    layoutWrappedText(createTextItem({ text, letterSpacing }), contentWidth, tenPerCharacter).map((tokens) =>
+      tokens.join(''),
     );
 
   // Pixi adds letter spacing once per grapheme of a word. A family of joined
@@ -96,11 +185,30 @@ describe('layoutWrappedText', () => {
   // A no-break space is no place to break a line to Pixi: it holds the words on
   // either side together, even where they are wider than the box together.
   // The layout used to break at every character JavaScript calls white space.
+  // (The space after the joined words would start the next line, so it goes.)
   it('keeps words joined by a no-break space on one line, as the canvas does', () => {
     const noBreakSpaces = [0x00a0, 0x2007, 0x202f].map((code) => String.fromCharCode(code));
     for (const space of noBreakSpaces) {
-      expect(lines(`alpha${space}beta gamma`, 80)).toEqual([`alpha${space}beta `, 'gamma']);
+      expect(lines(`alpha${space}beta gamma`, 80)).toEqual([`alpha${space}beta`, 'gamma']);
     }
+  });
+
+  // A word wider than the box gets a line of its own, and Pixi then starts the
+  // next line as one that wrapping started: a line break right after the word
+  // ends that still empty line, so the canvas shows an empty line between.
+  it('starts an empty line after a word wider than the box when a line break follows', () => {
+    const LF = String.fromCharCode(10);
+    expect(lines(`aaaaaaa${LF}bb`, 40)).toEqual(['aaaaaaa', '', 'bb']);
+    expect(lines(`aa aaaaaaa bb`, 40)).toEqual(['aa ', 'aaaaaaa', 'bb']);
+  });
+
+  // The same where spaces run past the box: the space that does not fit ends
+  // the line, the spaces after it are dropped, and a line break then ends an
+  // empty line.
+  it('starts an empty line after spaces that run past the box when a line break follows', () => {
+    const LF = String.fromCharCode(10);
+    expect(lines(`aaa   ${LF}bb`, 40)).toEqual(['aaa ', '', 'bb']);
+    expect(lines(`aaa   bb`, 40)).toEqual(['aaa ', 'bb']);
   });
 
   it('breaks at every space Pixi breaks at', () => {
@@ -138,11 +246,11 @@ describe('layoutWrappedText', () => {
   it('keeps one line for a text with nothing to draw', () => {
     expect(lines('', 1000)).toEqual(['']);
     expect(lines(String.fromCharCode(10), 1000)).toEqual(['']);
-    expect(lines('   ', 1000)).toEqual(['   ']);
+    expect(lines('   ', 1000)).toEqual(['']);
   });
 
   it('does not split at a hyphen that ends a word or stands alone', () => {
-    expect(layoutWrappedText(createTextItem({ text: 'a- b - c' }), 1000, (token) => token.length)).toEqual([
+    expect(layoutWrappedText(createTextItem({ text: 'a- b - c' }), 1000, tenPerCharacter)).toEqual([
       ['a-', ' ', 'b', ' ', '-', ' ', 'c'],
     ]);
   });
@@ -155,7 +263,7 @@ describe('layoutWrappedText', () => {
     const measured: string[] = [];
     const laidOut = layoutWrappedText(createTextItem({ text: `I ${heart}${selector} NY` }), 1000, (token) => {
       measured.push(token);
-      return token.length;
+      return tenPerCharacter(token);
     });
 
     expect(laidOut).toEqual([['I', ' ', heart, ' ', 'NY']]);
@@ -188,6 +296,10 @@ describe('text measurement', () => {
     expect(heightOf(`a${CR}b`)).toBe(20);
     expect(heightOf(`a${CR}${LF}b`)).toBe(20);
     expect(heightOf(`a${CR}${CR}b`)).toBe(30);
+    // Like the canvas, no line after a line break that ends the text.
+    expect(heightOf(`a${LF}`)).toBe(10);
+    expect(heightOf(`a${CR}${LF}  `)).toBe(10);
+    expect(heightOf(`a${LF}${LF}`)).toBe(20);
   });
 
   it('uses canvas measurement when a browser-like canvas context is available', () => {

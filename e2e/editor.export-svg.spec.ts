@@ -644,6 +644,10 @@ test.describe('SVG export', () => {
   //  - No-break spaces. Pixi never breaks a line at one; the layout did.
   //  - Carriage returns. Pixi starts a new line at one, as at a line feed; the
   //    layout broke at line feeds only and ran "alpha" and "beta" together.
+  //  - A line break after a word wider than the box. Pixi gives the word a line
+  //    of its own, and the line break then ends a still empty line, so the
+  //    canvas shows an empty line before "AND"; the layout drew "AND" right
+  //    under the word.
   // Where Pixi wraps shows only in a real browser, and the reference is the
   // canvas itself (Export > PNG). Lines are compared one by one, each across
   // more than its box, where an unwrapped line ends.
@@ -655,7 +659,17 @@ test.describe('SVG export', () => {
     const albertus = { fontFamily: 'Albertus MT Std', fontSize: 48 };
     const noBreakSpace = String.fromCharCode(0xa0);
     const carriageReturn = String.fromCharCode(13);
-    const layers = [
+    const lineFeed = String.fromCharCode(10);
+    type Layer = {
+      id: string;
+      fontSize: number;
+      y: number;
+      lines: number;
+      /** The lines, counted from 0, on which the canvas draws nothing. */
+      emptyLines?: number[];
+      [property: string]: unknown;
+    };
+    const layers: Layer[] = [
       { id: 'letter-spaced', ...albertus, text: 'Wrap these words', letterSpacing: 10, y: 30, width: 490, lines: 2 },
       // "alpha beta" alone is wider than the box; the canvas lets it overflow.
       { id: 'no-break-space', ...albertus, text: `alpha${noBreakSpace}beta gamma`, y: 170, width: 160, lines: 2 },
@@ -670,8 +684,18 @@ test.describe('SVG export', () => {
         lines: 2,
       },
       { id: 'carriage-return', ...albertus, text: `alpha${carriageReturn}beta`, y: 620, width: 490, lines: 2 },
+      // Capitals, so that nothing of the first line reaches into the empty one.
+      {
+        id: 'oversized-word',
+        ...albertus,
+        text: `OVERSIZED${lineFeed}AND`,
+        y: 760,
+        width: 150,
+        lines: 3,
+        emptyLines: [1],
+      },
     ];
-    const prepared = layers.map(({ lines, ...layer }, index) => {
+    const prepared = layers.map(({ lines, emptyLines = [], ...layer }, index) => {
       // The text fixture's line height is 1.1 x the font size.
       const lineHeight = layer.fontSize * 1.1;
       return {
@@ -684,6 +708,7 @@ test.describe('SVG export', () => {
         }),
         lineBoxes: Array.from({ length: lines }, (_, line) => ({
           name: `${layer.id}, line ${line + 1}`,
+          empty: emptyLines.includes(line),
           x: 20,
           y: layer.y + line * lineHeight,
           width: 900,
@@ -715,13 +740,20 @@ test.describe('SVG export', () => {
 
     expect(compared).toHaveLength(lineBoxes.length);
     compared.forEach((line, index) => {
-      const { name } = lineBoxes[index];
+      const { name, empty } = lineBoxes[index];
+      if (empty) {
+        // Neither drew anything here: about 0 pixels, give or take a stray
+        // anti-aliased one at the edge of the box.
+        expect(line.canvas.pixels, name).toBeLessThan(30);
+        expect(line.exported.pixels, name).toBeLessThan(30);
+        return;
+      }
       // The canvas drew a line here, so it wrapped the text where this test expects.
       expect(line.canvas.pixels, name).toBeGreaterThan(300);
       // The export drew the same line. Before the fix, the first line of the
       // letter-spaced, the leaning and the carriage-return layer ran on to the
-      // last word, leaving the second empty, and the no-break space ended the
-      // first line at "alpha".
+      // last word, leaving the second empty, the no-break space ended the first
+      // line at "alpha", and "AND" took the empty line under "OVERSIZED".
       expect(Math.abs(line.exported.left - line.canvas.left), name).toBeLessThanOrEqual(2);
       expect(Math.abs(line.exported.right - line.canvas.right), name).toBeLessThanOrEqual(2);
       expect(line.overlap, name).toBeGreaterThan(0.7);
