@@ -69,6 +69,22 @@ Place `.ttf`, `.otf`, `.woff`, or `.woff2` files in `src/assets/fonts/`. The app
 
 Users can also upload fonts at runtime through the editor UI. Uploaded fonts are persisted in local storage.
 
+### Emoji
+
+Emoji that a text's font does not have are drawn from the bundled Noto Emoji (`NotoEmoji-Regular.ttf`), a black-and-white emoji font, instead of the system's colour emoji font, so they take the text's fill, gradient, shadow and outline and export to SVG like any glyph. Noto Emoji is used for no ASCII character: its space, digits, `#` and `*` are as wide as an emoji, so a font that lacks them gets them from the system as before. Keycaps (such as 1️⃣) start with a digit, `#` or `*`, so they reach Noto Emoji another way: before drawing, each keycap is swapped for a private-use character (U+100000 to U+10000B), which the bundled font maps straight to its keycap picture. See `src/editor/fonts/emojiFallback.ts`.
+
+Noto Emoji is not listed in the font picker: every font falls back to it already, and as a text's own font it would draw no letters.
+
+Known limit: Firefox still draws an emoji with a skin tone (such as 👍🏽) from the system's colour emoji font, so there it stays in colour and SVG export does not match it. Chromium and WebKit draw it from Noto Emoji.
+
+The bundled `NotoEmoji-Regular.ttf` is made from Google's by `scripts/patch-noto-emoji-keycaps.py`, which makes two changes. It fixes the weight at 400, the only weight the app uses, which keeps the same outlines and halves the file. It also adds those 12 characters to the font's character map. When updating the font, start from Google's `NotoEmoji[wght].ttf` and run the script on it (needs Python with `fonttools`):
+
+```bash
+python scripts/patch-noto-emoji-keycaps.py path/to/NotoEmoji[wght].ttf src/assets/fonts/NotoEmoji-Regular.ttf
+```
+
+`src/editor/fonts/emojiKeycapFont.test.ts` fails if the bundled file lacks the patch.
+
 ## Testing
 
 ### Unit tests

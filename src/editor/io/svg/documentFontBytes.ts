@@ -4,6 +4,7 @@ import type {
   TextCanvasItem,
   UploadedFont,
 } from '../../document/documentTypes';
+import { EMOJI_FALLBACK_FAMILY } from '../../fonts/emojiFallback';
 import { toFontReference } from '../../fonts/fontModel';
 import { findFontForVariant } from '../../fonts/fontRegistry';
 import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
@@ -64,6 +65,39 @@ export function createDocumentFontLoader(
       return { kind: source.kind, bytes, ...(synthetic ? { synthetic } : {}) };
     } catch {
       return { kind: source.kind, bytes: null };
+    }
+  };
+}
+
+/**
+ * Build the `loadFallbackFontBytes` resolver for `exportToSvg`: the bytes of the
+ * emoji fallback file (see `fonts/emojiFallback`) that the canvas draws `item`'s
+ * missing characters with, chosen from `registeredFonts` as for any family (see
+ * `createDocumentFontLoader`), and what the browser fakes when it draws them.
+ *
+ * Nothing when no file of the fallback is registered: the canvas then draws
+ * those characters from a system font, which cannot be exported.
+ */
+export function createFallbackFontLoader(registeredFonts: readonly UploadedFont[], loaders: FontByteLoaders) {
+  return async (item: TextCanvasItem): Promise<FontBytes> => {
+    const font = findFontForVariant(
+      registeredFonts,
+      EMOJI_FALLBACK_FAMILY,
+      item.fontWeight === 'bold' ? '700' : '400',
+      item.fontStyle,
+    );
+    if (!font) {
+      return { kind: 'system', bytes: null };
+    }
+    const synthetic = syntheticStyle(item, font);
+    try {
+      const bytes =
+        font.kind === 'bundled'
+          ? await loaders.loadBundledBytes(font.sourceName)
+          : await loaders.loadUploadedBytes(toFontReference(font));
+      return { kind: font.kind, bytes, ...(synthetic ? { synthetic } : {}) };
+    } catch {
+      return { kind: font.kind, bytes: null };
     }
   };
 }

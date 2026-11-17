@@ -136,6 +136,33 @@ describe('browser font loader', () => {
     expect(registeredFontSources()).toEqual([String.raw`url("/fonts/a\"b\\c\a d.ttf")`]);
   });
 
+  it('uses faces of the emoji fallback family, bundled or uploaded, for no ASCII character', async () => {
+    await loadFontEntries([
+      ['../../assets/fonts/NotoEmoji-Regular.ttf', '/fonts/NotoEmoji-Regular.ttf'],
+      ['../../assets/fonts/Barlow-Regular.ttf', '/fonts/Barlow-Regular.ttf'],
+    ]);
+    await registerUploadedFontBytes({
+      family: 'noto emoji',
+      sourceName: 'noto emoji.ttf',
+      weight: '400',
+      style: 'normal',
+      kind: 'uploaded',
+      bytes: new Uint8Array([1]).buffer,
+    });
+
+    const rangeByFamily = vi
+      .mocked(document.fonts.add)
+      .mock.calls.map(([fontFace]) => fontFace as unknown as MockFontFace)
+      .map((fontFace) => [fontFace.family, fontFace.descriptors?.unicodeRange]);
+    expect(rangeByFamily).toEqual(
+      expect.arrayContaining([
+        ['Noto Emoji', 'U+80-10FFFF'],
+        ['Barlow', undefined],
+        ['noto emoji', 'U+80-10FFFF'],
+      ]),
+    );
+  });
+
   it('registers uploaded font files with uploaded provenance', async () => {
     const bytes = new Uint8Array([1, 2, 3]);
     const file = new File([bytes], 'SessionSans-BoldItalic.ttf');

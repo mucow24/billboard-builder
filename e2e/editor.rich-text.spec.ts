@@ -55,6 +55,12 @@ const CASES: RichCase[] = [
     text: 'AV<b><gradient start=#f00 end=#00f angle=90>ATAR</gradient></b> <i><color=#00f>Toy</color></i>',
     overrides: { fontFamily: 'Albertus MT Std' },
   },
+  {
+    // Emoji the font lacks come from the emoji fallback, inside tagged runs too:
+    // a thumbs up in a bold run, and a red heart typed with its emoji selector.
+    id: 'emoji in tagged runs',
+    text: `HH <b>H${String.fromCodePoint(0x1f44d)}H</b> <color=#f00>${String.fromCodePoint(0x2764, 0xfe0f)}H</color>`,
+  },
 ];
 
 const FONTS = [

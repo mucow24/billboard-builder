@@ -14,6 +14,20 @@ describe('layoutWrappedText', () => {
     expect(lines('alpha beta gamma', 110)).toEqual(['alpha beta ', 'gamma']);
   });
 
+  // Pixi adds letter spacing once per grapheme of a word. A family of joined
+  // emoji is eight UTF-16 units but one grapheme: 80px here, with no spacing.
+  it('counts the letter spacing of a word in graphemes', () => {
+    const family = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467);
+    const spacedLines = (text: string, contentWidth: number) =>
+      layoutWrappedText(createTextItem({ text, letterSpacing: 10 }), contentWidth, (token) => token.length * 10).map(
+        (tokens) => tokens.join(''),
+      );
+
+    // "familyA" is 90px and one spacing, the space 10px, the family 80px: 190px.
+    expect(spacedLines(`${family}A ${family}`, 190)).toEqual([`${family}A ${family}`]);
+    expect(spacedLines(`${family}A ${family}`, 189)).toEqual([`${family}A `, family]);
+  });
+
   // Pixi ends a line after a hyphen or dash inside a word. Without this the
   // canvas showed "Double-" / "click to" / "edit" where two lines were counted.
   it('wraps after a hyphen inside a word, as the canvas does', () => {
@@ -35,6 +49,21 @@ describe('layoutWrappedText', () => {
     expect(layoutWrappedText(createTextItem({ text: 'a- b - c' }), 1000, (token) => token.length)).toEqual([
       ['a-', ' ', 'b', ' ', '-', ' ', 'c'],
     ]);
+  });
+
+  // The canvas is given the text without them (see `drawnText`), so the lines
+  // are measured and drawn without them too.
+  it('lays out the text without emoji presentation selectors', () => {
+    const heart = String.fromCodePoint(0x2764);
+    const selector = String.fromCodePoint(0xfe0f);
+    const measured: string[] = [];
+    const laidOut = layoutWrappedText(createTextItem({ text: `I ${heart}${selector} NY` }), 1000, (token) => {
+      measured.push(token);
+      return token.length;
+    });
+
+    expect(laidOut).toEqual([['I', ' ', heart, ' ', 'NY']]);
+    expect(measured.join('')).not.toContain(selector);
   });
 });
 

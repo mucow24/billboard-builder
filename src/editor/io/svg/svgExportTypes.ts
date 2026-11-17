@@ -33,6 +33,12 @@ export interface OutlineFont {
    * tell (the test fakes) leaves this out, and is drawn one character at a time.
    */
   substitutions?(text: string): TextSubstitutions | null;
+  /**
+   * Whether the font has a glyph for the character `ch` (one code point). A
+   * font that cannot tell (the test fakes) leaves this out, and is taken to
+   * have a glyph for every character.
+   */
+  hasGlyph?(ch: string): boolean;
 }
 
 /** How `OutlineFont.glyphPath` writes a glyph, for the styles the export fakes (see syntheticFontStyle). */
@@ -79,9 +85,24 @@ export interface SyntheticFontStyle {
   italic: boolean;
 }
 
-/** Either the resolved outline font, or why it could not be obtained (drives the block+warn path). */
+/**
+ * The font the canvas draws a text's emoji from where the text's own font has
+ * none (see `fonts/emojiFallback`), and what the browser fakes when it draws
+ * them with it. That is decided apart from the text's own font: the fallback
+ * may need bold faked where the text's own font has a bold file.
+ */
+export interface FallbackOutline {
+  font: OutlineFont;
+  synthetic?: SyntheticFontStyle;
+}
+
+/**
+ * Either the resolved outline font, or why it could not be obtained (drives the
+ * block+warn path). `fallback` is there when the item has characters its own
+ * font lacks and the emoji fallback could be obtained.
+ */
 export type OutlineResult =
-  | { ok: true; font: OutlineFont; synthetic?: SyntheticFontStyle }
+  | { ok: true; font: OutlineFont; synthetic?: SyntheticFontStyle; fallback?: FallbackOutline }
   | { ok: false; reason: OutlineUnavailableReason };
 
 export interface FontOutlineProvider {

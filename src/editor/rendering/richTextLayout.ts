@@ -11,6 +11,7 @@
  * A word that changes style part-way ("un<b>believable</b>") stays in one piece.
  */
 import type { RichTextRun } from '../document/richText';
+import { graphemes } from './graphemes';
 
 export interface RichTextFragment {
   text: string;
@@ -109,10 +110,11 @@ export function layoutRichText(
   letterSpacing: number,
   measure: RichTextMeasure,
 ): RichTextLine[] {
-  // A token's advance: its width, with letter spacing after every character.
-  // A line of tokens is then as wide as their advances less one letter spacing.
+  // A token's advance: its width, with letter spacing after every character
+  // (every grapheme, as Pixi counts them: see `graphemes`). A line of tokens is
+  // then as wide as their advances less one letter spacing.
   const advanceOf = (token: Token): number =>
-    measure(token.text, token.run) + token.text.length * letterSpacing;
+    measure(token.text, token.run) + graphemes(token.text).length * letterSpacing;
 
   const toLine = (tokens: Token[]): RichTextLine => {
     // Neighbouring tokens of one run become one fragment, measured as a whole,
@@ -134,7 +136,7 @@ export function layoutRichText(
     const fragments: RichTextFragment[] = [];
     let x = 0;
     for (const { text, run } of merged) {
-      const width = measure(text, run) + Math.max(text.length - 1, 0) * letterSpacing;
+      const width = measure(text, run) + Math.max(graphemes(text).length - 1, 0) * letterSpacing;
       fragments.push({ text, run, x, width });
       x += width + letterSpacing;
     }

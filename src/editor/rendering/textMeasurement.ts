@@ -1,3 +1,5 @@
+import { drawnText } from '../fonts/emojiFallback';
+import { graphemes } from './graphemes';
 import { getRenderableCanvasFontDeclaration } from '../fonts/fontStyles';
 import type { TextCanvasItem } from '../document/documentTypes';
 import { parseRichText } from '../document/richText';
@@ -40,7 +42,7 @@ function splitAfterHyphens(token: string): string[] {
 }
 
 /**
- * Word-wrap `item.text` into lines (each a list of tokens) using the same
+ * Word-wrap `item.text`, as it is drawn (`drawnText`), into lines (each a list of tokens) using the same
  * tokenization and wrap rule Pixi renders with. `measure` returns a token's width
  * EXCLUDING letterSpacing; this function adds letterSpacing internally so callers
  * (height measurement here, glyph positioning in the SVG exporter) stay in lockstep
@@ -51,11 +53,12 @@ export function layoutWrappedText(
   contentWidth: number,
   measure: (text: string) => number,
 ): string[][] {
+  // Pixi adds letter spacing once per grapheme (see `graphemes`).
   const measureToken = (token: string): number =>
-    measure(token) + Math.max(token.length - 1, 0) * item.letterSpacing;
+    measure(token) + Math.max(graphemes(token).length - 1, 0) * item.letterSpacing;
 
   const lines: string[][] = [];
-  for (const paragraph of item.text.split('\n')) {
+  for (const paragraph of drawnText(item.text).split('\n')) {
     if (paragraph.length === 0) {
       lines.push([]);
       continue;
@@ -102,8 +105,23 @@ export function richTextRunItem(item: TextCanvasItem, run: RichTextRun): TextCan
 }
 
 /**
- * Lay out the rich text `runs` of `item` in a box `contentWidth` wide, measuring
- * with `context`: the 2D canvas the text is rasterised with.
+ * Rich text runs with their text as the canvas is given it (`drawnText`), as
+ * plain text is: everything that lays out, measures or draws the runs takes
+ * them from here. A run left with no text is dropped.
+ */
+export function drawnRichTextRuns(runs: RichTextRun[]): RichTextRun[] {
+  return runs
+    .map((run) => {
+      const text = drawnText(run.text);
+      return text === run.text ? run : { ...run, text };
+    })
+    .filter((run) => run.text.length > 0);
+}
+
+/**
+ * Lay out the rich text `runs` of `item`, as they are drawn (`drawnRichTextRuns`),
+ * in a box `contentWidth` wide, measuring with `context`: the 2D canvas the text
+ * is rasterised with.
  */
 export function layoutRichTextRuns(
   item: TextCanvasItem,
@@ -112,7 +130,7 @@ export function layoutRichTextRuns(
   context: CanvasRenderingContext2D,
 ): RichTextLine[] {
   const fonts = new Map<RichTextRun, string>();
-  return layoutRichText(runs, contentWidth, item.letterSpacing, (text, run) => {
+  return layoutRichText(drawnRichTextRuns(runs), contentWidth, item.letterSpacing, (text, run) => {
     let font = fonts.get(run);
     if (font === undefined) {
       font = getRenderableCanvasFontDeclaration(richTextRunItem(item, run));
@@ -131,7 +149,7 @@ export function measureWordWrappedTextHeight(
   const verticalPadding = item.padding.top + item.padding.bottom;
   const fallbackLineHeight = Math.ceil(item.fontSize * item.lineHeight);
   const rich = parseRichText(item.text);
-  const paragraphs = rich.plain.split('\n');
+  const paragraphs = drawnText(rich.plain).split('\n');
   const isJsdom =
     typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
   const context =

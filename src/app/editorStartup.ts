@@ -5,6 +5,7 @@ import type {
   UploadedFont,
 } from '../editor/document/documentTypes';
 import type { FontLoad, FontLoadOptions } from '../editor/fonts';
+import { EMOJI_FALLBACK_FAMILY, hasEmojiCharacter } from '../editor/fonts/emojiFallback';
 
 export interface EditorStartupDeps {
   /** Reads the autosaved canvas; null when there is none. */
@@ -27,15 +28,19 @@ export interface EditorStartupDeps {
   isCancelled: () => boolean;
 }
 
-/** The font families the text of a document is set in. */
+/**
+ * The font families the text of a document is drawn with: the ones it is set
+ * in, and the emoji fallback when any of it has emoji.
+ */
 function collectTextFontFamilies(document: ProjectDocument): string[] {
-  return [
-    ...new Set(
-      document.nodes
-        .flatMap(collectLeafItems)
-        .flatMap((item) => (item.kind === 'text' ? [item.fontFamily] : [])),
-    ),
-  ];
+  const textItems = document.nodes
+    .flatMap(collectLeafItems)
+    .flatMap((item) => (item.kind === 'text' ? [item] : []));
+  const families = new Set(textItems.map((item) => item.fontFamily));
+  if (textItems.some((item) => hasEmojiCharacter(item.text))) {
+    families.add(EMOJI_FALLBACK_FAMILY);
+  }
+  return [...families];
 }
 
 /**
@@ -44,7 +49,8 @@ function collectTextFontFamilies(document: ProjectDocument): string[] {
  * 1. Read the saved canvas.
  * 2. At the same time:
  *    - Register the fonts it is drawn with: the bundled files of its text's
- *      families, loaded before any other bundled font, and its uploaded fonts
+ *      families (the emoji fallback's too, where the text has emoji), loaded
+ *      before any other bundled font, and its uploaded fonts
  *      from storage. Text drawn before its font is registered keeps its fallback
  *      look, so the canvas waits for these fonts, and only for these.
  *    - Read the document library and which of its documents the saved canvas

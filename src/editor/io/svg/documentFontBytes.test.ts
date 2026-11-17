@@ -7,7 +7,7 @@ import type {
   TextCanvasItem,
   UploadedFont,
 } from '../../document/documentTypes';
-import { createDocumentFontLoader } from './documentFontBytes';
+import { createDocumentFontLoader, createFallbackFontLoader } from './documentFontBytes';
 
 function docWithFonts(fonts: DocumentFontReference[]): ProjectDocument {
   return { ...createDefaultProjectDocument(), fonts };
@@ -342,5 +342,56 @@ describe('createDocumentFontLoader', () => {
       loadUploadedBytes: vi.fn(),
     });
     expect(await load(textItem('Audiowide'))).toEqual({ kind: 'bundled', bytes: null });
+  });
+});
+
+describe('createFallbackFontLoader', () => {
+  const notoEmoji = registered('Noto Emoji', 'NotoEmoji-Regular.ttf', '400', 'normal');
+
+  it('loads the registered emoji fallback file, whatever family the item is set in', async () => {
+    const loaders = trackingLoaders();
+    const load = createFallbackFontLoader([...barlow, notoEmoji], loaders);
+
+    expect(await load(textItem('Barlow'))).toEqual({
+      kind: 'bundled',
+      bytes: loaders.bytesFor('NotoEmoji-Regular.ttf'),
+    });
+    expect(loaders.loadBundledBytes).toHaveBeenCalledWith('NotoEmoji-Regular.ttf');
+  });
+
+  // Noto Emoji has one regular file: the browser fakes bold and italic for it
+  // even where the item's own family has real ones.
+  it('says what the browser fakes for the emoji when the text is bold or italic', async () => {
+    const load = createFallbackFontLoader([...barlow, notoEmoji], trackingLoaders());
+
+    expect(await load(textItem('Barlow', 'bold', 'italic'))).toMatchObject({
+      synthetic: { bold: true, italic: true },
+    });
+  });
+
+  it('loads an uploaded file of the family that overrides the bundled one', async () => {
+    const uploaded = registered('Noto Emoji', 'MyEmoji.ttf', '400', 'normal', 'uploaded');
+    const loaders = trackingLoaders();
+    const load = createFallbackFontLoader([notoEmoji, uploaded], loaders);
+
+    expect(await load(textItem('Barlow'))).toEqual({ kind: 'uploaded', bytes: loaders.bytesFor('MyEmoji.ttf') });
+  });
+
+  it('has nothing when the fallback is not registered, as the canvas then draws from a system font', async () => {
+    const loaders = trackingLoaders();
+    const load = createFallbackFontLoader(barlow, loaders);
+
+    expect(await load(textItem('Barlow'))).toEqual({ kind: 'system', bytes: null });
+    expect(loaders.loadBundledBytes).not.toHaveBeenCalled();
+  });
+
+  it('degrades to null bytes (never throws) when a loader fails', async () => {
+    const load = createFallbackFontLoader([notoEmoji], {
+      loadBundledBytes: vi.fn(async () => {
+        throw new Error('network');
+      }),
+      loadUploadedBytes: vi.fn(),
+    });
+    expect(await load(textItem('Barlow'))).toEqual({ kind: 'bundled', bytes: null });
   });
 });
