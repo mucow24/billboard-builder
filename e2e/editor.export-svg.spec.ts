@@ -629,39 +629,72 @@ test.describe('SVG export', () => {
     expect(across.overlap).toBeGreaterThan(0.7);
   });
 
-  // Regression: the exporter laid letter-spaced text out on fewer lines than the
-  // canvas. Pixi wraps a line once it is wider than the box as drawn, letter
-  // spacing between all its characters included; the layout counted the spacing
-  // inside each word only and so fitted a line up to one spacing per word or
-  // space too wide. "Wrap these words" in Albertus at 48px with letter spacing
-  // 10 is 511px wide as drawn: the canvas wraps it in any narrower box, the
-  // export kept one line down to 471px. Where Pixi wraps shows only in a real
-  // browser, and the reference is the canvas itself (Export > PNG).
-  test('wraps letter-spaced text where the canvas does', async ({ page }) => {
+  // Regression: the exporter, and the text height a layer is measured by, broke
+  // some texts into other lines than the canvas, by other rules than Pixi's word
+  // wrap:
+  //  - Letter spacing. Pixi wraps a line once it is wider than the box as drawn,
+  //    letter spacing between all its characters included. The layout counted
+  //    the spacing inside each word only. "Wrap these words" in Albertus at 48px
+  //    with letter spacing 10 is 511px wide as drawn; the export kept it on one
+  //    line down to 471px.
+  //  - Ink. Pixi takes a word to be as wide as its ink where that reaches past
+  //    its advance. Each "Jazz" in Instrument Serif Italic at 120px advances
+  //    178px and inks 200px; the export kept "Jazz Jazz" on one line down to
+  //    376px, the canvas only from 420px.
+  //  - No-break spaces. Pixi never breaks a line at one; the layout did.
+  // Where Pixi wraps shows only in a real browser, and the reference is the
+  // canvas itself (Export > PNG). Lines are compared one by one, each across
+  // more than its box, where an unwrapped line ends.
+  test('wraps text where the canvas does', async ({ page }) => {
     await openFreshEditor(page);
     // The bundled fonts have to be in first: see the kerning test above.
     await waitForBundledFonts(page);
 
-    const fontSize = 48;
-    // The text fixture's line height is 1.1 x the font size.
-    const lineHeight = fontSize * 1.1;
-    const box = { x: 20, y: 30, width: 490, height: Math.ceil(2 * lineHeight) };
-    const doc = {
-      ...createProjectDocument([
-        createTextFixture({
-          ...box,
-          id: 'letter-spaced',
-          name: 'letter-spaced',
-          text: 'Wrap these words',
-          fontFamily: 'Albertus MT Std',
-          fontSize,
-          letterSpacing: 10,
-          zIndex: 1,
+    const albertus = { fontFamily: 'Albertus MT Std', fontSize: 48 };
+    const noBreakSpace = String.fromCharCode(0xa0);
+    const layers = [
+      { id: 'letter-spaced', ...albertus, text: 'Wrap these words', letterSpacing: 10, y: 30, width: 490, lines: 2 },
+      // "alpha beta" alone is wider than the box; the canvas lets it overflow.
+      { id: 'no-break-space', ...albertus, text: `alpha${noBreakSpace}beta gamma`, y: 170, width: 160, lines: 2 },
+      {
+        id: 'leaning',
+        fontFamily: 'Instrument Serif',
+        fontStyle: 'italic',
+        fontSize: 120,
+        text: 'Jazz Jazz',
+        y: 320,
+        width: 398,
+        lines: 2,
+      },
+    ];
+    const prepared = layers.map(({ lines, ...layer }, index) => {
+      // The text fixture's line height is 1.1 x the font size.
+      const lineHeight = layer.fontSize * 1.1;
+      return {
+        fixture: createTextFixture({
+          ...layer,
+          name: layer.id,
+          x: 20,
+          height: Math.ceil(lines * lineHeight),
+          zIndex: index + 1,
         }),
-      ]),
-      fonts: [{ family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' }],
+        lineBoxes: Array.from({ length: lines }, (_, line) => ({
+          name: `${layer.id}, line ${line + 1}`,
+          x: 20,
+          y: layer.y + line * lineHeight,
+          width: 900,
+          height: lineHeight,
+        })),
+      };
+    });
+    const doc = {
+      ...createProjectDocument(prepared.map(({ fixture }) => fixture)),
+      fonts: [
+        { family: 'Albertus MT Std', sourceName: 'Albertus MT Std Regular.otf', kind: 'bundled' },
+        { family: 'Instrument Serif', sourceName: 'InstrumentSerif-Italic.ttf', kind: 'bundled' },
+      ],
     };
-    await uploadProject(page, doc, 'letter-spaced-text.json');
+    await uploadProject(page, doc, 'wrapped-text.json');
 
     const svg = await readDownloadedSvg(
       await captureDownload(page, async () => {
@@ -673,24 +706,17 @@ test.describe('SVG export', () => {
     });
     const png = readFileSync(await pngDownload.path()).toString('base64');
 
-    // Each line compared across more than the box, where an unwrapped line ends.
-    const lineBoxes = [0, 1].map((line) => ({
-      name: `line ${line + 1}`,
-      x: box.x,
-      y: box.y + line * lineHeight,
-      width: 700,
-      height: lineHeight,
-    }));
-    const [inBox, ...lines] = await compareInkWithCanvas(page, svg, png, doc.canvas.width, [box, ...lineBoxes]);
+    const lineBoxes = prepared.flatMap((layer) => layer.lineBoxes);
+    const compared = await compareInkWithCanvas(page, svg, png, doc.canvas.width, lineBoxes);
 
-    expect(lines).toHaveLength(lineBoxes.length);
-    lines.forEach((line, index) => {
+    expect(compared).toHaveLength(lineBoxes.length);
+    compared.forEach((line, index) => {
       const { name } = lineBoxes[index];
-      // The canvas wrapped the text: it drew both lines, inside the box.
+      // The canvas drew a line here, so it wrapped the text where this test expects.
       expect(line.canvas.pixels, name).toBeGreaterThan(300);
-      expect(line.canvas.right, name).toBeLessThan(inBox.boxRight);
-      // The export drew the same lines: "Wrap these" and "words". Before the fix
-      // its first line ran on to "words", and its second was empty.
+      // The export drew the same line. Before the fix, the first line of the
+      // letter-spaced and the leaning layer ran on to the last word, leaving the
+      // second empty, and the no-break space ended the first line at "alpha".
       expect(Math.abs(line.exported.left - line.canvas.left), name).toBeLessThanOrEqual(2);
       expect(Math.abs(line.exported.right - line.canvas.right), name).toBeLessThanOrEqual(2);
       expect(line.overlap, name).toBeGreaterThan(0.7);

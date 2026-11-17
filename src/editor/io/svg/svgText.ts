@@ -1,7 +1,7 @@
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { graphemeIndexOfCodePoints, graphemes } from '../../rendering/graphemes';
-import { layoutWrappedText } from '../../rendering/textMeasurement';
+import { BREAKING_SPACES, layoutWrappedText } from '../../rendering/textMeasurement';
 import { toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
 import { glyphsPath, lineGlyphs } from './svgTextGlyphs';
@@ -58,8 +58,10 @@ export function textSvg(
   const box = getRenderBox(item);
   const contentWidth = Math.max(1, box.width - item.padding.left - item.padding.right);
   const measure = (text: string) => deps.measurer.measureWidth(item, text);
+  // Pixi wraps by the larger of a word's advance and its ink (see `layoutWrappedText`).
+  const wrapWidth = (text: string) => Math.max(measure(text), deps.measurer.measureInkWidth?.(item, text) ?? 0);
 
-  const lines = layoutWrappedText(item, contentWidth, measure).map((tokens) =>
+  const lines = layoutWrappedText(item, contentWidth, wrapWidth).map((tokens) =>
     drawnLine(tokens.join(''), item, deps.measurer),
   );
   const lineHeight = item.fontSize * item.lineHeight;
@@ -238,29 +240,6 @@ interface DrawnLine {
   /** The width the canvas aligns the line by. */
   width: number;
 }
-
-/**
- * The spaces Pixi takes off the end of a line, by character code: the characters
- * it breaks lines at (`BREAKING_SPACES` in pixi.js
- * `scene/text/canvas/utils/textTokenization`). No-break spaces (U+00A0, U+2007,
- * U+202F) are not among them, so they stay on the line and keep their width.
- */
-const BREAKING_SPACES = new Set([
-  0x0009, // tab
-  0x0020, // space
-  0x2000, // en quad
-  0x2001, // em quad
-  0x2002, // en space
-  0x2003, // em space
-  0x2004, // three-per-em space
-  0x2005, // four-per-em space
-  0x2006, // six-per-em space
-  0x2008, // punctuation space
-  0x2009, // thin space
-  0x200a, // hair space
-  0x205f, // medium mathematical space
-  0x3000, // ideographic space
-]);
 
 function withoutTrailingSpaces(text: string): string {
   let end = text.length;

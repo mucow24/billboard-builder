@@ -1,7 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { layoutWrappedText, measureWordWrappedTextHeight } from './textMeasurement';
+import { inkWidthOf, layoutWrappedText, measureWordWrappedTextHeight } from './textMeasurement';
 import { createTextItem } from '../document/documentDefaults';
+
+// Mirrors Pixi's CanvasTextMetrics._measureText: `boundsWidth =
+// actualBoundingBoxRight + actualBoundingBoxLeft`, each counted as 0 when the
+// browser does not report it. Pixi wraps and aligns by the larger of this and
+// the advance width, so the layout and the SVG exporter need the same number.
+describe('inkWidthOf', () => {
+  it('adds how far the ink reaches left of the pen to how far it reaches right', () => {
+    // A first glyph that starts 3px before the pen, ink ending 50px after it.
+    expect(inkWidthOf({ actualBoundingBoxLeft: 3, actualBoundingBoxRight: 50 })).toBe(53);
+  });
+
+  it('leaves out the gap when the ink starts right of the pen', () => {
+    // An ordinary left side bearing: the ink starts 2px after the pen.
+    expect(inkWidthOf({ actualBoundingBoxLeft: -2, actualBoundingBoxRight: 48 })).toBe(46);
+  });
+
+  it('counts a bound the browser does not report as zero', () => {
+    const metrics = {} as Pick<TextMetrics, 'actualBoundingBoxLeft' | 'actualBoundingBoxRight'>;
+    expect(inkWidthOf(metrics)).toBe(0);
+    expect(inkWidthOf({ ...metrics, actualBoundingBoxRight: 48 })).toBe(48);
+  });
+});
 
 describe('layoutWrappedText', () => {
   // 10px a character, so widths can be read off the text.
@@ -68,6 +90,23 @@ describe('layoutWrappedText', () => {
     const dashes = [0x2010, 0x2013, 0x2014, 0x00ad].map((code) => String.fromCharCode(code));
     for (const dash of dashes) {
       expect(lines(`alpha${dash}beta`, 70)).toEqual([`alpha${dash}`, 'beta']);
+    }
+  });
+
+  // A no-break space is no place to break a line to Pixi: it holds the words on
+  // either side together, even where they are wider than the box together.
+  // The layout used to break at every character JavaScript calls white space.
+  it('keeps words joined by a no-break space on one line, as the canvas does', () => {
+    const noBreakSpaces = [0x00a0, 0x2007, 0x202f].map((code) => String.fromCharCode(code));
+    for (const space of noBreakSpaces) {
+      expect(lines(`alpha${space}beta gamma`, 80)).toEqual([`alpha${space}beta `, 'gamma']);
+    }
+  });
+
+  it('breaks at every space Pixi breaks at', () => {
+    const spaces = [0x0009, 0x2002, 0x2009, 0x200a, 0x3000].map((code) => String.fromCharCode(code));
+    for (const space of spaces) {
+      expect(lines(`alpha${space}beta`, 70)).toEqual([`alpha${space}`, 'beta']);
     }
   });
 
@@ -245,4 +284,40 @@ describe('text measurement', () => {
     expect(paddedHeight).toBe(baseHeight - 30);
   });
 
+  // Pixi takes a word to be as wide as its ink where that reaches past its
+  // advance, as an italic's last letter does. Here "leaf" advances 40px and its
+  // ink is 46px wide: "leaf leaf" is 102px wide to Pixi, 90px by advance.
+  it('wraps a word by its ink where that is wider than its advance', () => {
+    const measureText = (text: string) => ({
+      width: text.length * 10,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: text.length * 10 + (text.endsWith('f') ? 6 : 0),
+    });
+    const item = createTextItem({
+      text: 'leaf leaf',
+      fontSize: 10,
+      lineHeight: 1,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+
+    expect(withCanvasMeasurement(measureText, () => measureWordWrappedTextHeight(item, 102))).toBe(10);
+    expect(withCanvasMeasurement(measureText, () => measureWordWrappedTextHeight(item, 101))).toBe(20);
+  });
 });
+
+/** Runs `run` as in a browser whose canvas measures text with `measureText`. */
+function withCanvasMeasurement<T>(measureText: (text: string) => Partial<TextMetrics>, run: () => T): T {
+  const originalNavigator = globalThis.navigator;
+  const originalCreateElement = document.createElement.bind(document);
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Mozilla/5.0' } });
+  const createElement = vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) =>
+    tagName === 'canvas'
+      ? ({ getContext: () => ({ font: '', measureText }) } as unknown as HTMLCanvasElement)
+      : originalCreateElement(tagName)) as typeof document.createElement);
+  try {
+    return run();
+  } finally {
+    createElement.mockRestore();
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: originalNavigator });
+  }
+}

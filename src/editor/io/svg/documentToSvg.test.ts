@@ -655,6 +655,15 @@ describe('documentToSvg — text line alignment', () => {
       ]);
     });
 
+    // Pixi wraps by the same width: "ABf ABf" advances 70px, but each "ABf" has
+    // 34px of ink, so the line is 78px wide to Pixi.
+    it('wraps a line by the ink of its words where that is wider than their advance', () => {
+      const lineCount = (width: number) =>
+        pensByLine({ text: 'ABf ABf', width, padding: noPadding }, leaningMeasurer).length;
+      expect(lineCount(78)).toBe(1);
+      expect(lineCount(77)).toBe(2);
+    });
+
     it('measures the ink of the line without its trailing spaces', () => {
       expect(pensByLine({ text: 'ABf  ', align: 'right' }, leaningMeasurer)).toEqual([[286, 296, 306]]);
     });
