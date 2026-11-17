@@ -642,6 +642,8 @@ test.describe('SVG export', () => {
   //    178px and inks 200px; the export kept "Jazz Jazz" on one line down to
   //    376px, the canvas only from 420px.
   //  - No-break spaces. Pixi never breaks a line at one; the layout did.
+  //  - Carriage returns. Pixi starts a new line at one, as at a line feed; the
+  //    layout broke at line feeds only and ran "alpha" and "beta" together.
   // Where Pixi wraps shows only in a real browser, and the reference is the
   // canvas itself (Export > PNG). Lines are compared one by one, each across
   // more than its box, where an unwrapped line ends.
@@ -652,6 +654,7 @@ test.describe('SVG export', () => {
 
     const albertus = { fontFamily: 'Albertus MT Std', fontSize: 48 };
     const noBreakSpace = String.fromCharCode(0xa0);
+    const carriageReturn = String.fromCharCode(13);
     const layers = [
       { id: 'letter-spaced', ...albertus, text: 'Wrap these words', letterSpacing: 10, y: 30, width: 490, lines: 2 },
       // "alpha beta" alone is wider than the box; the canvas lets it overflow.
@@ -666,6 +669,7 @@ test.describe('SVG export', () => {
         width: 398,
         lines: 2,
       },
+      { id: 'carriage-return', ...albertus, text: `alpha${carriageReturn}beta`, y: 620, width: 490, lines: 2 },
     ];
     const prepared = layers.map(({ lines, ...layer }, index) => {
       // The text fixture's line height is 1.1 x the font size.
@@ -715,8 +719,9 @@ test.describe('SVG export', () => {
       // The canvas drew a line here, so it wrapped the text where this test expects.
       expect(line.canvas.pixels, name).toBeGreaterThan(300);
       // The export drew the same line. Before the fix, the first line of the
-      // letter-spaced and the leaning layer ran on to the last word, leaving the
-      // second empty, and the no-break space ended the first line at "alpha".
+      // letter-spaced, the leaning and the carriage-return layer ran on to the
+      // last word, leaving the second empty, and the no-break space ended the
+      // first line at "alpha".
       expect(Math.abs(line.exported.left - line.canvas.left), name).toBeLessThanOrEqual(2);
       expect(Math.abs(line.exported.right - line.canvas.right), name).toBeLessThanOrEqual(2);
       expect(line.overlap, name).toBeGreaterThan(0.7);

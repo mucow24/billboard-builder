@@ -560,6 +560,36 @@ describe('documentToSvg — text line alignment', () => {
       ]);
     });
 
+    // Pixi breaks a line at a carriage return as at a line feed, and at the two
+    // together once. The export broke at line feeds only, so it ran "AB" and "CD"
+    // into one line after a lone carriage return, and measured the carriage
+    // return of a CRLF break as part of the line, which put "AB" 10px short of
+    // the box edge here.
+    it('breaks lines at carriage returns, and keeps them off the line', () => {
+      const CR = String.fromCharCode(13);
+      const LF = String.fromCharCode(10);
+      const twoLines = [
+        [300, 310],
+        [300, 310],
+      ];
+      expect(pensByLine({ text: `AB${CR}CD`, align: 'right' })).toEqual(twoLines);
+      expect(pensByLine({ text: `AB${CR}${LF}CD`, align: 'right' })).toEqual(twoLines);
+    });
+
+    // A line break at the end of the text starts no line on the canvas, so text
+    // that ends in one sits where it sits without it. Counting an empty last line
+    // put it half a line higher when centred and a line higher at the bottom.
+    it('places text that ends in a line break where it places the text without it', () => {
+      const LF = String.fromCharCode(10);
+      const baselines = (text: string, verticalAlign: 'middle' | 'bottom') =>
+        glyphPositions(svgOf([createTextItem({ text, verticalAlign, height: 300 })])).map(
+          (position) => position.baselineY,
+        );
+      for (const verticalAlign of ['middle', 'bottom'] as const) {
+        expect(baselines(`AB${LF}`, verticalAlign)).toEqual(baselines('AB', verticalAlign));
+      }
+    });
+
     it('keeps the spaces a line starts with as part of the line', () => {
       // "  AB" is 40px wide and its letters are the last two characters.
       expect(pensByLine({ text: '  AB', align: 'right' })).toEqual([[300, 310]]);

@@ -110,6 +110,37 @@ describe('layoutWrappedText', () => {
     }
   });
 
+  // Pixi starts a new line at a carriage return as at a line feed, and takes a
+  // carriage return followed by a line feed as one break. The layout used to
+  // break at line feeds only, so a lone carriage return stayed inside the line.
+  it('starts a new line at a carriage return, as the canvas does', () => {
+    const CR = String.fromCharCode(13);
+    const LF = String.fromCharCode(10);
+    expect(lines(`alpha${CR}beta`, 1000)).toEqual(['alpha', 'beta']);
+    expect(lines(`alpha${CR}${LF}beta`, 1000)).toEqual(['alpha', 'beta']);
+    expect(lines(`alpha${CR}${CR}beta`, 1000)).toEqual(['alpha', '', 'beta']);
+    expect(lines(`alpha${LF}${CR}beta`, 1000)).toEqual(['alpha', '', 'beta']);
+  });
+
+  // Pixi leaves out a last line with nothing on it but spaces, so a line break
+  // at the end of a text starts no line. One in the middle still does.
+  it('starts no line after a line break at the end of the text, as the canvas does', () => {
+    const CR = String.fromCharCode(13);
+    const LF = String.fromCharCode(10);
+    expect(lines(`alpha${LF}`, 1000)).toEqual(['alpha']);
+    expect(lines(`alpha${CR}`, 1000)).toEqual(['alpha']);
+    expect(lines(`alpha${CR}${LF}`, 1000)).toEqual(['alpha']);
+    expect(lines(`alpha${LF}   `, 1000)).toEqual(['alpha']);
+    expect(lines(`alpha${LF}${LF}`, 1000)).toEqual(['alpha', '']);
+    expect(lines(`alpha${LF}${LF}beta`, 1000)).toEqual(['alpha', '', 'beta']);
+  });
+
+  it('keeps one line for a text with nothing to draw', () => {
+    expect(lines('', 1000)).toEqual(['']);
+    expect(lines(String.fromCharCode(10), 1000)).toEqual(['']);
+    expect(lines('   ', 1000)).toEqual(['   ']);
+  });
+
   it('does not split at a hyphen that ends a word or stands alone', () => {
     expect(layoutWrappedText(createTextItem({ text: 'a- b - c' }), 1000, (token) => token.length)).toEqual([
       ['a-', ' ', 'b', ' ', '-', ' ', 'c'],
@@ -143,6 +174,20 @@ describe('text measurement', () => {
     const height = measureWordWrappedTextHeight(item, 120);
 
     expect(height).toBeGreaterThan(item.height);
+  });
+
+  it('counts a line for every line break in the fallback estimate, carriage returns included', () => {
+    const CR = String.fromCharCode(13);
+    const LF = String.fromCharCode(10);
+    const heightOf = (text: string) =>
+      measureWordWrappedTextHeight(
+        createTextItem({ text, height: 1, fontSize: 10, lineHeight: 1, padding: { top: 0, right: 0, bottom: 0, left: 0 } }),
+        320,
+      );
+
+    expect(heightOf(`a${CR}b`)).toBe(20);
+    expect(heightOf(`a${CR}${LF}b`)).toBe(20);
+    expect(heightOf(`a${CR}${CR}b`)).toBe(30);
   });
 
   it('uses canvas measurement when a browser-like canvas context is available', () => {
@@ -302,6 +347,23 @@ describe('text measurement', () => {
 
     expect(withCanvasMeasurement(measureText, () => measureWordWrappedTextHeight(item, 102))).toBe(10);
     expect(withCanvasMeasurement(measureText, () => measureWordWrappedTextHeight(item, 101))).toBe(20);
+  });
+
+  // The canvas draws no line after a line break that ends the text, so the
+  // height that places middle- and bottom-aligned text does not count one.
+  it('counts no line after a line break at the end of the text', () => {
+    const measureText = (text: string) => ({ width: text.length * 10 });
+    const heightOf = (text: string) =>
+      withCanvasMeasurement(measureText, () =>
+        measureWordWrappedTextHeight(
+          createTextItem({ text, fontSize: 10, lineHeight: 1, padding: { top: 0, right: 0, bottom: 0, left: 0 } }),
+          320,
+        ),
+      );
+
+    expect(heightOf(`alpha${String.fromCharCode(10)}`)).toBe(10);
+    expect(heightOf(`alpha${String.fromCharCode(13)}`)).toBe(10);
+    expect(heightOf(`alpha${String.fromCharCode(10)}beta`)).toBe(20);
   });
 });
 

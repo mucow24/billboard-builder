@@ -8,6 +8,16 @@ function getTextContentWidth(item: TextCanvasItem, width: number): number {
 }
 
 /**
+ * The paragraphs of an item's text, as it is drawn (`drawnText`), split where
+ * Pixi starts a new line (`tokenize` and `NEWLINE_SPLIT_REGEX` in pixi.js
+ * `scene/text/canvas/utils/textTokenization`): at a line feed, at a carriage
+ * return, and at a carriage return followed by a line feed, which is one break.
+ */
+function paragraphsOf(text: string): string[] {
+  return drawnText(text).split(/\r\n|\r|\n/);
+}
+
+/**
  * The spaces Pixi breaks lines at, by character code (`BREAKING_SPACES` in
  * pixi.js `scene/text/canvas/utils/textTokenization`); it also takes them off
  * the end of every line. No-break spaces (U+00A0, U+2007, U+202F) are not among
@@ -113,7 +123,7 @@ export function layoutWrappedText(
   const maxLineWidth = contentWidth + item.letterSpacing;
 
   const lines: string[][] = [];
-  for (const paragraph of drawnText(item.text).split('\n')) {
+  for (const paragraph of paragraphsOf(item.text)) {
     if (paragraph.length === 0) {
       lines.push([]);
       continue;
@@ -143,6 +153,16 @@ export function layoutWrappedText(
     if (hasContent) lines.push(current);
   }
 
+  // Pixi keeps the last line only when there is more on it than breaking spaces
+  // (`wordWrap` pushes it only if `trimRight(line)` is not empty), so a text that
+  // ends in a line break has no empty line after it. Counting one moved middle-
+  // and bottom-aligned text up by half a line and a line. A text with nothing
+  // else still has its one line.
+  const last = lines[lines.length - 1];
+  if (lines.length > 1 && last.every((token) => BREAKING_SPACES.has(token.charCodeAt(0)))) {
+    lines.pop();
+  }
+
   return lines;
 }
 
@@ -153,7 +173,7 @@ export function measureWordWrappedTextHeight(
   const safeWidth = getTextContentWidth(item, width);
   const verticalPadding = item.padding.top + item.padding.bottom;
   const fallbackLineHeight = Math.ceil(item.fontSize * item.lineHeight);
-  const paragraphs = drawnText(item.text).split('\n');
+  const paragraphs = paragraphsOf(item.text);
   const isJsdom =
     typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent);
   const context =
