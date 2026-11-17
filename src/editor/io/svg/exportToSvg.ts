@@ -1,6 +1,8 @@
 import type { ProjectDocument, TextCanvasItem } from '../../document/documentTypes';
+import { parseRichText } from '../../document/richText';
 import { isCanvasItemNode, visitNodes } from '../../document/sceneGraph';
 import { drawnText, isInEmojiFallbackRange } from '../../fonts/emojiFallback';
+import { richTextRunItem } from '../../rendering/textMeasurement';
 import { documentToSvg } from './documentToSvg';
 import { emojiFallbackOutline, hasGlyphsFor } from './svgTextGlyphs';
 import { fontVariantKey, resolveOutline, type FontKind } from './fontOutlineProvider';
@@ -79,10 +81,18 @@ export async function exportToSvg(doc: ProjectDocument, deps: ExportToSvgDeps): 
   });
 }
 
+/**
+ * Every text item, and for one with tags (see `document/richText`) the item in
+ * the style of each of its runs, with that run's text: a bold run needs the
+ * family's bold file, and the emoji fallback where its own text calls for it.
+ */
 function collectTextItems(doc: ProjectDocument): TextCanvasItem[] {
   const items: TextCanvasItem[] = [];
   visitNodes(doc.nodes, (node) => {
-    if (isCanvasItemNode(node) && node.kind === 'text') items.push(node);
+    if (!isCanvasItemNode(node) || node.kind !== 'text') return;
+    const rich = parseRichText(node.text);
+    if (!rich.hasMarkup) items.push(node);
+    else items.push(...rich.runs.map((run) => ({ ...richTextRunItem(node, run), text: run.text })));
   });
   return items;
 }
