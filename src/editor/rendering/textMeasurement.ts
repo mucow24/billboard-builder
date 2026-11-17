@@ -123,13 +123,26 @@ export interface TextWidths {
   ink: number;
 }
 
+/** What `wrapLikePixi` returns. */
+export interface PixiWrap {
+  /** The lines Pixi draws, each a list of tokens. */
+  lines: string[][];
+  /**
+   * The tokens of the last paragraph when the text has a line break before it,
+   * the paragraph has nothing on it but spaces, and Pixi therefore drew no line
+   * for it (it drops such a last line); otherwise null.
+   */
+  blankLastParagraph: string[] | null;
+}
+
 /**
  * Break `item.text`, as it is drawn (`drawnText`), into the lines the canvas
  * draws, each a list of tokens. This is a port of Pixi's `wordWrap` (pixi.js
  * `scene/text/canvas/utils/wordWrap`) for the style `PixiItemLayer` draws text
  * with: `whiteSpace: 'pre'` and no `breakWords`. The comparison test in
  * `textMeasurement.test.ts` runs both on the same texts and expects the same
- * lines; keep them in step on a Pixi upgrade or a change of that style.
+ * lines; keep them in step on a Pixi upgrade or a change of that style. The
+ * app lays text out with `layoutWrappedText`, which builds on this.
  *
  * `measure` gives the advance and the ink width of a token, letter spacing left
  * out. As in `CanvasTextMetrics._measureText`, a token takes up the larger of
@@ -142,11 +155,11 @@ export interface TextWidths {
  * and draws it, and so must callers), except one that would have run past the
  * box: Pixi drops those, as it drops the spaces a wrapped line would start with.
  */
-export function layoutWrappedText(
+export function wrapLikePixi(
   item: TextCanvasItem,
   contentWidth: number,
   measure: (text: string) => TextWidths,
-): string[][] {
+): PixiWrap {
   const { letterSpacing } = item;
   const tokenWidths = new Map<string, number>();
   const widthOf = (token: string): number => {
@@ -169,6 +182,10 @@ export function layoutWrappedText(
   // Under `whiteSpace: 'pre'` a paragraph keeps the spaces it starts with; a
   // line that wrapping starts does not.
   let canPrependSpaces = true;
+  // For `blankLastParagraph`: whether a line break came before the paragraph
+  // being laid out, and whether wrapping has ended a line inside it.
+  let afterLineBreak = false;
+  let paragraphHasLine = false;
   const endLine = () => {
     lines.push(line);
     line = [];
@@ -179,6 +196,8 @@ export function layoutWrappedText(
     if (isNewline(token)) {
       endLine();
       canPrependSpaces = true;
+      afterLineBreak = true;
+      paragraphHasLine = false;
       continue;
     }
 
@@ -189,12 +208,14 @@ export function layoutWrappedText(
       if (line.length > 0) endLine();
       lines.push([token]);
       canPrependSpaces = false;
+      paragraphHasLine = true;
       continue;
     }
 
     if (tokenWidth + width > wrapWidth) {
       canPrependSpaces = false;
       endLine();
+      paragraphHasLine = true;
     }
     if (line.length > 0 || !isBreakingSpace(token) || canPrependSpaces) {
       line.push(token);
@@ -205,8 +226,34 @@ export function layoutWrappedText(
   // Pixi keeps the last line only if there is more on it than spaces, so text
   // that ends in a line break has no empty line after it; and text with nothing
   // to draw is one empty line.
-  if (!line.every(isBreakingSpace)) lines.push(line);
-  return lines.length > 0 ? lines : [[]];
+  const blankLastLine = line.every(isBreakingSpace);
+  if (!blankLastLine) lines.push(line);
+  return {
+    lines: lines.length > 0 ? lines : [[]],
+    blankLastParagraph: blankLastLine && afterLineBreak && !paragraphHasLine ? line : null,
+  };
+}
+
+/**
+ * Break `item.text` into the lines the app lays it out in, each a list of
+ * tokens: the lines the canvas draws (`wrapLikePixi`, which see for `measure`),
+ * and one difference on purpose. A line break at the end of the text, followed
+ * by nothing but spaces, still starts a line, a blank one that Pixi does not
+ * draw. The measured height counts it, so middle- and bottom-aligned text that
+ * ends in a line break sits that blank line higher, as it always has, and the
+ * box keeps room for it. The canvas (through the height) and SVG export (through
+ * these lines) place the text by the same count.
+ *
+ * Everything that is not Pixi itself, the measured height and SVG export,
+ * breaks text into lines through this function.
+ */
+export function layoutWrappedText(
+  item: TextCanvasItem,
+  contentWidth: number,
+  measure: (text: string) => TextWidths,
+): string[][] {
+  const { lines, blankLastParagraph } = wrapLikePixi(item, contentWidth, measure);
+  return blankLastParagraph ? [...lines, blankLastParagraph] : lines;
 }
 
 export function measureWordWrappedTextHeight(
@@ -224,13 +271,10 @@ export function measureWordWrappedTextHeight(
       : null;
 
   if (!context) {
-    // A rough estimate where there is no canvas to measure with: its paragraphs
-    // split where the canvas starts a new line, with no line after a line break
-    // that ends the text (see `layoutWrappedText`).
+    // A rough estimate where there is no canvas to measure with: its paragraphs,
+    // split where the canvas starts a new line, at least a line each, the one
+    // after a line break that ends the text included (see `layoutWrappedText`).
     const paragraphs = drawnText(item.text).split(/\r\n|\r|\n/);
-    if (paragraphs.length > 1 && [...paragraphs[paragraphs.length - 1]].every(isBreakingSpace)) {
-      paragraphs.pop();
-    }
     const estimatedCharsPerLine = Math.max(
       1,
       Math.floor(safeWidth / (item.fontSize * 0.6))

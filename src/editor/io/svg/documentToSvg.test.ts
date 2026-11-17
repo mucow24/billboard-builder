@@ -576,17 +576,18 @@ describe('documentToSvg — text line alignment', () => {
       expect(pensByLine({ text: `AB${CR}${LF}CD`, align: 'right' })).toEqual(twoLines);
     });
 
-    // A line break at the end of the text starts no line on the canvas, so text
-    // that ends in one sits where it sits without it. Counting an empty last line
-    // put it half a line higher when centred and a line higher at the bottom.
-    it('places text that ends in a line break where it places the text without it', () => {
+    // A line break at the end of the text leaves a blank line after it, which
+    // the canvas places the text by too (through the measured height): the text
+    // sits half a line higher when centred and a line higher at the bottom.
+    it('places text that ends in a line break as if a blank line followed it', () => {
       const LF = String.fromCharCode(10);
-      const baselines = (text: string, verticalAlign: 'middle' | 'bottom') =>
-        glyphPositions(svgOf([createTextItem({ text, verticalAlign, height: 300 })])).map(
-          (position) => position.baselineY,
-        );
-      for (const verticalAlign of ['middle', 'bottom'] as const) {
-        expect(baselines(`AB${LF}`, verticalAlign)).toEqual(baselines('AB', verticalAlign));
+      const CR = String.fromCharCode(13);
+      const lineHeight = 42 * 1.1;
+      const baseline = (text: string, verticalAlign: 'middle' | 'bottom') =>
+        glyphPositions(svgOf([createTextItem({ text, verticalAlign, height: 300 })]))[0].baselineY;
+      for (const ending of [LF, CR, `${CR}${LF}`]) {
+        expect(baseline(`AB${ending}`, 'middle')).toBeCloseTo(baseline('AB', 'middle') - lineHeight / 2);
+        expect(baseline(`AB${ending}`, 'bottom')).toBeCloseTo(baseline('AB', 'bottom') - lineHeight);
       }
     });
 

@@ -2,15 +2,22 @@ import { NEWLINE_MATCH_REGEX, wordWrap, type ICanvas, type TextStyle } from 'pix
 import { describe, expect, it, vi } from 'vitest';
 
 import { graphemes } from './graphemes';
-import { BREAKING_SPACES, inkWidthOf, layoutWrappedText, measureWordWrappedTextHeight } from './textMeasurement';
+import {
+  BREAKING_SPACES,
+  inkWidthOf,
+  layoutWrappedText,
+  measureWordWrappedTextHeight,
+  wrapLikePixi,
+} from './textMeasurement';
 import { createTextItem } from '../document/documentDefaults';
 
-// `layoutWrappedText` is a port of Pixi's `wordWrap`, for the style PixiItemLayer
+// `wrapLikePixi` is a port of Pixi's `wordWrap`, for the style PixiItemLayer
 // draws text with (`whiteSpace: 'pre'`, no `breakWords`). Run both on the same
 // few thousand random texts, measured with the same fake font, and expect the
 // same lines. This catches a difference in the port, a change of that style
 // that the port does not follow, and a change in `wordWrap` on a Pixi upgrade.
-describe("layoutWrappedText against Pixi's own wordWrap", () => {
+// (`layoutWrappedText` adds one line on purpose; see its own tests.)
+describe("wrapLikePixi against Pixi's own wordWrap", () => {
   const code = (value: number) => String.fromCharCode(value);
   // Advance widths of a fake font by character; 10px for any other.
   const advances = new Map([
@@ -59,10 +66,10 @@ describe("layoutWrappedText against Pixi's own wordWrap", () => {
     return line.slice(0, end);
   };
   const portLines = (text: string, wrapWidth: number, letterSpacing: number) =>
-    layoutWrappedText(createTextItem({ text, letterSpacing }), wrapWidth, (token) => ({
+    wrapLikePixi(createTextItem({ text, letterSpacing }), wrapWidth, (token) => ({
       advance: advance(token),
       ink: ink(token),
-    })).map((tokens) => trimRight(tokens.join('')));
+    })).lines.map((tokens) => trimRight(tokens.join('')));
 
   it('breaks random texts into the lines Pixi breaks them into', () => {
     // Words, hyphens, the spaces Pixi breaks at and one it does not, line feeds
@@ -230,23 +237,34 @@ describe('layoutWrappedText', () => {
     expect(lines(`alpha${LF}${CR}beta`, 1000)).toEqual(['alpha', '', 'beta']);
   });
 
-  // Pixi leaves out a last line with nothing on it but spaces, so a line break
-  // at the end of a text starts no line. One in the middle still does.
-  it('starts no line after a line break at the end of the text, as the canvas does', () => {
+  // Pixi leaves out a last line with nothing on it but spaces, so it draws no
+  // line after a line break at the end of a text. The layout keeps one there on
+  // purpose: a blank line that the text's height counts, so text that ends in a
+  // line break is placed as it always was.
+  it('keeps a blank line after a line break at the end of the text, which the canvas does not draw', () => {
     const CR = String.fromCharCode(13);
     const LF = String.fromCharCode(10);
-    expect(lines(`alpha${LF}`, 1000)).toEqual(['alpha']);
-    expect(lines(`alpha${CR}`, 1000)).toEqual(['alpha']);
-    expect(lines(`alpha${CR}${LF}`, 1000)).toEqual(['alpha']);
-    expect(lines(`alpha${LF}   `, 1000)).toEqual(['alpha']);
-    expect(lines(`alpha${LF}${LF}`, 1000)).toEqual(['alpha', '']);
+    expect(lines(`alpha${LF}`, 1000)).toEqual(['alpha', '']);
+    expect(lines(`alpha${CR}`, 1000)).toEqual(['alpha', '']);
+    expect(lines(`alpha${CR}${LF}`, 1000)).toEqual(['alpha', '']);
+    expect(lines(`alpha${LF}   `, 1000)).toEqual(['alpha', '   ']);
+    expect(lines(`alpha${LF}${LF}`, 1000)).toEqual(['alpha', '', '']);
     expect(lines(`alpha${LF}${LF}beta`, 1000)).toEqual(['alpha', '', 'beta']);
+    // Spaces that run past the box already end a line of their own; no more.
+    expect(lines(`alpha${LF}${' '.repeat(12)}`, 100)).toEqual(['alpha', ' '.repeat(10)]);
+
+    // What Pixi draws, for comparison.
+    const pixi = (text: string) =>
+      wrapLikePixi(createTextItem({ text }), 1000, tenPerCharacter).lines.map((tokens) => tokens.join(''));
+    expect(pixi(`alpha${LF}`)).toEqual(['alpha']);
+    expect(pixi(`alpha${LF}${LF}`)).toEqual(['alpha', '']);
   });
 
   it('keeps one line for a text with nothing to draw', () => {
     expect(lines('', 1000)).toEqual(['']);
-    expect(lines(String.fromCharCode(10), 1000)).toEqual(['']);
     expect(lines('   ', 1000)).toEqual(['']);
+    // A line break alone is a line and the blank line after it.
+    expect(lines(String.fromCharCode(10), 1000)).toEqual(['', '']);
   });
 
   it('does not split at a hyphen that ends a word or stands alone', () => {
@@ -296,10 +314,10 @@ describe('text measurement', () => {
     expect(heightOf(`a${CR}b`)).toBe(20);
     expect(heightOf(`a${CR}${LF}b`)).toBe(20);
     expect(heightOf(`a${CR}${CR}b`)).toBe(30);
-    // Like the canvas, no line after a line break that ends the text.
-    expect(heightOf(`a${LF}`)).toBe(10);
-    expect(heightOf(`a${CR}${LF}  `)).toBe(10);
-    expect(heightOf(`a${LF}${LF}`)).toBe(20);
+    // Like the layout, a line after a line break that ends the text.
+    expect(heightOf(`a${LF}`)).toBe(20);
+    expect(heightOf(`a${CR}${LF}  `)).toBe(20);
+    expect(heightOf(`a${LF}${LF}`)).toBe(30);
   });
 
   it('uses canvas measurement when a browser-like canvas context is available', () => {
@@ -461,9 +479,10 @@ describe('text measurement', () => {
     expect(withCanvasMeasurement(measureText, () => measureWordWrappedTextHeight(item, 101))).toBe(20);
   });
 
-  // The canvas draws no line after a line break that ends the text, so the
-  // height that places middle- and bottom-aligned text does not count one.
-  it('counts no line after a line break at the end of the text', () => {
+  // The canvas draws no line after a line break that ends the text, but the
+  // height that places middle- and bottom-aligned text counts a blank one (see
+  // `layoutWrappedText`), a carriage return's as a line feed's.
+  it('counts a blank line after a line break at the end of the text', () => {
     const measureText = (text: string) => ({ width: text.length * 10 });
     const heightOf = (text: string) =>
       withCanvasMeasurement(measureText, () =>
@@ -473,8 +492,9 @@ describe('text measurement', () => {
         ),
       );
 
-    expect(heightOf(`alpha${String.fromCharCode(10)}`)).toBe(10);
-    expect(heightOf(`alpha${String.fromCharCode(13)}`)).toBe(10);
+    expect(heightOf('alpha')).toBe(10);
+    expect(heightOf(`alpha${String.fromCharCode(10)}`)).toBe(20);
+    expect(heightOf(`alpha${String.fromCharCode(13)}`)).toBe(20);
     expect(heightOf(`alpha${String.fromCharCode(10)}beta`)).toBe(20);
   });
 });
