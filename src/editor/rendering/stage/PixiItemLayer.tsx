@@ -59,6 +59,8 @@ import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
+import { rasteriseRichTextShadow } from './richTextShadow';
+import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
 import { measureTextBaselineShift } from './textBaselineShift';
 import { getTextMeasuringContext, measureTextRasterPadding } from './textRasterPadding';
 import { registerZoomScaledFilter } from './zoomScaledFilters';
@@ -323,21 +325,20 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
  * bold and regular stand on one line, and the same care for ink and texels as
  * plain text (see `buildTextLayers`).
  *
- * A drop shadow is drawn as texts of its own, all of them under all of the
- * fragments, so that no fragment's shadow falls on top of its neighbour. Such a
- * text is the fragment with a fill that shows nothing: Pixi draws the shadow of
- * a text whatever its fill.
+ * An outline (see `textStroke`) is drawn as texts of its own, all of them
+ * under all of the fragments, so that no fragment's stroke falls on its
+ * neighbour's fill.
  *
- * An outline (see `textStroke`) is drawn the same way, as texts between the
- * shadows and the fragments, so that no fragment's stroke falls on its
- * neighbour's fill. The shadows are then cast from fill and stroke together,
- * as they are for plain text (`buildTextLayers`).
+ * A drop shadow is not drawn by the texts at all. A shadow per fragment would
+ * be darker wherever two of them overlap, so `shadow` describes one image
+ * cast from all of the fragments and their strokes together, which goes under
+ * everything else (see `richTextShadow`).
  */
 function buildRichTextFragments(
   item: TextCanvasItem,
   runs: RichTextRun[],
   requestedResolution: number,
-) {
+): { texts: PixiTextLayer[]; shadow: { input: RichTextShadowInput; alpha: number } | null } | null {
   const context = getTextMeasuringContext();
   if (!context) return null;
 
@@ -366,10 +367,10 @@ function buildRichTextFragments(
   });
 
   type PlacedFragment = (typeof fragments)[number];
-  type Part = 'shadow' | 'stroke' | 'fill';
-  const parts: Part[] = [...(dropShadow ? ['shadow' as const] : []), ...(stroke ? ['stroke' as const] : []), 'fill'];
+  type Part = 'stroke' | 'fill';
+  const parts: Part[] = [...(stroke ? ['stroke' as const] : []), 'fill'];
 
-  /** The stroke a part's text has: the one it draws, or one that only shapes its shadow. */
+  /** The stroke a part's text has. */
   const strokeOf = (part: Part) => (part === 'fill' ? null : stroke);
 
   /** The style a part of a fragment is laid out and measured with: all of it but fill and padding. */
@@ -379,18 +380,13 @@ function buildRichTextFragments(
       ...pixiFontStyleOf(richTextRunItem(item, fragment.run)),
       wordWrap: false,
       whiteSpace: 'pre' as const,
-      // With a stroke the shadow is drawn opaque and the text made see-through
-      // as a whole (see `buildTextLayers`).
-      ...(part === 'shadow' && dropShadow
-        ? { dropShadow: partStroke ? { ...dropShadow, alpha: 1 } : dropShadow }
-        : {}),
-      ...(partStroke ? { stroke: pixiStrokeOf(partStroke, part === 'stroke') } : {}),
+      ...(partStroke ? { stroke: pixiStrokeOf(partStroke) } : {}),
     };
   };
 
   /**
-   * The Pixi texts of a fragment, by part: its shadow alone, its stroke alone,
-   * and the fragment itself without either.
+   * The Pixi texts of a fragment, by part: its stroke alone, and the fragment
+   * itself without one.
    */
   const pixiTextsOf = (placed: PlacedFragment): Partial<Record<Part, PixiTextLayer>> => {
     const measured = parts.map((part) => {
@@ -398,8 +394,8 @@ function buildRichTextFragments(
       return { part, layoutStyle, inkRoom: measureTextRasterPadding(placed.fragment.text, layoutStyle) };
     });
     // One resolution for all of a fragment's texts, clamped for the largest of
-    // their textures: stroke and shadow are rasterised on the texels the fill
-    // is (see `buildTextLayers`).
+    // their textures: the stroke is rasterised on the texels the fill is (see
+    // `buildTextLayers`).
     const resolution = clampRasterResolution(
       requestedResolution,
       Math.max(placed.fragment.width, lineHeight, 1) +
@@ -464,9 +460,6 @@ function buildRichTextFragments(
         }) ?? item.fill;
     }
 
-    let alpha = 1;
-    if (partStroke) alpha = part === 'shadow' ? dropShadow?.alpha ?? 1 : partStroke.alpha;
-
     return {
       key: `${part}:${key}`,
       text: fragment.text,
@@ -474,13 +467,110 @@ function buildRichTextFragments(
       resolution,
       x: x + placement.offset,
       y: y + placement.offset,
-      alpha,
+      alpha: partStroke?.alpha ?? 1,
     };
   };
 
-  // Every shadow under every stroke, and every stroke under every fill.
+  /** A fragment as the shadow is cast from it: its glyphs and its stroke. */
+  const shadowCasterOf = (placed: PlacedFragment): ShadowCaster => {
+    const style = layoutStyleOf(placed, stroke ? 'stroke' : 'fill');
+    return {
+      text: placed.fragment.text,
+      style,
+      left: placed.left,
+      lineTop: placed.lineTop,
+      baselineShift: measureTextBaselineShift(item, style),
+    };
+  };
+
+  // Every stroke under every fill.
   const texts = fragments.map(pixiTextsOf);
-  return parts.flatMap((part) => texts.flatMap((byPart) => byPart[part] ?? []));
+  return {
+    texts: parts.flatMap((part) => texts.flatMap((byPart) => byPart[part] ?? [])),
+    shadow:
+      dropShadow && fragments.length > 0
+        ? {
+            input: {
+              casters: fragments.map(shadowCasterOf),
+              strokeWidth: stroke?.width ?? 0,
+              shadow: {
+                angle: dropShadow.angle,
+                distance: dropShadow.distance,
+                blur: dropShadow.blur,
+                color: dropShadow.color,
+              },
+              requestedResolution,
+            },
+            alpha: dropShadow.alpha,
+          }
+        : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Rich text: the one shadow of all fragments
+// ---------------------------------------------------------------------------
+
+// Textures on their way out. React's strict mode unmounts and remounts a
+// component's effects once in development, with the same memoised texture: a
+// texture destroyed in the cleanup would be shown again right after. So the
+// cleanup only marks it, and it is destroyed once nothing has taken it back.
+const texturesToDestroy = new Set<Texture>();
+
+function useDestroyedWhenUnused(texture: Texture | null) {
+  useEffect(() => {
+    if (!texture) return;
+    texturesToDestroy.delete(texture);
+    return () => {
+      texturesToDestroy.add(texture);
+      setTimeout(() => {
+        if (texturesToDestroy.delete(texture)) texture.destroy(true);
+      }, 0);
+    };
+  }, [texture]);
+}
+
+/**
+ * The drop shadow of a text item with tags: one sprite under all of its
+ * fragments, see-through as a whole.
+ *
+ * `fontsKey` changes when a font the item is drawn with arrives: the image is
+ * drawn anew then, as the fragments are.
+ */
+function RichTextShadow({
+  input,
+  alpha,
+  fontsKey,
+}: {
+  input: RichTextShadowInput;
+  alpha: number;
+  fontsKey: string;
+}) {
+  // `input` is built anew on every render; its JSON says whether it changed.
+  const inputKey = JSON.stringify(input);
+  const shadow = useMemo(() => {
+    const image = rasteriseRichTextShadow(JSON.parse(inputKey) as RichTextShadowInput);
+    if (!image) return null;
+    // The source's resolution makes the texture as large in px as the image is.
+    const source = new CanvasSource({ resource: image.canvas, resolution: image.resolution });
+    return { texture: new Texture({ source }), x: image.x, y: image.y };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fontsKey: the same input draws differently once its font is in.
+  }, [inputKey, fontsKey]);
+  useDestroyedWhenUnused(shadow?.texture ?? null);
+
+  if (!shadow) return null;
+  // Keyed by texture: a sprite takes its size from its texture only when it is
+  // given one, and each image has a size of its own.
+  return (
+    <pixiSprite
+      key={shadow.texture.uid}
+      texture={shadow.texture}
+      x={shadow.x}
+      y={shadow.y}
+      alpha={alpha}
+      eventMode="none"
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -503,7 +593,9 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
   // and rasterises the text anew. Layers in other families are left alone. The
   // emoji fallback counts as one of every layer's families: the text may have
   // characters only it can draw.
-  useSyncExternalStore(subscribeToFontRegistrations, () => getTextFontRegistrationCount(item.fontFamily));
+  const fontRegistrations = useSyncExternalStore(subscribeToFontRegistrations, () =>
+    getTextFontRegistrationCount(item.fontFamily),
+  );
 
   // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
   // When zoom > 1 the texture is magnified and turns blurry, so scale
@@ -515,9 +607,16 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
   const fragments = rich.hasMarkup
     ? buildRichTextFragments(item, rich.runs, requestedResolution)
     : null;
-  const layers = fragments ?? buildTextLayers(item, requestedResolution);
+  const layers = fragments?.texts ?? buildTextLayers(item, requestedResolution);
   return (
     <>
+      {fragments?.shadow ? (
+        <RichTextShadow
+          input={fragments.shadow.input}
+          alpha={fragments.shadow.alpha}
+          fontsKey={`${fontRegistrations}:${document.fonts?.size ?? 0}`}
+        />
+      ) : null}
       {layers.map((layer) => (
         <pixiText
           key={layer.key}

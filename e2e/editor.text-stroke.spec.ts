@@ -36,13 +36,6 @@ interface StrokeCase {
   strokeWidth: number;
   stroke?: string;
   shadow?: boolean;
-  /**
-   * Text with tags casts one shadow per fragment, and where the strokes of two
-   * fragments overlap, so do their shadows: a see-through shadow is darker
-   * there. A known limit, as it is for the blurred shadows of fragments
-   * without an outline.
-   */
-  shadowSeams?: boolean;
   overrides?: Record<string, unknown>;
 }
 
@@ -64,7 +57,7 @@ const CASES: StrokeCase[] = [
   { id: 'tags', text: 'H<b>H</b><color=#00ff00>H</color>', strokeWidth: 16, overrides: { letterSpacing: -4 } },
   // A see-through shadow must be as dark under the stroke as under the fill.
   { id: 'shadow', text: 'HO', strokeWidth: 12, shadow: true },
-  { id: 'tags and shadow', text: 'H<b>O</b>', strokeWidth: 12, shadow: true, shadowSeams: true },
+  { id: 'tags and shadow', text: 'H<b>O</b>', strokeWidth: 12, shadow: true },
   // This family has no bold file: the browser fakes it by growing the glyphs,
   // and the outline goes around the grown glyphs.
   { id: 'faked bold', text: 'HO', strokeWidth: 12, overrides: { fontFamily: 'Albertus MT Std', fontWeight: 'bold' } },
@@ -353,11 +346,9 @@ test.describe('text outline on the canvas', () => {
 
       if (entry.shadow) {
         expect.soft(report.shadowAlpha, `${report.id}: the shadow shows`).toBeGreaterThanOrEqual(124);
-        if (!entry.shadowSeams) {
-          expect
-            .soft(report.shadowAlpha, `${report.id}: the shadow is darker where stroke and fill overlap`)
-            .toBeLessThanOrEqual(132);
-        }
+        expect
+          .soft(report.shadowAlpha, `${report.id}: the shadow is darker where stroke and fill overlap`)
+          .toBeLessThanOrEqual(132);
         // Cast from the stroke too: as far past the outlined ink as its offset.
         for (const reach of report.shadowReach ?? [NaN, NaN]) {
           expect
@@ -382,6 +373,93 @@ test.describe('text outline on the canvas', () => {
       // The canvas places a fragment on whole texels, the SVG where the layout
       // has it: a sliver between two paints can fall either way.
       expect.soft(report.colourOff, `${report.id}: pixels painted another colour in the SVG`).toBeLessThanOrEqual(40);
+    }
+  });
+});
+
+/**
+ * Text with tags is one Pixi text per fragment, and casts one shadow all the
+ * same: a see-through shadow is no darker where the shadows of two fragments
+ * meet, whether they overlap or blur into each other.
+ */
+const FLAT_SHADOW_CASES = [
+  // Letters so close that the glyphs of neighbouring fragments overlap, and their shadows with them.
+  { id: 'overlapping fragments', text: 'H<b>H</b>H', blur: 0, overrides: { letterSpacing: -12 } },
+  // The same, blurred: each fragment's shadow fades out under its neighbours'.
+  { id: 'blurred', text: 'H<b>H</b>H', blur: 4, overrides: { letterSpacing: -12 } },
+  // Lines so close that the glyphs of one line reach into the next.
+  { id: 'blurred, close lines', text: 'H<b>H</b>\n<i>H</i>H', blur: 4, overrides: { lineHeight: 0.6 } },
+];
+
+test.describe('shadow of text with tags', () => {
+  test('is one flat shadow where fragments meet', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForBundledFonts(page);
+
+    await uploadProject(page, {
+      ...createProjectDocument(
+        FLAT_SHADOW_CASES.map((entry, index) =>
+          createTextFixture({
+            id: `flat-shadow-${index}`,
+            name: entry.id,
+            zIndex: index + 1,
+            text: entry.text,
+            fontFamily: 'Barlow',
+            fontSize: 70,
+            fill: FILL,
+            x: index * CELL.width + BOX.dx,
+            y: BOX.dy,
+            width: BOX.width,
+            height: BOX.height,
+            strokeWidth: 0,
+            shadow: { color: SHADOW, blur: entry.blur, offsetX: SHADOW_OFFSET, offsetY: SHADOW_OFFSET, opacity: 0.5 },
+            ...entry.overrides,
+          }),
+        ),
+      ),
+      canvas: { width: FLAT_SHADOW_CASES.length * CELL.width, height: CELL.height },
+    });
+    const download = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = await fs.readFile(await download.path());
+    await fs.writeFile(test.info().outputPath('flat-shadow.png'), png);
+
+    const reports = await page.evaluate(
+      async ({ base64, count, cell }) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${base64}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const context = canvas.getContext('2d', { willReadFrequently: true })!;
+        context.drawImage(image, 0, 0);
+        return Array.from({ length: count }, (_, index) => {
+          const data = context.getImageData(index * cell.width, 0, cell.width, cell.height).data;
+          // The shadow where it shows alone, in its own colour: its most
+          // opaque pixel, and how many pixels of it there are.
+          let darkest = 0;
+          let shown = 0;
+          for (let at = 0; at < data.length; at += 4) {
+            if (data[at + 3] === 0 || data[at] > 5 || data[at + 1] > 5 || data[at + 2] < 250) continue;
+            darkest = Math.max(darkest, data[at + 3]);
+            if (data[at + 3] >= 64) shown += 1;
+          }
+          return { darkest, shown };
+        });
+      },
+      { base64: png.toString('base64'), count: FLAT_SHADOW_CASES.length, cell: CELL },
+    );
+
+    for (const [index, entry] of FLAT_SHADOW_CASES.entries()) {
+      const report = reports[index];
+      expect.soft(report.shown, `${entry.id}: the shadow shows`).toBeGreaterThan(200);
+      // A blurred shadow is a little short of its opacity inside thin stems.
+      expect.soft(report.darkest, `${entry.id}: the shadow reaches its opacity`).toBeGreaterThanOrEqual(110);
+      expect
+        .soft(report.darkest, `${entry.id}: the shadow is darker where the shadows of fragments meet`)
+        .toBeLessThanOrEqual(132);
     }
   });
 });
