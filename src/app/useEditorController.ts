@@ -198,6 +198,9 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
   const handleNewProject = useCallback(async () => {
     await library.newDocument();
   }, [library]);
+  const handleMakeCopy = useCallback(() => {
+    void library.copyDocument();
+  }, [library]);
   const openLibrary = useCallback(() => {
     setLibraryOpen(true);
     void library.loadLibraryPreviews();
@@ -258,6 +261,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       handleExportToClipboard,
       handleFontUpload,
       handleImageUpload,
+      handleMakeCopy,
       handleNewProject,
       handleOpenProject: library.importProjectFile,
       handleRevert,

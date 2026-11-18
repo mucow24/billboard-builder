@@ -44,14 +44,15 @@ interface UseDocumentLibraryControllerArgs {
 }
 
 /**
- * The name for a copy of a document named `name`: "<name> copy", or
- * "<name> copy 2", "<name> copy 3"... when the library already has that name.
- * A copy of a copy counts on from it, rather than getting "copy copy".
+ * The name for a copy of a document named `name`: "<name> Copy", or
+ * "<name> Copy 2", "<name> Copy 3"... when the library already has that name.
+ * A copy of a copy counts on from it, rather than getting "Copy Copy".
  */
 export function nameForCopy(name: string, takenNames: Iterable<string>): string {
   const taken = new Set(takenNames);
-  const base = name.replace(/ copy(?: \d+)?$/, '');
-  const first = `${base} copy`;
+  // Any case: copies made before the suffix was capitalized end in " copy".
+  const base = name.replace(/ copy(?: \d+)?$/i, '');
+  const first = `${base} Copy`;
   if (!taken.has(first)) {
     return first;
   }
@@ -463,6 +464,60 @@ export function useDocumentLibraryController({
       });
     }
 
+    /**
+     * Canvas > Make a copy: saves the document as it is in the editor, unsaved
+     * changes included, to the library as a new document named after it, and
+     * opens that copy. The original is first left like any other document:
+     * the user is asked whether its unsaved changes go into it as well.
+     */
+    function copyDocument(): Promise<boolean> {
+      return runExclusive(false, async () => {
+        const source = useEditorStore.getState().editor.document;
+        if (!(await leaveCurrentDocument())) {
+          return false;
+        }
+
+        const session = useDocumentLibrarySession.getState();
+        const copyDocumentContent: ProjectDocument = {
+          ...source,
+          name: nameForCopy(source.name, [
+            source.name,
+            ...session.entries.map((candidate) => candidate.name),
+          ]),
+        };
+        let preview: string | null = null;
+        try {
+          preview = await capturePreviewRef.current(source);
+        } catch (error) {
+          console.warn('No preview could be drawn for the library.', error);
+        }
+
+        const now = Date.now();
+        const copy: DocumentLibraryEntry = {
+          id: crypto.randomUUID(),
+          name: copyDocumentContent.name,
+          createdAt: now,
+          updatedAt: now,
+          fonts: copyDocumentContent.fonts,
+        };
+        try {
+          await defaultDocumentLibraryService.save(copy, copyDocumentContent, preview);
+        } catch (error) {
+          setErrorMessage(
+            `Failed to make a copy of "${source.name}": ${getErrorMessage(error, 'Unknown error.')}`,
+          );
+          return false;
+        }
+        useDocumentLibrarySession.setState((state) => ({
+          entries: upsertLibraryEntry(state.entries, copy),
+          previews: preview === null ? state.previews : { ...state.previews, [copy.id]: preview },
+        }));
+        await putDocumentInEditor(copyDocumentContent, copy.id, true);
+        setErrorMessage(null);
+        return true;
+      });
+    }
+
     /** Downloads the saved version of a library document as a JSON project file. */
     async function exportLibraryDocument(id: string): Promise<boolean> {
       const entry = useDocumentLibrarySession
@@ -513,6 +568,7 @@ export function useDocumentLibraryController({
       renameLibraryDocument,
       deleteLibraryDocument,
       duplicateLibraryDocument,
+      copyDocument,
       exportLibraryDocument,
       loadLibraryPreviews,
     };

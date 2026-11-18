@@ -777,17 +777,17 @@ describe('useDocumentLibraryController', () => {
       const [copy, original] = result.current.state.entries;
       expect(original.id).toBe(originalId);
       expect(copy.id).not.toBe(originalId);
-      expect(copy.name).toBe('Poster copy');
+      expect(copy.name).toBe('Poster Copy');
       expect(result.current.state.previews[copy.id]).toBe('data:image/png;base64,PREVIEW');
       const copied = await defaultDocumentLibraryService.loadDocument(copy);
-      expect(copied?.name).toBe('Poster copy');
+      expect(copied?.name).toBe('Poster Copy');
       expect(copied?.nodes.flatMap(collectLeafItems).map((item) => item.id)).toEqual(['first']);
       // Still on the original, with its unsaved change.
       expect(result.current.state.documentId).toBe(originalId);
       expect(itemIds()).toEqual(['first', 'unsaved']);
       expect(result.current.state.hasUnsavedChanges).toBe(true);
       const stored = (await defaultDocumentLibraryService.listEntries()).entries;
-      expect(stored.map((entry) => entry.name)).toEqual(['Poster copy', 'Poster']);
+      expect(stored.map((entry) => entry.name)).toEqual(['Poster Copy', 'Poster']);
     });
 
     it('copies the stored preview when it has not been read yet, as after a reload', async () => {
@@ -823,12 +823,135 @@ describe('useDocumentLibraryController', () => {
   });
 
   describe('naming a copy', () => {
-    it('adds "copy", then numbers further copies, counting on from a copy of a copy', () => {
-      expect(nameForCopy('Poster', ['Poster'])).toBe('Poster copy');
-      expect(nameForCopy('Poster', ['Poster', 'Poster copy'])).toBe('Poster copy 2');
-      expect(nameForCopy('Poster', ['Poster copy', 'Poster copy 2'])).toBe('Poster copy 3');
-      expect(nameForCopy('Poster copy', ['Poster', 'Poster copy'])).toBe('Poster copy 2');
-      expect(nameForCopy('Poster copy 2', ['Poster copy', 'Poster copy 2'])).toBe('Poster copy 3');
+    it('adds "Copy", then numbers further copies, counting on from a copy of a copy', () => {
+      expect(nameForCopy('Poster', ['Poster'])).toBe('Poster Copy');
+      expect(nameForCopy('Poster', ['Poster', 'Poster Copy'])).toBe('Poster Copy 2');
+      expect(nameForCopy('Poster', ['Poster Copy', 'Poster Copy 2'])).toBe('Poster Copy 3');
+      expect(nameForCopy('Poster Copy', ['Poster', 'Poster Copy'])).toBe('Poster Copy 2');
+      expect(nameForCopy('Poster Copy 2', ['Poster Copy', 'Poster Copy 2'])).toBe('Poster Copy 3');
+    });
+
+    it('counts on from a copy named with the earlier lowercase suffix', () => {
+      expect(nameForCopy('Poster copy', ['Poster', 'Poster copy'])).toBe('Poster Copy');
+      expect(nameForCopy('Poster copy 2', ['Poster Copy'])).toBe('Poster Copy 2');
+    });
+  });
+
+  describe('making a copy', () => {
+    async function makeCopy(result: Controller) {
+      let copied = false;
+      await act(async () => {
+        copied = await result.current.actions.copyDocument();
+      });
+      return copied;
+    }
+
+    it('saves the canvas as a new library document named after it and opens that', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      await save(result);
+      const originalId = result.current.state.documentId;
+      vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+      const saveWorkingCopy = vi.spyOn(defaultCanvasPersistenceService, 'save');
+
+      expect(await makeCopy(result)).toBe(true);
+
+      expect(confirmLeave).not.toHaveBeenCalled();
+      const copyId = result.current.state.documentId;
+      expect(copyId).not.toBe(originalId);
+      expect(editorDocument().name).toBe('Poster Copy');
+      expect(itemIds()).toEqual(['first']);
+      expect(result.current.state.hasUnsavedChanges).toBe(false);
+      expect(result.current.state.entries.map((entry) => [entry.id, entry.name])).toEqual([
+        [copyId, 'Poster Copy'],
+        [originalId, 'Poster'],
+      ]);
+      expect(result.current.state.previews[copyId]).toBe('data:image/png;base64,PREVIEW');
+      // The copy is the working copy now, so a reload opens it.
+      expect(saveWorkingCopy).toHaveBeenLastCalledWith(editorDocument(), copyId);
+      const stored = (await defaultDocumentLibraryService.listEntries()).entries;
+      expect(stored.map((entry) => entry.name)).toEqual(['Poster Copy', 'Poster']);
+    });
+
+    it('numbers the copy when the library already has one', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      await save(result);
+
+      await makeCopy(result);
+      expect(editorDocument().name).toBe('Poster Copy');
+      await makeCopy(result);
+      expect(editorDocument().name).toBe('Poster Copy 2');
+      expect(result.current.state.entries).toHaveLength(3);
+    });
+
+    it('puts unsaved changes in the copy and, when the user discards them, not in the original', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      await save(result);
+      const original = result.current.state.entries[0];
+      addRectangle('unsaved');
+      confirmLeave.mockResolvedValue('discard');
+
+      expect(await makeCopy(result)).toBe(true);
+
+      expect(confirmLeave).toHaveBeenCalledExactlyOnceWith({
+        documentName: 'Poster',
+        neverSaved: false,
+      });
+      expect(itemIds()).toEqual(['first', 'unsaved']);
+      expect(result.current.state.hasUnsavedChanges).toBe(false);
+      const storedOriginal = await defaultDocumentLibraryService.loadDocument(original);
+      expect(storedOriginal?.nodes.flatMap(collectLeafItems).map((item) => item.id)).toEqual([
+        'first',
+      ]);
+    });
+
+    it('saves unsaved changes to the original too when the user says so', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+
+      expect(await makeCopy(result)).toBe(true);
+
+      expect(result.current.state.entries.map((entry) => entry.name).sort()).toEqual([
+        'Poster',
+        'Poster Copy',
+      ]);
+      expect(editorDocument().name).toBe('Poster Copy');
+    });
+
+    it('stays on the original when the user cancels', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      const originalId = result.current.state.documentId;
+      confirmLeave.mockResolvedValue('cancel');
+
+      expect(await makeCopy(result)).toBe(false);
+
+      expect(result.current.state.documentId).toBe(originalId);
+      expect(editorDocument().name).toBe('Poster');
+      expect(result.current.state.entries).toEqual([]);
+    });
+
+    it('says why when the copy cannot be stored, and stays on the original', async () => {
+      const { result } = renderController();
+      renameCanvas('Poster');
+      addRectangle('first');
+      await save(result);
+      const originalId = result.current.state.documentId;
+      vi.spyOn(defaultDocumentLibraryService, 'save').mockRejectedValueOnce(new Error('full'));
+
+      expect(await makeCopy(result)).toBe(false);
+
+      expect(result.current.state.documentId).toBe(originalId);
+      expect(editorDocument().name).toBe('Poster');
+      expect(result.current.state.entries).toHaveLength(1);
+      expect(setErrorMessage).toHaveBeenLastCalledWith('Failed to make a copy of "Poster": full');
     });
   });
 
