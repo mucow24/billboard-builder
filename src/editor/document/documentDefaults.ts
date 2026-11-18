@@ -27,6 +27,9 @@ import { createGroupNode } from './sceneGraph';
 
 export const DEFAULT_FONT_FAMILY = 'Arial';
 
+/** The colour a text's outline has until one is chosen. New text has no outline: its width is 0. */
+export const DEFAULT_TEXT_STROKE = '#000000ff';
+
 export const DEFAULT_CANVAS_NAME = 'Untitled canvas';
 
 export const CANVAS_PRESETS: CanvasPreset[] = [
@@ -130,6 +133,8 @@ export function createTextItem(position?: Partial<TextCanvasItem>): TextCanvasIt
     lineHeight: 1.1,
     letterSpacing: 0,
     padding: { ...DEFAULT_TEXT_PADDING },
+    stroke: DEFAULT_TEXT_STROKE,
+    strokeWidth: 0,
     ...position,
   };
 }

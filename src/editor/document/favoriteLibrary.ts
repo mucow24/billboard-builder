@@ -111,6 +111,9 @@ export function summarizeFavoriteNodes(nodes: readonly CanvasNode[]): FavoriteNo
         break;
       case 'text':
         pushPreviewColor(item.fill);
+        if (item.strokeWidth > 0) {
+          pushPreviewColor(item.stroke);
+        }
         break;
       case 'image':
         if (item.adjustments.tintStrength > 0) {

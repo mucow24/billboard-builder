@@ -38,10 +38,10 @@ const finiteOrZero = (value: number | undefined): number =>
 
 /**
  * The room, in px, to give `style` as `padding` so that Pixi's text texture
- * holds all of the ink of `text` and all of its drop shadow, including what
- * leaves the box the texture is sized from (see `textInkOverhang`). 0 when
- * both already fit,
- * which leaves the texture exactly as it is without padding. Fit the result to
+ * holds all of the ink of `text`, its stroke included, and all of its drop
+ * shadow, including what leaves the box the texture is sized from (see
+ * `textInkOverhang`). 0 when all of it already fits, which leaves the texture
+ * exactly as it is without padding. Fit the result to
  * the text's resolution with `snapPaddingToTexels` before using it.
  *
  * Lines and their widths are Pixi's own measurement of `style`, so the result
@@ -94,6 +94,7 @@ export function measureTextRasterPadding(text: string, style: TextStyleOptions):
         wordWrap: textStyle.wordWrap,
         wordWrapWidth: textStyle.wordWrapWidth,
         letterSpacing: textStyle.letterSpacing,
+        strokeWidth: textStyle._stroke?.width ?? 0,
       },
       measureRun,
       CanvasTextMetrics.graphemeSegmenter,

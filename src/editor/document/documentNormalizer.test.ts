@@ -266,6 +266,24 @@ describe('document normalizer', () => {
     expect(normalizedWithout.nodes[0]).toMatchObject({ blurRadius: 0 });
   });
 
+  it('gives text saved before it had an outline none, and keeps a valid one', () => {
+    const text = createTextItem();
+    const saved = { ...text } as Record<string, unknown>;
+    delete saved.stroke;
+    delete saved.strokeWidth;
+
+    const normalize = (node: unknown) =>
+      normalizeProjectDocument({ version: 2, nodes: [node as never], fonts: [] }).nodes[0];
+
+    expect(normalize(saved)).toMatchObject({ stroke: '#000000ff', strokeWidth: 0 });
+    expect(normalize({ ...text, stroke: '#ff8800cc', strokeWidth: 7.5 })).toMatchObject({
+      stroke: '#ff8800cc',
+      strokeWidth: 7.5,
+    });
+    expect(normalize({ ...text, strokeWidth: -4 })).toMatchObject({ strokeWidth: 0 });
+    expect(normalize({ ...text, strokeWidth: Number.NaN })).toMatchObject({ strokeWidth: 0 });
+  });
+
   it('re-derives the polygon AABB from its vertices and defaults closed/curveRadius', () => {
     const polygon = createPolygonItem({
       vertices: [

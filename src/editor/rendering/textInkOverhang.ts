@@ -56,6 +56,14 @@ export interface RasterTextLayout {
   wordWrap: boolean;
   wordWrapWidth: number;
   letterSpacing: number;
+  /**
+   * Width of the style's stroke, 0 or absent without one. `width` and `height`
+   * are then Pixi's measurement of the style with its stroke: it draws every
+   * line half the stroke further right and down, and makes the texture wider by
+   * the whole stroke, but taller only where the first line's box is lower than
+   * the font plus the stroke.
+   */
+  strokeWidth?: number;
 }
 
 /**
@@ -203,20 +211,32 @@ export function measureInkOverhang(
   const shadowTop = shadow ? Math.max(0, reach - shadow.offsetY) : 0;
   const shadowBottom = shadow ? Math.max(0, reach + shadow.offsetY) : 0;
 
+  // A stroke is centred on the outline, so the ink grows by half of it on
+  // every side (its joins are round: see `textStroke`), and Pixi moves the pen
+  // by as much.
+  const strokeWidth = layout.strokeWidth ?? 0;
+  const halfStroke = Number.isFinite(strokeWidth) && strokeWidth > 0 ? strokeWidth / 2 : 0;
+
   const overhang: InkOverhang = { left: 0, right: 0, top: 0, bottom: 0 };
 
   layout.lines.forEach((line, index) => {
-    const ink = measureLineInk(line, layout.letterSpacing, measureRun, splitGraphemes);
-    if (!ink) return;
+    const glyphInk = measureLineInk(line, layout.letterSpacing, measureRun, splitGraphemes);
+    if (!glyphInk) return;
+    const ink: LineInk = {
+      left: glyphInk.left + halfStroke,
+      right: glyphInk.right + halfStroke,
+      ascent: glyphInk.ascent + halfStroke,
+      descent: glyphInk.descent + halfStroke,
+    };
 
     const lineWidth = layout.lineWidths[index] ?? 0;
-    let penX = 0;
+    let penX = halfStroke;
     if (layout.align === 'right') {
-      penX = alignWidth - lineWidth;
+      penX += alignWidth - lineWidth;
     } else if (layout.align === 'center') {
-      penX = (alignWidth - lineWidth) / 2;
+      penX += (alignWidth - lineWidth) / 2;
     }
-    const baseline = index * layout.lineHeight + layout.fontAscent + lineShift;
+    const baseline = halfStroke + index * layout.lineHeight + layout.fontAscent + lineShift;
 
     overhang.left = Math.max(overhang.left, ink.left - penX + shadowLeft);
     overhang.right = Math.max(overhang.right, penX + ink.right - textureWidth + shadowRight);

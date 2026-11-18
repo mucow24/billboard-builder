@@ -7,6 +7,8 @@ import { alignedLineLeft, textBlockTop, withoutTrailingSpaces } from '../../rend
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { graphemeIndexOfCodePoints, graphemes } from '../../rendering/graphemes';
 import { drawnRichTextRuns, layoutWrappedText, richTextRunItem } from '../../rendering/textMeasurement';
+import { TEXT_STROKE_JOIN, textStrokeOf } from '../../rendering/textStroke';
+import type { TextStrokePaint } from '../../rendering/textStroke';
 import { paintAttrs, toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
 import { glyphsPath, lineGlyphs } from './svgTextGlyphs';
@@ -105,8 +107,11 @@ export function textSvg(
   const bottom = Math.max(box.height, textTop + measuredHeight) + room;
   const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
   const pathEls = glyphGroupElements(groups, item, fillAttr, area, defs, `bold-${item.id}`);
+  // The outline goes under the fill, and the shadow is cast from both.
+  const stroke = textStrokeOf(item);
+  const strokeEls = stroke ? strokeLayer(strokeElements(groups, stroke), stroke) : '';
   const filterAttr = pushTextFilter(item, defs);
-  return wrapItem(item, effectiveOpacity, pathEls.join(''), filterAttr);
+  return wrapItem(item, effectiveOpacity, strokeEls + pathEls.join(''), filterAttr);
 }
 
 type OutlineFonts = Extract<OutlineResult, { ok: true }>;
@@ -163,7 +168,10 @@ function glyphGroup(
     bold,
     penOffsets: bold?.kind === 'smear' ? bold.offsets : [0],
     // Stroked outlines need their contours closed, or the stroke has gaps.
-    glyphStyle: { slant: synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0, closed: bold?.kind === 'stroke' },
+    glyphStyle: {
+      slant: synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0,
+      closed: bold?.kind === 'stroke' || textStrokeOf(item) !== null,
+    },
     paths: [],
   };
 }
@@ -259,6 +267,39 @@ function glyphGroupElements(
       const id = group === groups.own ? maskId : `${maskId}-fallback`;
       return strokedBoldPath(paint, d, fillAttr, group.bold.width, area, defs, id);
     });
+}
+
+/**
+ * The elements that draw the outline of a text (see `rendering/textStroke`)
+ * around the glyphs of `groups`: a stroked `<path>` each, to go under the
+ * elements that fill them. Round joins and caps, as on the canvas.
+ *
+ * Where a group's bold is faked by a stroke, the canvas outlines the glyphs as
+ * that bold has grown them, so the stroke here is wider by as much: its outer
+ * edge is then where the canvas has it. Its inner edge reaches further into the
+ * glyph than on the canvas, which shows only through a see-through fill.
+ */
+function strokeElements(groups: GlyphGroups, stroke: TextStrokePaint): string[] {
+  return [groups.own, ...(groups.fallback ? [groups.fallback] : [])]
+    .filter((group) => group.paths.length > 0)
+    .map((group) => {
+      const width = stroke.width + (group.bold?.kind === 'stroke' ? group.bold.width : 0);
+      return (
+        `<path d="${group.paths.join(' ')}" fill="none" stroke="${stroke.color}" ` +
+        `stroke-width="${fmt(width)}" stroke-linejoin="${TEXT_STROKE_JOIN}" stroke-linecap="${TEXT_STROKE_JOIN}"/>`
+      );
+    });
+}
+
+/**
+ * The outline of a whole text item: `elements` (see `strokeElements`) painted
+ * opaque and, where the outline's colour is see-through, made see-through
+ * together, so that strokes that overlap do not come out darker there.
+ */
+function strokeLayer(elements: string[], stroke: TextStrokePaint): string {
+  if (elements.length === 0) return '';
+  if (stroke.alpha >= 1) return elements.join('');
+  return `<g opacity="${fmt(stroke.alpha)}">${elements.join('')}</g>`;
 }
 
 /**
@@ -366,6 +407,9 @@ function richTextSvg(
   const itemFillAttr = () => (itemFill ??= gradientOrSolidFill(item, defs, box.width, box.height));
 
   const elements: string[] = [];
+  // The outline of every fragment, under the fill of every fragment.
+  const stroke = textStrokeOf(item);
+  const strokeEls: string[] = [];
   // Fragments written so far: numbers the ids of this one's gradient and mask.
   let written = 0;
   lines.forEach((line, lineIndex) => {
@@ -435,11 +479,13 @@ function richTextSvg(
         height: lineHeight + 2 * room,
       };
       elements.push(...glyphGroupElements(groups, colours, fillAttr, area, defs, `bold-${fragmentId}`));
+      if (stroke) strokeEls.push(...strokeElements(groups, stroke));
     }
   });
 
   if (elements.length === 0) return '';
-  return wrapItem(item, effectiveOpacity, elements.join(''), pushTextFilter(item, defs));
+  const inner = (stroke ? strokeLayer(strokeEls, stroke) : '') + elements.join('');
+  return wrapItem(item, effectiveOpacity, inner, pushTextFilter(item, defs));
 }
 
 /** One line of a text item, as the canvas draws it. */
