@@ -37,6 +37,7 @@ import { useCropSession } from './useCropSession';
 import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInteractionDerivedState';
 import {
   getGroupDescendantAtPoint,
+  getSelectedHitAtPoint,
   getSelectionCycleTargetAtPoint,
 } from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
@@ -93,8 +94,11 @@ interface HandledItemPointerEvent {
   clientX: number;
   clientY: number;
   button: number;
+  /** The item the press acted on: the selected item under the pointer when it stood in for the pressed one. */
   itemId: string;
   selectionNodeId: string;
+  /** The item that received the press. */
+  pressedItemId: string;
 }
 
 interface StageDescendantClickSample {
@@ -957,14 +961,37 @@ export function useCanvasInteractionSession({
   ]);
 
   const handleItemPointerDown = useCallback((
-    item: CanvasItem,
-    selectionNodeId: string,
+    pressedItem: CanvasItem,
+    pressedSelectionNodeId: string,
     pointer: Point,
     shiftKey: boolean,
     nativeEvent?: MouseEvent,
     source: PointerGestureSource = 'stage',
   ) => {
     const shiftPressed = resolveModifierKeys({ ctrlKey: false, shiftKey }).shiftKey;
+    // A plain press where the selection lies under the pointer acts on the
+    // selection, even when the pressed item is an unselected one on top of it.
+    // Shift (toggle the pressed item), alt (cycle) and an open crop session
+    // keep addressing the pressed item.
+    let item = pressedItem;
+    let selectionNodeId = pressedSelectionNodeId;
+    if (
+      !shiftPressed &&
+      !cropSessionRef.current &&
+      !(nativeEvent && isSelectionCycleClick(nativeEvent))
+    ) {
+      const selectedHit = getSelectedHitAtPoint(renderedItems, selectedNodeIds, pointer);
+      if (selectedHit && selectedHit.item.id !== pressedItem.id) {
+        const pressedRenderable = renderableByLeafId.get(pressedItem.id);
+        const pressedIsSelected =
+          selectedIdSet.has(pressedSelectionNodeId) ||
+          Boolean(pressedRenderable?.groupPath.some((groupId) => selectedIdSet.has(groupId)));
+        if (!pressedIsSelected) {
+          item = orderedItems.find((entry) => entry.id === selectedHit.item.id) ?? selectedHit.item;
+          selectionNodeId = selectedHit.nodeId;
+        }
+      }
+    }
     if (nativeEvent) {
       lastHandledItemPointerEventRef.current = {
         nativeEvent,
@@ -974,6 +1001,7 @@ export function useCanvasInteractionSession({
         button: nativeEvent.button,
         itemId: item.id,
         selectionNodeId,
+        pressedItemId: pressedItem.id,
       };
     }
     if (nativeEvent && isSelectionCycleClick(nativeEvent) && cycleSelectionAtPointer(pointer)) {
@@ -1036,16 +1064,28 @@ export function useCanvasInteractionSession({
     onSelectNode,
     onSelectPolygonVertex,
     onToggleSelectNode,
+    orderedItems,
+    renderableByLeafId,
+    renderedItems,
     selectedIdSet,
+    selectedNodeIds,
     setPendingItemGesture,
     updateSession,
   ]);
 
-  const handleItemDoubleClick = useCallback((item: CanvasItem) => {
+  const handleItemDoubleClick = useCallback((pressedItem: CanvasItem) => {
     if (cropSessionRef.current) {
       return;
     }
     const latestHandledItemEvent = lastHandledItemPointerEventRef.current;
+    // When the first press acted on the selected item underneath the pressed
+    // one, the double-click belongs to that item too.
+    const item =
+      latestHandledItemEvent &&
+      latestHandledItemEvent.pressedItemId === pressedItem.id &&
+      latestHandledItemEvent.itemId !== pressedItem.id
+        ? orderedItems.find((entry) => entry.id === latestHandledItemEvent.itemId) ?? pressedItem
+        : pressedItem;
     const currentSelectedNodeId = selectedNodeIds.length === 1 ? selectedNodeIds[0] : null;
     const currentSelectionDrillTarget = currentSelectedNodeId
       ? getNextDrilldownNodeId(document.nodes, currentSelectedNodeId, item.id)
@@ -1079,7 +1119,7 @@ export function useCanvasInteractionSession({
       setLastDrilldownSource(null);
       startImageCropSession(item);
     }
-  }, [cropSessionRef, document.nodes, onSelectNode, selectedNodeIds, startImageCropSession]);
+  }, [cropSessionRef, document.nodes, onSelectNode, orderedItems, selectedNodeIds, startImageCropSession]);
 
   const handleStageMouseDown = useCallback((event: CanvasPointerEvent) => {
     const isCanvasSurface = event.isCanvasSurface ?? false;

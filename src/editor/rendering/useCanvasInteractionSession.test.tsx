@@ -2477,6 +2477,154 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session).toBeNull();
   });
 
+  describe('pressing an unselected item that covers the selection', () => {
+    const bottom = createRectangleItem({ id: 'bottom', x: 0, y: 0, width: 300, height: 300 });
+    const top = createRectangleItem({ id: 'top', x: 100, y: 100, width: 100, height: 100 });
+    const overlap = { x: 150, y: 150 };
+
+    function itemPress(pointer: { x: number; y: number }, overrides: Partial<MouseEvent> = {}) {
+      return makeStageEvent(pointer, 'shape', overrides).nativeEvent as MouseEvent;
+    }
+
+    it('keeps the covered selection and drags it', () => {
+      const params = createHookParams({
+        document: createDocument([bottom, top]),
+        selectedNodeIds: ['bottom'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+      });
+
+      expect(params.onSelectNode).not.toHaveBeenCalled();
+      expect(result.current.session?.kind).toBe('drag');
+
+      act(() => {
+        result.current.handleStagePointerMove(makeStageEvent({ x: 190, y: 170 }, 'shape'));
+      });
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent({ x: 190, y: 170 }, 'shape'));
+      });
+
+      expect(params.onSelectNode).not.toHaveBeenCalled();
+      expect(params.onUpdateItem).toHaveBeenCalledTimes(1);
+      expect(params.onUpdateItem.mock.calls[0][0]).toBe('bottom');
+    });
+
+    it('selects the pressed item when the selection is not under the pointer', () => {
+      const elsewhere = createRectangleItem({ id: 'elsewhere', x: 600, y: 600, width: 50, height: 50 });
+      const params = createHookParams({
+        document: createDocument([bottom, top, elsewhere]),
+        selectedNodeIds: ['elsewhere'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledWith('top');
+    });
+
+    it('keeps a multi-selection when one of its items is covered at the pointer', () => {
+      const elsewhere = createRectangleItem({ id: 'elsewhere', x: 600, y: 600, width: 50, height: 50 });
+      const params = createHookParams({
+        document: createDocument([bottom, top, elsewhere]),
+        selectedNodeIds: ['bottom', 'elsewhere'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+      });
+
+      expect(params.onSelectNode).not.toHaveBeenCalled();
+      expect(result.current.session?.kind).toBe('group-drag');
+    });
+
+    it('keeps a selected group when one of its items is covered at the pointer', () => {
+      const group = { ...createGroupNode([bottom]), id: 'group' };
+      const params = createHookParams({
+        document: createDocument([group, top]),
+        selectedNodeIds: ['group'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+      });
+
+      expect(params.onSelectNode).not.toHaveBeenCalled();
+      expect(result.current.session).not.toBeNull();
+    });
+
+    it('still adds the pressed item to the selection on shift-press', () => {
+      const params = createHookParams({
+        document: createDocument([bottom, top]),
+        selectedNodeIds: ['bottom'],
+        onToggleSelectNode: vi.fn(),
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, true, itemPress(overlap, { shiftKey: true }));
+      });
+
+      expect(params.onToggleSelectNode).toHaveBeenCalledWith('top');
+    });
+
+    it('does not hold on to a selected locked item or generator underneath', () => {
+      const lockedBottom = { ...bottom, id: 'locked-bottom', locked: true };
+      const generator = { ...createGeneratorItem('noise', 800, 600), id: 'generator' };
+      for (const [under, id] of [[lockedBottom, 'locked-bottom'], [generator, 'generator']] as const) {
+        const params = createHookParams({
+          document: createDocument([under, top]),
+          selectedNodeIds: [id],
+        });
+        const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+        act(() => {
+          result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+        });
+
+        expect(params.onSelectNode).toHaveBeenCalledWith('top');
+      }
+    });
+
+    it('opens the crop of a covered selected image on double-click', () => {
+      const image = createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 300,
+        originalHeight: 300,
+      });
+      image.id = 'covered-image';
+      image.x = 0;
+      image.y = 0;
+      image.width = 300;
+      image.height = 300;
+      const params = createHookParams({
+        document: createDocument([image, top]),
+        selectedNodeIds: [image.id],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+      });
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent(overlap, 'shape'));
+      });
+      act(() => {
+        result.current.handleItemDoubleClick(top);
+      });
+
+      expect(params.onSelectNode).not.toHaveBeenCalled();
+      expect(result.current.cropSession?.itemId).toBe(image.id);
+    });
+  });
+
   describe('alt-click selection cycling', () => {
     const bottom = createRectangleItem({ id: 'bottom', x: 0, y: 0, width: 300, height: 300 });
     const lockedMiddle = createRectangleItem({

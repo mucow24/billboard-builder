@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getGroupDescendantAtPoint,
   getItemsAtPoint,
+  getSelectedHitAtPoint,
   getSelectionCycleTargetAtPoint,
 } from './interactionHitTesting';
 import { buildRenderableCanvasItems } from './renderAdapter';
@@ -103,6 +104,49 @@ describe('getGroupDescendantAtPoint', () => {
     // Inside the bent line's box but off both strokes: no hit.
     expect(getGroupDescendantAtPoint(renderables, 'group', { x: 600, y: 40 })).toBeNull();
     expect(getGroupDescendantAtPoint(renderables, 'group', { x: 500, y: 100 })?.id).toBe('bent');
+  });
+});
+
+describe('getSelectedHitAtPoint', () => {
+  const overlap = { x: 150, y: 150 };
+
+  function selectedHit(nodes: CanvasNode[], selection: string[], point = overlap) {
+    const hit = getSelectedHitAtPoint(renderablesFor(nodes, selection), selection, point);
+    return hit ? { itemId: hit.item.id, nodeId: hit.nodeId } : null;
+  }
+
+  it('finds a selected item covered by an unselected one', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['bottom'])).toEqual({ itemId: 'bottom', nodeId: 'bottom' });
+  });
+
+  it('returns null when the selection is empty or not under the point', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100), rect('elsewhere', 600, 600)];
+
+    expect(selectedHit(nodes, [])).toBeNull();
+    expect(selectedHit(nodes, ['elsewhere'])).toBeNull();
+    expect(selectedHit(nodes, ['top'], { x: 20, y: 20 })).toBeNull();
+  });
+
+  it('returns the top-most selected item of a multi-selection', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('middle', 50, 50, 200), rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['bottom', 'middle'])).toEqual({ itemId: 'middle', nodeId: 'middle' });
+  });
+
+  it('resolves an item inside a selected group to the group', () => {
+    const group = { ...createGroupNode([rect('child', 0, 0, 300)]), id: 'group' };
+    const nodes = [group, rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['group'])).toEqual({ itemId: 'child', nodeId: 'group' });
+  });
+
+  it('skips locked items and generators', () => {
+    const generator = { ...createGeneratorItem('noise', 800, 600), id: 'generator' };
+    const nodes = [generator, rect('locked', 0, 0, 300, { locked: true }), rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['generator', 'locked'])).toBeNull();
   });
 });
 
