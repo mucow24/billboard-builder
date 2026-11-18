@@ -47,7 +47,7 @@ import type { RichTextRun } from '../../document/richText';
 import { snapOffsetToTexels } from '../textBaseline';
 import { alignedLineLeft, textBlockTop } from '../textLineBreaking';
 import { snapPaddingToTexels } from '../textInkOverhang';
-import { strokedTextPlacement, TEXT_STROKE_JOIN, textStrokeOf } from '../textStroke';
+import { textStrokeOf } from '../textStroke';
 import type { TextStrokePaint } from '../textStroke';
 import {
   layoutRichTextRuns,
@@ -59,6 +59,8 @@ import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
+import { rasteriseTextOutline } from './textOutlineImage';
+import type { TextOutlineInput } from './textOutlineImage';
 import { rasteriseRichTextShadow } from './richTextShadow';
 import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
 import { measureTextBaselineShift } from './textBaselineShift';
@@ -163,9 +165,6 @@ function pixiFontStyleOf(item: TextCanvasItem) {
   };
 }
 
-/** A paint that shows nothing: for a text drawn for its stroke or its shadow alone. */
-const NO_PAINT = '#00000000';
-
 /** One Pixi text of a text layer: the props of a `<pixiText>` and its key. */
 interface PixiTextLayer {
   key: string;
@@ -175,24 +174,55 @@ interface PixiTextLayer {
   y: number;
   resolution: number;
   alpha: number;
+  /**
+   * Set where this is not a text to show but the filled text to draw an
+   * outline around (see `outlineLayer`): the outline's width in px
+   * and its colour. Shown as an image of the outline (`TextOutline`).
+   */
+  outline?: { strokeWidth: number; color: string };
 }
 
+/** A paint that covers: what the text an outline is drawn around is filled with. */
+const SOLID_PAINT = '#000000';
+
 /**
- * The stroke of a text item as Pixi's text style has it. Opaque: the Pixi text
- * that draws it is made see-through as a whole instead (`TextStrokePaint.alpha`).
- * With `visible` false it paints nothing and still counts for the drop shadow,
- * which Pixi casts from a text's shape whatever its paints.
+ * The outline of a text (see `textStroke`): the text filled, for `TextOutline`
+ * to draw the outline around.
+ *
+ * `style` is the text's style without fill, stroke or padding; `x` and `y` are
+ * where the text's fill goes. The text gets the padding of the fill plus room
+ * for the outline, in whole blocks of texels, so that it is rasterised exactly
+ * as the fill is.
  */
-function pixiStrokeOf(
+function outlineLayer(
+  key: string,
+  text: string,
+  style: Record<string, unknown>,
   stroke: TextStrokePaint,
-  visible = true,
-): { color: string; width: number; join: typeof TEXT_STROKE_JOIN; cap: typeof TEXT_STROKE_JOIN } {
+  x: number,
+  y: number,
+  resolution: number,
+): PixiTextLayer {
+  const filled = { ...style, fill: SOLID_PAINT };
+  // A texel more than half the stroke: the outline's soft edge.
+  const room = measureTextRasterPadding(text, filled) + stroke.width / 2 + 1 / resolution;
   return {
-    color: visible ? stroke.color : NO_PAINT,
-    width: stroke.width,
-    join: TEXT_STROKE_JOIN,
-    cap: TEXT_STROKE_JOIN,
+    key,
+    text,
+    style: { ...filled, padding: snapPaddingToTexels(room, resolution) },
+    x,
+    y,
+    resolution,
+    alpha: stroke.alpha,
+    outline: { strokeWidth: stroke.width, color: stroke.color },
   };
+}
+
+/** The Pixi texts that draw a text item, the lowest first, and the shadow under them. */
+interface TextLayers {
+  texts: PixiTextLayer[];
+  /** The one shadow of the whole item, where Pixi's texts do not cast it themselves. */
+  shadow: { input: RichTextShadowInput; alpha: number } | null;
 }
 
 /**
@@ -200,18 +230,16 @@ function pixiStrokeOf(
  * `requestedResolution` is the resolution the current zoom calls for.
  *
  * Without an outline that is one text, which casts its own drop shadow. With
- * one (see `textStroke`) there are up to three:
+ * one (see `textStroke`) there are up to three things:
  *
- * - the shadow, cast from the shape of fill and stroke together. Pixi draws
- *   the shadow of the stroke and the shadow of the fill one over the other, so
- *   a see-through shadow would be darker where the two overlap. It is drawn
- *   opaque, and the text made see-through as a whole.
- * - the stroke. Pixi strokes and fills a text line by line, which puts the
- *   stroke of a line on the fill of the line above wherever lines are close.
- *   In a text of its own, every stroke is under every fill.
+ * - the shadow, cast from the shape of fill and outline together. Pixi knows
+ *   nothing of the outline, so the shadow is an image of its own (see
+ *   `richTextShadow`), drawn opaque and made see-through as a whole.
+ * - the outline, drawn around the text as it is filled (`outlineLayer`). It
+ *   is under the fill of every line.
  * - the fill: the text exactly as it is drawn without an outline.
  */
-function buildTextLayers(item: TextCanvasItem, requestedResolution: number): PixiTextLayer[] {
+function buildTextLayers(item: TextCanvasItem, requestedResolution: number): TextLayers {
   const renderBox = getRenderBox(item);
   const contentWidth = Math.max(1, renderBox.width - item.padding.left - item.padding.right);
 
@@ -231,11 +259,6 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
     whiteSpace: 'pre' as const,
   };
   const layoutStyle = { ...baseStyle, ...(dropShadow && !stroke ? { dropShadow } : {}) };
-  const strokeStyle = stroke ? { ...baseStyle, stroke: pixiStrokeOf(stroke) } : null;
-  const shadowStyle =
-    stroke && dropShadow
-      ? { ...baseStyle, stroke: pixiStrokeOf(stroke, false), dropShadow: { ...dropShadow, alpha: 1 } }
-      : null;
 
   // Pixi sizes the text texture from advance widths and the font's ascent and
   // descent, and cuts off ink outside that box: the lean of an italic glyph at
@@ -247,8 +270,6 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
   // text itself stays where it is.
   const text = drawnText(item.text);
   const inkRoom = measureTextRasterPadding(text, layoutStyle);
-  const strokeRoom = strokeStyle ? measureTextRasterPadding(text, strokeStyle) : 0;
-  const shadowRoom = shadowStyle ? measureTextRasterPadding(text, shadowStyle) : 0;
 
   // Clamp so the largest texture, the text plus that room on both sides and
   // its stroke, stays under the GPU's MAX_TEXTURE_SIZE — past the cap, glyphs
@@ -257,7 +278,7 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
   const resolution = clampRasterResolution(
     requestedResolution,
     Math.max(item.width, item.height, 1) +
-      Math.max(inkRoom, strokeRoom, shadowRoom) * 2 +
+      inkRoom * 2 +
       (stroke?.width ?? 0),
     getMaxTextureSize(),
   );
@@ -272,7 +293,9 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
   // The whole text is moved by the difference, in whole texels so that the
   // texture is still shown texel for texel.
   const textX = item.padding.left;
-  textY += snapOffsetToTexels(measureTextBaselineShift(item, baseStyle), resolution);
+  const textTop = textY;
+  const baselineShift = measureTextBaselineShift(item, baseStyle);
+  textY += snapOffsetToTexels(baselineShift, resolution);
 
   // The gradient runs across the item's box, which starts this far into the
   // texture: the padding, less where the text sits inside the box.
@@ -283,30 +306,29 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
       }) ?? item.fill
     : item.fill;
 
-  /** A text drawn for its stroke or its shadow, moved onto the glyphs of the fill. */
-  const strokedLayer = (
-    key: string,
-    style: Record<string, unknown>,
-    room: number,
-    alpha: number,
-  ): PixiTextLayer => {
-    const placement = strokedTextPlacement(room, stroke?.width ?? 0, resolution);
-    return {
-      key,
-      text,
-      style: { ...style, fill: NO_PAINT, padding: placement.padding },
-      x: textX + placement.offset,
-      y: textY + placement.offset,
-      resolution,
-      alpha,
-    };
+  return {
+    texts: [
+      ...(stroke ? [outlineLayer('stroke', text, baseStyle, stroke, textX, textY, resolution)] : []),
+      { key: 'fill', text, style: { ...layoutStyle, fill, padding }, x: textX, y: textY, resolution, alpha: 1 },
+    ],
+    shadow:
+      stroke && dropShadow
+        ? {
+            input: {
+              casters: [{ text, style: baseStyle, left: textX, lineTop: textTop, baselineShift }],
+              strokeWidth: stroke.width,
+              shadow: {
+                angle: dropShadow.angle,
+                distance: dropShadow.distance,
+                blur: dropShadow.blur,
+                color: dropShadow.color,
+              },
+              requestedResolution,
+            },
+            alpha: dropShadow.alpha,
+          }
+        : null,
   };
-
-  return [
-    ...(shadowStyle ? [strokedLayer('shadow', shadowStyle, shadowRoom, dropShadow?.alpha ?? 1)] : []),
-    ...(stroke && strokeStyle ? [strokedLayer('stroke', strokeStyle, strokeRoom, stroke.alpha)] : []),
-    { key: 'fill', text, style: { ...layoutStyle, fill, padding }, x: textX, y: textY, resolution, alpha: 1 },
-  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +360,7 @@ function buildRichTextFragments(
   item: TextCanvasItem,
   runs: RichTextRun[],
   requestedResolution: number,
-): { texts: PixiTextLayer[]; shadow: { input: RichTextShadowInput; alpha: number } | null } | null {
+): TextLayers | null {
   const context = getTextMeasuringContext();
   if (!context) return null;
 
@@ -370,44 +392,30 @@ function buildRichTextFragments(
   type Part = 'stroke' | 'fill';
   const parts: Part[] = [...(stroke ? ['stroke' as const] : []), 'fill'];
 
-  /** The stroke a part's text has. */
-  const strokeOf = (part: Part) => (part === 'fill' ? null : stroke);
-
-  /** The style a part of a fragment is laid out and measured with: all of it but fill and padding. */
-  const layoutStyleOf = ({ fragment }: PlacedFragment, part: Part) => {
-    const partStroke = strokeOf(part);
-    return {
-      ...pixiFontStyleOf(richTextRunItem(item, fragment.run)),
-      wordWrap: false,
-      whiteSpace: 'pre' as const,
-      ...(partStroke ? { stroke: pixiStrokeOf(partStroke) } : {}),
-    };
-  };
+  /** The style a fragment is laid out and measured with: all of it but fill and padding. */
+  const layoutStyleOf = ({ fragment }: PlacedFragment) => ({
+    ...pixiFontStyleOf(richTextRunItem(item, fragment.run)),
+    wordWrap: false,
+    whiteSpace: 'pre' as const,
+  });
 
   /**
-   * The Pixi texts of a fragment, by part: its stroke alone, and the fragment
+   * The Pixi texts of a fragment, by part: its outline alone, and the fragment
    * itself without one.
    */
   const pixiTextsOf = (placed: PlacedFragment): Partial<Record<Part, PixiTextLayer>> => {
-    const measured = parts.map((part) => {
-      const layoutStyle = layoutStyleOf(placed, part);
-      return { part, layoutStyle, inkRoom: measureTextRasterPadding(placed.fragment.text, layoutStyle) };
-    });
+    const layoutStyle = layoutStyleOf(placed);
+    const inkRoom = measureTextRasterPadding(placed.fragment.text, layoutStyle);
     // One resolution for all of a fragment's texts, clamped for the largest of
-    // their textures: the stroke is rasterised on the texels the fill is (see
-    // `buildTextLayers`).
+    // their textures: the outline is drawn around the texels the fill is on
+    // (see `buildTextLayers`).
     const resolution = clampRasterResolution(
       requestedResolution,
-      Math.max(placed.fragment.width, lineHeight, 1) +
-        Math.max(...measured.map(({ inkRoom }) => inkRoom)) * 2 +
-        (stroke?.width ?? 0),
+      Math.max(placed.fragment.width, lineHeight, 1) + inkRoom * 2 + (stroke?.width ?? 0),
       getMaxTextureSize(),
     );
     return Object.fromEntries(
-      measured.map(({ part, layoutStyle, inkRoom }) => [
-        part,
-        pixiTextOf(placed, part, layoutStyle, inkRoom, resolution),
-      ]),
+      parts.map((part) => [part, pixiTextOf(placed, part, layoutStyle, inkRoom, resolution)]),
     );
   };
 
@@ -418,10 +426,7 @@ function buildRichTextFragments(
     inkRoom: number,
     resolution: number,
   ): PixiTextLayer => {
-    const partStroke = strokeOf(part);
-    // A stroked text is moved back onto the glyphs of the unstroked one.
-    const placement = strokedTextPlacement(inkRoom, partStroke?.width ?? 0, resolution);
-    const padding = placement.padding;
+    const padding = snapPaddingToTexels(inkRoom, resolution);
 
     // `item` gives the baseline wanted, `layoutStyle` where Pixi draws this
     // fragment's font: the difference moves the fragment onto the shared line.
@@ -429,11 +434,14 @@ function buildRichTextFragments(
     const shift = snapOffsetToTexels(measureTextBaselineShift(item, layoutStyle), resolution);
     const y = lineTop + shift;
 
+    // The outline is drawn around the fragment as it is filled.
+    if (part === 'stroke' && stroke) {
+      return outlineLayer(`${part}:${key}`, fragment.text, layoutStyle, stroke, x, y, resolution);
+    }
+
     const paint = fragment.run.paint;
     let fill: FillGradient | string = item.fill;
-    if (part !== 'fill') {
-      fill = NO_PAINT;
-    } else if (paint?.kind === 'color') {
+    if (paint?.kind === 'color') {
       fill = paint.color;
     } else if (paint?.kind === 'gradient') {
       // Across the fragment's own box, as a layer's gradient runs across the
@@ -465,15 +473,15 @@ function buildRichTextFragments(
       text: fragment.text,
       style: { ...layoutStyle, fill, padding },
       resolution,
-      x: x + placement.offset,
-      y: y + placement.offset,
-      alpha: partStroke?.alpha ?? 1,
+      x,
+      y,
+      alpha: 1,
     };
   };
 
   /** A fragment as the shadow is cast from it: its glyphs and its stroke. */
   const shadowCasterOf = (placed: PlacedFragment): ShadowCaster => {
-    const style = layoutStyleOf(placed, stroke ? 'stroke' : 'fill');
+    const style = layoutStyleOf(placed);
     return {
       text: placed.fragment.text,
       style,
@@ -573,6 +581,40 @@ function RichTextShadow({
   );
 }
 
+/**
+ * The outline around a filled text (`PixiTextLayer.outline`): one sprite,
+ * where a `<pixiText>` would show the text itself.
+ *
+ * `fontsKey` changes when a font the item is drawn with arrives: the image is
+ * drawn anew then, as the texts are.
+ */
+function TextOutline({ input, alpha, fontsKey }: { input: TextOutlineInput; alpha: number; fontsKey: string }) {
+  // `input` is built anew on every render; its JSON says whether it changed.
+  const inputKey = JSON.stringify(input);
+  const image = useMemo(() => {
+    const drawn = rasteriseTextOutline(JSON.parse(inputKey) as TextOutlineInput);
+    if (!drawn) return null;
+    // The source's resolution makes the texture as large in px as the image is.
+    const source = new CanvasSource({ resource: drawn.canvas, resolution: drawn.resolution });
+    return { texture: new Texture({ source }), x: drawn.x, y: drawn.y };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fontsKey: the same input draws differently once its font is in.
+  }, [inputKey, fontsKey]);
+  useDestroyedWhenUnused(image?.texture ?? null);
+
+  if (!image) return null;
+  // Keyed by texture: a sprite takes its size from its texture only when it is given one.
+  return (
+    <pixiSprite
+      key={image.texture.uid}
+      texture={image.texture}
+      x={image.x}
+      y={image.y}
+      alpha={alpha}
+      eventMode="none"
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Text content component (redraws when the text's font arrives)
 // ---------------------------------------------------------------------------
@@ -607,28 +649,45 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
   const fragments = rich.hasMarkup
     ? buildRichTextFragments(item, rich.runs, requestedResolution)
     : null;
-  const layers = fragments?.texts ?? buildTextLayers(item, requestedResolution);
+  const { texts: layers, shadow } = fragments ?? buildTextLayers(item, requestedResolution);
+  const fontsKey = `${fontRegistrations}:${document.fonts?.size ?? 0}`;
   return (
     <>
-      {fragments?.shadow ? (
+      {shadow ? (
         <RichTextShadow
-          input={fragments.shadow.input}
-          alpha={fragments.shadow.alpha}
-          fontsKey={`${fontRegistrations}:${document.fonts?.size ?? 0}`}
+          input={shadow.input}
+          alpha={shadow.alpha}
+          fontsKey={fontsKey}
         />
       ) : null}
-      {layers.map((layer) => (
-        <pixiText
-          key={layer.key}
-          text={layer.text}
-          style={layer.style}
-          x={layer.x}
-          y={layer.y}
-          alpha={layer.alpha}
-          resolution={layer.resolution}
-          eventMode="none"
-        />
-      ))}
+      {layers.map((layer) =>
+        layer.outline ? (
+          <TextOutline
+            key={layer.key}
+            input={{
+              text: layer.text,
+              style: layer.style,
+              x: layer.x,
+              y: layer.y,
+              resolution: layer.resolution,
+              ...layer.outline,
+            }}
+            alpha={layer.alpha}
+            fontsKey={fontsKey}
+          />
+        ) : (
+          <pixiText
+            key={layer.key}
+            text={layer.text}
+            style={layer.style}
+            x={layer.x}
+            y={layer.y}
+            alpha={layer.alpha}
+            resolution={layer.resolution}
+            eventMode="none"
+          />
+        ),
+      )}
     </>
   );
 }

@@ -4,7 +4,7 @@ import { createDefaultProjectDocument, createTextItem } from '../../document/doc
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { fakeMeasurer, fakeOutlineFont, makeSvgDeps } from '../../../test/svgExportFakes';
 import { documentToSvg } from './documentToSvg';
-import type { GlyphPathStyle, SyntheticFontStyle } from './svgExportTypes';
+import type { GlyphPathStyle, SyntheticFontStyle, TextMeasurer } from './svgExportTypes';
 
 /**
  * The outline of a text layer as `svgText` writes it. That it looks like the
@@ -12,13 +12,17 @@ import type { GlyphPathStyle, SyntheticFontStyle } from './svgExportTypes';
  * tests pin down what is written, and in which order.
  */
 
-function exportText(overrides: Partial<TextCanvasItem>, synthetic?: SyntheticFontStyle): string {
+function exportText(
+  overrides: Partial<TextCanvasItem>,
+  synthetic?: SyntheticFontStyle,
+  measurer: TextMeasurer = fakeMeasurer,
+): string {
   const item = createTextItem({ id: 'layer', text: 'AB', fontSize: 64, ...overrides });
   return documentToSvg(
     { ...createDefaultProjectDocument(), nodes: [item] },
     makeSvgDeps({
       fontOutlines: { getOutlineFont: () => ({ ok: true, font: fakeOutlineFont, synthetic }) },
-      measurer: fakeMeasurer,
+      measurer,
     }),
   ).svg;
 }
@@ -101,6 +105,62 @@ describe('text with an outline', () => {
     expect(tags.map(isOutline)).toEqual([true, false]);
     expect(tags[0]).toContain('stroke-width="10"');
     expect(tags[1]).toContain('stroke-width="2" stroke-linejoin="miter"');
+  });
+
+  // The widened stroke reaches further into the glyphs than the outline of the
+  // bold does, which a see-through fill would show.
+  describe('around faked bold with a see-through fill', () => {
+    const maskOf = (svg: string) => svg.match(/<mask id="outline-layer"[^>]*>(.*?)<\/mask>/s)?.[1];
+    const outlineOf = (svg: string) => pathTags(svg.replace(/<mask.*?<\/mask>/gs, '')).find(isOutline);
+
+    it('leaves the stroke whole under an opaque fill', () => {
+      const svg = exportText({ ...OUTLINED, fill: '#336699' }, { bold: true, italic: false });
+      expect(svg).not.toContain('<mask');
+    });
+
+    it('hides the inside of the bold, less the half of a wide outline that lies in it', () => {
+      const svg = exportText({ ...OUTLINED, fill: '#33669900' }, { bold: true, italic: false });
+      expect(outlineOf(svg)).toContain('stroke-width="10"');
+      expect(outlineOf(svg)).toContain('mask="url(#outline-layer)"');
+      const hidden = pathTags(maskOf(svg) ?? '');
+      expect(hidden).toHaveLength(2);
+      expect(hidden[0]).toContain('fill="#000"');
+      expect(hidden[0]).not.toContain('stroke');
+      // 8 wide around a bold grown by 2: 6 of it is inside the regular outlines.
+      expect(hidden[1]).toContain('fill="none" stroke="#fff" stroke-width="6" stroke-linejoin="round"');
+    });
+
+    it('hides the regular glyphs grown short of the bold under a thin outline', () => {
+      const svg = exportText({ stroke: '#ff0000ff', strokeWidth: 0.5, fill: '#33669980' }, { bold: true, italic: false });
+      const hidden = pathTags(maskOf(svg) ?? '');
+      expect(hidden).toHaveLength(1);
+      expect(hidden[0]).toContain('fill="#000" stroke="#000" stroke-width="1.5" stroke-linejoin="miter" stroke-miterlimit="4"');
+    });
+  });
+
+  // Firefox fakes bold by smearing the glyph sideways: the stroke runs around
+  // every copy, inside the smear too.
+  describe('around smeared bold with a see-through fill', () => {
+    const smearing: TextMeasurer = { ...fakeMeasurer, syntheticBoldAdvance: () => 2 };
+    const exported = (fill: string) => exportText({ ...OUTLINED, fill }, { bold: true, italic: false }, smearing);
+
+    it('leaves the stroke whole under an opaque fill', () => {
+      expect(exported('#336699')).not.toContain('<mask');
+    });
+
+    it('hides one copy made smaller by half the outline, at every place the glyph is smeared to', () => {
+      const svg = exported('#33669900');
+      const copy = svg.match(/<mask id="outline-layer-copy"[^>]*>(.*?)<\/mask>/s)?.[1] ?? '';
+      expect(copy).toContain('fill="#fff" stroke="#000" stroke-width="8" stroke-linejoin="round"');
+      const hidden = svg.match(/<mask id="outline-layer"[^>]*>(.*?)<\/mask>/s)?.[1] ?? '';
+      const places = [...hidden.matchAll(/<g transform="translate\(([\d.]+) 0\)"><rect [^>]*mask="url\(#outline-layer-copy\)"/g)];
+      expect(places.length).toBeGreaterThanOrEqual(3);
+      expect(Number(places[0][1])).toBe(0);
+      expect(Number(places[places.length - 1][1])).toBe(2);
+      const outline = pathTags(svg.replace(/<mask.*?<\/mask>/gs, '')).find(isOutline);
+      expect(outline).toContain('stroke-width="8"');
+      expect(outline).toContain('mask="url(#outline-layer)"');
+    });
   });
 
   it('casts the shadow from outline and fill together', () => {
