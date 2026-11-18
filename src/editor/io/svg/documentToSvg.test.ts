@@ -223,8 +223,17 @@ describe('documentToSvg — shadow / blur filters', () => {
     ]);
     expect(svg).toContain('<filter id="fx-s1"');
     expect(svg).toMatch(/<feDropShadow[^>]*dx="2"[^>]*dy="3"/);
+    // As soft as the canvas draws it: 0.905 times the blur, plus 1.5.
+    expect(svg).toMatch(/<feDropShadow[^>]*stdDeviation="5.12"/);
     expect(svg).toContain('flood-opacity="0.5"');
     expect(svg).toContain('filter="url(#fx-s1)"');
+  });
+
+  it('leaves a shadow without blur sharp', () => {
+    const svg = svgOf([
+      createRectangleItem({ shadow: { color: '#000000', blur: 0, offsetX: 2, offsetY: 3, opacity: 0.5 } }),
+    ]);
+    expect(svg).toMatch(/<feDropShadow[^>]*stdDeviation="0"/);
   });
 
   it('omits the shadow filter when shadow opacity is 0', () => {
@@ -233,7 +242,8 @@ describe('documentToSvg — shadow / blur filters', () => {
 
   it('emits a feGaussianBlur filter for blurRadius', () => {
     const svg = svgOf([createRectangleItem({ id: 'b1', blurRadius: 6 })]);
-    expect(svg).toMatch(/<feGaussianBlur[^>]*stdDeviation="3"/);
+    // As far as the canvas blurs: a standard deviation of 1.355 times the radius.
+    expect(svg).toMatch(/<feGaussianBlur[^>]*stdDeviation="8.13"/);
     expect(svg).toContain('filter="url(#fx-b1)"');
   });
 });
@@ -247,7 +257,8 @@ describe('documentToSvg — filter region of shapes, lines, images and generator
     const attr = (name: string) => Number(tag.match(new RegExp(` ${name}="([^"]+)"`))?.[1]);
     expect(tag).toContain('filterUnits="userSpaceOnUse"');
     const [x, y, width, height] = [attr('x'), attr('y'), attr('width'), attr('height')];
-    return { left: x, top: y, right: x + width, bottom: y + height };
+    const round = (value: number) => Math.round(value * 1000) / 1000;
+    return { left: x, top: y, right: round(x + width), bottom: round(y + height) };
   }
 
   it('reaches down to a shadow that falls further than half the item', () => {
@@ -264,14 +275,15 @@ describe('documentToSvg — filter region of shapes, lines, images and generator
         height: 10,
         stroke: '#ff0000',
         strokeWidth: 30,
-        // A blur of 8 is a standard deviation of 2, which shows 6 px out.
+        // A blur of 8 is a standard deviation of 8.74, which shows 26.22 px out:
+        // further than the shadow is moved to the right, so it shows on the left too.
         shadow: { ...SHADOW, blur: 8, offsetX: 25, offsetY: -40 },
       }),
     ]);
     expect(filterRegion(svg)).toEqual({
-      left: -15,
-      top: -15 - 40 - 6,
-      right: 200 + 15 + 25 + 6,
+      left: -15 - 1.22,
+      top: -15 - 40 - 26.22,
+      right: 200 + 15 + 25 + 26.22,
       bottom: 10 + 15,
     });
   });
@@ -290,9 +302,9 @@ describe('documentToSvg — filter region of shapes, lines, images and generator
   });
 
   it('holds the blur on every side', () => {
-    // A blur radius of 6 is a standard deviation of 3, which shows 9 px out.
+    // A blur radius of 6 is a standard deviation of 8.13, which shows 24.39 px out.
     const svg = svgOf([createRectangleItem({ width: 200, height: 8, strokeWidth: 0, blurRadius: 6 })]);
-    expect(filterRegion(svg)).toEqual({ left: -9, top: -9, right: 209, bottom: 17 });
+    expect(filterRegion(svg)).toEqual({ left: -24.39, top: -24.39, right: 224.39, bottom: 32.39 });
   });
 
   it('gives a horizontal line a region as tall as its stroke', () => {
@@ -337,8 +349,9 @@ describe('documentToSvg — filter region of shapes, lines, images and generator
         shadow: { ...SHADOW, offsetX: 80 },
       }),
     ]);
-    // SVG mitres a corner out to 4 half stroke widths, then bevels it.
-    expect(filterRegion(svg)).toEqual({ left: -40, top: -40, right: 120 + 40 + 80, bottom: 140 });
+    // Like the canvas, the SVG mitres a corner out to 10 half stroke widths, then bevels it.
+    expect(svg).toContain('stroke-miterlimit="10"');
+    expect(filterRegion(svg)).toEqual({ left: -100, top: -100, right: 120 + 100 + 80, bottom: 200 });
   });
 
   it('measures the region of an image and of a generator from their box', () => {
@@ -358,11 +371,12 @@ describe('documentToSvg — filter region of shapes, lines, images and generator
     });
 
     const generator = createGeneratorItem('scanlines', 800, 600);
+    // A blur radius of 4 shows 16.26 px out.
     expect(filterRegion(svgOf([{ ...generator, blurRadius: 4 }]))).toEqual({
-      left: -6,
-      top: -6,
-      right: 806,
-      bottom: 606,
+      left: -16.26,
+      top: -16.26,
+      right: 816.26,
+      bottom: 616.26,
     });
   });
 });

@@ -155,9 +155,9 @@ describe('the filter region of text with an outline', () => {
   it('holds what a layer blur spreads', () => {
     const sharp = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW })).region;
     const blurred = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW, blurRadius: 8 })).region;
-    // Three standard deviations of the blur, which is half its radius.
-    expect(sharp.x - blurred.x).toBeCloseTo(12, 5);
-    expect(blurred.bottom - sharp.bottom).toBeCloseTo(12, 5);
+    // Three standard deviations of the blur, which is 1.355 times its radius.
+    expect(sharp.x - blurred.x).toBeCloseTo(32.52, 2);
+    expect(blurred.bottom - sharp.bottom).toBeCloseTo(32.52, 2);
   });
 
   it('grows with the outline', () => {

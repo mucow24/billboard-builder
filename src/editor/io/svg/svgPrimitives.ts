@@ -25,14 +25,36 @@ interface GradientCapable {
 }
 
 /**
- * Gaussian-vs-Kawase blur conversion factors (see plan): Pixi halves the app
- * shadow blur before handing it to a Kawase DropShadowFilter, and a Kawase blur
- * of strength X ≈ a Gaussian sigma of X/2 — so a feDropShadow stdDeviation of
- * blur/4 approximates Pixi's shadow. blurRadius maps to a Gaussian sigma of
- * blurRadius/2. Both are starting points flagged for a screenshot tuning pass.
+ * The Gaussians that come closest to what the canvas draws, measured on
+ * Export > PNG: a Gaussian edge fitted, by least squares, to the edge of a
+ * blurred square and to the edge of the blurred shadow of a square, for blur
+ * values from 1 to 32. The results are the same at every device pixel ratio.
+ *
+ * - `blurRadius` goes to Pixi's BlurFilter as its strength. Its edge is a
+ *   Gaussian with a standard deviation of 1.355 times the radius, to within
+ *   1.6% of full opacity anywhere along the edge.
+ * - A shape's shadow blur goes, halved, to a Kawase blur of 8 passes
+ *   (DropShadowFilter). Its edge is a Gaussian, to within 1%, with a standard
+ *   deviation of 0.905 times the blur plus 1.5 px: every pass samples half a
+ *   texel off, which blurs a little whatever the blur is. A blur of 0 skips
+ *   the passes and leaves the shadow sharp.
  */
-const SHADOW_BLUR_TO_STDDEV = 0.25;
-const BLUR_RADIUS_TO_STDDEV = 0.5;
+const BLUR_RADIUS_TO_STDDEV = 1.355;
+const SHADOW_BLUR_TO_STDDEV = 0.905;
+const SHADOW_BLUR_STDDEV_FLOOR = 1.5;
+
+/** Standard deviation of the Gaussian that matches a shape's shadow at `blur` on the canvas. */
+function shapeShadowStdDev(blur: number): number {
+  return blur > 0 ? blur * SHADOW_BLUR_TO_STDDEV + SHADOW_BLUR_STDDEV_FLOOR : 0;
+}
+
+/**
+ * Pixi's default miter limit, which the canvas draws the corners of an n-gon
+ * with: a corner is mitred while its tip is at most this many half stroke
+ * widths from its vertex, and bevelled past that. SVG has the same rule with a
+ * default of 4.
+ */
+export const NGON_MITER_LIMIT = 10;
 /** Pixi renders text shadow via the canvas-2D text style with an un-halved blur, so text uses a larger sigma than shapes. */
 export const TEXT_SHADOW_BLUR_TO_STDDEV = 0.5;
 /** A Gaussian blur paints nothing that shows further out than this many standard deviations. */
@@ -90,7 +112,9 @@ export function ngonShape(item: NgonCanvasItem, fillAttr: string): string {
   const points = computeNgonPoints(item.width, item.height, item.sides)
     .map((p) => `${fmt(p.x)},${fmt(p.y)}`)
     .join(' ');
-  return `<polygon points="${points}" ${fillAttr}${strokeAttr(item)}/>`;
+  const stroke = strokeAttr(item);
+  const miter = stroke ? ` stroke-miterlimit="${NGON_MITER_LIMIT}"` : '';
+  return `<polygon points="${points}" ${fillAttr}${stroke}${miter}/>`;
 }
 
 /**
@@ -190,7 +214,7 @@ export function itemFilterDef(
   // includeShadow + its own (larger) sigma because Pixi renders text shadow
   // through the text style rather than the container filter.
   const includeShadow = opts?.includeShadow ?? item.kind !== 'text';
-  const shadowStdDevFactor = opts?.shadowStdDevFactor ?? SHADOW_BLUR_TO_STDDEV;
+  const shadowStdDevFactor = opts?.shadowStdDevFactor;
 
   const primitives: string[] = [];
   let input = 'SourceGraphic';
@@ -214,7 +238,8 @@ export function itemFilterDef(
   if (hasShadow) {
     const { hex, alpha } = toSvgPaint(s.color);
     const floodOpacity = alpha * s.opacity;
-    const stdDev = s.blur * shadowStdDevFactor;
+    const stdDev =
+      shadowStdDevFactor === undefined ? shapeShadowStdDev(s.blur) : s.blur * shadowStdDevFactor;
     primitives.push(
       `<feDropShadow in="${input}" dx="${fmt(s.offsetX)}" dy="${fmt(s.offsetY)}" ` +
         `stdDeviation="${fmt(stdDev)}" ` +

@@ -24,6 +24,11 @@ import {
  * wide stroke and a shadow longer than half the item, and is empty for a
  * horizontal line.
  *
+ * The canvas blurs with Pixi's filters, the SVG with Gaussians: the export
+ * picks the Gaussians that come closest, so a blurred item and a soft shadow
+ * are as wide and as dark in the SVG as on the canvas. The corners of an n-gon
+ * are mitred up to the same limit in both.
+ *
  * Every case is drawn twice from the same layers, by the canvas (Export > PNG)
  * and by the browser from Export > SVG, and the two are compared.
  */
@@ -49,10 +54,10 @@ interface FilterCase {
   /** The item, given the top-left corner of its box. */
   build: (x: number, y: number) => Fixture;
   /**
-   * What the SVG has to paint (left, top, right, bottom, in px of the cell),
-   * for a case that cannot be compared with the canvas.
+   * Blurred: compared by how opaque each pixel is, since a blurred edge has no
+   * place of its own, and the two blurs are close but not the same.
    */
-  svgPaints?: number[];
+  soft?: boolean;
 }
 
 const CASES: FilterCase[] = [
@@ -140,15 +145,72 @@ const CASES: FilterCase[] = [
     id: 'image',
     build: (x, y) => createImageFixture({ x, y, width: 200, height: 24, shadow: hardShadow(0, 50) }),
   },
-  // The blur reaches further past the item than half its height. The canvas
-  // blurs about twice as far as the SVG does, so this case is held against the
-  // Gaussian the SVG asks for (a standard deviation of 8 px): it fades to the
-  // alpha the bounds are read at 14 px from the middle of the bar and 5.5 px
-  // past its ends.
+  // The canvas mitres a corner this pointed; SVG's default limit would bevel it.
+  {
+    id: 'pointed triangle',
+    build: (x, y) =>
+      createNgonFixture({
+        x,
+        y,
+        width: 160,
+        height: 40,
+        sides: 3,
+        stroke: '#ff0000',
+        strokeWidth: 20,
+        shadow: hardShadow(0, 50),
+      }),
+  },
+  // The blur reaches further past the item than half its height.
   {
     id: 'blur',
-    svgPaints: [AT.dx - 5.5, AT.dy + 4 - 14, AT.dx + 200 + 4.5, AT.dy + 3 + 14],
-    build: (x, y) => createRectangleFixture({ x, y, width: 200, height: 8, fill: '#ff0000', blurRadius: 16 }),
+    soft: true,
+    build: (x, y) => createRectangleFixture({ x, y, width: 200, height: 8, fill: '#ff0000', blurRadius: 10 }),
+  },
+  {
+    id: 'wide blur',
+    soft: true,
+    build: (x, y) => createRectangleFixture({ x, y, width: 160, height: 80, fill: '#ff0000', blurRadius: 12 }),
+  },
+  {
+    id: 'soft shadow',
+    soft: true,
+    build: (x, y) =>
+      createRectangleFixture({
+        x,
+        y,
+        width: 160,
+        height: 50,
+        fill: '#ff0000',
+        shadow: { color: SHADOW, blur: 12, offsetX: 30, offsetY: 50, opacity: 1 },
+      }),
+  },
+  {
+    id: 'faint soft shadow',
+    soft: true,
+    build: (x, y) =>
+      createEllipseFixture({
+        x,
+        y,
+        width: 160,
+        height: 60,
+        fill: '#ff0000',
+        shadow: { color: SHADOW, blur: 4, offsetX: -20, offsetY: 40, opacity: 0.5 },
+      }),
+  },
+  // The shadow is cast from the blurred shape.
+  {
+    id: 'blur and soft shadow',
+    soft: true,
+    build: (x, y) =>
+      createRectangleFixture({
+        x,
+        y,
+        width: 160,
+        height: 50,
+        fill: '#ff0000',
+        blurRadius: 4,
+        shadow: { color: SHADOW, blur: 8, offsetX: 30, offsetY: 50, opacity: 1 },
+      }),
   },
 ];
 
@@ -159,6 +221,10 @@ const PLACED = CASES.map((entry, index) => {
 
 const CANVAS = { width: COLUMNS * CELL.width, height: Math.ceil(CASES.length / COLUMNS) * CELL.height };
 
+/** How far apart the faint outer edge of a blur may be, in px, and how much its opacity may differ, of 255. */
+const SOFT_EDGE_PX = 2;
+const SOFT_ALPHA = 12;
+
 interface Report {
   id: string;
   /** Bounds of everything painted (alpha 24 of 255 and up): left, top, right, bottom, in px of the cell. */
@@ -166,6 +232,9 @@ interface Report {
   canvasBox: number[] | null;
   /** Pixels solid in one and empty in the other. */
   disagree: number;
+  /** The most the SVG's opacity at a pixel is outside the canvas's at that pixel and its neighbours, of 255, and where. */
+  alphaOff: number;
+  alphaOffAt: string;
 }
 
 async function compareSvgWithCanvas(page: Page, svg: string, pngBase64: string): Promise<Report[]> {
@@ -201,10 +270,30 @@ async function compareSvgWithCanvas(page: Page, svg: string, pngBase64: string):
           return box;
         };
         let disagree = 0;
+        let alphaOff = 0;
+        let alphaOffAt = '';
         for (let at = 0; at < a.length; at += 4) {
           if ((a[at + 3] >= 250 && b[at + 3] <= 5) || (b[at + 3] >= 250 && a[at + 3] <= 5)) disagree += 1;
+          // Held against the canvas's pixels around it too: the sharp edge of
+          // the item itself can fall a pixel apart in the two.
+          const x = (at / 4) % cell.width;
+          const y = Math.floor(at / 4 / cell.width);
+          let low = 255;
+          let high = 0;
+          for (let ny = Math.max(0, y - 1); ny <= Math.min(cell.height - 1, y + 1); ny += 1) {
+            for (let nx = Math.max(0, x - 1); nx <= Math.min(cell.width - 1, x + 1); nx += 1) {
+              const alpha = b[(ny * cell.width + nx) * 4 + 3];
+              low = Math.min(low, alpha);
+              high = Math.max(high, alpha);
+            }
+          }
+          const off = Math.max(0, a[at + 3] - high, low - a[at + 3]);
+          if (off > alphaOff) {
+            alphaOff = off;
+            alphaOffAt = `${x},${y}: SVG ${a[at + 3]}, canvas ${low} to ${high} around it`;
+          }
         }
-        return { id: entry.id, svgBox: bounds(a), canvasBox: bounds(b), disagree };
+        return { id: entry.id, svgBox: bounds(a), canvasBox: bounds(b), disagree, alphaOff, alphaOffAt };
       });
     },
     { svg, pngBase64, placed: PLACED.map(({ id, cell }) => ({ id, cell })), cell: CELL },
@@ -236,16 +325,18 @@ test.describe('SVG export of blur and drop shadow', () => {
       const entry = CASES.find((candidate) => candidate.id === report.id)!;
       expect.soft(report.canvasBox, `${report.id}: the canvas draws the item`).not.toBeNull();
       expect.soft(report.svgBox, `${report.id}: the SVG draws the item`).not.toBeNull();
-      const expected = entry.svgPaints ?? report.canvasBox;
-      const offBy = (report.svgBox ?? []).map((edge, index) => Math.abs(edge - (expected?.[index] ?? NaN)));
+      const offBy = (report.svgBox ?? []).map((edge, index) => Math.abs(edge - (report.canvasBox?.[index] ?? NaN)));
       expect
         .soft(
           offBy.length === 4 ? Math.max(...offBy) : NaN,
-          `${report.id}: SVG paints ${report.svgBox}, ${entry.svgPaints ? 'not' : 'the canvas'} ${expected} (left, top, right, bottom)`,
+          `${report.id}: SVG paints ${report.svgBox}, the canvas ${report.canvasBox} (left, top, right, bottom)`,
         )
-        .toBeLessThanOrEqual(entry.svgPaints ? 1.5 : 1);
-      if (!entry.svgPaints) {
-        expect.soft(report.disagree, `${report.id}: pixels painted in only one of SVG and canvas`).toBeLessThanOrEqual(8);
+        .toBeLessThanOrEqual(entry.soft ? SOFT_EDGE_PX : 1);
+      expect.soft(report.disagree, `${report.id}: pixels painted in only one of SVG and canvas`).toBeLessThanOrEqual(8);
+      if (entry.soft) {
+        expect
+          .soft(report.alphaOff, `${report.id}: opacity differs most at ${report.alphaOffAt}`)
+          .toBeLessThanOrEqual(SOFT_ALPHA);
       }
     }
   });

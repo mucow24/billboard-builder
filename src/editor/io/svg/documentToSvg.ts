@@ -7,6 +7,7 @@ import {
   gradientOrSolidFill,
   imageShape,
   itemFilterDef,
+  NGON_MITER_LIMIT,
   ngonShape,
   polygonShape,
   rectShape,
@@ -107,9 +108,6 @@ function serializeLeaf(
   }
 }
 
-/** SVG's default `stroke-miterlimit`: a mitred corner reaches at most this many half stroke widths past its vertex. */
-const SVG_MITER_LIMIT = 4;
-
 /**
  * The area that holds all of a non-text item's ink, in the coordinates of the
  * item's group (origin at the item's top-left corner, before rotation): its box,
@@ -118,7 +116,7 @@ const SVG_MITER_LIMIT = 4;
  * A stroke is centred on the outline, so it reaches half its width past the box.
  * The corners of a rectangle stay inside that, an ellipse has none, a freeform
  * polygon has round joins and a line square-cut ends. Only the mitred corners of
- * an n-gon go further: up to the miter limit, past which SVG bevels them.
+ * an n-gon go further: up to the miter limit, past which they are bevelled.
  */
 export function itemInkArea(item: Exclude<CanvasItem, { kind: 'text' }>): {
   x: number;
@@ -128,7 +126,7 @@ export function itemInkArea(item: Exclude<CanvasItem, { kind: 'text' }>): {
 } {
   let reach = 0;
   if ('strokeWidth' in item && item.strokeWidth > 0 && item.stroke && item.stroke !== 'transparent') {
-    reach = (item.strokeWidth / 2) * (item.kind === 'ngon' ? SVG_MITER_LIMIT : 1);
+    reach = (item.strokeWidth / 2) * (item.kind === 'ngon' ? NGON_MITER_LIMIT : 1);
   }
   return { x: -reach, y: -reach, width: item.width + 2 * reach, height: item.height + 2 * reach };
 }
