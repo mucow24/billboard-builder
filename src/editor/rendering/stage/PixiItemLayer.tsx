@@ -366,18 +366,16 @@ function buildRichTextFragments(
   });
 
   type PlacedFragment = (typeof fragments)[number];
+  type Part = 'shadow' | 'stroke' | 'fill';
+  const parts: Part[] = [...(dropShadow ? ['shadow' as const] : []), ...(stroke ? ['stroke' as const] : []), 'fill'];
 
-  /**
-   * The Pixi text of a fragment: its shadow alone, its stroke alone, or the
-   * fragment itself without either.
-   */
-  const pixiTextOf = (
-    { fragment, key, left, lineTop }: PlacedFragment,
-    part: 'shadow' | 'stroke' | 'fill',
-  ): PixiTextLayer => {
-    // The stroke this text has: the one it draws, or one that only shapes its shadow.
-    const partStroke = part === 'fill' ? null : stroke;
-    const layoutStyle = {
+  /** The stroke a part's text has: the one it draws, or one that only shapes its shadow. */
+  const strokeOf = (part: Part) => (part === 'fill' ? null : stroke);
+
+  /** The style a part of a fragment is laid out and measured with: all of it but fill and padding. */
+  const layoutStyleOf = ({ fragment }: PlacedFragment, part: Part) => {
+    const partStroke = strokeOf(part);
+    return {
       ...pixiFontStyleOf(richTextRunItem(item, fragment.run)),
       wordWrap: false,
       whiteSpace: 'pre' as const,
@@ -388,13 +386,43 @@ function buildRichTextFragments(
         : {}),
       ...(partStroke ? { stroke: pixiStrokeOf(partStroke, part === 'stroke') } : {}),
     };
+  };
 
-    const inkRoom = measureTextRasterPadding(fragment.text, layoutStyle);
+  /**
+   * The Pixi texts of a fragment, by part: its shadow alone, its stroke alone,
+   * and the fragment itself without either.
+   */
+  const pixiTextsOf = (placed: PlacedFragment): Partial<Record<Part, PixiTextLayer>> => {
+    const measured = parts.map((part) => {
+      const layoutStyle = layoutStyleOf(placed, part);
+      return { part, layoutStyle, inkRoom: measureTextRasterPadding(placed.fragment.text, layoutStyle) };
+    });
+    // One resolution for all of a fragment's texts, clamped for the largest of
+    // their textures: stroke and shadow are rasterised on the texels the fill
+    // is (see `buildTextLayers`).
     const resolution = clampRasterResolution(
       requestedResolution,
-      Math.max(fragment.width, lineHeight, 1) + inkRoom * 2 + (partStroke?.width ?? 0),
+      Math.max(placed.fragment.width, lineHeight, 1) +
+        Math.max(...measured.map(({ inkRoom }) => inkRoom)) * 2 +
+        (stroke?.width ?? 0),
       getMaxTextureSize(),
     );
+    return Object.fromEntries(
+      measured.map(({ part, layoutStyle, inkRoom }) => [
+        part,
+        pixiTextOf(placed, part, layoutStyle, inkRoom, resolution),
+      ]),
+    );
+  };
+
+  const pixiTextOf = (
+    { fragment, key, left, lineTop }: PlacedFragment,
+    part: Part,
+    layoutStyle: ReturnType<typeof layoutStyleOf>,
+    inkRoom: number,
+    resolution: number,
+  ): PixiTextLayer => {
+    const partStroke = strokeOf(part);
     // A stroked text is moved back onto the glyphs of the unstroked one.
     const placement = strokedTextPlacement(inkRoom, partStroke?.width ?? 0, resolution);
     const padding = placement.padding;
@@ -450,11 +478,9 @@ function buildRichTextFragments(
     };
   };
 
-  return [
-    ...(dropShadow ? fragments.map((placed) => pixiTextOf(placed, 'shadow')) : []),
-    ...(stroke ? fragments.map((placed) => pixiTextOf(placed, 'stroke')) : []),
-    ...fragments.map((placed) => pixiTextOf(placed, 'fill')),
-  ];
+  // Every shadow under every stroke, and every stroke under every fill.
+  const texts = fragments.map(pixiTextsOf);
+  return parts.flatMap((part) => texts.flatMap((byPart) => byPart[part] ?? []));
 }
 
 // ---------------------------------------------------------------------------

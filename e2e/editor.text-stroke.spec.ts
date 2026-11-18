@@ -26,9 +26,9 @@ import {
 const FILL = '#ffffff';
 const STROKE = '#ff0000';
 const SHADOW = '#0000ff';
-// Short enough to stay inside the region the SVG export gives its shadow
-// filter, which is half the height of the glyphs on every side.
-const SHADOW_OFFSET = 12;
+// Longer than half the height of the glyphs: more than an SVG filter has room
+// for unless the export measures its region from the text's ink.
+const SHADOW_OFFSET = 30;
 
 interface StrokeCase {
   id: string;
@@ -70,6 +70,9 @@ const CASES: StrokeCase[] = [
   { id: 'faked bold', text: 'HO', strokeWidth: 12, overrides: { fontFamily: 'Albertus MT Std', fontWeight: 'bold' } },
   // A see-through stroke must be no darker where the strokes of two letters overlap.
   { id: 'see-through stroke', text: 'HIH', strokeWidth: 20, stroke: '#ff000080', overrides: { letterSpacing: -8 } },
+  // An outline wider than the glyphs are tall, and its shadow: neither is cut
+  // off, on the canvas or in the SVG.
+  { id: 'wide stroke and shadow', text: 'HO', strokeWidth: 60, shadow: true },
 ];
 
 const COLUMNS = 3;

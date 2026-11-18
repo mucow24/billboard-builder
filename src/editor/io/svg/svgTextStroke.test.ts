@@ -113,6 +113,72 @@ describe('text with an outline', () => {
   });
 });
 
+/** The region of the item's filter, and the corners of the glyph paths under it. */
+function filterRegionAndInk(svg: string) {
+  const tag = svg.match(/<filter [^>]*>/)?.[0] ?? '';
+  const attr = (name: string) => Number(tag.match(new RegExp(` ${name}="([-\\d.]+)"`))?.[1]);
+  const region = { x: attr('x'), y: attr('y'), right: attr('x') + attr('width'), bottom: attr('y') + attr('height') };
+  const numbers = pathTags(svg).flatMap((path) =>
+    [...(pathData(path) ?? '').matchAll(/(-?[\d.]+)[ ,](-?[\d.]+)/g)].map(([, x, y]) => [Number(x), Number(y)]),
+  );
+  const xs = numbers.map(([x]) => x);
+  const ys = numbers.map(([, y]) => y);
+  return {
+    tag,
+    region,
+    ink: { x: Math.min(...xs), y: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) },
+  };
+}
+
+describe('the filter region of text with an outline', () => {
+  const SHADOW = { color: '#000000', blur: 10, offsetX: 40, offsetY: -25, opacity: 0.5 };
+  // Wider than the glyphs are tall: more than the default region has room for.
+  const WIDE = { stroke: '#ff0000ff', strokeWidth: 90 };
+
+  it('is given in the coordinates of the item, not as a share of the glyphs', () => {
+    const { tag } = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW }));
+    expect(tag).toContain('filterUnits="userSpaceOnUse"');
+    expect(tag).not.toContain('%');
+  });
+
+  it('holds the ink, half the outline around it, and the shadow where it falls', () => {
+    const { region, ink } = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW }));
+    const half = WIDE.strokeWidth / 2;
+    // Three standard deviations of the shadow's blur, which is half its blur.
+    const soft = 3 * (SHADOW.blur / 2);
+    expect(region.x).toBeLessThanOrEqual(ink.x - half - soft);
+    expect(region.y).toBeLessThanOrEqual(ink.y - half - soft + SHADOW.offsetY);
+    expect(region.right).toBeGreaterThanOrEqual(ink.right + half + soft + SHADOW.offsetX);
+    expect(region.bottom).toBeGreaterThanOrEqual(ink.bottom + half + soft);
+  });
+
+  it('holds what a layer blur spreads', () => {
+    const sharp = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW })).region;
+    const blurred = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW, blurRadius: 8 })).region;
+    // Three standard deviations of the blur, which is half its radius.
+    expect(sharp.x - blurred.x).toBeCloseTo(12, 5);
+    expect(blurred.bottom - sharp.bottom).toBeCloseTo(12, 5);
+  });
+
+  it('grows with the outline', () => {
+    const thin = filterRegionAndInk(exportText({ stroke: '#ff0000ff', strokeWidth: 10, shadow: SHADOW })).region;
+    const wide = filterRegionAndInk(exportText({ ...WIDE, shadow: SHADOW })).region;
+    expect(thin.x - wide.x).toBeCloseTo(40, 5);
+    expect(wide.right - thin.right).toBeCloseTo(40, 5);
+  });
+
+  it('covers every fragment of text with tags', () => {
+    const { region, ink } = filterRegionAndInk(
+      exportText({ ...WIDE, shadow: SHADOW, text: 'A<b>B</b>\n<color=#00ff00>AB</color>' }),
+    );
+    const half = WIDE.strokeWidth / 2;
+    expect(region.x).toBeLessThanOrEqual(ink.x - half);
+    expect(region.y).toBeLessThanOrEqual(ink.y - half + SHADOW.offsetY);
+    expect(region.right).toBeGreaterThanOrEqual(ink.right + half + SHADOW.offsetX);
+    expect(region.bottom).toBeGreaterThanOrEqual(ink.bottom + half);
+  });
+});
+
 describe('text with tags and an outline', () => {
   it('puts the outline of every fragment under the fill of every fragment', () => {
     const tags = pathTags(exportText({ ...OUTLINED, text: 'A<b>B</b><color=#00ff00>A</color>' }));
