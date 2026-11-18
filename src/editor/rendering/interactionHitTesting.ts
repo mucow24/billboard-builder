@@ -92,6 +92,50 @@ export function getItemsAtPoint(renderedItems: RenderableCanvasItem[], point: Po
     .reverse();
 }
 
+/** The selected node `item` belongs to: a selected group around it, or itself. */
+function getSelectedNodeIdOfItem(item: RenderableCanvasItem, selectedIds: ReadonlySet<string>) {
+  const selectedGroupId = item.groupPath.find((groupId) => selectedIds.has(groupId));
+  if (selectedGroupId) {
+    return selectedGroupId;
+  }
+  if (selectedIds.has(item.id)) {
+    return item.id;
+  }
+  return selectedIds.has(item.selectableNodeId) ? item.selectableNodeId : null;
+}
+
+/**
+ * The top-most item under `point` that is part of the current selection, with
+ * the selected node it belongs to, or `null` when the selection is not under
+ * the point. A plain press there keeps the selection (and drags it) even when
+ * an unselected item lies on top: otherwise an item reached with alt-click
+ * could never be pressed again without losing it to whatever covers it.
+ *
+ * Locked items are skipped because they take no pointer events, and
+ * generators because they cover the whole canvas and cannot be dragged: a
+ * selected generator would swallow every click.
+ */
+export function getSelectedHitAtPoint(
+  renderedItems: RenderableCanvasItem[],
+  selectedNodeIds: readonly string[],
+  point: Point,
+): { item: RenderableCanvasItem; nodeId: string } | null {
+  if (selectedNodeIds.length === 0) {
+    return null;
+  }
+  const selectedIds = new Set(selectedNodeIds);
+  for (const item of getItemsAtPoint(renderedItems, point)) {
+    if (item.locked || item.kind === 'generator') {
+      continue;
+    }
+    const nodeId = getSelectedNodeIdOfItem(item, selectedIds);
+    if (nodeId) {
+      return { item, nodeId };
+    }
+  }
+  return null;
+}
+
 /**
  * Resolve an alt-click at `point` to the node it should select, or `null`
  * when nothing is under the point.
