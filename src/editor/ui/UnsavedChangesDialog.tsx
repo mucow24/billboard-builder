@@ -10,14 +10,40 @@ interface UnsavedChangesDialogProps {
   canvasName: string;
   /** The canvas is not in the library at all: discarding loses the whole canvas, not just changes. */
   neverSaved: boolean;
+  /**
+   * A copy of the canvas is what replaces it (Canvas > Make a copy). The copy
+   * holds the unsaved changes whatever the answer, so nothing is discarded:
+   * "save" also saves them to the original, "discard" leaves the original as it is.
+   */
+  forCopy?: boolean;
   onAnswer: (answer: UnsavedChangesAnswer) => void;
+}
+
+function question(canvasName: string, neverSaved: boolean, forCopy: boolean) {
+  if (forCopy) {
+    return neverSaved
+      ? `"${canvasName}" has not been saved to the library. The copy will hold all of it. Save "${canvasName}" itself to the library as well?`
+      : `"${canvasName}" has changes that are not in the library. The copy will include them. Save them to "${canvasName}" as well, or leave it at its last saved version?`;
+  }
+  return neverSaved
+    ? `"${canvasName}" has not been saved to the library. Save it, or discard it for good?`
+    : `"${canvasName}" has changes that are not in the library. Save them, or discard them and keep its last saved version?`;
 }
 
 /**
  * Asked before another canvas replaces one with unsaved changes. Escape, and a
  * click beside the dialog, answer "cancel": nothing is saved and nothing is lost.
+ *
+ * Before a copy of the canvas replaces it (`forCopy`), the question and its
+ * buttons say that the changes are kept in the copy: the second button is then
+ * "Copy only", and is not styled as a destructive one.
  */
-export function UnsavedChangesDialog({ canvasName, neverSaved, onAnswer }: UnsavedChangesDialogProps) {
+export function UnsavedChangesDialog({
+  canvasName,
+  neverSaved,
+  forCopy = false,
+  onAnswer,
+}: UnsavedChangesDialogProps) {
   const titleId = useId();
   const messageId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -52,9 +78,7 @@ export function UnsavedChangesDialog({ canvasName, neverSaved, onAnswer }: Unsav
           Unsaved changes
         </h2>
         <p id={messageId} className="unsaved-changes-message">
-          {neverSaved
-            ? `"${canvasName}" has not been saved to the library. Save it, or discard it for good?`
-            : `"${canvasName}" has changes that are not in the library. Save them, or discard them and keep its last saved version?`}
+          {question(canvasName, neverSaved, forCopy)}
         </p>
         <div className="unsaved-changes-actions">
           <button
@@ -63,14 +87,14 @@ export function UnsavedChangesDialog({ canvasName, neverSaved, onAnswer }: Unsav
             className="library-button library-button-primary"
             onClick={() => onAnswer('save')}
           >
-            Save
+            {forCopy ? 'Save original too' : 'Save'}
           </button>
           <button
             type="button"
-            className="library-button library-button-danger"
+            className={forCopy ? 'library-button' : 'library-button library-button-danger'}
             onClick={() => onAnswer('discard')}
           >
-            Discard
+            {forCopy ? 'Copy only' : 'Discard'}
           </button>
           <button type="button" className="library-button" onClick={() => onAnswer('cancel')}>
             Cancel

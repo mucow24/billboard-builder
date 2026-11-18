@@ -369,6 +369,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
         <UnsavedChangesDialog
           canvasName={leavePrompt.documentName}
           neverSaved={leavePrompt.neverSaved}
+          forCopy={leavePrompt.forCopy}
           onAnswer={answerLeavePrompt}
         />
       ) : null}

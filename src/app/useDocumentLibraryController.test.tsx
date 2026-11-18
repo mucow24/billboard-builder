@@ -426,7 +426,11 @@ describe('useDocumentLibraryController', () => {
       await act(async () => {
         await result.current.actions.newDocument();
       });
-      expect(confirmLeave).toHaveBeenLastCalledWith({ documentName: 'Poster', neverSaved: true });
+      expect(confirmLeave).toHaveBeenLastCalledWith({
+        documentName: 'Poster',
+        neverSaved: true,
+        forCopy: false,
+      });
 
       await act(async () => {
         await result.current.actions.openLibraryDocument(result.current.state.entries[0].id);
@@ -435,7 +439,11 @@ describe('useDocumentLibraryController', () => {
       await act(async () => {
         await result.current.actions.newDocument();
       });
-      expect(confirmLeave).toHaveBeenLastCalledWith({ documentName: 'Poster', neverSaved: false });
+      expect(confirmLeave).toHaveBeenLastCalledWith({
+        documentName: 'Poster',
+        neverSaved: false,
+        forCopy: false,
+      });
       expect(confirmLeave).toHaveBeenCalledTimes(2);
     });
 
@@ -901,6 +909,7 @@ describe('useDocumentLibraryController', () => {
       expect(confirmLeave).toHaveBeenCalledExactlyOnceWith({
         documentName: 'Poster',
         neverSaved: false,
+        forCopy: true,
       });
       expect(itemIds()).toEqual(['first', 'unsaved']);
       expect(result.current.state.hasUnsavedChanges).toBe(false);
@@ -917,6 +926,17 @@ describe('useDocumentLibraryController', () => {
 
       expect(await makeCopy(result)).toBe(true);
 
+      expect(confirmLeave).toHaveBeenCalledExactlyOnceWith({
+        documentName: 'Poster',
+        neverSaved: true,
+        forCopy: true,
+      });
+      // One preview serves both: the copy reuses the one just drawn for the original.
+      expect(capturePreview).toHaveBeenCalledOnce();
+      expect(Object.values(result.current.state.previews)).toEqual([
+        'data:image/png;base64,PREVIEW',
+        'data:image/png;base64,PREVIEW',
+      ]);
       expect(result.current.state.entries.map((entry) => entry.name).sort()).toEqual([
         'Poster',
         'Poster Copy',

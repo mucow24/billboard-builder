@@ -342,6 +342,7 @@ describe('useEditorController', () => {
       expect(result.current.state.leavePrompt).toEqual({
         documentName: 'Untitled canvas',
         neverSaved: true,
+        forCopy: false,
       });
     });
     await act(async () => {

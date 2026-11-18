@@ -58,11 +58,12 @@ This editor is organized around a small set of ownership boundaries.
 
 The editor edits one document at a time; the library holds the others.
 
-- **Working copy and saved version.** The document in the editor is the *working copy*. It is autosaved shortly after every change and survives a reload, unsaved changes included. A *saved version* is what the library holds for a document; it is written only by Canvas > Save, or when the user answers "Save" on leaving a document. A working copy that differs from its saved version has unsaved changes (`hasUnsavedChanges` in `src/editor/document/documentComparison.ts`).
+- **Working copy and saved version.** The document in the editor is the *working copy*. It is autosaved shortly after every change and survives a reload, unsaved changes included. A *saved version* is what the library holds for a document; it is written only by Canvas > Save, by answering "Save" on leaving a document, by Canvas > Make a copy, and by Duplicate in the library; the last two write the saved version of a new document. A working copy that differs from its saved version has unsaved changes (`hasUnsavedChanges` in `src/editor/document/documentComparison.ts`).
 - **`documentLibrarySession`** (`src/app/documentLibrarySession.ts`) is a second Zustand store, next to the editor store. It holds what ties the two together:
   - `currentId`: the id of the document in the editor. The library has an entry for it only once it was saved.
   - `savedDocument`: the saved version of that document, or `null` if it was never saved. A never-saved document has unsaved changes as soon as it is not blank.
   - `entries`, `entriesKnown`, `previews`: what the library lists, whether that list is complete, and the preview images read so far.
+- **Make a copy.** Canvas > Make a copy saves the working copy, unsaved changes included, as a new library document and switches `currentId` to it. The original is left like any other document: its unsaved changes are asked about first.
 - **`useDocumentLibraryController`** (`src/app`) is the only writer of the library and of that store after startup. The editor store knows nothing about the library.
 
 ### Storage layout

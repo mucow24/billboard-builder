@@ -460,11 +460,22 @@ test.describe('document library', () => {
     await openLayersTab(page);
     await expect(layerRows(page)).toHaveCount(2);
 
-    // An unsaved change goes into the next copy; discarded, it stays out of the original.
+    // An unsaved change goes into the next copy. The question says so, and
+    // answered "Copy only" the change stays out of the original.
     await clickItem(page, 'beta-rect');
     await page.keyboard.press('Delete');
     await expect(unsavedDot(page)).toBeVisible();
-    await clickToolbarPopoverItem(page, 'Canvas', 'Make a copy', 'Discard');
+    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+    await page
+      .getByRole('group', { name: 'Canvas actions' })
+      .getByRole('button', { name: 'Make a copy', exact: true })
+      .click();
+    const prompt = unsavedChangesPrompt(page);
+    await expect(prompt.locator('.unsaved-changes-message')).toHaveText(
+      '"Beta Copy" has changes that are not in the library. The copy will include them. Save them to "Beta Copy" as well, or leave it at its last saved version?',
+    );
+    await expect(prompt.getByRole('button', { name: 'Discard' })).toHaveCount(0);
+    await waitForLibraryIdle(page, 'Copy only');
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta Copy 2');
     await expect(unsavedDot(page)).toHaveCount(0);
     await expect(layerRows(page)).toHaveCount(1);

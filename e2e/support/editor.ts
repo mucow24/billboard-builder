@@ -1454,8 +1454,12 @@ export async function openToolbarPopover(page: Page, triggerName: string) {
   await page.getByRole('button', { name: triggerName, exact: true }).click();
 }
 
-/** A button of the question asked before a canvas with unsaved changes is replaced. */
-export type UnsavedChangesAnswer = 'Save' | 'Discard' | 'Cancel';
+/**
+ * A button of the question asked before a canvas with unsaved changes is
+ * replaced. Before Canvas > Make a copy the first two are named
+ * 'Save original too' and 'Copy only'.
+ */
+export type UnsavedChangesAnswer = 'Save' | 'Discard' | 'Cancel' | 'Save original too' | 'Copy only';
 
 /** The question asked before a canvas with unsaved changes is replaced. */
 export function unsavedChangesPrompt(page: Page) {
