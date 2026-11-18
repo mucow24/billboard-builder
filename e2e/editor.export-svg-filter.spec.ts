@@ -124,7 +124,6 @@ const CASES: FilterCase[] = [
         shadow: hardShadow(0, 70),
       }),
   },
-<<<<<<< HEAD
   // The stroke is wider than the ellipse is tall. The canvas draws an ellipse
   // as a polygon whose corners at the two flat ends are sharp: mitred, the
   // stroke would reach 2 px past the ellipse at each end.
@@ -141,8 +140,6 @@ const CASES: FilterCase[] = [
         shadow: hardShadow(0, 70),
       }),
   },
-=======
->>>>>>> origin/main
   {
     id: 'polygon',
     build: (x, y) =>
