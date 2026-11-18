@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { outlineCoverage, outlinedShapeCoverage } from './alphaOutline';
+import {
+  edgeField,
+  outlineCoverage,
+  outlineCoverageOf,
+  outlinedShapeCoverage,
+  outlinedShapeCoverageOf,
+} from './alphaOutline';
 
 const SIZE = 40;
 
@@ -105,5 +111,48 @@ describe('outlinedShapeCoverage', () => {
     const across = row(outlinedShapeCoverage(square, SIZE, SIZE, 3), 20);
     // From 7 to 33, whole.
     expect(across.slice(5, 35)).toEqual([0, 0, ...Array.from({ length: 26 }, () => 1), 0, 0]);
+  });
+});
+
+describe('edgeField', () => {
+  const square = shape((x, y) => (x >= 10 && x < 30 && y >= 10 && y < 30 ? 1 : 0));
+
+  it('is nothing for an image without a shape', () => {
+    expect(edgeField(shape(() => 0), SIZE, SIZE, 3)).toBeNull();
+    expect(sum(Array.from(outlineCoverageOf(null, SIZE * SIZE, 3)))).toBe(0);
+    expect(sum(Array.from(outlinedShapeCoverageOf(null, SIZE * SIZE, 3)))).toBe(0);
+  });
+
+  it('covers the ink and what an outline can reach, and no more of the image', () => {
+    const field = edgeField(square, SIZE, SIZE, 3);
+    // The ink is 10 to 29: 3 texels of reach and 2 to spare on every side.
+    expect(field).toMatchObject({ left: 5, top: 5, width: 30, height: 30, imageWidth: SIZE, imageHeight: SIZE });
+    expect(field?.distances).toHaveLength(30 * 30);
+  });
+
+  it('stops at the edges of the image', () => {
+    const field = edgeField(square, SIZE, SIZE, 30);
+    expect(field).toMatchObject({ left: 0, top: 0, width: SIZE, height: SIZE });
+  });
+
+  it('serves the outline and the grown shape alike, at any width up to its reach', () => {
+    const field = edgeField(square, SIZE, SIZE, 4);
+    for (const halfWidth of [1, 2.5, 4]) {
+      expect(Array.from(outlineCoverageOf(field, SIZE * SIZE, halfWidth))).toEqual(
+        Array.from(outlineCoverage(square, SIZE, SIZE, halfWidth)),
+      );
+      expect(Array.from(outlinedShapeCoverageOf(field, SIZE * SIZE, halfWidth))).toEqual(
+        Array.from(outlinedShapeCoverage(square, SIZE, SIZE, halfWidth)),
+      );
+    }
+  });
+
+  it('leaves texels beyond its reach out of a narrow outline and inside the grown shape', () => {
+    // A block wide enough that its middle is far from every edge.
+    const block = shape((x, y) => (x >= 4 && x < 36 && y >= 4 && y < 36 ? 1 : 0));
+    const field = edgeField(block, SIZE, SIZE, 2);
+    const middle = 20 * SIZE + 20;
+    expect(outlineCoverageOf(field, SIZE * SIZE, 2)[middle]).toBe(0);
+    expect(outlinedShapeCoverageOf(field, SIZE * SIZE, 2)[middle]).toBe(255);
   });
 });

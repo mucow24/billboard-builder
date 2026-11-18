@@ -59,7 +59,8 @@ import { getRenderBox } from '../transformGeometry';
 import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
-import { rasteriseTextOutline } from './textOutlineImage';
+import { SOLID_PAINT } from './textEdgeField';
+import { outlineResolutionCap, rasteriseTextOutline } from './textOutlineImage';
 import type { TextOutlineInput } from './textOutlineImage';
 import { rasteriseRichTextShadow } from './richTextShadow';
 import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
@@ -176,23 +177,49 @@ interface PixiTextLayer {
   alpha: number;
   /**
    * Set where this is not a text to show but the filled text to draw an
-   * outline around (see `outlineLayer`): the outline's width in px
-   * and its colour. Shown as an image of the outline (`TextOutline`).
+   * outline around (see `outlineLayer`): the outline's width in px, its
+   * colour, the room the text's image needs around the text in px, and the
+   * resolution the text is rasterised at for it (`withOutlineResolution`).
+   * Shown as an image of the outline (`TextOutline`).
    */
-  outline?: { strokeWidth: number; color: string };
+  outline?: { strokeWidth: number; color: string; room: number; resolution: number };
 }
 
-/** A paint that covers: what the text an outline is drawn around is filled with. */
-const SOLID_PAINT = '#000000';
+/**
+ * `layers` with the resolution their outlines are rasterised at and the
+ * padding that goes with it, and the finest of those resolutions.
+ *
+ * Working an outline out costs time for every texel, so the outlines of one
+ * item are no finer than the texel budget allows (`outlineResolutionCap`).
+ * Under that cap an outline is rasterised at the resolution of its fill, with
+ * the fill's padding plus its own room in whole blocks of texels: exactly as
+ * the fill is. At the cap it no longer follows the zoom at all.
+ */
+function withOutlineResolution(layers: PixiTextLayer[]): { layers: PixiTextLayer[]; resolution: number | null } {
+  const outlines = layers.filter((layer) => layer.outline);
+  if (outlines.length === 0) return { layers, resolution: null };
+  const cap = outlineResolutionCap(
+    outlines.map((layer) => ({ text: layer.text, style: layer.style, room: layer.outline?.room ?? 0 })),
+  );
+  return {
+    layers: layers.map((layer) => {
+      if (!layer.outline) return layer;
+      const resolution = Math.min(layer.resolution, cap);
+      // A texel more than the room: the outline's soft edge.
+      const padding = snapPaddingToTexels(layer.outline.room + 1 / resolution, resolution);
+      return { ...layer, style: { ...layer.style, padding }, outline: { ...layer.outline, resolution } };
+    }),
+    resolution: Math.min(cap, ...outlines.map((layer) => layer.resolution)),
+  };
+}
 
 /**
  * The outline of a text (see `textStroke`): the text filled, for `TextOutline`
  * to draw the outline around.
  *
  * `style` is the text's style without fill, stroke or padding; `x` and `y` are
- * where the text's fill goes. The text gets the padding of the fill plus room
- * for the outline, in whole blocks of texels, so that it is rasterised exactly
- * as the fill is.
+ * where the text's fill goes. Its padding and the resolution it is rasterised
+ * at are settled for all of an item's outlines together (`withOutlineResolution`).
  */
 function outlineLayer(
   key: string,
@@ -204,17 +231,20 @@ function outlineLayer(
   resolution: number,
 ): PixiTextLayer {
   const filled = { ...style, fill: SOLID_PAINT };
-  // A texel more than half the stroke: the outline's soft edge.
-  const room = measureTextRasterPadding(text, filled) + stroke.width / 2 + 1 / resolution;
   return {
     key,
     text,
-    style: { ...filled, padding: snapPaddingToTexels(room, resolution) },
+    style: filled,
     x,
     y,
     resolution,
     alpha: stroke.alpha,
-    outline: { strokeWidth: stroke.width, color: stroke.color },
+    outline: {
+      strokeWidth: stroke.width,
+      color: stroke.color,
+      room: measureTextRasterPadding(text, filled) + stroke.width / 2,
+      resolution,
+    },
   };
 }
 
@@ -306,24 +336,37 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Tex
       }) ?? item.fill
     : item.fill;
 
+  const outlined = withOutlineResolution([
+    ...(stroke ? [outlineLayer('stroke', text, baseStyle, stroke, textX, textY, resolution)] : []),
+    { key: 'fill', text, style: { ...layoutStyle, fill, padding }, x: textX, y: textY, resolution, alpha: 1 },
+  ]);
   return {
-    texts: [
-      ...(stroke ? [outlineLayer('stroke', text, baseStyle, stroke, textX, textY, resolution)] : []),
-      { key: 'fill', text, style: { ...layoutStyle, fill, padding }, x: textX, y: textY, resolution, alpha: 1 },
-    ],
+    texts: outlined.layers,
     shadow:
       stroke && dropShadow
         ? {
             input: {
-              casters: [{ text, style: baseStyle, left: textX, lineTop: textTop, baselineShift }],
+              casters: [
+                {
+                  text,
+                  style: baseStyle,
+                  left: textX,
+                  lineTop: textTop,
+                  baselineShift,
+                  // The outline's own padding: one edge field for both.
+                  padding: outlined.layers[0].style.padding as number,
+                },
+              ],
               strokeWidth: stroke.width,
+              ...(outlined.resolution ? { outlineResolution: outlined.resolution } : {}),
+              // No finer than the outline: at its cap the shadow stops following the zoom too.
+              requestedResolution: Math.min(requestedResolution, outlined.resolution ?? requestedResolution),
               shadow: {
                 angle: dropShadow.angle,
                 distance: dropShadow.distance,
                 blur: dropShadow.blur,
                 color: dropShadow.color,
               },
-              requestedResolution,
             },
             alpha: dropShadow.alpha,
           }
@@ -479,8 +522,11 @@ function buildRichTextFragments(
     };
   };
 
-  /** A fragment as the shadow is cast from it: its glyphs and its stroke. */
-  const shadowCasterOf = (placed: PlacedFragment): ShadowCaster => {
+  /**
+   * A fragment as the shadow is cast from it: its glyphs, and its outline
+   * where it has one. `outline` is the fragment's outline layer.
+   */
+  const shadowCasterOf = (placed: PlacedFragment, outline: PixiTextLayer | undefined): ShadowCaster => {
     const style = layoutStyleOf(placed);
     return {
       text: placed.fragment.text,
@@ -488,26 +534,36 @@ function buildRichTextFragments(
       left: placed.left,
       lineTop: placed.lineTop,
       baselineShift: measureTextBaselineShift(item, style),
+      // The outline's own padding: one edge field for both.
+      ...(outline ? { padding: outline.style.padding as number } : {}),
     };
   };
 
   // Every stroke under every fill.
   const texts = fragments.map(pixiTextsOf);
+  const outlined = withOutlineResolution(parts.flatMap((part) => texts.flatMap((byPart) => byPart[part] ?? [])));
   return {
-    texts: parts.flatMap((part) => texts.flatMap((byPart) => byPart[part] ?? [])),
+    texts: outlined.layers,
     shadow:
       dropShadow && fragments.length > 0
         ? {
             input: {
-              casters: fragments.map(shadowCasterOf),
+              casters: fragments.map((placed) =>
+                shadowCasterOf(
+                  placed,
+                  outlined.layers.find((layer) => layer.key === `stroke:${placed.key}`),
+                ),
+              ),
               strokeWidth: stroke?.width ?? 0,
+              ...(outlined.resolution ? { outlineResolution: outlined.resolution } : {}),
               shadow: {
                 angle: dropShadow.angle,
                 distance: dropShadow.distance,
                 blur: dropShadow.blur,
                 color: dropShadow.color,
               },
-              requestedResolution,
+              // No finer than the outline: at its cap the shadow stops following the zoom too.
+              requestedResolution: Math.min(requestedResolution, outlined.resolution ?? requestedResolution),
             },
             alpha: dropShadow.alpha,
           }
@@ -583,12 +639,28 @@ function RichTextShadow({
 
 /**
  * The outline around a filled text (`PixiTextLayer.outline`): one sprite,
- * where a `<pixiText>` would show the text itself.
+ * where a `<pixiText>` would show the text itself. The image is white and
+ * tinted with `color`, so that a change of colour draws nothing anew.
  *
  * `fontsKey` changes when a font the item is drawn with arrives: the image is
  * drawn anew then, as the texts are.
  */
-function TextOutline({ input, alpha, fontsKey }: { input: TextOutlineInput; alpha: number; fontsKey: string }) {
+function TextOutline({
+  input,
+  x,
+  y,
+  color,
+  alpha,
+  fontsKey,
+}: {
+  input: TextOutlineInput;
+  /** Where the image goes, in px of the item. */
+  x: number;
+  y: number;
+  color: string;
+  alpha: number;
+  fontsKey: string;
+}) {
   // `input` is built anew on every render; its JSON says whether it changed.
   const inputKey = JSON.stringify(input);
   const image = useMemo(() => {
@@ -596,7 +668,7 @@ function TextOutline({ input, alpha, fontsKey }: { input: TextOutlineInput; alph
     if (!drawn) return null;
     // The source's resolution makes the texture as large in px as the image is.
     const source = new CanvasSource({ resource: drawn.canvas, resolution: drawn.resolution });
-    return { texture: new Texture({ source }), x: drawn.x, y: drawn.y };
+    return { texture: new Texture({ source }) };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fontsKey: the same input draws differently once its font is in.
   }, [inputKey, fontsKey]);
   useDestroyedWhenUnused(image?.texture ?? null);
@@ -607,8 +679,9 @@ function TextOutline({ input, alpha, fontsKey }: { input: TextOutlineInput; alph
     <pixiSprite
       key={image.texture.uid}
       texture={image.texture}
-      x={image.x}
-      y={image.y}
+      x={x}
+      y={y}
+      tint={color}
       alpha={alpha}
       eventMode="none"
     />
@@ -667,11 +740,13 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
             input={{
               text: layer.text,
               style: layer.style,
-              x: layer.x,
-              y: layer.y,
-              resolution: layer.resolution,
-              ...layer.outline,
+              resolution: layer.outline.resolution,
+              strokeWidth: layer.outline.strokeWidth,
             }}
+            // Where Pixi puts the texture of the text's fill, on whole texels or not.
+            x={layer.x - (layer.style.padding as number)}
+            y={layer.y - (layer.style.padding as number)}
+            color={layer.outline.color}
             alpha={layer.alpha}
             fontsKey={fontsKey}
           />

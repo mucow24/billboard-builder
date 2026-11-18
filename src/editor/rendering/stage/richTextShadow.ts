@@ -27,11 +27,12 @@ import { CanvasTextGenerator, CanvasTextMetrics, Color, TextStyle } from 'pixi.j
 import type { TextStyleOptions } from 'pixi.js';
 
 import { snapOffsetToTexels } from '../textBaseline';
-import { outlinedShapeCoverage } from '../alphaOutline';
+import { outlinedShapeCoverageOf } from '../alphaOutline';
 import { shadowBlurReach, snapPaddingToTexels } from '../textInkOverhang';
 import { shadowCanvasRects } from '../textShadowCanvas';
 import type { TexelRect } from '../textShadowCanvas';
 import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
+import { SOLID_PAINT, textEdgeField } from './textEdgeField';
 import { measureTextRasterPadding } from './textRasterPadding';
 
 /** A fragment the shadow is cast from. */
@@ -48,6 +49,12 @@ export interface ShadowCaster {
   lineTop: number;
   /** How far the fragment is moved down from there onto the shared baseline, in px. */
   baselineShift: number;
+  /**
+   * The padding the fragment's outline is rasterised with, where the layer
+   * has one: with the same padding and resolution the shadow is cast from the
+   * very edge field the outline is drawn from (`textEdgeField`).
+   */
+  padding?: number;
 }
 
 /** Everything the shadow image depends on. Plain data: its JSON is its identity. */
@@ -55,6 +62,11 @@ export interface RichTextShadowInput {
   casters: ShadowCaster[];
   /** The width of the layer's outline in px, 0 without one. */
   strokeWidth: number;
+  /**
+   * The resolution the layer's outline is rasterised at, where it has one
+   * (`outlineRasterResolution`): the shadow is drawn no finer.
+   */
+  outlineResolution?: number;
   /** The shadow as Pixi's text style has it. */
   shadow: { angle: number; distance: number; blur: number; color: string };
   /** The resolution the current zoom calls for, in texels per px. */
@@ -69,9 +81,6 @@ export interface RichTextShadowImage {
   /** Texels per px. */
   resolution: number;
 }
-
-/** A paint that covers: what the silhouette is drawn with. */
-const SOLID = '#000000';
 
 /**
  * Draw the one shadow of `input`'s fragments. Null where there is nothing to
@@ -108,7 +117,7 @@ export function rasteriseRichTextShadow(input: RichTextShadowInput): RichTextSha
   });
   const span = (low: number[], high: number[], offset: number) =>
     Math.max(...high) - Math.min(...low) + Math.abs(offset) + reach * 2;
-  const resolution = clampRasterResolution(
+  const fitting = clampRasterResolution(
     requestedResolution,
     Math.max(
       span(boxes.map((box) => box.left), boxes.map((box) => box.right), offsetX),
@@ -116,6 +125,10 @@ export function rasteriseRichTextShadow(input: RichTextShadowInput): RichTextSha
     ),
     getMaxTextureSize(),
   );
+  // Growing the fragments by their outline costs time for every texel: with an
+  // outline the shadow is no finer than the outline itself is drawn.
+  const resolution =
+    strokeWidth > 0 && input.outlineResolution ? Math.min(fitting, input.outlineResolution) : fitting;
 
   // Texels are counted from the item's left edge and from the top of the first
   // line. Across, every fragment starts on a whole texel. Down, the fragments
@@ -127,31 +140,34 @@ export function rasteriseRichTextShadow(input: RichTextShadowInput): RichTextSha
     // Padding in whole blocks of texels, as the fragment's own texts have it:
     // the glyphs are rasterised exactly as its fill is. A texel more than half
     // the stroke is the outline's soft edge.
-    const padding = snapPaddingToTexels(
-      inkRoom + halfStroke + (strokeWidth > 0 ? 1 / resolution : 0),
-      resolution,
-    );
+    const padding =
+      caster.padding ??
+      snapPaddingToTexels(inkRoom + halfStroke + (strokeWidth > 0 ? 1 / resolution : 0), resolution);
     const x = snapOffsetToTexels(caster.left, resolution) - padding;
     const y = caster.lineTop + snapOffsetToTexels(caster.baselineShift, resolution) - padding;
-    const { canvasAndContext, frame } = CanvasTextGenerator.getCanvasAndContext({
-      text: caster.text,
-      style: new TextStyle({ ...caster.style, fill: SOLID, padding }),
-      resolution,
-    });
-    const filled = canvasAndContext.canvas as CanvasImageSource;
-    // Without an outline the fragment is copied as it is.
-    let image: CanvasImageSource = filled;
-    let release = () => CanvasTextGenerator.returnCanvasAndContext(canvasAndContext);
-    if (strokeWidth > 0) {
-      const grown = grownBy(canvasAndContext.context, frame.width, frame.height, halfStroke * resolution);
-      if (grown) {
-        release();
-        image = grown;
-        release = () => {
-          grown.width = 0;
-          grown.height = 0;
-        };
-      }
+    const style = { ...caster.style, fill: SOLID_PAINT, padding };
+
+    let image: CanvasImageSource;
+    let release: () => void;
+    let frame: { width: number; height: number };
+    const grown = strokeWidth > 0 ? grownText(caster.text, style, resolution, halfStroke * resolution) : null;
+    if (grown) {
+      image = grown;
+      frame = grown;
+      release = () => {
+        grown.width = 0;
+        grown.height = 0;
+      };
+    } else {
+      // Without an outline the fragment is copied as it is.
+      const generated = CanvasTextGenerator.getCanvasAndContext({
+        text: caster.text,
+        style: new TextStyle(style),
+        resolution,
+      });
+      image = generated.canvasAndContext.canvas as CanvasImageSource;
+      frame = { width: generated.frame.width, height: generated.frame.height };
+      release = () => CanvasTextGenerator.returnCanvasAndContext(generated.canvasAndContext);
     }
     const rect: TexelRect = {
       left: Math.round(x * resolution),
@@ -232,26 +248,25 @@ export function rasteriseRichTextShadow(input: RichTextShadowInput): RichTextSha
 }
 
 /**
- * The shape in the first `width` by `height` texels of `context`, grown by
- * `halfWidth` texels on all sides: a fragment together with its outline.
- * Null where there is no canvas to draw it on.
+ * `text` filled in `style` and grown by `halfWidth` texels on all sides: a
+ * fragment together with its outline, opaque. Null where there is no canvas
+ * to draw it on.
  */
-function grownBy(
-  context: { getImageData(x: number, y: number, width: number, height: number): { data: ArrayLike<number> } },
-  width: number,
-  height: number,
+function grownText(
+  text: string,
+  style: TextStyleOptions,
+  resolution: number,
   halfWidth: number,
 ): HTMLCanvasElement | null {
+  const filled = textEdgeField(text, style, resolution, halfWidth);
+  if (!filled) return null;
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, width);
-  canvas.height = Math.max(1, height);
+  canvas.width = filled.width;
+  canvas.height = filled.height;
   const target = canvas.getContext('2d');
   if (!target) return null;
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-  const alpha = new Uint8Array(canvas.width * canvas.height);
-  for (let i = 0; i < alpha.length; i += 1) alpha[i] = pixels[i * 4 + 3];
-  const coverage = outlinedShapeCoverage(alpha, canvas.width, canvas.height, halfWidth);
-  const image = target.createImageData(canvas.width, canvas.height);
+  const coverage = outlinedShapeCoverageOf(filled.field, filled.width * filled.height, halfWidth);
+  const image = target.createImageData(filled.width, filled.height);
   for (let i = 0; i < coverage.length; i += 1) image.data[i * 4 + 3] = coverage[i];
   target.putImageData(image, 0, 0);
   return canvas;
