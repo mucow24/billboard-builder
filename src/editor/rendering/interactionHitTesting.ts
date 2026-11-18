@@ -107,13 +107,10 @@ function getSelectedNodeIdOfItem(item: RenderableCanvasItem, selectedIds: Readon
 /**
  * The top-most item under `point` that is part of the current selection, with
  * the selected node it belongs to, or `null` when the selection is not under
- * the point. A plain press there keeps the selection (and drags it) even when
- * an unselected item lies on top: otherwise an item reached with alt-click
- * could never be pressed again without losing it to whatever covers it.
+ * the point.
  *
- * Locked items are skipped because they take no pointer events, and
- * generators because they cover the whole canvas and cannot be dragged: a
- * selected generator would swallow every click.
+ * Locked items and generators are skipped: neither can be dragged, which is
+ * all this lookup is used for (see `resolveCoveredSelectionPress`).
  */
 export function getSelectedHitAtPoint(
   renderedItems: RenderableCanvasItem[],
@@ -134,6 +131,34 @@ export function getSelectedHitAtPoint(
     }
   }
   return null;
+}
+
+/**
+ * Resolve a plain press on the item `pressedItemId` at `point` to the covered
+ * selection it should drag: the top-most selected item under the point and
+ * its selected node. `null` when the press is an ordinary one, because the
+ * pressed item is itself part of the selection or the selection is not under
+ * the point.
+ *
+ * A drag that starts on an unselected item covering the selection moves the
+ * selection: otherwise an item reached with alt-click could never be dragged
+ * from where it is covered. A click (no drag) there still selects the pressed
+ * item; that part is the caller's.
+ */
+export function resolveCoveredSelectionPress(
+  renderedItems: RenderableCanvasItem[],
+  selectedNodeIds: readonly string[],
+  pressedItemId: string,
+  point: Point,
+): { item: RenderableCanvasItem; nodeId: string } | null {
+  if (selectedNodeIds.length === 0) {
+    return null;
+  }
+  const pressed = renderedItems.find((item) => item.id === pressedItemId);
+  if (!pressed || getSelectedNodeIdOfItem(pressed, new Set(selectedNodeIds))) {
+    return null;
+  }
+  return getSelectedHitAtPoint(renderedItems, selectedNodeIds, point);
 }
 
 /**
@@ -162,14 +187,8 @@ export function getSelectionCycleTargetAtPoint(
 
   const selectedIds = new Set(selectedNodeIds);
   const resolveStop = (item: RenderableCanvasItem) => {
-    const selectedGroupId = item.groupPath.find((groupId) => selectedIds.has(groupId));
-    if (selectedGroupId) {
-      return { nodeId: selectedGroupId, selected: true };
-    }
-    if (selectedIds.has(item.id)) {
-      return { nodeId: item.id, selected: true };
-    }
-    return { nodeId: item.selectableNodeId, selected: selectedIds.has(item.selectableNodeId) };
+    const selectedNodeId = getSelectedNodeIdOfItem(item, selectedIds);
+    return { nodeId: selectedNodeId ?? item.selectableNodeId, selected: selectedNodeId !== null };
   };
 
   const stops: Array<{ nodeId: string; selected: boolean }> = [];

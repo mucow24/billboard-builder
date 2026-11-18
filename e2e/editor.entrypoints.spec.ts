@@ -477,7 +477,7 @@ test.describe('editor canvas entrypoints', () => {
     await page.keyboard.up('Alt');
   });
 
-  test('CS-27 a click or drag over the selection keeps it when an unselected item lies on top', async ({ page }) => {
+  test('CS-27 a drag from an unselected item that covers the selection moves the selection, a click selects the item', async ({ page }) => {
     const bottom = createRectangleFixture({
       id: 'keep-bottom',
       name: 'Bottom Rectangle',
@@ -497,7 +497,6 @@ test.describe('editor canvas entrypoints', () => {
       zIndex: 1,
     });
     const overlap = { x: 350, y: 300 };
-    const blank = { x: 940, y: 180 };
 
     await openFreshEditor(page);
     await uploadProject(page, createProjectDocument([bottom, top]), 'keep-covered-selection.json');
@@ -521,17 +520,18 @@ test.describe('editor canvas entrypoints', () => {
     await expectSelectedLayer('keep-bottom');
     await page.keyboard.up('Alt');
 
-    // A plain click on the overlap keeps it selected.
+    // A plain click on the overlap still selects the item on top.
+    await clickEmptyCanvas(page, overlap);
+    await expectSelectedLayer('keep-top');
+
+    // Alt-click back down to the covered item (alt-clicks never count towards
+    // a double-click), then drag from the overlap: the covered item moves, not
+    // the item on top, and it stays selected.
+    await page.keyboard.down('Alt');
     await clickEmptyCanvas(page, overlap);
     await expectSelectedLayer('keep-bottom');
-
-    // Every plain press below lands on the top rectangle, so each one waits
-    // out the editor's 400ms double-click window after the one before it.
-    const waitPastDoubleClick = () => page.waitForTimeout(410);
-
-    // A drag from the overlap moves it, not the item on top.
+    await page.keyboard.up('Alt');
     const topBefore = await readItem('keep-top');
-    await waitPastDoubleClick();
     await dragEmptyCanvas(page, overlap, { x: overlap.x + 80, y: overlap.y + 40 });
     await expectSelectedLayer('keep-bottom');
     const bottomAfter = await readItem('keep-bottom');
@@ -539,10 +539,9 @@ test.describe('editor canvas entrypoints', () => {
     expect(bottomAfter.y).toBeGreaterThan(100);
     expect(await readItem('keep-top')).toEqual(topBefore);
 
-    // With nothing selected, the same click selects the top item again.
-    await clickEmptyCanvas(page, blank);
-    await expectNoActiveSelection(page);
-    await waitPastDoubleClick();
+    // The drag's press landed on the top rectangle, as does this click: wait
+    // out the editor's 400ms double-click window between the two.
+    await page.waitForTimeout(410);
     await clickEmptyCanvas(page, overlap);
     await expectSelectedLayer('keep-top');
   });
