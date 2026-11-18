@@ -19,10 +19,13 @@ function renderable(
   return { ...item, groupPath: [], selectableNodeId: item.id, ...overrides };
 }
 
+type Params = Parameters<typeof resolveHoverOutline>[0];
+
 function resolve(
   hoveredItemId: string | null,
   renderedItems: RenderableCanvasItem[],
   selection: { nodeIds?: string[]; itemIds?: string[] } = {},
+  interaction: Partial<Params> = {},
 ) {
   return resolveHoverOutline({
     hoveredItemId,
@@ -30,6 +33,12 @@ function resolve(
     selectedNodeIds: selection.nodeIds ?? [],
     selectedItemIds: selection.itemIds ?? [],
     canvasBounds: CANVAS_BOUNDS,
+    activeTool: 'select',
+    gestureInProgress: false,
+    cropping: false,
+    marqueeInProgress: false,
+    panKeyHeld: false,
+    ...interaction,
   });
 }
 
@@ -55,9 +64,19 @@ describe('resolveHoverOutline', () => {
     });
   });
 
-  it('skips an item that clicks pass through', () => {
+  it('skips a locked item, which clicks pass through', () => {
     expect(resolve('text', [{ ...text, locked: true }, rect])).toBeNull();
-    expect(resolve('text', [{ ...text, hidden: true }, rect])).toBeNull();
+  });
+
+  it.each<[string, Partial<Params>]>([
+    ['another tool is active', { activeTool: 'rectangle' }],
+    ['the pan tool is active', { activeTool: 'pan' }],
+    ['a gesture is under way', { gestureInProgress: true }],
+    ['an image is being cropped', { cropping: true }],
+    ['a marquee is being dragged out', { marqueeInProgress: true }],
+    ['the spacebar is held to pan', { panKeyHeld: true }],
+  ])('points nothing out while %s', (_name, interaction) => {
+    expect(resolve('text', [text, rect], {}, interaction)).toBeNull();
   });
 
   it('outlines the whole group a click on its item would select', () => {

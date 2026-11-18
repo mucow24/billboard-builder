@@ -77,7 +77,10 @@ export function CanvasStage({
   const [lastTestHookEvent, setLastTestHookEvent] = useState<string | null>(null);
   const [rendererReady, setRendererReady] = useState(false);
 
-  // The item under the pointer, as the item layer reports it.
+  // The item under the pointer, as the item layer reports it. It changes only
+  // on pointer events: when the content moves under a pointer that stays where
+  // it is (wheel pan or zoom, undo, paste, reorder), the hover is stale until
+  // the pointer next moves. Accepted: the next move puts it right.
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const handleItemHoverChange = useCallback((itemId: string, hovering: boolean) => {
     // An item's "out" must not undo the "over" of the item the pointer went to.
@@ -157,6 +160,7 @@ export function CanvasStage({
   // none either, so handles don't pop in and out under the pointer (or swap
   // its cursor) mid-drag.
   const hideTransformHandles = selectionLocked || selectionHasGenerator || marqueeInProgress;
+  const canvasBounds = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
   const {
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,
@@ -172,7 +176,7 @@ export function CanvasStage({
     showGroupInteractionHooks,
   } = buildStageDerivedState({
     activeTool,
-    canvasBounds: { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height },
+    canvasBounds,
     renderedGroupBounds,
     renderedSelectedItems,
     renderedSelectionFrame,
@@ -185,17 +189,19 @@ export function CanvasStage({
   });
 
   // Hovering points out what a click would select, so only while a click
-  // would select: with the select tool, and no gesture or crop under way.
-  const hoverOutline =
-    activeTool === 'select' && !session && !cropSession && !marqueeInProgress && !viewport.spacebarHeld
-      ? resolveHoverOutline({
-          hoveredItemId,
-          renderedItems,
-          selectedNodeIds,
-          selectedItemIds: renderedSelectedItems.map((item) => item.id),
-          canvasBounds: { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height },
-        })
-      : null;
+  // would select (see resolveHoverOutline).
+  const hoverOutline = resolveHoverOutline({
+    hoveredItemId,
+    renderedItems,
+    selectedNodeIds,
+    selectedItemIds: renderedSelectedItems.map((item) => item.id),
+    canvasBounds,
+    activeTool,
+    gestureInProgress: Boolean(session),
+    cropping: Boolean(cropSession),
+    marqueeInProgress,
+    panKeyHeld: viewport.spacebarHeld,
+  });
   const { handleStagePointerLeave } = viewport;
   const handleStageMouseLeave = useCallback(() => {
     setHoveredItemId(null);

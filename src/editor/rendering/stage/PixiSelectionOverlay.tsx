@@ -318,16 +318,17 @@ function ItemOutlineOnly({
 
 export function PixiHoverOutline({ outline, zoom }: { outline: HoverOutline; zoom: number }) {
   const strokeWidth = BASE_HOVER_STROKE_WIDTH / getZoomScaledDimensions(zoom).nz;
-  const bounds = outline.kind === 'bounds' ? outline.bounds : null;
+  // Keyed on the numbers: the outline is resolved anew on every stage render.
+  const { x, y, width, height } =
+    outline.kind === 'bounds' ? outline.bounds : { x: 0, y: 0, width: 0, height: 0 };
 
   const drawBounds = useCallback(
     (g: Graphics) => {
       g.clear();
-      if (!bounds) return;
-      g.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+      g.rect(x, y, width, height);
       g.stroke({ color: HOVER_STROKE, width: strokeWidth });
     },
-    [bounds, strokeWidth],
+    [x, y, width, height, strokeWidth],
   );
 
   return (

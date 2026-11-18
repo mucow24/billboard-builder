@@ -1119,9 +1119,10 @@ const PixiItemView = memo(function PixiItemView({
   // Hover follows the item a press would land on: Pixi reports over and out
   // for the topmost item that takes events, by the same hit areas as a press.
   const itemId = item.id;
+  // Bound to both "over" and "move" on purpose. A move counts as coming over
+  // too: Pixi sends "over" once per item, and not again for an item that the
+  // pointer never left while it took no events.
   const handleMouseOver = useCallback(() => onItemHoverChange(itemId, true), [itemId, onItemHoverChange]);
-  // A move counts as coming over too: Pixi sends "over" once per item, and not
-  // again for an item that the pointer never left while it took no events.
   const handleMouseOut = useCallback(() => onItemHoverChange(itemId, false), [itemId, onItemHoverChange]);
   // Pixi sends no "out" to an item that stops taking events (another tool, a
   // lock) or is removed while the pointer is on it.
