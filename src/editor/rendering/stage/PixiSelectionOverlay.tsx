@@ -17,6 +17,7 @@ import {
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 import { getRenderBox } from '../transformGeometry';
+import type { HoverOutline } from './hoverOutline';
 import {
   BASE_POLYGON_SELECTION_OUTSET,
   hasTransformBox,
@@ -28,12 +29,17 @@ const SELECTION_STROKE = 0x7dd3fc;
 const HANDLE_FILL = 0xe0f2fe;
 const HANDLE_FILL_ALPHA = 0.95;
 const HANDLE_STROKE = 0x0f172a;
+// Amber against the selection's sky blue: the two are told apart at a glance,
+// also where a hovered item touches or overlaps the selected one.
+const HOVER_STROKE = 0xfbbf24;
 
 // ── Base overlay dimensions (divided by zoom at draw time) ───────────────────
 const BASE_HANDLE_RADIUS = 8;
 const BASE_HANDLE_STROKE_WIDTH = 2;
 const BASE_SELECTION_STROKE_WIDTH = 2;
 const BASE_ROTATE_HANDLE_OFFSET = 50;
+// Thinner than the selection's: hovering only points something out.
+const BASE_HOVER_STROKE_WIDTH = 1.5;
 // Edge "+" insert discs are slightly smaller than vertex handles so the two
 // read differently at a glance.
 const BASE_EDGE_ADD_RADIUS = 6;
@@ -267,11 +273,16 @@ export function PixiSelectionOverlay({
 function ItemOutlineOnly({
   item,
   zoom,
+  color = SELECTION_STROKE,
+  baseStrokeWidth = BASE_SELECTION_STROKE_WIDTH,
 }: {
   item: RenderableCanvasItem;
   zoom: number;
+  color?: number;
+  // Width on screen, divided by zoom at draw time.
+  baseStrokeWidth?: number;
 }) {
-  const { selectionStroke } = getZoomScaledDimensions(zoom);
+  const strokeWidth = baseStrokeWidth / getZoomScaledDimensions(zoom).nz;
   const renderBox = useMemo(() => getRenderBox(item), [item]);
 
   const drawOutline = useCallback(
@@ -280,13 +291,12 @@ function ItemOutlineOnly({
       if (item.kind === 'polygon') {
         const polygon = item as RenderableCanvasItem & { kind: 'polygon' };
         drawPolygonChain(g, polygon);
-        g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
       } else {
         g.rect(0, 0, renderBox.width, renderBox.height);
-        g.stroke({ color: SELECTION_STROKE, width: selectionStroke });
       }
+      g.stroke({ color, width: strokeWidth });
     },
-    [item, renderBox.width, renderBox.height, selectionStroke],
+    [item, renderBox.width, renderBox.height, color, strokeWidth],
   );
 
   if (item.kind === 'polygon') {
@@ -300,6 +310,38 @@ function ItemOutlineOnly({
       rotation={(item.rotation * Math.PI) / 180}
     >
       <pixiGraphics draw={drawOutline} eventMode="none" />
+    </pixiContainer>
+  );
+}
+
+// ── Hover outline (what a click at the pointer would select) ─────────────────
+
+export function PixiHoverOutline({ outline, zoom }: { outline: HoverOutline; zoom: number }) {
+  const strokeWidth = BASE_HOVER_STROKE_WIDTH / getZoomScaledDimensions(zoom).nz;
+  const bounds = outline.kind === 'bounds' ? outline.bounds : null;
+
+  const drawBounds = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      if (!bounds) return;
+      g.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+      g.stroke({ color: HOVER_STROKE, width: strokeWidth });
+    },
+    [bounds, strokeWidth],
+  );
+
+  return (
+    <pixiContainer label="hover-outline" eventMode="none">
+      {outline.kind === 'item' ? (
+        <ItemOutlineOnly
+          item={outline.item}
+          zoom={zoom}
+          color={HOVER_STROKE}
+          baseStrokeWidth={BASE_HOVER_STROKE_WIDTH}
+        />
+      ) : (
+        <pixiGraphics draw={drawBounds} eventMode="none" />
+      )}
     </pixiContainer>
   );
 }

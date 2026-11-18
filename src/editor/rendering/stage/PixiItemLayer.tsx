@@ -963,6 +963,11 @@ interface PixiItemLayerProps {
     nativeEvent?: MouseEvent,
   ) => void;
   onItemDoubleClick: (item: CanvasItem) => void;
+  /**
+   * The pointer came over an item a click would land on, or left it. Leaving
+   * is also reported when the item stops taking clicks or goes away.
+   */
+  onItemHoverChange: (itemId: string, hovering: boolean) => void;
   spacebarHeld: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
@@ -976,6 +981,7 @@ export function PixiItemLayer({
   items,
   onItemPointerDown,
   onItemDoubleClick,
+  onItemHoverChange,
   spacebarHeld,
   startPanDrag,
   toCanvasPointer,
@@ -996,6 +1002,7 @@ export function PixiItemLayer({
             item={item}
             onItemPointerDown={onItemPointerDown}
             onItemDoubleClick={onItemDoubleClick}
+            onItemHoverChange={onItemHoverChange}
             spacebarHeld={spacebarHeld}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
@@ -1014,6 +1021,7 @@ interface PixiItemViewProps {
   item: RenderableCanvasItem;
   onItemPointerDown: PixiItemLayerProps['onItemPointerDown'];
   onItemDoubleClick: PixiItemLayerProps['onItemDoubleClick'];
+  onItemHoverChange: PixiItemLayerProps['onItemHoverChange'];
   spacebarHeld: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
@@ -1027,6 +1035,7 @@ const PixiItemView = memo(function PixiItemView({
   item,
   onItemPointerDown,
   onItemDoubleClick,
+  onItemHoverChange,
   spacebarHeld,
   startPanDrag,
   toCanvasPointer,
@@ -1106,6 +1115,20 @@ const PixiItemView = memo(function PixiItemView({
   );
 
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;
+
+  // Hover follows the item a press would land on: Pixi reports over and out
+  // for the topmost item that takes events, by the same hit areas as a press.
+  const itemId = item.id;
+  const handleMouseOver = useCallback(() => onItemHoverChange(itemId, true), [itemId, onItemHoverChange]);
+  // A move counts as coming over too: Pixi sends "over" once per item, and not
+  // again for an item that the pointer never left while it took no events.
+  const handleMouseOut = useCallback(() => onItemHoverChange(itemId, false), [itemId, onItemHoverChange]);
+  // Pixi sends no "out" to an item that stops taking events (another tool, a
+  // lock) or is removed while the pointer is on it.
+  useEffect(() => {
+    if (eventMode !== 'static') return;
+    return () => onItemHoverChange(itemId, false);
+  }, [eventMode, itemId, onItemHoverChange]);
 
   const renderBox = useMemo(
     () => getRenderBox(item),
@@ -1233,6 +1256,9 @@ const PixiItemView = memo(function PixiItemView({
         eventMode={eventMode}
         hitArea={genHitArea}
         onMouseDown={handleMouseDown}
+        onMouseOver={handleMouseOver}
+        onMouseMove={handleMouseOver}
+        onMouseOut={handleMouseOut}
       >
         <PixiGeneratorContent
           item={item as GeneratorCanvasItem}
@@ -1266,6 +1292,9 @@ const PixiItemView = memo(function PixiItemView({
       eventMode={eventMode}
       hitArea={polygonHitArea ?? shapeHitArea}
       onMouseDown={handleMouseDown}
+      onMouseOver={handleMouseOver}
+      onMouseMove={handleMouseOver}
+      onMouseOut={handleMouseOut}
     >
       {children}
     </pixiContainer>

@@ -19,7 +19,8 @@ import { createPixiRendererHandle } from '../renderer/pixiRendererHandle';
 
 import { PixiImageCropContent, PixiImageCropOverlay } from './PixiImageCropOverlay';
 import { PixiItemLayer } from './PixiItemLayer';
-import { PixiSelectionOverlay } from './PixiSelectionOverlay';
+import { PixiHoverOutline, PixiSelectionOverlay } from './PixiSelectionOverlay';
+import type { HoverOutline } from './hoverOutline';
 import { BACKDROP_SIZE, CANVAS_SURFACE_FILL } from './renderConstants';
 import { useFocusVeil } from './useFocusVeil';
 
@@ -79,6 +80,9 @@ interface PixiCanvasSceneProps {
   } | null;
   guides: GuideLine[];
   handleItemDoubleClick: (item: CanvasItem) => void;
+  /** Outline of what a click at the pointer would select, or null for none. */
+  hoverOutline: HoverOutline | null;
+  onItemHoverChange: (itemId: string, hovering: boolean) => void;
   handleItemPointerDown: (
     item: CanvasItem,
     selectionNodeId: string,
@@ -143,6 +147,8 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       guides,
       handleItemDoubleClick,
       handleItemPointerDown,
+      hoverOutline,
+      onItemHoverChange,
       onStageMouseDown,
       onStageMouseLeave,
       onStageMouseMove,
@@ -428,6 +434,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
                   items={sceneItems}
                   onItemPointerDown={handleItemPointerDown}
                   onItemDoubleClick={handleItemDoubleClick}
+                  onItemHoverChange={onItemHoverChange}
                   spacebarHeld={spacebarHeld}
                   startPanDrag={startPanDrag}
                   toCanvasPointer={toCanvasPointer}
@@ -457,6 +464,8 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
             {guides && guides.length > 0 ? (
               <pixiGraphics label="guide-lines" draw={drawGuides} eventMode="none" />
             ) : null}
+            {/* Hover outline (below the selection and its handles) */}
+            {hoverOutline ? <PixiHoverOutline outline={hoverOutline} zoom={zoom} /> : null}
             {/* Crop overlay (replaces selection overlay when active) */}
             {cropSession ? (
               <PixiImageCropOverlay
