@@ -543,11 +543,12 @@ function applyFillAndStroke(
   item: GradientCapable & { stroke: string; strokeWidth: number },
   width: number,
   height: number,
+  join: 'miter' | 'round' = 'miter',
 ) {
   const grad = buildPixiGradient(item, width, height);
   g.fill(grad ?? item.fill);
   if (item.strokeWidth > 0 && item.stroke && item.stroke !== 'transparent') {
-    g.stroke({ color: item.stroke, width: item.strokeWidth });
+    g.stroke({ color: item.stroke, width: item.strokeWidth, join });
   }
 }
 
@@ -566,7 +567,12 @@ function drawEllipse(g: Graphics, item: EllipseCanvasItem) {
   const rx = item.width / 2;
   const ry = item.height / 2;
   g.ellipse(rx, ry, rx, ry);
-  applyFillAndStroke(g, item, item.width, item.height);
+  // Pixi draws the ellipse as a polygon with the same number of corners per
+  // quarter turn whatever its proportions, so the corners at the two ends of a
+  // flat ellipse are sharp. Mitred, a wide stroke would stick out past the
+  // ellipse there (4 px for 200x8 with a 24 px stroke); rounded, it stays
+  // half a stroke width from the outline, as in the SVG export.
+  applyFillAndStroke(g, item, item.width, item.height, 'round');
 }
 
 function drawNgon(g: Graphics, item: NgonCanvasItem) {
