@@ -26,6 +26,11 @@ export interface LeaveRequest {
   documentName: string;
   /** The document is not in the library at all, so discarding it loses all of it. */
   neverSaved: boolean;
+  /**
+   * Asked by Canvas > Make a copy: the copy holds the unsaved changes either
+   * way, so the question is only whether the original gets them too.
+   */
+  forCopy: boolean;
 }
 
 /** What to do with unsaved changes before another document takes their place. */
@@ -44,14 +49,15 @@ interface UseDocumentLibraryControllerArgs {
 }
 
 /**
- * The name for a copy of a document named `name`: "<name> copy", or
- * "<name> copy 2", "<name> copy 3"... when the library already has that name.
- * A copy of a copy counts on from it, rather than getting "copy copy".
+ * The name for a copy of a document named `name`: "<name> Copy", or
+ * "<name> Copy 2", "<name> Copy 3"... when the library already has that name.
+ * A copy of a copy counts on from it, rather than getting "Copy Copy".
  */
 export function nameForCopy(name: string, takenNames: Iterable<string>): string {
   const taken = new Set(takenNames);
-  const base = name.replace(/ copy(?: \d+)?$/, '');
-  const first = `${base} copy`;
+  // Any case: copies made before the suffix was capitalized end in " copy".
+  const base = name.replace(/ copy(?: \d+)?$/i, '');
+  const first = `${base} Copy`;
   if (!taken.has(first)) {
     return first;
   }
@@ -170,6 +176,22 @@ export function useDocumentLibraryController({
     }
 
     /**
+     * Writes a saved version to the library and lists it. Without a preview
+     * the library keeps the one it has. Rejects when it cannot be stored.
+     */
+    async function storeInLibrary(
+      entry: DocumentLibraryEntry,
+      libraryDocument: ProjectDocument,
+      preview: string | null,
+    ): Promise<void> {
+      await defaultDocumentLibraryService.save(entry, libraryDocument, preview);
+      useDocumentLibrarySession.setState((state) => ({
+        entries: upsertLibraryEntry(state.entries, entry),
+        previews: preview === null ? state.previews : { ...state.previews, [entry.id]: preview },
+      }));
+    }
+
+    /**
      * Saves the document in the editor to the library if it has unsaved
      * changes. False when it could not be saved; the reason is then shown.
      */
@@ -198,19 +220,14 @@ export function useDocumentLibraryController({
         fonts: editorDocument.fonts,
       };
       try {
-        await defaultDocumentLibraryService.save(entry, editorDocument, preview);
+        await storeInLibrary(entry, editorDocument, preview);
       } catch (error) {
         setErrorMessage(
           `Failed to save "${editorDocument.name}" to the library: ${getErrorMessage(error, 'Unknown error.')}`,
         );
         return false;
       }
-
-      useDocumentLibrarySession.setState((state) => ({
-        savedDocument: editorDocument,
-        entries: upsertLibraryEntry(state.entries, entry),
-        previews: preview === null ? state.previews : { ...state.previews, [entry.id]: preview },
-      }));
+      useDocumentLibrarySession.setState({ savedDocument: editorDocument });
       return true;
     }
 
@@ -218,8 +235,9 @@ export function useDocumentLibraryController({
      * Settles what happens to the unsaved changes of the document in the
      * editor before another takes its place. True when it may be replaced:
      * nothing was unsaved, the user had it saved, or chose to discard it.
+     * `forCopy` says a copy of the document is what takes its place.
      */
-    async function leaveCurrentDocument(): Promise<boolean> {
+    async function leaveCurrentDocument(forCopy = false): Promise<boolean> {
       const editorDocument = useEditorStore.getState().editor.document;
       const { savedDocument: saved } = useDocumentLibrarySession.getState();
       if (!hasUnsavedChanges(editorDocument, saved)) {
@@ -228,6 +246,7 @@ export function useDocumentLibraryController({
       const choice = await confirmLeaveRef.current({
         documentName: editorDocument.name,
         neverSaved: saved === null,
+        forCopy,
       });
       if (choice === 'cancel') {
         return false;
@@ -447,11 +466,7 @@ export function useDocumentLibraryController({
             updatedAt: now,
             fonts: entry.fonts,
           };
-          await defaultDocumentLibraryService.save(copy, libraryDocument, preview);
-          useDocumentLibrarySession.setState((state) => ({
-            entries: upsertLibraryEntry(state.entries, copy),
-            previews: preview === null ? state.previews : { ...state.previews, [copy.id]: preview },
-          }));
+          await storeInLibrary(copy, libraryDocument, preview);
           setErrorMessage(null);
           return true;
         } catch (error) {
@@ -460,6 +475,64 @@ export function useDocumentLibraryController({
           );
           return false;
         }
+      });
+    }
+
+    /**
+     * Canvas > Make a copy: saves the document as it is in the editor, unsaved
+     * changes included, to the library as a new document named after it, and
+     * opens that copy. The original is first left like any other document:
+     * the user is asked whether its unsaved changes go into it as well.
+     */
+    function copyDocument(): Promise<boolean> {
+      return runExclusive(false, async () => {
+        const source = useEditorStore.getState().editor.document;
+        if (!(await leaveCurrentDocument(true))) {
+          return false;
+        }
+
+        const session = useDocumentLibrarySession.getState();
+        const copyDocumentContent: ProjectDocument = {
+          ...source,
+          // The name of the open document counts as taken even when the library
+          // does not list it: a never-saved canvas named "X Copy" is not in
+          // `entries`, and its copy would otherwise get that very name back.
+          name: nameForCopy(source.name, [
+            source.name,
+            ...session.entries.map((candidate) => candidate.name),
+          ]),
+        };
+        // The preview of the original is the copy's too when the library holds
+        // exactly this document, as it does right after the user answered Save.
+        let preview: string | null =
+          session.savedDocument === source ? (session.previews[session.currentId] ?? null) : null;
+        if (preview === null) {
+          try {
+            preview = await capturePreviewRef.current(source);
+          } catch (error) {
+            console.warn('No preview could be drawn for the library.', error);
+          }
+        }
+
+        const now = Date.now();
+        const copy: DocumentLibraryEntry = {
+          id: crypto.randomUUID(),
+          name: copyDocumentContent.name,
+          createdAt: now,
+          updatedAt: now,
+          fonts: copyDocumentContent.fonts,
+        };
+        try {
+          await storeInLibrary(copy, copyDocumentContent, preview);
+        } catch (error) {
+          setErrorMessage(
+            `Failed to make a copy of "${source.name}": ${getErrorMessage(error, 'Unknown error.')}`,
+          );
+          return false;
+        }
+        await putDocumentInEditor(copyDocumentContent, copy.id, true);
+        setErrorMessage(null);
+        return true;
       });
     }
 
@@ -513,6 +586,7 @@ export function useDocumentLibraryController({
       renameLibraryDocument,
       deleteLibraryDocument,
       duplicateLibraryDocument,
+      copyDocument,
       exportLibraryDocument,
       loadLibraryPreviews,
     };

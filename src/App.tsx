@@ -86,6 +86,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       handleExportToClipboard,
       handleFontUpload,
       handleImageUpload,
+      handleMakeCopy,
       handleNewProject,
       handleOpenProject,
       clearPendingCollapsedGroupIds,
@@ -227,6 +228,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
             onGroup={groupSelectedNodes}
             onLoadFromJson={() => openInputRef.current?.click()}
             onLoadFromLibrary={openLibrary}
+            onMakeCopy={handleMakeCopy}
             onNewProject={() => {
               void handleNewProject();
             }}
@@ -367,6 +369,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
         <UnsavedChangesDialog
           canvasName={leavePrompt.documentName}
           neverSaved={leavePrompt.neverSaved}
+          forCopy={leavePrompt.forCopy}
           onAnswer={answerLeavePrompt}
         />
       ) : null}

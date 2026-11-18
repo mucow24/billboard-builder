@@ -58,6 +58,7 @@ function renderToolbar(overrides: Partial<ComponentProps<typeof Toolbar>> = {}) 
     onInspectorTabChange: vi.fn(),
     onLoadFromJson: vi.fn(),
     onLoadFromLibrary: vi.fn(),
+    onMakeCopy: vi.fn(),
     onRevert: vi.fn(),
     onSaveToJson: vi.fn(),
     canRevert: false,
@@ -146,10 +147,12 @@ describe('Toolbar', () => {
     const onSave = vi.fn();
     const onSaveToJson = vi.fn();
     const onNewProject = vi.fn();
+    const onMakeCopy = vi.fn();
 
     renderToolbar({
       canRevert: true,
       hasUnsavedChanges: true,
+      onMakeCopy,
       onSaveToJson,
       onLoadFromJson,
       onLoadFromLibrary,
@@ -183,6 +186,11 @@ describe('Toolbar', () => {
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'Revert' }));
     expect(onRevert).toHaveBeenCalledOnce();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.click(screen.getByRole('button', { name: 'Make a copy' }));
+    expect(onMakeCopy).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('group', { name: 'Canvas actions' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Canvas' }));
     await user.click(screen.getByRole('button', { name: 'New' }));

@@ -5,10 +5,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { DocumentLibraryDialog } from './DocumentLibraryDialog';
 import { UnsavedChangesDialog, type UnsavedChangesAnswer } from './UnsavedChangesDialog';
 
-function renderDialog({ neverSaved = false }: { neverSaved?: boolean } = {}) {
+function renderDialog({
+  neverSaved = false,
+  forCopy = false,
+}: { neverSaved?: boolean; forCopy?: boolean } = {}) {
   const props = {
     canvasName: 'Poster',
     neverSaved,
+    forCopy,
     onAnswer: vi.fn<(answer: UnsavedChangesAnswer) => void>(),
   };
   return { ...render(<UnsavedChangesDialog {...props} />), props };
@@ -30,6 +34,42 @@ describe('UnsavedChangesDialog', () => {
     expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
       '"Poster" has not been saved to the library. Save it, or discard it for good?',
     );
+  });
+
+  describe('before a copy of the canvas replaces it', () => {
+    it('says the copy includes the changes and asks whether the original gets them too', () => {
+      renderDialog({ forCopy: true });
+
+      expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
+        '"Poster" has changes that are not in the library. The copy will include them. Save them to "Poster" as well, or leave it at its last saved version?',
+      );
+    });
+
+    it('says the copy holds all of a canvas that was never saved', () => {
+      renderDialog({ forCopy: true, neverSaved: true });
+
+      expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
+        '"Poster" has not been saved to the library. The copy will hold all of it. Save "Poster" itself to the library as well?',
+      );
+    });
+
+    it('offers to save the original too or to copy only, with nothing called a discard', async () => {
+      const user = userEvent.setup();
+      const { props } = renderDialog({ forCopy: true });
+
+      expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument();
+      expect(screen.getByRole('alertdialog')).not.toHaveTextContent(/discard/i);
+      const copyOnly = screen.getByRole('button', { name: 'Copy only' });
+      expect(copyOnly).not.toHaveClass('library-button-danger');
+      expect(screen.getByRole('button', { name: 'Save original too' })).toHaveFocus();
+
+      await user.click(screen.getByRole('button', { name: 'Save original too' }));
+      await user.click(copyOnly);
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await user.keyboard('{Escape}');
+
+      expect(props.onAnswer.mock.calls).toEqual([['save'], ['discard'], ['cancel'], ['cancel']]);
+    });
   });
 
   it('answers with the button that is pressed', async () => {

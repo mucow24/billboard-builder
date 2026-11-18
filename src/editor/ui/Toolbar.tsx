@@ -52,6 +52,7 @@ interface ToolbarProps {
   onGroup: () => void;
   onLoadFromJson: () => void;
   onLoadFromLibrary: () => void;
+  onMakeCopy: () => void;
   onNewProject: () => void;
   onRedo: () => void;
   onReorder: (mode: ReorderMode) => void;
@@ -100,6 +101,7 @@ export function Toolbar({
   onGroup,
   onLoadFromJson,
   onLoadFromLibrary,
+  onMakeCopy,
   onNewProject,
   onRedo,
   onReorder,
@@ -288,6 +290,7 @@ export function Toolbar({
               onCanvasSizeChange={onCanvasSizeChange}
               onLoadFromJson={onLoadFromJson}
               onLoadFromLibrary={onLoadFromLibrary}
+              onMakeCopy={onMakeCopy}
               onRevert={onRevert}
               onSave={onSave}
               onSaveToJson={onSaveToJson}

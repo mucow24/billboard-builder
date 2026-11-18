@@ -423,27 +423,69 @@ test.describe('document library', () => {
     let dialog = await openLibrary(page);
     await dialog.getByRole('button', { name: 'Duplicate Alpha' }).click();
     await expect(libraryCards(dialog)).toHaveCount(3);
-    expect(await libraryNames(dialog)).toEqual(['Alpha copy', 'Beta', 'Alpha']);
-    await expect(dialog.getByRole('button', { name: 'Open Alpha copy' }).locator('img')).toHaveAttribute(
+    expect(await libraryNames(dialog)).toEqual(['Alpha Copy', 'Beta', 'Alpha']);
+    await expect(dialog.getByRole('button', { name: 'Open Alpha Copy' }).locator('img')).toHaveAttribute(
       'src',
       /^data:image\/png;base64,/,
     );
     await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta');
 
     // The copy is a canvas of its own: renaming it leaves Alpha alone.
-    await dialog.getByRole('button', { name: 'Open Alpha copy' }).click();
+    await dialog.getByRole('button', { name: 'Open Alpha Copy' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha copy');
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Alpha Copy');
     await expect(unsavedDot(page)).toHaveCount(0);
     expect((await readPersistedCanvasDocument(page))?.nodes).toEqual([
       expect.objectContaining({ id: 'alpha-rect' }),
     ]);
 
     dialog = await openLibrary(page);
-    await dialog.getByRole('button', { name: 'Duplicate Alpha copy' }).click();
+    await dialog.getByRole('button', { name: 'Duplicate Alpha Copy' }).click();
     await expect(libraryCards(dialog)).toHaveCount(4);
-    expect((await libraryNames(dialog))[0]).toBe('Alpha copy 2');
+    expect((await libraryNames(dialog))[0]).toBe('Alpha Copy 2');
     await expect(dialog.locator('.library-card-date').first()).toHaveText(/^Saved \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+
+  test('LIB-13 Canvas > Make a copy saves the canvas under a new name and opens the copy', async ({ page }) => {
+    await openEditorWithAlphaAndBeta(page);
+
+    await clickToolbarPopoverItem(page, 'Canvas', 'Make a copy');
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta Copy');
+    await expect(unsavedDot(page)).toHaveCount(0);
+
+    // The copy is the open canvas: it survives a reload.
+    await page.reload();
+    await waitForEditor(page);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta Copy');
+    await openLayersTab(page);
+    await expect(layerRows(page)).toHaveCount(2);
+
+    // An unsaved change goes into the next copy. The question says so, and
+    // answered "Copy only" the change stays out of the original.
+    await clickItem(page, 'beta-rect');
+    await page.keyboard.press('Delete');
+    await expect(unsavedDot(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+    await page
+      .getByRole('group', { name: 'Canvas actions' })
+      .getByRole('button', { name: 'Make a copy', exact: true })
+      .click();
+    const prompt = unsavedChangesPrompt(page);
+    await expect(prompt.locator('.unsaved-changes-message')).toHaveText(
+      '"Beta Copy" has changes that are not in the library. The copy will include them. Save them to "Beta Copy" as well, or leave it at its last saved version?',
+    );
+    await expect(prompt.getByRole('button', { name: 'Discard' })).toHaveCount(0);
+    await waitForLibraryIdle(page, 'Copy only');
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta Copy 2');
+    await expect(unsavedDot(page)).toHaveCount(0);
+    await expect(layerRows(page)).toHaveCount(1);
+
+    const dialog = await openLibrary(page);
+    expect(await libraryNames(dialog)).toEqual(['Beta Copy 2', 'Beta Copy', 'Beta', 'Alpha']);
+    await dialog.getByRole('button', { name: 'Open Beta Copy', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId('canvas-name-display')).toHaveText('Beta Copy');
+    await expect(layerRows(page)).toHaveCount(2);
   });
 
   test('LIB-08 deletes canvases from the library after asking, including the open one', async ({ page }) => {
