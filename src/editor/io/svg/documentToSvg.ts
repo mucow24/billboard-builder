@@ -7,6 +7,7 @@ import {
   gradientOrSolidFill,
   imageShape,
   itemFilterDef,
+  NGON_MITER_LIMIT,
   ngonShape,
   polygonShape,
   rectShape,
@@ -107,10 +108,40 @@ function serializeLeaf(
   }
 }
 
-/** Push the item's blur/shadow filter into <defs>, returning a `filter="url(#id)"` attribute (or ''). */
-function pushItemFilter(item: CanvasItem, defs: string[]): string {
+/**
+ * The area that holds all of a non-text item's ink, in the coordinates of the
+ * item's group (origin at the item's top-left corner, before rotation): its box,
+ * and as far past it as its stroke reaches.
+ *
+ * A stroke is centred on the outline, so it reaches half its width past the box.
+ * The corners of a rectangle stay inside that, an ellipse has none, a freeform
+ * polygon has round joins and a line square-cut ends. Only the mitred corners of
+ * an n-gon go further: up to the miter limit, past which they are bevelled.
+ */
+export function itemInkArea(item: Exclude<CanvasItem, { kind: 'text' }>): {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} {
+  let reach = 0;
+  if ('strokeWidth' in item && item.strokeWidth > 0 && item.stroke && item.stroke !== 'transparent') {
+    reach = (item.strokeWidth / 2) * (item.kind === 'ngon' ? NGON_MITER_LIMIT : 1);
+  }
+  return { x: -reach, y: -reach, width: item.width + 2 * reach, height: item.height + 2 * reach };
+}
+
+/**
+ * Push the item's blur/shadow filter into <defs>, returning a `filter="url(#id)"` attribute (or '').
+ *
+ * The filter's region is measured from the item's ink. The default one is
+ * measured from the bounding box of the geometry, strokes left out: it cuts off
+ * a wide stroke and a shadow longer than half the item, and is empty for a
+ * horizontal or vertical line, which then is not drawn at all.
+ */
+function pushItemFilter(item: Exclude<CanvasItem, { kind: 'text' }>, defs: string[]): string {
   const id = `fx-${item.id}`;
-  const def = itemFilterDef(id, item);
+  const def = itemFilterDef(id, item, { inkArea: itemInkArea(item) });
   if (!def) return '';
   defs.push(def);
   return ` filter="url(#${id})"`;
