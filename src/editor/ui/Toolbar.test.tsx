@@ -139,6 +139,20 @@ describe('Toolbar', () => {
     expect(onReorder).not.toHaveBeenCalled();
   });
 
+  it('lists Make a copy directly under New in the Canvas menu', async () => {
+    const user = userEvent.setup();
+
+    renderToolbar();
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    const menu = screen.getByRole('group', { name: 'Canvas actions' });
+    const newButton = within(menu).getByRole('button', { name: 'New' });
+    expect(menu.firstElementChild).toBe(newButton);
+    expect(newButton.nextElementSibling).toBe(
+      within(menu).getByRole('button', { name: 'Make a copy' }),
+    );
+  });
+
   it('routes canvas popover actions through the existing callbacks', async () => {
     const user = userEvent.setup();
     const onLoadFromJson = vi.fn();

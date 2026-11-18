@@ -261,6 +261,10 @@ export function CanvasMenu({
         <path d="M8 7v4" />
         <path d="M6 9h4" />
       </ToolbarMenuAction>
+      <ToolbarMenuAction label="Make a copy" onSelect={createMenuActionHandler(onMakeCopy)}>
+        <rect x="7" y="7" width="9" height="9" rx="1" />
+        <path d="M4 13V4h9" />
+      </ToolbarMenuAction>
       <ToolbarSubmenu
         label="Load"
         panelLabel="Load a canvas"
@@ -309,10 +313,6 @@ export function CanvasMenu({
           <path d="M12 3.5v3h3" />
         </ToolbarMenuAction>
       </ToolbarSubmenu>
-      <ToolbarMenuAction label="Make a copy" onSelect={createMenuActionHandler(onMakeCopy)}>
-        <rect x="7" y="7" width="9" height="9" rx="1" />
-        <path d="M4 13V4h9" />
-      </ToolbarMenuAction>
       <ToolbarMenuAction label="Revert" disabled={!canRevert} onSelect={createMenuActionHandler(onRevert)}>
         <path d="M7.5 5 4 8.5 7.5 12" />
         <path d="M4.5 8.5h7a4 4 0 1 1 0 8H9" />
