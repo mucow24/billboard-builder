@@ -238,6 +238,135 @@ describe('documentToSvg — shadow / blur filters', () => {
   });
 });
 
+describe('documentToSvg — filter region of shapes, lines, images and generators', () => {
+  const SHADOW = { color: '#000000', blur: 0, offsetX: 0, offsetY: 0, opacity: 1 };
+
+  /** The region of the one filter in `svg`, in the coordinates of the item's group. */
+  function filterRegion(svg: string) {
+    const tag = svg.match(/<filter [^>]*>/)?.[0] ?? '';
+    const attr = (name: string) => Number(tag.match(new RegExp(` ${name}="([^"]+)"`))?.[1]);
+    expect(tag).toContain('filterUnits="userSpaceOnUse"');
+    const [x, y, width, height] = [attr('x'), attr('y'), attr('width'), attr('height')];
+    return { left: x, top: y, right: x + width, bottom: y + height };
+  }
+
+  it('reaches down to a shadow that falls further than half the item', () => {
+    const svg = svgOf([
+      createRectangleItem({ width: 200, height: 20, strokeWidth: 0, shadow: { ...SHADOW, offsetY: 40 } }),
+    ]);
+    expect(filterRegion(svg)).toEqual({ left: 0, top: 0, right: 200, bottom: 60 });
+  });
+
+  it('holds the box, half the stroke, and the shadow with its blur', () => {
+    const svg = svgOf([
+      createRectangleItem({
+        width: 200,
+        height: 10,
+        stroke: '#ff0000',
+        strokeWidth: 30,
+        // A blur of 8 is a standard deviation of 2, which shows 6 px out.
+        shadow: { ...SHADOW, blur: 8, offsetX: 25, offsetY: -40 },
+      }),
+    ]);
+    expect(filterRegion(svg)).toEqual({
+      left: -15,
+      top: -15 - 40 - 6,
+      right: 200 + 15 + 25 + 6,
+      bottom: 10 + 15,
+    });
+  });
+
+  it('leaves the stroke out of the region when it is not drawn', () => {
+    const svg = svgOf([
+      createRectangleItem({
+        width: 200,
+        height: 10,
+        stroke: 'transparent',
+        strokeWidth: 30,
+        shadow: { ...SHADOW, offsetX: 5 },
+      }),
+    ]);
+    expect(filterRegion(svg)).toEqual({ left: 0, top: 0, right: 205, bottom: 10 });
+  });
+
+  it('holds the blur on every side', () => {
+    // A blur radius of 6 is a standard deviation of 3, which shows 9 px out.
+    const svg = svgOf([createRectangleItem({ width: 200, height: 8, strokeWidth: 0, blurRadius: 6 })]);
+    expect(filterRegion(svg)).toEqual({ left: -9, top: -9, right: 209, bottom: 17 });
+  });
+
+  it('gives a horizontal line a region as tall as its stroke', () => {
+    const svg = svgOf([
+      createLineItem({
+        vertices: [{ x: 10, y: 50 }, { x: 210, y: 50 }],
+        strokeWidth: 16,
+        shadow: { ...SHADOW, offsetX: 20, offsetY: 30 },
+      }),
+    ]);
+    // The line's box is the least a box can be, 1 px tall: nearly all of the
+    // region's height comes from the stroke.
+    expect(filterRegion(svg)).toEqual({ left: -8, top: -8, right: 200 + 8 + 20, bottom: 1 + 8 + 30 });
+  });
+
+  it('holds half the stroke of an ellipse and of a freeform polygon', () => {
+    const shadow = { ...SHADOW, offsetX: -30 };
+    const ellipse = svgOf([
+      createEllipseItem({ width: 200, height: 16, stroke: '#ff0000', strokeWidth: 24, shadow }),
+    ]);
+    expect(filterRegion(ellipse)).toEqual({ left: -42, top: -12, right: 212, bottom: 28 });
+
+    const polygon = svgOf([
+      createPolygonItem({
+        vertices: [{ x: 50, y: 60 }, { x: 250, y: 60 }, { x: 250, y: 80 }],
+        stroke: '#ff0000',
+        strokeWidth: 24,
+        shadow,
+      }),
+    ]);
+    expect(filterRegion(polygon)).toEqual({ left: -42, top: -12, right: 212, bottom: 32 });
+  });
+
+  it('holds the mitred corners of an n-gon, up to the miter limit', () => {
+    const svg = svgOf([
+      createNgonItem({
+        width: 120,
+        height: 100,
+        sides: 3,
+        stroke: '#ff0000',
+        strokeWidth: 20,
+        shadow: { ...SHADOW, offsetX: 80 },
+      }),
+    ]);
+    // SVG mitres a corner out to 4 half stroke widths, then bevels it.
+    expect(filterRegion(svg)).toEqual({ left: -40, top: -40, right: 120 + 40 + 80, bottom: 140 });
+  });
+
+  it('measures the region of an image and of a generator from their box', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAAA',
+      mimeType: 'image/png',
+      width: 200,
+      height: 24,
+      originalWidth: 200,
+      originalHeight: 24,
+    });
+    expect(filterRegion(svgOf([{ ...image, shadow: { ...SHADOW, offsetY: 50 } }]))).toEqual({
+      left: 0,
+      top: 0,
+      right: 200,
+      bottom: 74,
+    });
+
+    const generator = createGeneratorItem('scanlines', 800, 600);
+    expect(filterRegion(svgOf([{ ...generator, blurRadius: 4 }]))).toEqual({
+      left: -6,
+      top: -6,
+      right: 806,
+      bottom: 606,
+    });
+  });
+});
+
 describe('documentToSvg — opacity and colour alpha', () => {
   it('puts effective opacity on the group and omits it at full opacity', () => {
     expect(svgOf([createRectangleItem({ opacity: 0.4 })])).toContain('opacity="0.4"');
