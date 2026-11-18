@@ -116,6 +116,11 @@ export interface TextCanvasItem extends BaseCanvasItem, GradientFillItem {
   lineHeight: number;
   letterSpacing: number;
   padding: TextPadding;
+  // An outline around the glyphs, `strokeWidth` px wide and centred on their
+  // edge, drawn under the fill: the outer half shows, and the inner half too
+  // where the fill is see-through. 0 is no outline.
+  stroke: string;
+  strokeWidth: number;
 }
 
 export interface ImageCanvasItem extends BaseCanvasItem {

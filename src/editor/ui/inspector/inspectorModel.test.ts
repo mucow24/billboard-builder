@@ -198,6 +198,11 @@ describe('inspectorModel', () => {
       color: '#ff0000ff',
     });
     expect(getLayerPreviewStyle(imageItem)).toEqual({});
+    // A text's outline shows on its chip, as a rectangle's stroke does.
+    expect(
+      getLayerPreviewStyle({ ...frontItem, stroke: '#00ff00ff', strokeWidth: 4 } as typeof frontItem),
+    ).toMatchObject({ borderColor: '#00ff00ff', borderWidth: '2px' });
+    expect(getLayerPreviewStyle(frontItem)).toMatchObject({ borderWidth: '' });
     expect(getSortedLayerItems([backItem, frontItem, imageItem]).map((item) => item.id)).toEqual([
       frontItem.id,
       imageItem.id,

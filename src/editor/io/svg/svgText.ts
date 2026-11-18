@@ -7,6 +7,8 @@ import { alignedLineLeft, textBlockTop, withoutTrailingSpaces } from '../../rend
 import { getRenderBox } from '../../rendering/transformGeometry';
 import { graphemeIndexOfCodePoints, graphemes } from '../../rendering/graphemes';
 import { drawnRichTextRuns, layoutWrappedText, richTextRunItem } from '../../rendering/textMeasurement';
+import { TEXT_STROKE_JOIN, textStrokeOf } from '../../rendering/textStroke';
+import type { TextStrokePaint } from '../../rendering/textStroke';
 import { paintAttrs, toSvgPaint } from './svgColor';
 import { fmt } from './svgEscape';
 import { glyphsPath, lineGlyphs } from './svgTextGlyphs';
@@ -100,13 +102,32 @@ export function textSvg(
 
   const fillAttr = gradientOrSolidFill(item, defs, box.width, box.height);
   // Room around the lines for ink that leaves them, the stroke included.
-  const room = item.fontSize;
+  const stroke = textStrokeOf(item);
+  const room = inkRoomOf(item, stroke);
   const top = Math.min(0, textTop) - room;
   const bottom = Math.max(box.height, textTop + measuredHeight) + room;
   const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
   const pathEls = glyphGroupElements(groups, item, fillAttr, area, defs, `bold-${item.id}`);
-  const filterAttr = pushTextFilter(item, defs);
-  return wrapItem(item, effectiveOpacity, pathEls.join(''), filterAttr);
+  // The outline goes under the fill, and the shadow is cast from both.
+  const strokeEls = stroke ? strokeLayer(strokeElements(groups, stroke), stroke) : '';
+  const filterAttr = pushTextFilter(item, defs, area);
+  return wrapItem(item, effectiveOpacity, strokeEls + pathEls.join(''), filterAttr);
+}
+
+interface Area {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * How far the ink of a text can leave its lines: glyphs by no more than the font
+ * size, and the outline by half its width beyond them (round joins reach no
+ * further).
+ */
+function inkRoomOf(item: TextCanvasItem, stroke: TextStrokePaint | null): number {
+  return item.fontSize + (stroke ? stroke.width / 2 : 0);
 }
 
 type OutlineFonts = Extract<OutlineResult, { ok: true }>;
@@ -163,7 +184,10 @@ function glyphGroup(
     bold,
     penOffsets: bold?.kind === 'smear' ? bold.offsets : [0],
     // Stroked outlines need their contours closed, or the stroke has gaps.
-    glyphStyle: { slant: synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0, closed: bold?.kind === 'stroke' },
+    glyphStyle: {
+      slant: synthetic?.italic ? SYNTHETIC_OBLIQUE_SLANT : 0,
+      closed: bold?.kind === 'stroke' || textStrokeOf(item) !== null,
+    },
     paths: [],
   };
 }
@@ -259,6 +283,39 @@ function glyphGroupElements(
       const id = group === groups.own ? maskId : `${maskId}-fallback`;
       return strokedBoldPath(paint, d, fillAttr, group.bold.width, area, defs, id);
     });
+}
+
+/**
+ * The elements that draw the outline of a text (see `rendering/textStroke`)
+ * around the glyphs of `groups`: a stroked `<path>` each, to go under the
+ * elements that fill them. Round joins and caps, as on the canvas.
+ *
+ * Where a group's bold is faked by a stroke, the canvas outlines the glyphs as
+ * that bold has grown them, so the stroke here is wider by as much: its outer
+ * edge is then where the canvas has it. Its inner edge reaches further into the
+ * glyph than on the canvas, which shows only through a see-through fill.
+ */
+function strokeElements(groups: GlyphGroups, stroke: TextStrokePaint): string[] {
+  return [groups.own, ...(groups.fallback ? [groups.fallback] : [])]
+    .filter((group) => group.paths.length > 0)
+    .map((group) => {
+      const width = stroke.width + (group.bold?.kind === 'stroke' ? group.bold.width : 0);
+      return (
+        `<path d="${group.paths.join(' ')}" fill="none" stroke="${stroke.color}" ` +
+        `stroke-width="${fmt(width)}" stroke-linejoin="${TEXT_STROKE_JOIN}" stroke-linecap="${TEXT_STROKE_JOIN}"/>`
+      );
+    });
+}
+
+/**
+ * The outline of a whole text item: `elements` (see `strokeElements`) painted
+ * opaque and, where the outline's colour is see-through, made see-through
+ * together, so that strokes that overlap do not come out darker there.
+ */
+function strokeLayer(elements: string[], stroke: TextStrokePaint): string {
+  if (elements.length === 0) return '';
+  if (stroke.alpha >= 1) return elements.join('');
+  return `<g opacity="${fmt(stroke.alpha)}">${elements.join('')}</g>`;
 }
 
 /**
@@ -366,6 +423,13 @@ function richTextSvg(
   const itemFillAttr = () => (itemFill ??= gradientOrSolidFill(item, defs, box.width, box.height));
 
   const elements: string[] = [];
+  // The outline of every fragment, under the fill of every fragment.
+  const stroke = textStrokeOf(item);
+  const strokeEls: string[] = [];
+  // Room around a fragment for ink that leaves it, the stroke included.
+  const room = inkRoomOf(item, stroke);
+  // The area of every fragment written: together they hold all of the text's ink.
+  const areas: Area[] = [];
   // Fragments written so far: numbers the ids of this one's gradient and mask.
   let written = 0;
   lines.forEach((line, lineIndex) => {
@@ -426,20 +490,29 @@ function richTextSvg(
         fillAttr = itemFillAttr();
       }
 
-      // Room around the fragment for ink that leaves it, the stroke included.
-      const room = item.fontSize;
       const area = {
         x: left - room,
         y: lineTop - room,
         width: fragment.width + 2 * room,
         height: lineHeight + 2 * room,
       };
+      areas.push(area);
       elements.push(...glyphGroupElements(groups, colours, fillAttr, area, defs, `bold-${fragmentId}`));
+      if (stroke) strokeEls.push(...strokeElements(groups, stroke));
     }
   });
 
   if (elements.length === 0) return '';
-  return wrapItem(item, effectiveOpacity, elements.join(''), pushTextFilter(item, defs));
+  const inner = (stroke ? strokeLayer(strokeEls, stroke) : '') + elements.join('');
+  const left = Math.min(...areas.map((area) => area.x));
+  const top = Math.min(...areas.map((area) => area.y));
+  const inkArea = {
+    x: left,
+    y: top,
+    width: Math.max(...areas.map((area) => area.x + area.width)) - left,
+    height: Math.max(...areas.map((area) => area.y + area.height)) - top,
+  };
+  return wrapItem(item, effectiveOpacity, inner, pushTextFilter(item, defs, inkArea));
 }
 
 /** One line of a text item, as the canvas draws it. */
@@ -509,12 +582,20 @@ function kernedOffsets(
   return offsets;
 }
 
-/** Text filter combines blurRadius with a text-tuned drop shadow (Pixi renders text shadow via the text style). */
-function pushTextFilter(item: TextCanvasItem, defs: string[]): string {
+/**
+ * Text filter combines blurRadius with a text-tuned drop shadow (Pixi renders text shadow via the text style).
+ *
+ * `inkArea` has to contain all of the text's ink, its outline included. The
+ * filter's region is measured from it: the default one is measured from the
+ * bounding box of the glyphs, which has no room for a wide outline or a long
+ * shadow and cuts them off.
+ */
+function pushTextFilter(item: TextCanvasItem, defs: string[], inkArea: Area): string {
   const id = `fx-${item.id}`;
   const def = itemFilterDef(id, item, {
     includeShadow: true,
     shadowStdDevFactor: TEXT_SHADOW_BLUR_TO_STDDEV,
+    inkArea,
   });
   if (!def) return '';
   defs.push(def);

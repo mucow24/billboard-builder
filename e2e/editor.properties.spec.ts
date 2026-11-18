@@ -128,7 +128,8 @@ test.describe('editor properties flows', () => {
     await expect(page.getByRole('button', { name: 'Geometry' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Shadow' })).toBeVisible();
     await expect(page.getByLabel('Fill', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Stroke' })).toHaveCount(0);
+    // A rectangle's border and a text's outline are the same two fields.
+    await expect(page.getByRole('button', { name: 'Stroke' })).toBeVisible();
     await expect(page.getByLabel('Font')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Geometry' }).click();
@@ -212,7 +213,8 @@ test.describe('editor properties flows', () => {
     await expect(page.getByRole('spinbutton', { name: 'X' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Shadow' }).click();
-    await page.getByRole('button', { name: 'Color', exact: true }).click();
+    // The Stroke section above has a Color of its own: the shadow's is the last.
+    await page.getByRole('button', { name: 'Color', exact: true }).last().click();
     await page.getByLabel('Color hex', { exact: true }).fill('#33669980');
     await page.getByLabel('Color hex', { exact: true }).press('Enter');
     await page.getByRole('spinbutton', { name: 'Blur Radius' }).fill('12');

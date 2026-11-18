@@ -432,7 +432,8 @@ describe('SelectionInspector', () => {
     expect(screen.getByLabelText('Bold')).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: 'Font' })).toHaveTextContent('Mixed fonts');
     expect(screen.getAllByText('Mixed').length).toBeGreaterThan(0);
-    expect(screen.queryByRole('button', { name: 'Stroke' })).not.toBeInTheDocument();
+    // Text has an outline, so two texts share the Stroke section.
+    expect(screen.getByRole('button', { name: 'Stroke' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Text content'), {
       target: { value: 'Shared headline' },
@@ -483,7 +484,8 @@ describe('SelectionInspector', () => {
     expect(screen.getByRole('button', { name: 'Toggle gradient' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Geometry' }));
     expect(screen.getByLabelText('X')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Stroke' })).not.toBeInTheDocument();
+    // A rectangle's border and a text's outline are the same two fields.
+    expect(screen.getByRole('button', { name: 'Stroke' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Font')).not.toBeInTheDocument();
   });
 

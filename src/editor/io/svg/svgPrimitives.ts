@@ -35,6 +35,8 @@ const SHADOW_BLUR_TO_STDDEV = 0.25;
 const BLUR_RADIUS_TO_STDDEV = 0.5;
 /** Pixi renders text shadow via the canvas-2D text style with an un-halved blur, so text uses a larger sigma than shapes. */
 export const TEXT_SHADOW_BLUR_TO_STDDEV = 0.5;
+/** A Gaussian blur paints nothing that shows further out than this many standard deviations. */
+const GAUSSIAN_REACH_IN_STDDEVS = 3;
 
 interface PositionedItem {
   x: number;
@@ -168,11 +170,21 @@ export function gradientOrSolidFill(
  * first, then shadow casts off the blurred shape). Returns null when the item has
  * neither. Text shadow is handled separately (Pixi renders it via the text style),
  * so this skips shadow for text.
+ *
+ * The filter draws nothing outside its region. By default that is the bounding
+ * box of what it filters and half as much again on every side, a box that leaves
+ * strokes out. `inkArea`, in the item's own coordinates, replaces it with a
+ * region measured from the item: that area, which has to contain all of the
+ * item's ink, and as far beyond it as the blur and the shadow reach.
  */
 export function itemFilterDef(
   id: string,
   item: CanvasItem,
-  opts?: { includeShadow?: boolean; shadowStdDevFactor?: number },
+  opts?: {
+    includeShadow?: boolean;
+    shadowStdDevFactor?: number;
+    inkArea?: { x: number; y: number; width: number; height: number };
+  },
 ): string | null {
   // Shapes/lines/images route their shadow through this filter; text passes
   // includeShadow + its own (larger) sigma because Pixi renders text shadow
@@ -182,12 +194,15 @@ export function itemFilterDef(
 
   const primitives: string[] = [];
   let input = 'SourceGraphic';
+  // How far past the ink the filter paints, on each side.
+  const reach = { left: 0, top: 0, right: 0, bottom: 0 };
 
   if (item.blurRadius > 0) {
-    primitives.push(
-      `<feGaussianBlur in="${input}" stdDeviation="${fmt(item.blurRadius * BLUR_RADIUS_TO_STDDEV)}" result="blurred"/>`,
-    );
+    const stdDev = item.blurRadius * BLUR_RADIUS_TO_STDDEV;
+    primitives.push(`<feGaussianBlur in="${input}" stdDeviation="${fmt(stdDev)}" result="blurred"/>`);
     input = 'blurred';
+    const blurReach = stdDev * GAUSSIAN_REACH_IN_STDDEVS;
+    reach.left = reach.top = reach.right = reach.bottom = blurReach;
   }
 
   const s = item.shadow;
@@ -199,15 +214,27 @@ export function itemFilterDef(
   if (hasShadow) {
     const { hex, alpha } = toSvgPaint(s.color);
     const floodOpacity = alpha * s.opacity;
+    const stdDev = s.blur * shadowStdDevFactor;
     primitives.push(
       `<feDropShadow in="${input}" dx="${fmt(s.offsetX)}" dy="${fmt(s.offsetY)}" ` +
-        `stdDeviation="${fmt(s.blur * shadowStdDevFactor)}" ` +
+        `stdDeviation="${fmt(stdDev)}" ` +
         `flood-color="${hex}" flood-opacity="${fmt(floodOpacity)}"/>`,
     );
+    // The shadow is cast from the blurred shape, and falls to one side of it.
+    const shadowReach = stdDev * GAUSSIAN_REACH_IN_STDDEVS;
+    reach.left += Math.max(0, shadowReach - s.offsetX);
+    reach.right += Math.max(0, shadowReach + s.offsetX);
+    reach.top += Math.max(0, shadowReach - s.offsetY);
+    reach.bottom += Math.max(0, shadowReach + s.offsetY);
   }
 
   if (primitives.length === 0) return null;
-  return `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%">${primitives.join('')}</filter>`;
+  const area = opts?.inkArea;
+  const region = area
+    ? `filterUnits="userSpaceOnUse" x="${fmt(area.x - reach.left)}" y="${fmt(area.y - reach.top)}" ` +
+      `width="${fmt(area.width + reach.left + reach.right)}" height="${fmt(area.height + reach.top + reach.bottom)}"`
+    : 'x="-50%" y="-50%" width="200%" height="200%"';
+  return `<filter id="${id}" ${region}>${primitives.join('')}</filter>`;
 }
 
 /** Basic image element filling the frame. Crop/sourceTransform/mirror/adjustments are layered on in a later step. */

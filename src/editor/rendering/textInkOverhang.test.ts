@@ -312,6 +312,55 @@ describe('measureInkOverhang with a shadow', () => {
   });
 });
 
+describe('measureInkOverhang with a stroke', () => {
+  // Pixi's measurement of a 20 px stroke: the texture is wider by the stroke,
+  // and at least as tall as the font plus the stroke.
+  const stroked = (overrides: Partial<RasterTextLayout> = {}) => {
+    const base = layout(overrides);
+    return layout({
+      strokeWidth: 20,
+      width: base.width + 20,
+      height: Math.max(base.lineHeight, 120) + (base.lines.length - 1) * base.lineHeight,
+      ...overrides,
+    });
+  };
+
+  it('reports nothing while the stroke stays inside the texture Pixi grew for it', () => {
+    expect(measureInkOverhang(stroked(), measureWith({ H: UPRIGHT }), splitCharacters)).toEqual(NONE);
+  });
+
+  it('reports as much to the left and right as without the stroke: the pen moves by half of it', () => {
+    const tail = measureWith({ j: run({ inkLeft: 3 }) });
+    expect(measureInkOverhang(layout({ lines: ['j'] }), tail, splitCharacters).left).toBe(3);
+    expect(measureInkOverhang(stroked({ lines: ['j'] }), tail, splitCharacters).left).toBe(3);
+
+    // Right aligned, the texture is as wide as the wrap width, plus the stroke.
+    const lean = measureWith({ H: run({ inkRight: 70 }) });
+    expect(measureInkOverhang(layout({ align: 'right', width: 300 }), lean, splitCharacters).right).toBe(10);
+    expect(measureInkOverhang(stroked({ align: 'right', width: 320 }), lean, splitCharacters).right).toBe(10);
+  });
+
+  // A line box of 130 is taller than font plus stroke, so Pixi adds nothing
+  // below: the baseline is at 10 + 15 + 80, and the stroke ends 10 under a
+  // descender of 20.
+  it('reports the stroke under the last line where the line box leaves no room for it', () => {
+    const descender = measureWith({ q: run({ inkDescent: 20 }) });
+    const tall = { lines: ['q'], lineHeight: 130, height: 130 };
+    expect(measureInkOverhang(layout(tall), descender, splitCharacters).bottom).toBe(0);
+    expect(measureInkOverhang(stroked(tall), descender, splitCharacters).bottom).toBe(5);
+  });
+
+  it('casts the shadow from the stroked ink', () => {
+    const shadow = { offsetX: 30, offsetY: 0, blur: 0 };
+    const reach = (strokeLayout: RasterTextLayout) =>
+      measureInkOverhang(strokeLayout, measureWith({ H: UPRIGHT }), splitCharacters, shadow).right;
+    // Ink to 55 in a texture of 60, thrown 30 and showing 1 further; the
+    // stroked ink ends 5 short of its own texture just the same.
+    expect(reach(layout())).toBe(26);
+    expect(reach(stroked())).toBe(26);
+  });
+});
+
 describe('rasterPaddingForOverhang', () => {
   it('needs no padding without overhang, whatever the font size', () => {
     expect(rasterPaddingForOverhang(NONE, 100)).toBe(0);

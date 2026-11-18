@@ -5,6 +5,7 @@ import {
   createFullImageCropRect,
   DEFAULT_CANVAS_NAME,
   DEFAULT_ITEM_SHADOW,
+  DEFAULT_TEXT_STROKE,
 } from './documentDefaults';
 import { normalizeImageAdjustments } from './imageAdjustments';
 import { collectLeafItems, normalizeLeafZIndices, isGroupNode } from './sceneGraph';
@@ -197,6 +198,9 @@ export function normalizeCanvasItem(item: CanvasItem | LegacyLineCanvasItem): Ca
         lineHeight: clampFinite(item.lineHeight, 1, 0.1),
         letterSpacing: clampFinite(item.letterSpacing ?? 0, 0),
         padding: normalizeTextPadding(item.padding),
+        // Text saved before it had an outline has neither field.
+        stroke: typeof item.stroke === 'string' ? item.stroke : DEFAULT_TEXT_STROKE,
+        strokeWidth: clampFinite(item.strokeWidth ?? 0, 0, 0),
       };
       return normalizedTextItem;
     }

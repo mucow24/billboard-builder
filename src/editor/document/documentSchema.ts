@@ -199,6 +199,8 @@ const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   lineHeight: z.number().positive(),
   letterSpacing: z.number().optional(),
   padding: TextPaddingSchema.optional(),
+  stroke: z.string().optional(),
+  strokeWidth: z.number().nonnegative().optional(),
 });
 
 const ImageCanvasItemSchema = BaseCanvasItemSchema.extend({

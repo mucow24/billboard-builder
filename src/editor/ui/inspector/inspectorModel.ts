@@ -149,7 +149,7 @@ export function getLayerPreviewStyle(item: CanvasItem): Record<string, string> {
   }
   if ('fill' in item) {
     const hasVisibleStroke =
-      (item.kind === 'rectangle' || item.kind === 'ellipse') &&
+      (item.kind === 'rectangle' || item.kind === 'ellipse' || item.kind === 'text') &&
       item.strokeWidth > 0;
     const previewStroke = hasVisibleStroke ? item.stroke : item.fill;
     return {

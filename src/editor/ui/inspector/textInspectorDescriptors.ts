@@ -11,6 +11,7 @@ import {
 } from './selectionInspectorRenderers';
 import {
   ALIGN_OPTIONS,
+  createColorField,
   createCustomField,
   createDimensionsField,
   createPositionXField,
@@ -157,6 +158,40 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       sectionOrder: SECTION_ORDER.text,
 
       valueType: 'select',
+    }),
+    createColorField({
+      buildChange: (_context, nextValue) => ({ stroke: nextValue }),
+      fieldOrder: 10,
+      getValue: (item) => (item.kind === 'text' ? item.stroke : ''),
+      label: 'Color',
+      tooltip: 'Color of the outline around the letters.',
+      propertyKey: 'stroke',
+      sectionKey: 'stroke',
+      sectionLabel: 'Stroke',
+      sectionOrder: SECTION_ORDER.stroke,
+
+      valueType: 'color',
+    }),
+    createNumberField({
+      buildChange: (_context, nextValue) => ({ strokeWidth: nextValue }),
+      digits: 1,
+      fieldOrder: 20,
+      getValue: (item) => (item.kind === 'text' ? item.strokeWidth : 0),
+      label: 'Width',
+      tooltip:
+        'Thickness of the outline around the letters, in pixels. Half of it lies outside each letter ' +
+        'and half behind it. 0 removes it.',
+      max: 50,
+      min: 0,
+      propertyKey: 'strokeWidth',
+      sectionKey: 'stroke',
+      sectionLabel: 'Stroke',
+      sectionOrder: SECTION_ORDER.stroke,
+      slider: true,
+      step: 1,
+      textMax: Infinity,
+
+      valueType: 'number',
     }),
     createPositionXField(),
     createPositionYField(),
