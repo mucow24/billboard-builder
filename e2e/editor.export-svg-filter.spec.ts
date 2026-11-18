@@ -12,8 +12,10 @@ import {
   createPolygonFixture,
   createProjectDocument,
   createRectangleFixture,
+  createTextFixture,
   openFreshEditor,
   uploadProject,
+  waitForBundledFonts,
 } from './support/editor';
 
 /**
@@ -197,6 +199,29 @@ const CASES: FilterCase[] = [
         shadow: { color: SHADOW, blur: 4, offsetX: -20, offsetY: 40, opacity: 0.5 },
       }),
   },
+  // A text's shadow is drawn by the canvas 2D text style, with a blur of its own kind.
+  ...[4, 14].map((blur) => ({
+    id: `soft text shadow ${blur}`,
+    soft: true,
+    build: (x: number, y: number) =>
+      createTextFixture({
+        x,
+        y,
+        width: 200,
+        height: 100,
+        text: 'HO',
+        fontFamily: 'Barlow',
+        fontSize: 70,
+        fill: '#ff0000',
+        shadow: { color: SHADOW, blur, offsetX: 25, offsetY: 40, opacity: 1 },
+      }),
+  })),
+  {
+    id: 'blurred text',
+    soft: true,
+    build: (x, y) =>
+      createTextFixture({ x, y, width: 200, height: 100, text: 'HO', fontFamily: 'Barlow', fontSize: 70, fill: '#ff0000', blurRadius: 5 }),
+  },
   // The shadow is cast from the blurred shape.
   {
     id: 'blur and soft shadow',
@@ -303,6 +328,7 @@ async function compareSvgWithCanvas(page: Page, svg: string, pngBase64: string):
 test.describe('SVG export of blur and drop shadow', () => {
   test('cuts off nothing the canvas draws', async ({ page }) => {
     await openFreshEditor(page);
+    await waitForBundledFonts(page);
     await uploadProject(page, {
       ...createProjectDocument(PLACED.map((entry) => entry.item)),
       canvas: CANVAS,
