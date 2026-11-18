@@ -124,6 +124,22 @@ const CASES: FilterCase[] = [
         shadow: hardShadow(0, 70),
       }),
   },
+  // The stroke is wider than the ellipse is tall. The canvas draws an ellipse
+  // as a polygon whose corners at the two flat ends are sharp: mitred, the
+  // stroke would reach 2 px past the ellipse at each end.
+  {
+    id: 'flat ellipse',
+    build: (x, y) =>
+      createEllipseFixture({
+        x,
+        y,
+        width: 200,
+        height: 16,
+        stroke: '#ff0000',
+        strokeWidth: 24,
+        shadow: hardShadow(0, 70),
+      }),
+  },
   {
     id: 'polygon',
     build: (x, y) =>
