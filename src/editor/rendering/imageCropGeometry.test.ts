@@ -311,6 +311,9 @@ describe('image crop geometry', () => {
       baseItem: item,
       pointerStart: { x: 40, y: 30 },
       pointer: { x: 50, y: 40 },
+      siblingItems: [],
+      snapEnabled: false,
+      stageRect: { x: 0, y: 0, width: 300, height: 200 },
     });
 
     expect(panned.crop).toMatchObject({
@@ -370,6 +373,9 @@ describe('image crop geometry', () => {
       baseItem: item,
       pointerStart: { x: 40, y: 30 },
       pointer: { x: 50, y: 40 },
+      siblingItems: [],
+      snapEnabled: false,
+      stageRect: { x: 0, y: 0, width: 300, height: 200 },
     });
 
     expect(panned.crop).toMatchObject({
@@ -391,6 +397,8 @@ describe('image crop geometry', () => {
 
   describe('snapping while panning', () => {
     const stageRect = { x: 0, y: 0, width: 400, height: 300 };
+    // Keeps the stage's own guides far from the rotated-picture tests.
+    const largeStageRect = { x: 0, y: 0, width: 4000, height: 3000 };
 
     // Crop frame at (30,20) 80x45; the whole picture at (10,10) 160x90.
     function createCroppedItem() {
@@ -496,7 +504,13 @@ describe('image crop geometry', () => {
       item.rotation = 30;
       const pan = { pointerStart: { x: 40, y: 30 }, pointer: { x: 140, y: 120 } };
       const unsnapped = getItemAABB(
-        panImageUnderCrop({ baseItem: item, ...pan, snapEnabled: false }).fullImageItem,
+        panImageUnderCrop({
+          baseItem: item,
+          ...pan,
+          siblingItems: [],
+          snapEnabled: false,
+          stageRect: largeStageRect,
+        }).fullImageItem,
       );
       const guideX = unsnapped.x + unsnapped.width + 2;
       const sibling = createRectangleItem({ x: guideX, y: 1000, width: 500, height: 50 });
@@ -505,7 +519,7 @@ describe('image crop geometry', () => {
         baseItem: item,
         ...pan,
         siblingItems: [sibling],
-        stageRect: { x: 0, y: 0, width: 4000, height: 3000 },
+        stageRect: largeStageRect,
         threshold: 3,
       });
 
@@ -514,6 +528,35 @@ describe('image crop geometry', () => {
       expect(snapped.x + snapped.width).toBeCloseTo(guideX, 8);
       expect(snapped.y).toBeCloseTo(unsnapped.y, 8);
       expect(panned.previewItem).toMatchObject({ x: 30, y: 20, rotation: 30 });
+    });
+
+    it('does not snap a rotated picture to its own crop frame', () => {
+      const item = createCroppedItem();
+      item.rotation = 30;
+      const frame = getItemAABB(item);
+      const pointerStart = { x: 40, y: 30 };
+      const panTo = (pointer: { x: number; y: number }, snapEnabled: boolean) =>
+        panImageUnderCrop({
+          baseItem: item,
+          pointerStart,
+          pointer,
+          siblingItems: [],
+          snapEnabled,
+          stageRect: largeStageRect,
+          threshold: 3,
+        });
+      // Pan so the picture's bounding box ends 2 px from the frame's
+      // bounding box, well inside the threshold.
+      const atRest = getItemAABB(panTo(pointerStart, false).fullImageItem);
+      const pointer = { x: pointerStart.x + frame.x + 2 - atRest.x, y: pointerStart.y + 50 };
+      const raw = getItemAABB(panTo(pointer, false).fullImageItem);
+      expect(raw.x).toBeCloseTo(frame.x + 2, 8);
+
+      const panned = panTo(pointer, true);
+
+      expect(panned.guides).toEqual([]);
+      expect(getItemAABB(panned.fullImageItem).x).toBeCloseTo(raw.x, 8);
+      expect(getItemAABB(panned.fullImageItem).y).toBeCloseTo(raw.y, 8);
     });
   });
 });

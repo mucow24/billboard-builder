@@ -212,10 +212,9 @@ export function panImageUnderCrop(params: {
   baseItem: ImageCanvasItem;
   pointerStart: Point;
   pointer: Point;
-  /** Snapping runs only when both `siblingItems` and `stageRect` are given. */
-  siblingItems?: CanvasItem[];
+  siblingItems: CanvasItem[];
   snapEnabled?: boolean;
-  stageRect?: SnapRect;
+  stageRect: SnapRect;
   threshold?: number;
 }) {
   const {
@@ -242,20 +241,27 @@ export function panImageUnderCrop(params: {
   let previewItem = panBy(stageDelta);
   let guides: GuideLine[] = [];
 
-  if (snapEnabled && siblingItems && stageRect) {
+  if (snapEnabled) {
     // Snap the whole picture's bounding box, as an ordinary move does, to
-    // the stage and the other items, and also to the crop frame, which
-    // stays put while the picture slides under it.
-    const frame = getItemAABB(baseItem);
+    // the stage and the other items. The cache is built fresh on every move
+    // (as in resizeImageCrop), so adding lines to it below is safe; if it is
+    // ever built once per gesture, the additions must move with it.
     const cache = buildCandidateCache(siblingItems, stageRect);
-    cache.lines.push(
-      { orientation: 'vertical', position: frame.x },
-      { orientation: 'vertical', position: frame.x + frame.width / 2 },
-      { orientation: 'vertical', position: frame.x + frame.width },
-      { orientation: 'horizontal', position: frame.y },
-      { orientation: 'horizontal', position: frame.y + frame.height / 2 },
-      { orientation: 'horizontal', position: frame.y + frame.height },
-    );
+    // Also snap to the crop frame, which stays put while the picture slides
+    // under it. Not when the item is rotated: the frame's bounding box then
+    // lines up with none of its real edges, so a snap to it would show a
+    // guide without making anything flush.
+    if (Math.abs(baseItem.rotation) < 0.001) {
+      const frame = getItemAABB(baseItem);
+      cache.lines.push(
+        { orientation: 'vertical', position: frame.x },
+        { orientation: 'vertical', position: frame.x + frame.width / 2 },
+        { orientation: 'vertical', position: frame.x + frame.width },
+        { orientation: 'horizontal', position: frame.y },
+        { orientation: 'horizontal', position: frame.y + frame.height / 2 },
+        { orientation: 'horizontal', position: frame.y + frame.height },
+      );
+    }
     const rawRect = getItemAABB(buildFullImageTransformItem(previewItem));
     const snapped = getSnappedRect(rawRect, siblingItems, stageRect, threshold, cache);
     guides = snapped.guides;
