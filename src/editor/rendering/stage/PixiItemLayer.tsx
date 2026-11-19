@@ -60,6 +60,16 @@ import { useImageElement } from '../useImageElement';
 import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
 import { rasteriseRichTextShadow } from './richTextShadow';
+import {
+  fontOutlinesVersion,
+  peekFontOutlines,
+  rasteriseVectorOutline,
+  requestFontOutlines,
+  subscribeToFontOutlines,
+  textOutlineShapes,
+  wantsVectorOutline,
+} from './vectorTextOutline';
+import type { TextOutlineShape } from '../../io/svg/svgExportTypes';
 import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
 import { measureTextBaselineShift } from './textBaselineShift';
 import { getTextMeasuringContext, measureTextRasterPadding } from './textRasterPadding';
@@ -574,6 +584,73 @@ function RichTextShadow({
 }
 
 // ---------------------------------------------------------------------------
+// The outline of faked bold, from the glyphs' contours
+// ---------------------------------------------------------------------------
+
+/** Whether a layer of a text item is one of its outline's Pixi texts (`buildTextLayers`, `buildRichTextFragments`). */
+const isStrokeLayer = (layer: PixiTextLayer) => layer.key === 'stroke' || layer.key.startsWith('stroke:');
+
+/**
+ * The pieces of `item`'s outline where it is drawn from the glyphs' contours
+ * (`wantsVectorOutline`). Null everywhere else, and until the contours of its
+ * fonts have been read; the outline is then the browser's stroke.
+ */
+function useVectorOutlineShapes(item: TextCanvasItem, fontRegistrations: number): TextOutlineShape[] | null {
+  const wanted = wantsVectorOutline(item);
+  // What has been read of the fonts' contours: nothing to an item that wants none.
+  const read = useSyncExternalStore(subscribeToFontOutlines, () => (wanted ? fontOutlinesVersion() : 0));
+  useEffect(() => {
+    if (wanted) requestFontOutlines(item);
+  });
+  // Where the item is plays no part in its outline: a move lays nothing out anew.
+  const itemKey = wanted ? JSON.stringify({ ...item, x: 0, y: 0, rotation: 0 }) : null;
+  return useMemo(() => {
+    if (itemKey === null) return null;
+    const fontOutlines = peekFontOutlines(item);
+    return fontOutlines ? textOutlineShapes(item, fontOutlines) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- itemKey stands for item; read and fontRegistrations: the same item is laid out differently once its fonts are in.
+  }, [itemKey, read, fontRegistrations]);
+}
+
+/**
+ * The outline of a text item drawn from its glyphs' contours: one sprite, in
+ * place of the outline's Pixi texts. The image is white and tinted with the
+ * outline's colour, and see-through as a whole.
+ */
+function VectorTextOutline({
+  shapes,
+  stroke,
+  resolution,
+}: {
+  shapes: TextOutlineShape[];
+  stroke: TextStrokePaint;
+  resolution: number;
+}) {
+  const image = useMemo(() => {
+    const drawn = rasteriseVectorOutline(shapes, stroke.width, resolution);
+    if (!drawn) return null;
+    // The source's resolution makes the texture as large in px as the image is.
+    const source = new CanvasSource({ resource: drawn.canvas, resolution: drawn.resolution });
+    return { texture: new Texture({ source }), x: drawn.x, y: drawn.y };
+  }, [shapes, stroke.width, resolution]);
+  useDestroyedWhenUnused(image?.texture ?? null);
+
+  if (!image) return null;
+  // Keyed by texture: a sprite takes its size from its texture only when it is given one.
+  return (
+    <pixiSprite
+      key={image.texture.uid}
+      texture={image.texture}
+      x={image.x}
+      y={image.y}
+      tint={stroke.color}
+      alpha={stroke.alpha}
+      eventMode="none"
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Text content component (redraws when the text's font arrives)
 // ---------------------------------------------------------------------------
 
@@ -608,6 +685,34 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
     ? buildRichTextFragments(item, rich.runs, requestedResolution)
     : null;
   const layers = fragments?.texts ?? buildTextLayers(item, requestedResolution);
+
+  // Where the browser fakes bold, its stroke runs inside the glyphs too, which
+  // a see-through fill shows: the outline is then drawn from the glyphs'
+  // contours instead, in the place of the outline's Pixi texts (above the
+  // shadow, under every fill).
+  const stroke = textStrokeOf(item);
+  const outlineShapes = useVectorOutlineShapes(item, fontRegistrations);
+  const vectorOutline =
+    stroke && outlineShapes ? (
+      <VectorTextOutline key="vector-outline" shapes={outlineShapes} stroke={stroke} resolution={requestedResolution} />
+    ) : null;
+  const firstStroke = layers.findIndex(isStrokeLayer);
+  const shown = vectorOutline ? layers.filter((layer) => !isStrokeLayer(layer)) : layers;
+  // How many of the layers shown are under the outline.
+  const under = vectorOutline ? Math.max(0, firstStroke) : shown.length;
+
+  const pixiTextOf = (layer: PixiTextLayer) => (
+    <pixiText
+      key={layer.key}
+      text={layer.text}
+      style={layer.style}
+      x={layer.x}
+      y={layer.y}
+      alpha={layer.alpha}
+      resolution={layer.resolution}
+      eventMode="none"
+    />
+  );
   return (
     <>
       {fragments?.shadow ? (
@@ -617,18 +722,9 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
           fontsKey={`${fontRegistrations}:${document.fonts?.size ?? 0}`}
         />
       ) : null}
-      {layers.map((layer) => (
-        <pixiText
-          key={layer.key}
-          text={layer.text}
-          style={layer.style}
-          x={layer.x}
-          y={layer.y}
-          alpha={layer.alpha}
-          resolution={layer.resolution}
-          eventMode="none"
-        />
-      ))}
+      {shown.slice(0, under).map(pixiTextOf)}
+      {vectorOutline}
+      {shown.slice(under).map(pixiTextOf)}
     </>
   );
 }

@@ -1,9 +1,26 @@
 import type { ApplicationRef } from '@pixi/react';
 import { Container, Rectangle } from 'pixi.js';
 
+import { fontOutlinesSettled } from '../stage/vectorTextOutline';
 import { configureZoomScaledFilters } from '../stage/zoomScaledFilters';
 import type { CanvasRendererHandle } from './canvasRendererTypes';
 import { extractStraightAlphaCanvas } from './straightAlphaExtract';
+
+/** A frame takes this long at most, for whoever waits for one: a hidden tab draws none. */
+const FRAME_TIMEOUT_MS = 100;
+
+/** Wait for `count` animation frames, or as long as they should take where none come. */
+async function nextFrames(count: number): Promise<void> {
+  for (let i = 0; i < count; i += 1) {
+    await new Promise<void>((resolve) => {
+      const timeout = setTimeout(resolve, FRAME_TIMEOUT_MS);
+      requestAnimationFrame(() => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
+}
 
 /**
  * Create a CanvasRendererHandle backed by a PixiJS Application.
@@ -34,6 +51,12 @@ export function createPixiRendererHandle(
     },
 
     async exportToDataURL({ contentWidth, contentHeight, pixelRatio, mimeType = 'image/png' }) {
+      // The outline of faked bold is drawn from the font's contours once they
+      // have been read (`vectorTextOutline`), and by the browser's own stroke
+      // until then: an export waits for the reading, and for the canvas to
+      // have taken the outlines in.
+      if (await fontOutlinesSettled()) await nextFrames(2);
+
       const app = appRef.current?.getApplication();
       const exportContainer = exportContainerRef.current;
       if (!app?.renderer || !exportContainer) return '';

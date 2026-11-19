@@ -28,6 +28,7 @@ import type {
   SvgExportWarning,
   SyntheticFontStyle,
   TextMeasurer,
+  TextOutlineShape,
 } from './svgExportTypes';
 import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor, type SyntheticBold } from './syntheticFontStyle';
 
@@ -46,6 +47,10 @@ import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor, type SyntheticBold } from '.
  * outlined from the fallback (`lookup.fallback`, see `lineGlyphs`), as the canvas
  * draws them. Their bold and italic are faked by what the fallback lacks, in a
  * path of their own.
+ *
+ * The canvas runs this too, for the outline of faked bold alone
+ * (`rendering/stage/vectorTextOutline`): it is drawn from the glyphs as they
+ * are laid out here, so a change to the layout moves it on the canvas.
  */
 export function textSvg(
   item: TextCanvasItem,
@@ -109,7 +114,9 @@ export function textSvg(
   const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
   const pathEls = glyphGroupElements(groups, item, fillAttr, area, defs, `bold-${item.id}`);
   // The outline goes under the fill, and the shadow is cast from both.
-  const strokeEls = stroke ? strokeLayer(strokeElements(groups, stroke), stroke) : '';
+  const strokeEls = stroke
+    ? strokeLayer(strokeElements(groups, stroke, item, area, defs, `outline-${item.id}`, deps.onTextOutline), stroke)
+    : '';
   const filterAttr = pushTextFilter(item, defs, area);
   return wrapItem(item, effectiveOpacity, strokeEls + pathEls.join(''), filterAttr);
 }
@@ -165,6 +172,8 @@ interface GlyphGroup {
   glyphStyle: GlyphPathStyle;
   /** The SVG path data of the glyphs, as they are drawn. */
   paths: string[];
+  /** Of those, the glyphs at their pen positions: all of them unless they are smeared. */
+  unsmearedPaths: string[];
 }
 
 /**
@@ -189,6 +198,7 @@ function glyphGroup(
       closed: bold?.kind === 'stroke' || textStrokeOf(item) !== null,
     },
     paths: [],
+    unsmearedPaths: [],
   };
 }
 
@@ -250,10 +260,12 @@ function placeGlyphs(
     const { fallback: fromFallback, drawn } = line.glyphs[index];
     const group = fromFallback && groups.fallback ? groups.fallback : groups.own;
     const penX = left + offset + spacingsBefore[index] * item.letterSpacing;
-    for (const penOffset of group.penOffsets) {
+    group.penOffsets.forEach((penOffset, copy) => {
       const path = glyphsPath(group.font, drawn, item.fontSize, penX + penOffset, baselineY, group.glyphStyle);
-      if (path) group.paths.push(path);
-    }
+      if (!path) return;
+      group.paths.push(path);
+      if (copy === 0) group.unsmearedPaths.push(path);
+    });
   });
 }
 
@@ -293,18 +305,112 @@ function glyphGroupElements(
  * Where a group's bold is faked by a stroke, the canvas outlines the glyphs as
  * that bold has grown them, so the stroke here is wider by as much: its outer
  * edge is then where the canvas has it. Its inner edge reaches further into the
- * glyph than on the canvas, which shows only through a see-through fill.
+ * glyph than the outline does. Where it is faked by smearing, the stroke runs
+ * around every copy of the glyph, inside the smear as well. Under an opaque
+ * fill neither shows. Where `paint`, the colours the glyphs are filled with, is
+ * see-through, the stroke is cut back to the outline by a mask
+ * (`boldOutlineMask`, `smearOutlineMask`) over `area`, which has to contain
+ * all of the text's ink; `maskId` is unique in the document.
+ *
+ * `onTextOutline` is told each group's glyphs (`SvgExportDeps.onTextOutline`).
+ * The canvas draws the outline of faked bold from them
+ * (`rendering/stage/vectorTextOutline`), and decides by the same test of
+ * `paint` whether to: a change to this layout, to what is told, or to when the
+ * stroke is masked changes what is on the canvas too.
  */
-function strokeElements(groups: GlyphGroups, stroke: TextStrokePaint): string[] {
+function strokeElements(
+  groups: GlyphGroups,
+  stroke: TextStrokePaint,
+  paint: { fill: string; secondaryFill: string },
+  area: Area,
+  defs: string[],
+  maskId: string,
+  onTextOutline?: (shape: TextOutlineShape) => void,
+): string[] {
+  const seeThrough = toSvgPaint(paint.fill).alpha < 1 || toSvgPaint(paint.secondaryFill).alpha < 1;
   return [groups.own, ...(groups.fallback ? [groups.fallback] : [])]
     .filter((group) => group.paths.length > 0)
     .map((group) => {
-      const width = stroke.width + (group.bold?.kind === 'stroke' ? group.bold.width : 0);
+      const d = group.paths.join(' ');
+      const boldWidth = group.bold?.kind === 'stroke' ? group.bold.width : 0;
+      onTextOutline?.({ d, unsmearedD: group.unsmearedPaths.join(' '), bold: group.bold, area });
+      let mask = '';
+      if (group.bold && seeThrough) {
+        const id = group === groups.own ? maskId : `${maskId}-fallback`;
+        defs.push(
+          group.bold.kind === 'stroke'
+            ? boldOutlineMask(id, d, stroke.width, boldWidth, area)
+            : smearOutlineMask(id, group.unsmearedPaths.join(' '), group.bold.offsets, stroke.width, area),
+        );
+        mask = ` mask="url(#${id})"`;
+      }
       return (
-        `<path d="${group.paths.join(' ')}" fill="none" stroke="${stroke.color}" ` +
-        `stroke-width="${fmt(width)}" stroke-linejoin="${TEXT_STROKE_JOIN}" stroke-linecap="${TEXT_STROKE_JOIN}"/>`
+        `<path d="${d}" fill="none" stroke="${stroke.color}" ` +
+        `stroke-width="${fmt(stroke.width + boldWidth)}" stroke-linejoin="${TEXT_STROKE_JOIN}" ` +
+        `stroke-linecap="${TEXT_STROKE_JOIN}"${mask}/>`
       );
     });
+}
+
+/**
+ * The mask that leaves, of a stroke around the glyph outlines `d`, only the
+ * outline of their faked bold: everything but the inside of the bold shape,
+ * that shape made smaller by half of `strokeWidth`.
+ *
+ * The edge of the bold lies half of `boldWidth` outside the outlines, so the
+ * inner edge of its outline lies half of `boldWidth - strokeWidth` outside
+ * them. Where that is outside, the shape to hide is the outlines grown as the
+ * bold itself is, filled and stroked with mitered joins. Where it is inside,
+ * it is the filled outlines less a stroke with round joins.
+ */
+function boldOutlineMask(id: string, d: string, strokeWidth: number, boldWidth: number, area: Area): string {
+  const rect = `x="${fmt(area.x)}" y="${fmt(area.y)}" width="${fmt(area.width)}" height="${fmt(area.height)}"`;
+  const difference = boldWidth - strokeWidth;
+  const hidden =
+    difference >= 0
+      ? `<path d="${d}" fill="#000" stroke="#000" stroke-width="${fmt(difference)}" ` +
+        `stroke-linejoin="miter" stroke-miterlimit="4"/>`
+      : `<path d="${d}" fill="#000"/>` +
+        `<path d="${d}" fill="none" stroke="#fff" stroke-width="${fmt(-difference)}" ` +
+        `stroke-linejoin="round" stroke-linecap="round"/>`;
+  return `<mask id="${id}" maskUnits="userSpaceOnUse" ${rect}><rect ${rect} fill="#fff"/>${hidden}</mask>`;
+}
+
+/**
+ * The masks that leave, of a stroke around every copy of smeared glyphs, only
+ * the outline of the smear: everything but the inside of the smear, made
+ * smaller by half of `strokeWidth`.
+ *
+ * `d` is the glyph outlines at their pen positions, `offsets` how far right of
+ * them the copies are. What is hidden is one copy made smaller by half the
+ * stroke (the first mask: its fill less its own stroke), smeared as the
+ * glyphs are: drawn once at every offset. That is the smear made smaller,
+ * except in a stem thinner than the stroke is wide, where a sliver narrower
+ * than the smear's distance stays in the outline's colour.
+ */
+function smearOutlineMask(
+  id: string,
+  d: string,
+  offsets: readonly number[],
+  strokeWidth: number,
+  area: Area,
+): string {
+  const rect = `x="${fmt(area.x)}" y="${fmt(area.y)}" width="${fmt(area.width)}" height="${fmt(area.height)}"`;
+  const smaller =
+    `<mask id="${id}-copy" maskUnits="userSpaceOnUse" ${rect}>` +
+    `<path d="${d}" fill="#fff" stroke="#000" stroke-width="${fmt(strokeWidth)}" ` +
+    `stroke-linejoin="round" stroke-linecap="round"/></mask>`;
+  // A mask is laid out in the coordinates of the element that uses it: each
+  // copy is cut by the same mask, moved along with it.
+  const hidden = offsets
+    .map(
+      (offset) =>
+        `<g transform="translate(${fmt(offset)} 0)"><rect ${rect} fill="#000" mask="url(#${id}-copy)"/></g>`,
+    )
+    .join('');
+  return (
+    smaller + `<mask id="${id}" maskUnits="userSpaceOnUse" ${rect}><rect ${rect} fill="#fff"/>${hidden}</mask>`
+  );
 }
 
 /**
@@ -498,7 +604,11 @@ function richTextSvg(
       };
       areas.push(area);
       elements.push(...glyphGroupElements(groups, colours, fillAttr, area, defs, `bold-${fragmentId}`));
-      if (stroke) strokeEls.push(...strokeElements(groups, stroke));
+      if (stroke) {
+        strokeEls.push(
+          ...strokeElements(groups, stroke, colours, area, defs, `outline-${fragmentId}`, deps.onTextOutline),
+        );
+      }
     }
   });
 
