@@ -13,6 +13,7 @@ import { CanvasTestHooks } from './stage/CanvasTestHooks';
 import { CanvasViewportHud } from './stage/CanvasViewportHud';
 import { buildStageDerivedState } from './stage/stageDerived';
 import { buildStageSceneHandlers } from './stage/stageHandlers';
+import { resolveHoverOutline } from './stage/hoverOutline';
 import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
 import { useCanvasViewport, type FitObstructionRefs } from './stage/useCanvasViewport';
 import { toOverlayStyle } from './stage/viewportMath';
@@ -75,6 +76,16 @@ export function CanvasStage({
 
   const [lastTestHookEvent, setLastTestHookEvent] = useState<string | null>(null);
   const [rendererReady, setRendererReady] = useState(false);
+
+  // The item under the pointer, as the item layer reports it. It changes only
+  // on pointer events: when the content moves under a pointer that stays where
+  // it is (wheel pan or zoom, undo, paste, reorder), the hover is stale until
+  // the pointer next moves. Accepted: the next move puts it right.
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const handleItemHoverChange = useCallback((itemId: string, hovering: boolean) => {
+    // An item's "out" must not undo the "over" of the item the pointer went to.
+    setHoveredItemId((current) => (hovering ? itemId : current === itemId ? null : current));
+  }, []);
 
   const viewportState = useCanvasViewport({
     activeTool,
@@ -149,6 +160,7 @@ export function CanvasStage({
   // none either, so handles don't pop in and out under the pointer (or swap
   // its cursor) mid-drag.
   const hideTransformHandles = selectionLocked || selectionHasGenerator || marqueeInProgress;
+  const canvasBounds = { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height };
   const {
     cropFullImageHandleViewportPoints,
     cropFullImageRotaterViewportPoint,
@@ -164,7 +176,7 @@ export function CanvasStage({
     showGroupInteractionHooks,
   } = buildStageDerivedState({
     activeTool,
-    canvasBounds: { x: 0, y: 0, width: document.canvas.width, height: document.canvas.height },
+    canvasBounds,
     renderedGroupBounds,
     renderedSelectedItems,
     renderedSelectionFrame,
@@ -175,6 +187,26 @@ export function CanvasStage({
     zoom: viewport.zoom,
     viewport,
   });
+
+  // Hovering points out what a click would select, so only while a click
+  // would select (see resolveHoverOutline).
+  const hoverOutline = resolveHoverOutline({
+    hoveredItemId,
+    renderedItems,
+    selectedNodeIds,
+    selectedItemIds: renderedSelectedItems.map((item) => item.id),
+    canvasBounds,
+    activeTool,
+    gestureInProgress: Boolean(session),
+    cropping: Boolean(cropSession),
+    marqueeInProgress,
+    panKeyHeld: viewport.spacebarHeld,
+  });
+  const { handleStagePointerLeave } = viewport;
+  const handleStageMouseLeave = useCallback(() => {
+    setHoveredItemId(null);
+    handleStagePointerLeave();
+  }, [handleStagePointerLeave]);
 
   const sceneHandlers = buildStageSceneHandlers({
     activeTool,
@@ -196,6 +228,8 @@ export function CanvasStage({
       data-testid="canvas-stage-root"
       // The veil itself is drawn by the scene, over the items only.
       data-export-bounds-cue={showExportBoundsCue ? 'active' : 'inactive'}
+      // The node the hover outline is drawn around, if any.
+      data-hover-outline={hoverOutline?.nodeId}
       style={{ cursor: viewport.getStageCursor(Boolean(session)) }}
     >
       <CanvasViewportHud
@@ -228,8 +262,10 @@ export function CanvasStage({
         guides={guides}
         handleItemDoubleClick={handleItemDoubleClick}
         handleItemPointerDown={handleItemPointerDown}
+        hoverOutline={hoverOutline}
+        onItemHoverChange={handleItemHoverChange}
         onStageMouseDown={sceneHandlers.onStageMouseDown}
-        onStageMouseLeave={viewport.handleStagePointerLeave}
+        onStageMouseLeave={handleStageMouseLeave}
         onStageMouseMove={sceneHandlers.onStageMouseMove}
         onStageMouseUp={sceneHandlers.onStageMouseUp}
         onStageWheel={sceneHandlers.onStageWheel}

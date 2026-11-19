@@ -2477,6 +2477,197 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.session).toBeNull();
   });
 
+  describe('pressing an unselected item that covers the selection', () => {
+    const bottom = createRectangleItem({ id: 'bottom', x: 0, y: 0, width: 300, height: 300 });
+    const top = createRectangleItem({ id: 'top', x: 100, y: 100, width: 100, height: 100 });
+    const elsewhere = createRectangleItem({ id: 'elsewhere', x: 600, y: 600, width: 50, height: 50 });
+    const overlap = { x: 150, y: 150 };
+    const dragEnd = { x: 190, y: 170 };
+
+    function itemPress(pointer: { x: number; y: number }, overrides: Partial<MouseEvent> = {}) {
+      return makeStageEvent(pointer, 'shape', overrides).nativeEvent as MouseEvent;
+    }
+
+    type Hook = { current: ReturnType<typeof useCanvasInteractionSession> };
+
+    /** Press `pressed` at the overlap and release without moving. */
+    function click(result: Hook, pressed: CanvasItem) {
+      act(() => {
+        result.current.handleItemPointerDown(pressed, pressed.id, overlap, false, itemPress(overlap));
+      });
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent(overlap, 'shape'));
+      });
+    }
+
+    /** Press `pressed` at the overlap, move to `dragEnd` and release. */
+    function drag(result: Hook, pressed: CanvasItem) {
+      act(() => {
+        result.current.handleItemPointerDown(pressed, pressed.id, overlap, false, itemPress(overlap));
+      });
+      act(() => {
+        result.current.handleStagePointerMove(makeStageEvent(dragEnd, 'shape'));
+      });
+      act(() => {
+        result.current.handleStageMouseUp(makeStageEvent(dragEnd, 'shape'));
+      });
+    }
+
+    function movedItemIds(params: ReturnType<typeof createHookParams>) {
+      const single = params.onUpdateItem.mock.calls.map((call) => call[0] as string);
+      return single.sort();
+    }
+
+    const cases: Array<{
+      name: string;
+      nodes: () => CanvasNode[];
+      selectedNodeIds: string[];
+      moved: string[];
+    }> = [
+      {
+        name: 'a single covered item',
+        nodes: () => [bottom, top],
+        selectedNodeIds: ['bottom'],
+        moved: ['bottom'],
+      },
+      {
+        name: 'a multi-selection with one item covered',
+        nodes: () => [bottom, top, elsewhere],
+        selectedNodeIds: ['bottom', 'elsewhere'],
+        moved: ['bottom', 'elsewhere'],
+      },
+      {
+        name: 'a selected group with one item covered',
+        nodes: () => [{ ...createGroupNode([bottom]), id: 'group' }, top],
+        selectedNodeIds: ['group'],
+        moved: ['bottom'],
+      },
+      {
+        // Drilled into the group: child A is selected, its sibling B covers it.
+        name: 'a drilled-in child covered by a sibling',
+        nodes: () => [{ ...createGroupNode([bottom, top]), id: 'group' }],
+        selectedNodeIds: ['bottom'],
+        moved: ['bottom'],
+      },
+    ];
+
+    for (const testCase of cases) {
+      it(`selects the pressed item on a click over ${testCase.name}`, () => {
+        const params = createHookParams({
+          document: createDocument(testCase.nodes()),
+          selectedNodeIds: testCase.selectedNodeIds,
+        });
+        const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+        act(() => {
+          result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+        });
+        // Nothing is decided until the button comes back up.
+        expect(params.onSelectNode).not.toHaveBeenCalled();
+        act(() => {
+          result.current.handleStageMouseUp(makeStageEvent(overlap, 'shape'));
+        });
+
+        expect(params.onSelectNode).toHaveBeenCalledTimes(1);
+        expect(params.onSelectNode).toHaveBeenCalledWith('top');
+        expect(params.onUpdateItem).not.toHaveBeenCalled();
+        expect(result.current.session).toBeNull();
+      });
+
+      it(`moves the selection on a drag from over ${testCase.name}`, () => {
+        const params = createHookParams({
+          document: createDocument(testCase.nodes()),
+          selectedNodeIds: testCase.selectedNodeIds,
+        });
+        const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+        drag(result, top);
+
+        expect(params.onSelectNode).not.toHaveBeenCalled();
+        expect(movedItemIds(params)).toEqual(testCase.moved);
+        expect(result.current.session).toBeNull();
+      });
+    }
+
+    it('selects the pressed item at once when the selection is not under the pointer', () => {
+      const params = createHookParams({
+        document: createDocument([bottom, top, elsewhere]),
+        selectedNodeIds: ['elsewhere'],
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, false, itemPress(overlap));
+      });
+
+      expect(params.onSelectNode).toHaveBeenCalledWith('top');
+    });
+
+    it('still adds the pressed item to the selection on shift-press', () => {
+      const params = createHookParams({
+        document: createDocument([bottom, top]),
+        selectedNodeIds: ['bottom'],
+        onToggleSelectNode: vi.fn(),
+      });
+      const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+      act(() => {
+        result.current.handleItemPointerDown(top, top.id, overlap, true, itemPress(overlap, { shiftKey: true }));
+      });
+
+      expect(params.onToggleSelectNode).toHaveBeenCalledWith('top');
+    });
+
+    it('picks up the pressed item when the selection underneath is locked or a generator', () => {
+      const lockedBottom = { ...bottom, id: 'locked-bottom', locked: true };
+      const generator = { ...createGeneratorItem('noise', 800, 600), id: 'generator' };
+      for (const [under, id] of [[lockedBottom, 'locked-bottom'], [generator, 'generator']] as const) {
+        const params = createHookParams({
+          document: createDocument([under, top]),
+          selectedNodeIds: [id],
+        });
+        const { result } = renderHook(() => useCanvasInteractionSession(params));
+
+        drag(result, top);
+
+        expect(params.onSelectNode).toHaveBeenCalledWith('top');
+        expect(movedItemIds(params)).toEqual(['top']);
+      }
+    });
+
+    it('addresses the pressed item, not the covered selection, on double-click', () => {
+      const topImage = createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 100,
+        originalHeight: 100,
+      });
+      topImage.id = 'top';
+      topImage.x = 100;
+      topImage.y = 100;
+      topImage.width = 100;
+      topImage.height = 100;
+      const params = createHookParams({
+        document: createDocument([bottom, topImage]),
+        selectedNodeIds: ['bottom'],
+      });
+      const { result, rerender } = renderHook((props) => useCanvasInteractionSession(props), {
+        initialProps: params,
+      });
+
+      // First click of the pair selects the top image...
+      click(result, topImage);
+      expect(params.onSelectNode).toHaveBeenCalledWith('top');
+      rerender({ ...params, selectedNodeIds: ['top'] });
+
+      // ...and the second opens its crop.
+      act(() => {
+        result.current.handleItemDoubleClick(topImage);
+      });
+      expect(result.current.cropSession?.itemId).toBe('top');
+    });
+  });
+
   describe('alt-click selection cycling', () => {
     const bottom = createRectangleItem({ id: 'bottom', x: 0, y: 0, width: 300, height: 300 });
     const lockedMiddle = createRectangleItem({

@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   getGroupDescendantAtPoint,
   getItemsAtPoint,
+  getSelectedHitAtPoint,
   getSelectionCycleTargetAtPoint,
+  resolveCoveredSelectionPress,
 } from './interactionHitTesting';
 import { buildRenderableCanvasItems } from './renderAdapter';
 import {
@@ -103,6 +105,107 @@ describe('getGroupDescendantAtPoint', () => {
     // Inside the bent line's box but off both strokes: no hit.
     expect(getGroupDescendantAtPoint(renderables, 'group', { x: 600, y: 40 })).toBeNull();
     expect(getGroupDescendantAtPoint(renderables, 'group', { x: 500, y: 100 })?.id).toBe('bent');
+  });
+});
+
+describe('getSelectedHitAtPoint', () => {
+  const overlap = { x: 150, y: 150 };
+
+  function selectedHit(nodes: CanvasNode[], selection: string[], point = overlap) {
+    const hit = getSelectedHitAtPoint(renderablesFor(nodes, selection), selection, point);
+    return hit ? { itemId: hit.item.id, nodeId: hit.nodeId } : null;
+  }
+
+  it('finds a selected item covered by an unselected one', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['bottom'])).toEqual({ itemId: 'bottom', nodeId: 'bottom' });
+  });
+
+  it('returns null when the selection is empty or not under the point', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100), rect('elsewhere', 600, 600)];
+
+    expect(selectedHit(nodes, [])).toBeNull();
+    expect(selectedHit(nodes, ['elsewhere'])).toBeNull();
+    expect(selectedHit(nodes, ['top'], { x: 20, y: 20 })).toBeNull();
+  });
+
+  it('returns the top-most selected item of a multi-selection', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('middle', 50, 50, 200), rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['bottom', 'middle'])).toEqual({ itemId: 'middle', nodeId: 'middle' });
+  });
+
+  it('resolves an item inside a selected group to the group', () => {
+    const group = { ...createGroupNode([rect('child', 0, 0, 300)]), id: 'group' };
+    const nodes = [group, rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['group'])).toEqual({ itemId: 'child', nodeId: 'group' });
+  });
+
+  it('skips locked items and generators', () => {
+    const generator = { ...createGeneratorItem('noise', 800, 600), id: 'generator' };
+    const nodes = [generator, rect('locked', 0, 0, 300, { locked: true }), rect('top', 100, 100)];
+
+    expect(selectedHit(nodes, ['generator', 'locked'])).toBeNull();
+  });
+});
+
+describe('resolveCoveredSelectionPress', () => {
+  const overlap = { x: 150, y: 150 };
+
+  function coveredPress(nodes: CanvasNode[], selection: string[], pressedItemId: string, point = overlap) {
+    const hit = resolveCoveredSelectionPress(renderablesFor(nodes, selection), selection, pressedItemId, point);
+    return hit ? { itemId: hit.item.id, nodeId: hit.nodeId } : null;
+  }
+
+  it('resolves a press on an unselected item to the selected item it covers', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100)];
+
+    expect(coveredPress(nodes, ['bottom'], 'top')).toEqual({ itemId: 'bottom', nodeId: 'bottom' });
+  });
+
+  it('is null when the pressed item is itself selected', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100)];
+
+    expect(coveredPress(nodes, ['top'], 'top')).toBeNull();
+    expect(coveredPress(nodes, ['bottom', 'top'], 'top')).toBeNull();
+  });
+
+  it('is null when the pressed item belongs to a selected group', () => {
+    const group = { ...createGroupNode([rect('child-a', 0, 0, 300), rect('child-b', 100, 100)]), id: 'group' };
+
+    expect(coveredPress([group], ['group'], 'child-b')).toBeNull();
+  });
+
+  it('is null when nothing is selected, the selection is elsewhere, or the pressed item is unknown', () => {
+    const nodes = [rect('bottom', 0, 0, 300), rect('top', 100, 100), rect('elsewhere', 600, 600)];
+
+    expect(coveredPress(nodes, [], 'top')).toBeNull();
+    expect(coveredPress(nodes, ['elsewhere'], 'top')).toBeNull();
+    expect(coveredPress(nodes, ['bottom'], 'missing')).toBeNull();
+  });
+
+  it('resolves a press on a sibling to the drilled-in child it covers', () => {
+    const group = { ...createGroupNode([rect('child-a', 0, 0, 300), rect('child-b', 100, 100)]), id: 'group' };
+
+    expect(coveredPress([group], ['child-a'], 'child-b')).toEqual({ itemId: 'child-a', nodeId: 'child-a' });
+  });
+
+  it('resolves to the selected group of a covered item', () => {
+    const group = { ...createGroupNode([rect('child', 0, 0, 300)]), id: 'group' };
+
+    expect(coveredPress([group, rect('top', 100, 100)], ['group'], 'top')).toEqual({
+      itemId: 'child',
+      nodeId: 'group',
+    });
+  });
+
+  it('is null over a selected locked item or generator', () => {
+    const generator = { ...createGeneratorItem('noise', 800, 600), id: 'generator' };
+    const nodes = [generator, rect('locked', 0, 0, 300, { locked: true }), rect('top', 100, 100)];
+
+    expect(coveredPress(nodes, ['generator', 'locked'], 'top')).toBeNull();
   });
 });
 

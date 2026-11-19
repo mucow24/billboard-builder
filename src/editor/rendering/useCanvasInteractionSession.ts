@@ -38,6 +38,7 @@ import { useInteractionDerivedState, useSubgroupOutlineFrames } from './useInter
 import {
   getGroupDescendantAtPoint,
   getSelectionCycleTargetAtPoint,
+  resolveCoveredSelectionPress,
 } from './interactionHitTesting';
 import { useModifierKeys } from './useModifierKeys';
 import {
@@ -79,13 +80,21 @@ interface UseCanvasInteractionSessionParams {
   stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
-interface PendingItemGesture {
-  kind: 'pickup-drag' | 'shift-toggle';
+interface PendingItemGestureBase {
   pointerStart: Point;
   selectionNodeId: string;
   item: CanvasItem;
   source: PointerGestureSource;
 }
+
+type PendingItemGesture =
+  | (PendingItemGestureBase & { kind: 'pickup-drag' | 'shift-toggle' })
+  /**
+   * A press on an unselected item that covers the selection. `item` and
+   * `selectionNodeId` are the covered selection, which a drag moves; a release
+   * without a drag selects `pressedSelectionNodeId`, the node of the pressed item.
+   */
+  | (PendingItemGestureBase & { kind: 'covered-selection'; pressedSelectionNodeId: string });
 
 interface HandledItemPointerEvent {
   nativeEvent: MouseEvent;
@@ -496,7 +505,7 @@ export function useCanvasInteractionSession({
   }, [createGroupDragSessionForNode, orderedItems]);
 
   const createPendingItemSession = useCallback((pending: PendingItemGesture) => (
-    pending.kind === 'shift-toggle'
+    pending.kind === 'shift-toggle' || pending.kind === 'covered-selection'
       ? createSelectedDragSession(
           pending.item,
           pending.selectionNodeId,
@@ -690,12 +699,20 @@ export function useCanvasInteractionSession({
 
       const pending = pendingItemGestureRef.current;
       clearPendingItemGesture();
-      if (!pointer) {
+      // A release without a drag: the deferred click takes effect.
+      const commitClick = () => {
         if (pending.kind === 'shift-toggle') {
           onToggleSelectNode?.(pending.selectionNodeId);
+        } else if (pending.kind === 'covered-selection') {
+          setLastDrilldownSource(null);
+          onSelectPolygonVertex?.(null);
+          onSelectNode(pending.pressedSelectionNodeId);
         }
         updateSession(null);
         updateGuides([]);
+      };
+      if (!pointer) {
+        commitClick();
         return true;
       }
 
@@ -704,11 +721,7 @@ export function useCanvasInteractionSession({
         pointer.y - pending.pointerStart.y,
       );
       if (distance < PICKUP_DRAG_THRESHOLD) {
-        if (pending.kind === 'shift-toggle') {
-          onToggleSelectNode?.(pending.selectionNodeId);
-        }
-        updateSession(null);
-        updateGuides([]);
+        commitClick();
         return true;
       }
 
@@ -728,6 +741,8 @@ export function useCanvasInteractionSession({
       createPendingItemSession,
       finishSession,
       updateGuides,
+      onSelectNode,
+      onSelectPolygonVertex,
       onToggleSelectNode,
       updateSession,
     ],
@@ -979,6 +994,32 @@ export function useCanvasInteractionSession({
     if (nativeEvent && isSelectionCycleClick(nativeEvent) && cycleSelectionAtPointer(pointer)) {
       return;
     }
+    // A plain press on an unselected item that covers the selection: a drag
+    // from here moves the selection, so an item reached with alt-click can be
+    // dragged from where it is covered. A release without a drag selects the
+    // pressed item, like any click. Both are decided on mouse-up, as for a
+    // shift-toggle. Shift and an open crop session address the pressed item.
+    if (!shiftPressed && !cropSessionRef.current) {
+      const covered = resolveCoveredSelectionPress(renderedItems, selectedNodeIds, item.id, pointer);
+      const coveredItem = covered ? orderedItems.find((entry) => entry.id === covered.item.id) : undefined;
+      if (
+        covered &&
+        coveredItem &&
+        createSelectedDragSession(coveredItem, covered.nodeId, pointer, source)
+      ) {
+        setLastDrilldownSource(null);
+        setPendingItemGesture({
+          kind: 'covered-selection',
+          pointerStart: pointer,
+          selectionNodeId: covered.nodeId,
+          item: coveredItem,
+          pressedSelectionNodeId: selectionNodeId,
+          source,
+        });
+        updateSession(null);
+        return;
+      }
+    }
     // Pressing the polygon body (not a handle) drops any vertex sub-selection,
     // like clicking off a vertex in massimo.
     if (item.kind === 'polygon') {
@@ -1036,7 +1077,10 @@ export function useCanvasInteractionSession({
     onSelectNode,
     onSelectPolygonVertex,
     onToggleSelectNode,
+    orderedItems,
+    renderedItems,
     selectedIdSet,
+    selectedNodeIds,
     setPendingItemGesture,
     updateSession,
   ]);
