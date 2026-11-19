@@ -229,9 +229,16 @@
   cursor: pointer;
 }
 
-.inspector-action-button:hover {
+.inspector-action-button:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: rgba(125, 160, 210, 0.4);
+}
+
+.inspector-action-button:disabled {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: var(--surface-disabled);
+  color: var(--text-disabled);
+  cursor: not-allowed;
 }
 
 .inspector-toggle-button-glyph {

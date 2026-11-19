@@ -1,5 +1,10 @@
 import {
+  buildResetImageCropChange,
+  isImageCropped,
+} from '../../rendering/imagePresentation';
+import {
   renderMirrorField,
+  renderTextActionField,
 } from './selectionInspectorRenderers';
 import {
   createBooleanField,
@@ -125,6 +130,24 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
 
       valueType: 'number',
+    }),
+    createCustomField({
+      buildChange: ({ item }) =>
+        item.kind === 'image' && isImageCropped(item) ? buildResetImageCropChange(item) : {},
+      fieldOrder: 70,
+      getDisabled: ({ selectedItems }) =>
+        !selectedItems.some((item) => item.kind === 'image' && isImageCropped(item)),
+      getValue: (item) => item.kind === 'image' && isImageCropped(item),
+      label: 'Reset crop',
+      tooltip:
+        'Undo the crop: fit the whole image into its current box, stretching it if the box has different proportions. Only available while the image is cropped.',
+      propertyKey: 'resetCrop',
+      render: renderTextActionField,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
+
+      valueType: 'custom',
     }),
     createNumberField({
       buildChange: (_context, nextValue) => ({ opacity: nextValue }),

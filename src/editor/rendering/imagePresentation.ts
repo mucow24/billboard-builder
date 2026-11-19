@@ -33,6 +33,49 @@ export function scaleImageSourceTransform(
   };
 }
 
+/** Slack, in canvas pixels, for the rounding left behind by resizes. */
+const UNCROPPED_TOLERANCE = 0.01;
+
+/**
+ * Where the whole picture has to sit to fill the item's frame exactly: no
+ * empty space inside the frame and no picture outside it.
+ */
+function getFrameFillingSourceTransform(item: ImageCanvasItem): ImageSourceTransform {
+  return {
+    x: 0,
+    y: 0,
+    width: item.width * item.scaleX,
+    height: item.height * item.scaleY,
+    rotation: 0,
+  };
+}
+
+/** Whether any of the picture is cut off by the frame, or any of the frame is left empty. */
+export function isImageCropped(item: ImageCanvasItem): boolean {
+  const filling = getFrameFillingSourceTransform(item);
+  const current = item.sourceTransform;
+  return (
+    Math.abs(current.x - filling.x) > UNCROPPED_TOLERANCE ||
+    Math.abs(current.y - filling.y) > UNCROPPED_TOLERANCE ||
+    Math.abs(current.width - filling.width) > UNCROPPED_TOLERANCE ||
+    Math.abs(current.height - filling.height) > UNCROPPED_TOLERANCE ||
+    Math.abs(current.rotation - filling.rotation) > UNCROPPED_TOLERANCE
+  );
+}
+
+/**
+ * Undoes the crop without moving or resizing the item: the whole picture is
+ * squeezed into the frame as it stands, whatever that does to its proportions.
+ */
+export function buildResetImageCropChange(
+  item: ImageCanvasItem,
+): Pick<ImageCanvasItem, 'crop' | 'sourceTransform'> {
+  return {
+    crop: { x: 0, y: 0, width: item.originalWidth, height: item.originalHeight },
+    sourceTransform: getFrameFillingSourceTransform(item),
+  };
+}
+
 export function getImageNodePresentation(
   sourceTransform: ImageSourceTransform,
   mirrorHorizontal: boolean,

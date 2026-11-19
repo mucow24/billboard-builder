@@ -715,6 +715,53 @@ describe('SelectionInspector', () => {
     expect(screen.getByText('W:')).toHaveAttribute('title', 'Width in pixels.');
   });
 
+  it('offers Reset crop below Tint strength, disabled until the image is cropped', async () => {
+    const user = userEvent.setup();
+    const onItemChange = vi.fn();
+    const imageItem = {
+      ...createImageItem({
+        src: 'data:image/png;base64,abc',
+        mimeType: 'image/png',
+        originalWidth: 200,
+        originalHeight: 100,
+      }),
+      width: 200,
+      height: 100,
+      sourceTransform: { x: 0, y: 0, width: 200, height: 100, rotation: 0 },
+    };
+    const renderWith = (item: typeof imageItem) => (
+      <SelectionInspector
+        availableFonts={[]}
+        fonts={[]}
+        onGroupOpacityChange={vi.fn()}
+        onItemChange={onItemChange}
+        selectedItem={item}
+        selectedNodeCount={1}
+        selectedItems={[item]}
+      />
+    );
+
+    const { rerender } = render(renderWith(imageItem));
+
+    const resetButton = screen.getByRole('button', { name: 'Reset crop' });
+    expect(resetButton).toBeDisabled();
+    expect(
+      screen.getByRole('slider', { name: 'Tint strength' }).compareDocumentPosition(resetButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Cropped to its left half.
+    const croppedItem = { ...imageItem, width: 100 };
+    rerender(renderWith(croppedItem));
+    expect(resetButton).toBeEnabled();
+
+    await user.click(resetButton);
+    expect(expectLatestChange(onItemChange, croppedItem)).toEqual({
+      crop: { x: 0, y: 0, width: 200, height: 100 },
+      sourceTransform: { x: 0, y: 0, width: 100, height: 100, rotation: 0 },
+    });
+  });
+
   it('opens the Polygon section from the start, with a Mirror button that flips the polygon on each click', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();

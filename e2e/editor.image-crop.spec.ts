@@ -683,6 +683,82 @@ test.describe('editor image crop', () => {
     });
   });
 
+  test('Reset crop squeezes the whole image into its crop box, straight from crop mode', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'reset-crop-image',
+      name: 'Reset Crop Image',
+      x: 520,
+      y: 320,
+      width: 160,
+      height: 90,
+    });
+    const readSavedImage = async () => {
+      const savedProject = await saveAndReadProject(page);
+      return collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+        (item) => item.id === 'reset-crop-image',
+      );
+    };
+    /** Drags the crop box's right edge 80px to the left, about halving it. */
+    const cropFromTheRight = async () => {
+      await doubleClickItem(page, 'reset-crop-image');
+      const cropSession = await expectCropMode(page);
+      const handle = cropSession.cropHandlePoints?.['middle-right'];
+      if (!handle) {
+        throw new Error('Expected a crop right handle.');
+      }
+      await dragEmptyCanvas(page, handle, { x: handle.x - 80, y: handle.y });
+      const { x, y, width, height } = (await expectCropMode(page)).previewItem;
+      return { x, y, width, height };
+    };
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'reset-crop.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickItem(page, 'reset-crop-image');
+    await openPropertiesTab(page);
+    const resetCrop = page.getByRole('button', { name: 'Reset crop' });
+    await expect(resetCrop).toBeDisabled();
+
+    const croppedBox = await cropFromTheRight();
+    expect(croppedBox.width).toBeLessThan(120);
+    expect(croppedBox.height).toBe(90);
+
+    // Still in crop mode: the button already knows about the crop.
+    await expect(resetCrop).toBeEnabled();
+    await resetCrop.click();
+    await expect(resetCrop).toBeDisabled();
+
+    // The box stays as cropped, and the whole picture now fills it.
+    const cropSession = await expectCropMode(page);
+    expect(cropSession.previewItem).toMatchObject(croppedBox);
+    expect(cropSession.fullImageItem).toMatchObject(croppedBox);
+
+    await clickEmptyCanvas(page, { x: 120, y: 120 });
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+    const squeezed = await readSavedImage();
+    expect(squeezed).toMatchObject({
+      ...croppedBox,
+      crop: { x: 0, y: 0, width: 160, height: 90 },
+      sourceTransform: { x: 0, y: 0, width: croppedBox.width, height: 90, rotation: 0 },
+    });
+
+    // Escape still puts back the image crop mode started with, Reset crop included.
+    const recroppedBox = await cropFromTheRight();
+    expect(recroppedBox.width).toBeLessThan(croppedBox.width);
+    await expect(resetCrop).toBeEnabled();
+    await resetCrop.click();
+    await expect(resetCrop).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+    expect(await readSavedImage()).toMatchObject({
+      ...croppedBox,
+      sourceTransform: { x: 0, y: 0, width: croppedBox.width, height: 90, rotation: 0 },
+    });
+  });
+
   test('Escape in an inspector field stays with the field and keeps crop mode active', async ({
     page,
   }) => {

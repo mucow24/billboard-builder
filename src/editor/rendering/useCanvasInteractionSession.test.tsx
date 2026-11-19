@@ -2287,6 +2287,78 @@ describe('useCanvasInteractionSession', () => {
     expect(result.current.cropSession?.previewItem.width).toBeCloseTo(106, 10);
   });
 
+  it('writes each crop gesture to the document as it ends, follows the document, and puts the image back on Escape', () => {
+    const image = createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 50,
+      x: 20,
+      y: 10,
+      width: 160,
+      height: 50,
+    });
+    image.id = 'crop-image';
+    const params = createHookParams({
+      document: createDocument([image]),
+      selectedNodeIds: [image.id],
+    });
+    const { result, rerender } = renderHook(
+      (hookParams) => useCanvasInteractionSession(hookParams),
+      { initialProps: params },
+    );
+
+    act(() => {
+      result.current.handleItemDoubleClick(image);
+    });
+    act(() => {
+      result.current.beginCropResize('middle-right', { x: 180, y: 35 });
+    });
+    act(() => {
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 35, ctrlKey: true }));
+    });
+    expect(params.onUpdateItem).not.toHaveBeenCalled();
+    act(() => {
+      window.dispatchEvent(new MouseEvent('mouseup', { clientX: 100, clientY: 35, ctrlKey: true }));
+    });
+
+    // The gesture is in the document, where the properties panel can see it,
+    // and crop mode carries on.
+    expect(params.onUpdateItem).toHaveBeenCalledTimes(1);
+    expect(params.onUpdateItem).toHaveBeenCalledWith(
+      image.id,
+      expect.objectContaining({
+        width: 80,
+        sourceTransform: expect.objectContaining({ x: 0, width: 160 }),
+      }),
+    );
+    expect(result.current.cropSession).not.toBeNull();
+
+    // The panel's Reset crop then changes the document's copy; the session shows it.
+    const reset = {
+      ...image,
+      width: 80,
+      sourceTransform: { x: 0, y: 0, width: 80, height: 50, rotation: 0 },
+    };
+    rerender({ ...params, document: createDocument([reset]) });
+    expect(result.current.cropSession?.previewItem.sourceTransform.width).toBe(80);
+    expect(result.current.cropSession?.fullImageItem.width).toBe(80);
+
+    params.onUpdateItem.mockClear();
+    act(() => {
+      window.document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(result.current.cropSession).toBeNull();
+    expect(params.onUpdateItem).toHaveBeenCalledTimes(1);
+    expect(params.onUpdateItem).toHaveBeenCalledWith(
+      image.id,
+      expect.objectContaining({
+        width: 160,
+        sourceTransform: image.sourceTransform,
+      }),
+    );
+  });
+
   it('snaps group drag previews and emits guides', () => {
     const first = createRectangleItem({ id: 'first', x: 100, y: 100, width: 80, height: 40 });
     const second = createRectangleItem({ id: 'second', x: 220, y: 100, width: 80, height: 40 });

@@ -108,6 +108,21 @@ export function renderMirrorActionField({ field, onCommit }: CustomFieldRenderPr
   );
 }
 
+/** A one-click action that names itself, so it takes the whole row with no separate label. */
+export function renderTextActionField({ field, onCommit }: CustomFieldRenderProps) {
+  return (
+    <button
+      type="button"
+      className="inspector-action-button"
+      disabled={field.disabled}
+      title={field.descriptor.tooltip}
+      onClick={() => onCommit(true)}
+    >
+      {field.descriptor.label}
+    </button>
+  );
+}
+
 export function renderAlignField({ field, onCommit }: CustomFieldRenderProps) {
   return (
     <SegmentedSelectInput

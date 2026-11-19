@@ -75,6 +75,21 @@ interface UseCropSessionParams {
   resolveSession: (current: InteractionSession, pointer: Point) => InteractionSession;
 }
 
+/** Everything about an image that crop mode can change. */
+function getCropGeometry(item: ImageCanvasItem): Partial<ImageCanvasItem> {
+  return {
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
+    rotation: item.rotation,
+    crop: item.crop,
+    sourceTransform: item.sourceTransform,
+    scaleX: item.scaleX,
+    scaleY: item.scaleY,
+  };
+}
+
 export function useCropSession({
   orderedItems,
   stageBounds,
@@ -122,28 +137,76 @@ export function useCropSession({
     });
   }, [updateCropSession]);
 
+  // The document's copy of the image being cropped. Each crop gesture is
+  // written to the document as it ends, so between gestures this is what the
+  // session shows, and the properties panel sees the crop as it stands.
+  const documentItem = cropSession
+    ? orderedItems.find((entry) => entry.id === cropSession.itemId)
+    : undefined;
+
+  const writePreviewToDocument = useCallback((current: ImageCropSessionState) => {
+    const inDocument = orderedItems.find((entry) => entry.id === current.itemId);
+    // The preview is the box as drawn; the document's copy keeps its own
+    // scale, so the changes are worked out against that copy.
+    const changes = buildImageCropCommitChanges(
+      inDocument?.kind === 'image' ? inDocument : current.originalItem,
+      current.previewItem,
+    );
+    if (changes) {
+      onUpdateItem(current.itemId, changes);
+    }
+  }, [orderedItems, onUpdateItem]);
+
+  // When the document's copy changes under the session (a finished gesture
+  // landing, an edit in the properties panel, undo), carry on from it.
+  useEffect(() => {
+    const current = cropSessionRef.current;
+    if (
+      !current ||
+      current.activeInteraction ||
+      documentItem?.kind !== 'image' ||
+      documentItem === current.previewItem
+    ) {
+      return;
+    }
+    // The session works on the box as drawn.
+    const previewItem = bakeImageScale(documentItem);
+    updateCropSession({
+      ...current,
+      previewItem,
+      fullImageItem: buildFullImageTransformItem(previewItem),
+      crop: previewItem.crop,
+    });
+  }, [documentItem, updateCropSession]);
+
   const commitCropSession = useCallback(() => {
     const current = cropSessionRef.current;
     if (!current) {
       return false;
     }
     updateGuides([]);
-    const changes = buildImageCropCommitChanges(current.originalItem, current.previewItem);
-    if (changes) {
-      onUpdateItem(current.itemId, changes);
-    }
+    writePreviewToDocument(current);
     updateCropSession(null);
     return true;
-  }, [updateGuides, onUpdateItem, updateCropSession]);
+  }, [updateGuides, writePreviewToDocument, updateCropSession]);
 
+  /** Leaves crop mode with the image as it was on the way in. */
   const cancelCropSession = useCallback(() => {
-    if (!cropSessionRef.current) {
+    const current = cropSessionRef.current;
+    if (!current) {
       return false;
     }
     updateGuides([]);
+    const inDocument = orderedItems.find((entry) => entry.id === current.itemId);
+    if (inDocument?.kind === 'image' && inDocument !== current.originalItem) {
+      const original = getCropGeometry(current.originalItem);
+      if (JSON.stringify(getCropGeometry(inDocument)) !== JSON.stringify(original)) {
+        onUpdateItem(current.itemId, original);
+      }
+    }
     updateCropSession(null);
     return true;
-  }, [updateGuides, updateCropSession]);
+  }, [orderedItems, onUpdateItem, updateGuides, updateCropSession]);
 
   useEffect(() => {
     if (!cropSession) {
@@ -373,8 +436,9 @@ export function useCropSession({
       ...current,
       activeInteraction: null,
     });
+    writePreviewToDocument(current);
     return true;
-  }, [updateGuides, updateCropSession]);
+  }, [updateGuides, updateCropSession, writePreviewToDocument]);
 
   return {
     cropSession,
