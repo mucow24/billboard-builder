@@ -10,7 +10,8 @@ import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import { cloneCanvasNode } from '../editor/document/sceneGraph';
 import type { CanvasTool } from '../editor/document/documentTypes';
 import { useEditorStore, type EditorStoreState } from '../editor/state/store';
-import { selectSelectedNodes } from '../editor/core/selectors';
+import { selectSelectedItems, selectSelectedNodes } from '../editor/core/selectors';
+import { buildTextStyleToggleCommands, type TextStyleToggle } from '../editor/core/textStyleToggle';
 import type { InspectorTab } from '../editor/ui/inspector/types';
 
 interface UseEditorShortcutsArgs {
@@ -64,6 +65,15 @@ export function useEditorShortcuts({
       applyTransaction([{ family: 'selection', command: { type: 'clear_selection' } }]);
     }
 
+    /** Ctrl/Cmd+B and +I: toggles the style on the selected text, as one undo step. */
+    function toggleSelectedTextStyle(style: TextStyleToggle) {
+      const { editor } = useEditorStore.getState();
+      const commands = buildTextStyleToggleCommands(selectSelectedItems(editor.document, editor), style);
+      if (commands.length > 0) {
+        applyTransaction(commands.map((command) => ({ family: 'document' as const, command })));
+      }
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       const hasModifier = event.ctrlKey || event.metaKey;
       const isEditable = isEditableTarget(event.target);
@@ -112,6 +122,23 @@ export function useEditorShortcuts({
           return;
         }
         groupSelectedNodes();
+        return;
+      }
+      // Shift and Alt are left alone: Ctrl+Shift+I opens the developer tools,
+      // and AltGr (Ctrl+Alt on Windows) types characters on some layouts.
+      if (
+        hasModifier &&
+        !isEditable &&
+        !event.shiftKey &&
+        !event.altKey &&
+        (pressedKey === 'b' || pressedKey === 'i')
+      ) {
+        // Taken even with no text selected, so Firefox never opens its
+        // bookmarks sidebar (Ctrl+B) or page info (Ctrl+I) over the editor.
+        event.preventDefault();
+        if (!event.repeat) {
+          toggleSelectedTextStyle(pressedKey === 'b' ? 'bold' : 'italic');
+        }
         return;
       }
       if (hasModifier && !isEditable && event.key === 'ArrowUp') {

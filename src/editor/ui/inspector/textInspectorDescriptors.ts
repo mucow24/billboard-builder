@@ -25,6 +25,7 @@ import {
   VERTICAL_ALIGN_OPTIONS,
 } from './inspectorFieldHelpers';
 import type { CustomFieldDescriptor, InspectorFieldDescriptor } from './selectionInspectorModel';
+import { modKey } from '../toolbarUtils';
 
 function createFontFamilyField(): CustomFieldDescriptor {
   return createCustomField({
@@ -100,7 +101,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       fieldOrder: 40,
       getValue: (item) => item.kind === 'text' && item.fontWeight === 'bold',
       label: 'Bold',
-      tooltip: 'Make the text bold.',
+      tooltip: `Make the text bold (${modKey}+B).`,
       propertyKey: 'fontWeight',
       render: renderBoldField,
       sectionKey: 'text',
@@ -116,7 +117,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       fieldOrder: 50,
       getValue: (item) => item.kind === 'text' && item.fontStyle === 'italic',
       label: 'Italic',
-      tooltip: 'Make the text italic.',
+      tooltip: `Make the text italic (${modKey}+I).`,
       propertyKey: 'fontStyle',
       render: renderItalicField,
       sectionKey: 'text',

@@ -184,6 +184,8 @@ docs/                   # Interaction test coverage matrix
 | Ctrl+X | Cut |
 | Ctrl+V | Paste |
 | Ctrl+D | Duplicate |
+| Ctrl+B | Bold the selected text, or unbold it when all of it is bold |
+| Ctrl+I | Italicize the selected text, or straighten it when all of it is italic |
 | Ctrl+A | Select all |
 | Ctrl+S | Save to the library |
 | Alt+Click | Select through the items under the cursor: each click steps to the next one down, including locked and covered items |
