@@ -10,7 +10,7 @@ import type {
   GuideLine,
   ProjectDocument,
 } from '../../document/documentTypes';
-import type { Point, ResizeHandle } from '../interactionGeometry';
+import { localToStage, type Point, type ResizeHandle } from '../interactionGeometry';
 import type { PointerGestureSource } from '../interactionSession';
 import type { RenderableCanvasItem } from '../renderAdapter';
 import type { CanvasPointerEvent, CanvasRendererHandle } from '../renderer/canvasRendererTypes';
@@ -353,7 +353,26 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
         g.clear();
         if (!guides || guides.length === 0) return;
         for (const guide of guides) {
-          if (guide.orientation === 'vertical') {
+          if (guide.frame) {
+            const { origin, rotation } = guide.frame;
+            const vertical = guide.orientation === 'vertical';
+            const from = localToStage(
+              vertical
+                ? { x: guide.position, y: -GUIDE_EXTENT }
+                : { x: -GUIDE_EXTENT, y: guide.position },
+              origin,
+              rotation,
+            );
+            const to = localToStage(
+              vertical
+                ? { x: guide.position, y: GUIDE_EXTENT }
+                : { x: GUIDE_EXTENT, y: guide.position },
+              origin,
+              rotation,
+            );
+            g.moveTo(from.x, from.y);
+            g.lineTo(to.x, to.y);
+          } else if (guide.orientation === 'vertical') {
             g.moveTo(guide.position, -GUIDE_EXTENT);
             g.lineTo(guide.position, canvasHeight + GUIDE_EXTENT);
           } else {

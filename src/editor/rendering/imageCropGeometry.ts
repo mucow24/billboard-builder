@@ -9,7 +9,12 @@ import type {
 import { buildVisibleImageCropFromSourceTransform } from './imagePresentation';
 import { getCommitChanges } from './interactionSession';
 import { getItemAABB } from './selectionGeometry';
-import { buildCandidateCache, getResizeSnappedRect, getSnappedRect } from './snapping';
+import {
+  buildCandidateCache,
+  getResizeSnappedRect,
+  getSnappedRect,
+  isMultipleOf90,
+} from './snapping';
 import {
   localToStage,
   stageToLocal,
@@ -108,6 +113,31 @@ export function buildCroppedImagePreviewItem(
   return buildImagePreviewItem(baseItem, sourceTransform);
 }
 
+/**
+ * The full image's four edges as snap lines in the crop frame's own axes.
+ * Empty when the image is turned inside the frame by anything other than a
+ * quarter turn: its edges are then not parallel to the frame's.
+ */
+function getImageEdgeLines(
+  sourceTransform: ImageSourceTransform,
+): { orientation: 'vertical' | 'horizontal'; position: number }[] {
+  if (!isMultipleOf90(sourceTransform.rotation)) {
+    return [];
+  }
+  const origin = { x: sourceTransform.x, y: sourceTransform.y };
+  const opposite = localToStage(
+    { x: sourceTransform.width, y: sourceTransform.height },
+    origin,
+    sourceTransform.rotation,
+  );
+  return [
+    { orientation: 'vertical', position: origin.x },
+    { orientation: 'vertical', position: opposite.x },
+    { orientation: 'horizontal', position: origin.y },
+    { orientation: 'horizontal', position: opposite.y },
+  ];
+}
+
 export function resizeImageCrop(params: {
   baseItem: ImageCanvasItem;
   handle: ResizeHandle;
@@ -166,36 +196,52 @@ export function resizeImageCrop(params: {
   }
 
   let guides: GuideLine[] = [];
-  if (snapEnabled && Math.abs(baseItem.rotation) < 0.001) {
-    const st = baseItem.sourceTransform;
-    const cache = buildCandidateCache(siblingItems, stageRect);
-    // Add the source image edges so the crop box snaps to the full image bounds.
-    const imgLeft = baseItem.x + st.x;
-    const imgTop = baseItem.y + st.y;
-    cache.lines.push(
-      { orientation: 'vertical', position: imgLeft },
-      { orientation: 'vertical', position: imgLeft + st.width },
-      { orientation: 'horizontal', position: imgTop },
-      { orientation: 'horizontal', position: imgTop + st.height },
-    );
+  if (snapEnabled) {
+    // Snapping runs in the crop frame's own axes (origin at the frame's
+    // top-left corner, turned with the item), where the frame's edges are
+    // axis-aligned whatever the item's rotation.
+    const frameIsUpright = Math.abs(baseItem.rotation) < 0.001;
+    const lines: ReturnType<typeof getImageEdgeLines> = [];
+    if (frameIsUpright) {
+      // The stage's and the siblings' guides are axis-aligned on the stage,
+      // so they only line up with the edges of an upright frame.
+      for (const line of buildCandidateCache(siblingItems, stageRect).lines) {
+        lines.push({
+          orientation: line.orientation,
+          position:
+            line.position - (line.orientation === 'vertical' ? baseItem.x : baseItem.y),
+        });
+      }
+    }
+    // Last, so that a stage or sibling guide wins a tie with an image edge.
+    lines.push(...getImageEdgeLines(baseItem.sourceTransform));
     const snapped = getResizeSnappedRect(
-      {
-        x: baseItem.x + left,
-        y: baseItem.y + top,
-        width: right - left,
-        height: bottom - top,
-      },
+      { x: left, y: top, width: right - left, height: bottom - top },
       siblingItems,
       stageRect,
       handle,
       threshold,
-      cache,
+      { lines, vertical: [], horizontal: [] },
     );
-    left = snapped.rect.x - baseItem.x;
-    top = snapped.rect.y - baseItem.y;
-    right = snapped.rect.x + snapped.rect.width - baseItem.x;
-    bottom = snapped.rect.y + snapped.rect.height - baseItem.y;
-    guides = snapped.guides;
+    left = snapped.rect.x;
+    top = snapped.rect.y;
+    right = snapped.rect.x + snapped.rect.width;
+    bottom = snapped.rect.y + snapped.rect.height;
+    guides = snapped.guides.map((guide) =>
+      frameIsUpright
+        ? {
+            orientation: guide.orientation,
+            position:
+              guide.position + (guide.orientation === 'vertical' ? baseItem.x : baseItem.y),
+          }
+        : {
+            ...guide,
+            frame: {
+              origin: { x: baseItem.x, y: baseItem.y },
+              rotation: baseItem.rotation,
+            },
+          },
+    );
   }
 
   const nextWidth = Math.max(1, right - left);
