@@ -763,6 +763,101 @@ describe('SelectionInspector', () => {
     });
   });
 
+  describe('Reset crop', () => {
+    function createTestImage(name: string) {
+      return createImageItem({
+        name,
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+        x: 30,
+        y: 20,
+      });
+    }
+
+    function createCroppedImage(name: string) {
+      return {
+        ...createTestImage(name),
+        width: 80,
+        height: 45,
+        sourceTransform: { x: -20, y: -10, width: 160, height: 90, rotation: 0 },
+      };
+    }
+
+    function renderImageInspector(
+      selectedItems: CanvasItem[],
+      onItemChange = vi.fn(),
+    ) {
+      render(
+        <SelectionInspector
+          availableFonts={[]}
+          fonts={[]}
+          onGroupOpacityChange={vi.fn()}
+          onItemChange={onItemChange}
+          selectedItem={selectedItems.length === 1 ? selectedItems[0] : undefined}
+          selectedNodeCount={selectedItems.length}
+          selectedItems={selectedItems}
+        />
+      );
+      return onItemChange;
+    }
+
+    it('sits last in the Image section, right below Tint strength', () => {
+      renderImageInspector([createTestImage('Photo')]);
+
+      const imageSection = document.querySelector('[data-section="image"]');
+      const fields = Array.from(imageSection?.children ?? []);
+      expect(fields.at(-2)).toHaveTextContent('Tint strength');
+      expect(fields.at(-1)).toContainElement(screen.getByRole('button', { name: 'Reset crop' }));
+    });
+
+    it('is disabled while the image is not cropped', () => {
+      renderImageInspector([createTestImage('Photo')]);
+
+      expect(screen.getByRole('button', { name: 'Reset crop' })).toBeDisabled();
+    });
+
+    it('shows the whole image in its box again when clicked', async () => {
+      const user = userEvent.setup();
+      const croppedImage = createCroppedImage('Photo');
+      const onItemChange = renderImageInspector([croppedImage]);
+
+      const resetButton = screen.getByRole('button', { name: 'Reset crop' });
+      expect(resetButton).toBeEnabled();
+      expect(resetButton).toHaveAttribute('title', expect.stringContaining('whole image'));
+
+      await user.click(resetButton);
+      expect(onItemChange).toHaveBeenCalledTimes(1);
+      // Panned and zoomed, not cut: the box keeps its size.
+      expect(expectLatestChange(onItemChange, croppedImage)).toEqual({
+        width: 80,
+        height: 45,
+        crop: { x: 0, y: 0, width: 160, height: 90 },
+        sourceTransform: { x: 0, y: 0, width: 80, height: 45, rotation: 0 },
+      });
+    });
+
+    it('resets only the cropped images of a selection', async () => {
+      const user = userEvent.setup();
+      const croppedImage = createCroppedImage('Cropped');
+      const uncroppedImage = createTestImage('Uncropped');
+      const onItemChange = renderImageInspector([croppedImage, uncroppedImage]);
+
+      await user.click(screen.getByRole('button', { name: 'Reset crop' }));
+      expect(expectLatestChange(onItemChange, croppedImage)).toMatchObject({
+        sourceTransform: { x: 0, y: 0, width: 80, height: 45, rotation: 0 },
+      });
+      expect(expectLatestChange(onItemChange, uncroppedImage)).toEqual({});
+    });
+
+    it('is disabled for a selection of uncropped images', () => {
+      renderImageInspector([createTestImage('One'), createTestImage('Two')]);
+
+      expect(screen.getByRole('button', { name: 'Reset crop' })).toBeDisabled();
+    });
+  });
+
   it('swaps fill colors for text items', async () => {
     const user = userEvent.setup();
     const onItemChange = vi.fn();

@@ -41,6 +41,43 @@ async function expectCropMode(page: Page) {
   return stageDebug.cropSession!;
 }
 
+async function expectCropModeClosed(page: Page) {
+  await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+}
+
+// The middle of an item's box on the canvas; the box turns about its top-left.
+function centerOf(box: { x: number; y: number; width: number; height: number; rotation?: number }) {
+  const angle = ((box.rotation ?? 0) * Math.PI) / 180;
+  const halfWidth = box.width / 2;
+  const halfHeight = box.height / 2;
+  return {
+    x: box.x + halfWidth * Math.cos(angle) - halfHeight * Math.sin(angle),
+    y: box.y + halfWidth * Math.sin(angle) + halfHeight * Math.cos(angle),
+  };
+}
+
+type SavedImageNode = Record<string, unknown> & {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  sourceTransform: { x: number; y: number; width: number; height: number; rotation: number };
+};
+
+async function readSavedLeaf(page: Page, id: string): Promise<SavedImageNode> {
+  const savedProject = await saveAndReadProject(page);
+  const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+    (item) => item.id === id,
+  );
+  if (!savedImage) {
+    throw new Error(`Expected ${id} in the saved project.`);
+  }
+  return savedImage as SavedImageNode;
+}
+
+const FULL_IMAGE_CROP = { x: 0, y: 0, width: 160, height: 90 };
+
 test.describe('editor image crop', () => {
   test('keeps crop affordance hook sizing stable while zoom changes', async ({ page }) => {
     const image = createImageFixture({
@@ -705,5 +742,225 @@ test.describe('editor image crop', () => {
     expect(Math.abs(cropSession.fullImageItem.rotation)).toBeGreaterThan(10);
     expect(cropSession.cropHandleViewportPoints?.['top-left']?.x).toBeCloseTo(initialTopLeft.x, 1);
     expect(cropSession.cropHandleViewportPoints?.['top-left']?.y).toBeCloseTo(initialTopLeft.y, 1);
+  });
+
+  // The Reset crop tests use boxes of 320 x 360 and up: at the fitted zoom,
+  // about 28%, a smaller box's handles cover its middle, so a drag there
+  // would crop instead of pan.
+  test('IC-18 Reset crop undoes a crop-mode pan and zoom, keeps the box, and is one undo step', async ({
+    page,
+  }) => {
+    // Placed, then moved, scaled up 4x and rotated on the canvas, but not
+    // cropped: the whole 160 x 90 image fills its 640 x 360 box.
+    const image = createImageFixture({
+      id: 'reset-crop-image',
+      name: 'Reset Crop Image',
+      x: 150,
+      y: 200,
+      width: 640,
+      height: 360,
+      rotation: 12,
+    });
+    const box = { x: 150, y: 200, width: 640, height: 360, rotation: 12, scaleX: 1, scaleY: 1 };
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-reset.json');
+    await setCanvasTestHooksEnabled(page, false);
+    const readSavedImage = () => readSavedLeaf(page, 'reset-crop-image');
+
+    await doubleClickItem(page, 'reset-crop-image');
+    let cropSession = await expectCropMode(page);
+    await openPropertiesTab(page);
+    const resetCrop = page.getByRole('button', { name: 'Reset crop' });
+    await expect(resetCrop).toBeDisabled();
+
+    // Inside crop mode, pan the image, then scale it up past its box, then
+    // commit with a double-click, which keeps the image selected. (Panning
+    // down-right first moves the image's bottom-right handle out of the box
+    // and off the box's own corner handle, which would otherwise win.)
+    const cropCenter = centerOf(cropSession.previewItem);
+    await dragEmptyCanvas(page, cropCenter, { x: cropCenter.x + 200, y: cropCenter.y + 120 });
+    cropSession = await expectCropMode(page);
+    const fullResizeHandle = cropSession.fullImageHandlePoints?.['bottom-right'];
+    if (!fullResizeHandle) {
+      throw new Error('Expected a full-image resize handle.');
+    }
+    await dragEmptyCanvas(page, fullResizeHandle, {
+      x: fullResizeHandle.x + 120,
+      y: fullResizeHandle.y + 80,
+    });
+    cropSession = await expectCropMode(page);
+    expect(cropSession.fullImageItem.width).toBeGreaterThan(700);
+    await doubleClickCanvas(page, cropCenter);
+    await expectCropModeClosed(page);
+    await expect(resetCrop).toBeEnabled();
+    const cropped = await readSavedImage();
+    expect(cropped).toMatchObject(box);
+    expect(cropped.sourceTransform.width).toBeGreaterThan(700);
+
+    // The box stays exactly where and as it is; the whole image fills it again.
+    await resetCrop.click();
+    await expect(resetCrop).toBeDisabled();
+    expect(await readSavedImage()).toMatchObject({
+      ...box,
+      crop: FULL_IMAGE_CROP,
+      sourceTransform: { x: 0, y: 0, width: 640, height: 360, rotation: 0 },
+    });
+
+    // One undo brings the crop back.
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(resetCrop).toBeEnabled();
+    expect(await readSavedImage()).toMatchObject({
+      ...box,
+      sourceTransform: cropped.sourceTransform,
+    });
+  });
+
+  test('IC-17 Reset crop after cutting with a crop handle grows the box back without stretching the image', async ({
+    page,
+  }) => {
+    // The whole 160 x 90 image fills its 640 x 360 box: not cropped.
+    const image = createImageFixture({
+      id: 'reset-crop-edge-image',
+      name: 'Reset Crop Edge Image',
+      x: 150,
+      y: 200,
+      width: 640,
+      height: 360,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-reset-edge.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await doubleClickItem(page, 'reset-crop-edge-image');
+    let cropSession = await expectCropMode(page);
+    await openPropertiesTab(page);
+    const resetCrop = page.getByRole('button', { name: 'Reset crop' });
+    await expect(resetCrop).toBeDisabled();
+
+    // Cut about half off the right with the black crop handle, then commit
+    // with a double-click, which keeps the image selected.
+    const rightHandle = cropSession.cropHandlePoints?.['middle-right'];
+    if (!rightHandle) {
+      throw new Error('Expected a crop right handle.');
+    }
+    await dragEmptyCanvas(page, rightHandle, { x: rightHandle.x - 320, y: rightHandle.y });
+    cropSession = await expectCropMode(page);
+    expect(cropSession.previewItem.width).toBeLessThan(400);
+    await doubleClickCanvas(page, centerOf(cropSession.previewItem));
+    await expectCropModeClosed(page);
+    await expect(resetCrop).toBeEnabled();
+    expect((await readSavedLeaf(page, 'reset-crop-edge-image')).width).toBeLessThan(400);
+
+    await resetCrop.click();
+    await expect(resetCrop).toBeDisabled();
+    const reset = await readSavedLeaf(page, 'reset-crop-edge-image');
+    // The whole image at its own 16:9 proportions, and the box grown back.
+    expect(reset).toMatchObject({
+      x: 150,
+      y: 200,
+      rotation: 0,
+      crop: FULL_IMAGE_CROP,
+      sourceTransform: { x: 0, y: 0, rotation: 0 },
+    });
+    expect(reset.width).toBeCloseTo(640, 6);
+    expect(reset.height).toBeCloseTo(360, 6);
+    expect(reset.sourceTransform.width).toBeCloseTo(640, 6);
+    expect(reset.sourceTransform.height).toBeCloseTo(360, 6);
+  });
+
+  test('IC-19 Reset crop in crop mode resets the open crop, and committing keeps the reset', async ({
+    page,
+  }) => {
+    // Cut to its left half: a 320 x 360 box showing half of the image, drawn
+    // 640 x 360.
+    const image = createImageFixture({
+      id: 'reset-crop-open-image',
+      name: 'Reset Crop Open Image',
+      x: 150,
+      y: 200,
+      width: 320,
+      height: 360,
+      crop: { x: 0, y: 0, width: 80, height: 90 },
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-reset-open.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await doubleClickItem(page, 'reset-crop-open-image');
+    await expectCropMode(page);
+    await openPropertiesTab(page);
+    const resetCrop = page.getByRole('button', { name: 'Reset crop' });
+    await expect(resetCrop).toBeEnabled();
+
+    await resetCrop.click();
+    await expect(resetCrop).toBeDisabled();
+    // Crop mode stays open, now framing the whole image.
+    await expect
+      .poll(async () => (await readStageDebug(page)).cropSession?.previewItem.width ?? 0)
+      .toBeGreaterThan(600);
+    let cropSession = await expectCropMode(page);
+    expect(cropSession.previewItem).toMatchObject({ x: 150, y: 200, rotation: 0 });
+    expect(cropSession.previewItem.width).toBeCloseTo(640, 6);
+    expect(cropSession.previewItem.height).toBeCloseTo(360, 6);
+    expect(cropSession.fullImageItem.x).toBeCloseTo(150, 6);
+    expect(cropSession.fullImageItem.width).toBeCloseTo(640, 6);
+
+    // A crop-mode edit after the reset builds on it, and the commit keeps it.
+    const center = centerOf(cropSession.previewItem);
+    await dragEmptyCanvas(page, center, { x: center.x + 40, y: center.y + 20 });
+    cropSession = await expectCropMode(page);
+    await doubleClickCanvas(page, center);
+    await expectCropModeClosed(page);
+    await expect(resetCrop).toBeEnabled();
+    const committed = await readSavedLeaf(page, 'reset-crop-open-image');
+    expect(committed.width).toBeCloseTo(640, 6);
+    expect(committed.height).toBeCloseTo(360, 6);
+    expect(committed.sourceTransform.width).toBeCloseTo(640, 6);
+    expect(committed.sourceTransform.x).toBeGreaterThan(20);
+  });
+
+  test('IC-20 an inspector edit made in crop mode shows at once and survives the commit', async ({
+    page,
+  }) => {
+    const image = createImageFixture({
+      id: 'crop-inspector-edit-image',
+      name: 'Crop Inspector Edit Image',
+      x: 150,
+      y: 200,
+      width: 640,
+      height: 360,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-inspector-edit.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await doubleClickItem(page, 'crop-inspector-edit-image');
+    await expectCropMode(page);
+    await openPropertiesTab(page);
+    await page.getByRole('button', { name: 'Geometry' }).click();
+    const rotationInput = page.getByRole('spinbutton', { name: 'Rotation' });
+    await rotationInput.fill('20');
+    await rotationInput.press('Enter');
+
+    // Crop mode stays open, and its frame turns with the item at once.
+    await expect
+      .poll(async () => (await readStageDebug(page)).cropSession?.previewItem.rotation ?? null)
+      .toBe(20);
+    const cropSession = await expectCropMode(page);
+    await expect(rotationInput).toHaveValue('20');
+
+    // Pan, then commit: both the pan and the new angle are kept.
+    const center = centerOf(cropSession.previewItem);
+    await dragEmptyCanvas(page, center, { x: center.x + 40, y: center.y + 20 });
+    await expectCropMode(page);
+    await doubleClickCanvas(page, center);
+    await expectCropModeClosed(page);
+    const committed = await readSavedLeaf(page, 'crop-inspector-edit-image');
+    expect(committed.rotation).toBe(20);
+    expect(Math.abs(committed.sourceTransform.x) + Math.abs(committed.sourceTransform.y)).toBeGreaterThan(10);
   });
 });

@@ -329,6 +329,7 @@ describe('selectionInspectorModel', () => {
       'Opacity',
       'Tint color',
       'Tint strength',
+      'Reset crop',
     ]);
     expect(labelsOf('shadow')).toEqual(['Opacity', 'Color', 'Blur Radius', 'Offset X', 'Offset Y']);
   });

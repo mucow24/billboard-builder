@@ -108,6 +108,21 @@ export function renderMirrorActionField({ field, onCommit }: CustomFieldRenderPr
   );
 }
 
+/** A full-width text button that runs the field's action once per click. */
+export function renderTextActionField({ field, onCommit }: CustomFieldRenderProps) {
+  return (
+    <button
+      type="button"
+      className="inspector-action-button"
+      title={field.descriptor.tooltip}
+      disabled={field.disabled}
+      onClick={() => onCommit(true)}
+    >
+      {field.descriptor.label}
+    </button>
+  );
+}
+
 export function renderAlignField({ field, onCommit }: CustomFieldRenderProps) {
   return (
     <SegmentedSelectInput

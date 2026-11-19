@@ -197,6 +197,11 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | IC-14 | Keyboard | Crop mode active, focus in a text field (inspector input, HUD zoom field) | Press Escape | The field handles Escape; crop affordance stays visible | Crop session stays active with no document mutation; Escape outside a text field still cancels it (IC-08) | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 | IC-15 | Canvas | Crop mode active, snap candidate visible | Drag inside the image near a guide, then repeat with Ctrl held | Guides appear and an edge or the centre of the whole picture's bounding box lands on the guide while the crop frame stays fixed; with Ctrl there are no guides and no snap | Pan snapping matches normal guide behavior and Ctrl disables it; candidates are the stage, other items, and (unless the item is rotated) the crop frame's own edges and centre | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
 | IC-16 | Canvas | Crop mode active on a rotated image | Drag a crop boundary out past the image's edge, then back in across it | The boundary lands on the image's edge and one slanted guide is drawn along that edge | Crop boundaries snap to the whole picture's edges at any item rotation; a rotated frame snaps to those edges only (not the stage or other items), and a picture turned inside the frame offers its edges only at quarter turns | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-17 | Properties | Uncropped image | Double-click the image, drag a black crop handle inward, double-click to commit, then click Image > Reset crop | Reset crop is disabled until the crop is committed and again after the reset; the whole image shows, unstretched, in a box grown back to the right | The box regains the image's own proportions at the same corner, scale and angle; `sourceTransform` fills it; `crop` is the whole image | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-18 | Properties | Uncropped image moved, scaled and rotated on the canvas | In crop mode pan and scale the whole image, commit, click Reset crop, then press Ctrl+Z | The whole image fills the box again; Ctrl+Z brings the crop back and re-enables Reset crop | The box keeps its position, size, scale and angle; one undo step restores the crop-mode `sourceTransform` | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-19 | Properties | Crop mode active on a cropped image | Click Reset crop, then pan and double-click to commit | Crop mode stays open and frames the whole image; Reset crop turns disabled, then enabled again after the pan | The open crop session restarts from the reset item, so the commit keeps the reset and adds only the pan | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-20 | Properties | Crop mode active | Edit a geometry field (Rotation) in the inspector, then pan and double-click to commit | The field shows the new value and the crop frame turns at once; crop mode stays open | The commit keeps the inspector edit and the pan. Crop-mode edits not yet committed when a geometry field changes are dropped, as crop mode starts over from the edited item | user-flow | Chromium | Covered in [e2e/editor.image-crop.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.image-crop.spec.ts) |
+| IC-21 | Properties | Crop mode active, crop edits in progress | Change a setting that is not geometry (Brightness, Tint, Mirror, Opacity) | The change shows on the image in crop mode at once | Crop edits in progress are kept; the commit writes only geometry | support/debug | - | Unit coverage only in [src/editor/rendering/imageCropGeometry.test.ts](/home/mikek/src/billboard-builder/src/editor/rendering/imageCropGeometry.test.ts) (`syncImageCropSessionToDocument`); no browser test |
 
 ## 6. Group and Multi-Selection Transform Flows
 
@@ -385,7 +390,7 @@ A scenario only counts as fully proven if it has at least one A-class assertion 
 
 ### Scenarios with A-class assertions (fully proven)
 
-CS-01 through CS-18, GD-01 through GD-15, NI-01, NI-04, NI-05, NI-11, NI-12, ST-01 through ST-12, ST-13, ST-14, ST-15, ST-16, IC-01 through IC-13, GT-04 through GT-11, GT-09, all LY/PI/TL/KB/CB/FL entries, all UI entries.
+CS-01 through CS-18, GD-01 through GD-15, NI-01, NI-04, NI-05, NI-11, NI-12, ST-01 through ST-12, ST-13, ST-14, ST-15, ST-16, IC-01 through IC-13, IC-17 through IC-20, GT-04 through GT-11, GT-09, all LY/PI/TL/KB/CB/FL entries, all UI entries.
 
 ### Scenarios with A-class assertions added during audit
 
@@ -427,7 +432,7 @@ No current critical matrix gaps remain in the planned rollout.
 
 Non-critical deferred scenarios can still exist elsewhere in the matrix when the browser entrypoint conflicts with current product semantics, such as `CS-10`.
 
-Non-critical gaps: `HO-05` and `HO-09` (hover outline during a gesture, and around a generator) have unit coverage only.
+Non-critical gaps: `HO-05` and `HO-09` (hover outline during a gesture, and around a generator) have unit coverage only. `IC-21` (a setting other than geometry changed in crop mode) has unit coverage only.
 
 ## Patch Closeout Template
 

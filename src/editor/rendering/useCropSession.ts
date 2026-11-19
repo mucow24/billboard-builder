@@ -19,6 +19,7 @@ import {
   buildSourceTransformFromFullImageItem,
   panImageUnderCrop,
   resizeImageCrop,
+  syncImageCropSessionToDocument,
 } from './imageCropGeometry';
 import { SNAP_THRESHOLD } from './snapping';
 import { isEditableTarget } from './domUtils';
@@ -141,6 +142,24 @@ export function useCropSession({
     updateCropSession(null);
     return true;
   }, [updateGuides, updateCropSession]);
+
+  // The inspector and undo can change the item while crop mode is open.
+  const documentCropItem = cropSession
+    ? orderedItems.find((entry) => entry.id === cropSession.itemId)
+    : undefined;
+
+  useEffect(() => {
+    const current = cropSessionRef.current;
+    if (!current || documentCropItem?.kind !== 'image') {
+      return;
+    }
+    const next = syncImageCropSessionToDocument(current, documentCropItem);
+    if (next === 'restart') {
+      startCropSession(documentCropItem);
+    } else if (next !== current) {
+      updateCropSession(next);
+    }
+  }, [cropSession, documentCropItem, startCropSession, updateCropSession]);
 
   useEffect(() => {
     if (!cropSession) {
