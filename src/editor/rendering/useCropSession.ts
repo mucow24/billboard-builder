@@ -6,7 +6,6 @@ import {
   type ResizeHandle,
 } from './interactionGeometry';
 import {
-  getCommitChanges,
   createResizeSession,
   createRotateSession,
   type InteractionSession,
@@ -14,8 +13,10 @@ import {
   type SessionWithModifiers,
 } from './interactionSession';
 import {
+  bakeImageScale,
   buildCroppedImagePreviewItem,
   buildFullImageTransformItem,
+  buildImageCropCommitChanges,
   buildSourceTransformFromFullImageItem,
   panImageUnderCrop,
   resizeImageCrop,
@@ -123,11 +124,14 @@ export function useCropSession({
   }, []);
 
   const startCropSession = useCallback((item: ImageCanvasItem) => {
+    // The session works on the box as drawn; originalItem stays the
+    // document's item.
+    const previewItem = bakeImageScale(item);
     updateCropSession({
       itemId: item.id,
       originalItem: item,
-      previewItem: item,
-      fullImageItem: buildFullImageTransformItem(item),
+      previewItem,
+      fullImageItem: buildFullImageTransformItem(previewItem),
       crop: item.crop,
       activeInteraction: null,
     });
@@ -142,15 +146,14 @@ export function useCropSession({
 
   const writePreviewToDocument = useCallback((current: ImageCropSessionState) => {
     const inDocument = orderedItems.find((entry) => entry.id === current.itemId);
-    if (inDocument === current.previewItem) {
-      return;
-    }
-    const nextChanges = getCommitChanges(current.previewItem);
-    if (
-      !inDocument ||
-      JSON.stringify(getCommitChanges(inDocument)) !== JSON.stringify(nextChanges)
-    ) {
-      onUpdateItem(current.itemId, nextChanges);
+    // The preview is the box as drawn; the document's copy keeps its own
+    // scale, so the changes are worked out against that copy.
+    const changes = buildImageCropCommitChanges(
+      inDocument?.kind === 'image' ? inDocument : current.originalItem,
+      current.previewItem,
+    );
+    if (changes) {
+      onUpdateItem(current.itemId, changes);
     }
   }, [orderedItems, onUpdateItem]);
 
@@ -166,11 +169,13 @@ export function useCropSession({
     ) {
       return;
     }
+    // The session works on the box as drawn.
+    const previewItem = bakeImageScale(documentItem);
     updateCropSession({
       ...current,
-      previewItem: documentItem,
-      fullImageItem: buildFullImageTransformItem(documentItem),
-      crop: documentItem.crop,
+      previewItem,
+      fullImageItem: buildFullImageTransformItem(previewItem),
+      crop: previewItem.crop,
     });
   }, [documentItem, updateCropSession]);
 
