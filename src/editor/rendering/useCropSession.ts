@@ -286,12 +286,16 @@ export function useCropSession({
         return;
       }
       case 'image-pan': {
-        updateGuides([]);
         const next = panImageUnderCrop({
           baseItem: current.activeInteraction.initialPreviewItem,
           pointerStart: current.activeInteraction.pointerStart,
           pointer,
+          siblingItems: orderedItems.filter((entry) => entry.id !== current.itemId),
+          snapEnabled: !modifiers.ctrlKey,
+          stageRect: stageBounds,
+          threshold: SNAP_THRESHOLD / zoom,
         });
+        updateGuides(next.guides);
         updateCropSession({
           ...current,
           crop: next.crop,

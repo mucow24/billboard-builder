@@ -7,7 +7,8 @@ import type {
   SnapRect,
 } from '../document/documentTypes';
 import { buildVisibleImageCropFromSourceTransform } from './imagePresentation';
-import { buildCandidateCache, getResizeSnappedRect } from './snapping';
+import { getItemAABB } from './selectionGeometry';
+import { buildCandidateCache, getResizeSnappedRect, getSnappedRect } from './snapping';
 import {
   localToStage,
   stageToLocal,
@@ -211,28 +212,71 @@ export function panImageUnderCrop(params: {
   baseItem: ImageCanvasItem;
   pointerStart: Point;
   pointer: Point;
+  siblingItems: CanvasItem[];
+  snapEnabled?: boolean;
+  stageRect: SnapRect;
+  threshold?: number;
 }) {
-  const { baseItem, pointer, pointerStart } = params;
-  const pointerStartLocal = stageToLocal(
+  const {
+    baseItem,
+    pointer,
     pointerStart,
-    { x: 0, y: 0 },
-    baseItem.rotation,
-  );
-  const pointerLocal = stageToLocal(pointer, { x: 0, y: 0 }, baseItem.rotation);
-  const deltaLocal = {
-    x: pointerLocal.x - pointerStartLocal.x,
-    y: pointerLocal.y - pointerStartLocal.y,
+    siblingItems,
+    snapEnabled = true,
+    stageRect,
+    threshold,
+  } = params;
+  const panBy = (stageDelta: Point) => {
+    const deltaLocal = stageToLocal(stageDelta, { x: 0, y: 0 }, baseItem.rotation);
+    return buildImagePreviewItem(baseItem, {
+      ...baseItem.sourceTransform,
+      x: baseItem.sourceTransform.x + deltaLocal.x,
+      y: baseItem.sourceTransform.y + deltaLocal.y,
+    });
   };
-  const nextSourceTransform: ImageSourceTransform = {
-    ...baseItem.sourceTransform,
-    x: baseItem.sourceTransform.x + deltaLocal.x,
-    y: baseItem.sourceTransform.y + deltaLocal.y,
+  const stageDelta = {
+    x: pointer.x - pointerStart.x,
+    y: pointer.y - pointerStart.y,
   };
-  const previewItem = buildImagePreviewItem(baseItem, nextSourceTransform);
+  let previewItem = panBy(stageDelta);
+  let guides: GuideLine[] = [];
+
+  if (snapEnabled) {
+    // Snap the whole picture's bounding box, as an ordinary move does, to
+    // the stage and the other items. The cache is built fresh on every move
+    // (as in resizeImageCrop), so adding lines to it below is safe; if it is
+    // ever built once per gesture, the additions must move with it.
+    const cache = buildCandidateCache(siblingItems, stageRect);
+    // Also snap to the crop frame, which stays put while the picture slides
+    // under it. Not when the item is rotated: the frame's bounding box then
+    // lines up with none of its real edges, so a snap to it would show a
+    // guide without making anything flush.
+    if (Math.abs(baseItem.rotation) < 0.001) {
+      const frame = getItemAABB(baseItem);
+      cache.lines.push(
+        { orientation: 'vertical', position: frame.x },
+        { orientation: 'vertical', position: frame.x + frame.width / 2 },
+        { orientation: 'vertical', position: frame.x + frame.width },
+        { orientation: 'horizontal', position: frame.y },
+        { orientation: 'horizontal', position: frame.y + frame.height / 2 },
+        { orientation: 'horizontal', position: frame.y + frame.height },
+      );
+    }
+    const rawRect = getItemAABB(buildFullImageTransformItem(previewItem));
+    const snapped = getSnappedRect(rawRect, siblingItems, stageRect, threshold, cache);
+    guides = snapped.guides;
+    if (guides.length > 0) {
+      previewItem = panBy({
+        x: stageDelta.x + snapped.rect.x - rawRect.x,
+        y: stageDelta.y + snapped.rect.y - rawRect.y,
+      });
+    }
+  }
 
   return {
     crop: previewItem.crop,
     fullImageItem: buildFullImageTransformItem(previewItem),
+    guides,
     previewItem,
   };
 }
