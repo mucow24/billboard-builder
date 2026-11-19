@@ -472,33 +472,44 @@ test.describe('shadow of text with tags', () => {
  */
 test.describe('outline of faked bold', () => {
   const STROKE_WIDTH = 4;
+  const FAKED_CELL = { width: 400, height: 320 };
+  // A family with a regular file only, and stems thin enough that the rings of
+  // the browser's stroke would fill them.
+  const FAKED_BOLD_CASES = [
+    { id: 'no fill', text: 'H', fontWeight: 'bold', fill: '#00000000' },
+    // The fill shows the outline through it, and its own colour between the bands.
+    { id: 'translucent fill', text: 'H', fontWeight: 'bold', fill: '#ffffff40' },
+    // One Pixi text per fragment, and only the tagged one has its bold faked.
+    { id: 'tagged run', text: '<b>H</b>', fontWeight: 'normal', fill: '#00000000' },
+    { id: 'tagged run, translucent fill', text: '<b>H</b>', fontWeight: 'normal', fill: '#ffffff40' },
+  ];
 
   test('is one line around the bold shape, on the canvas and in the SVG', async ({ page }) => {
     await openFreshEditor(page);
     await waitForBundledFonts(page);
 
     await uploadProject(page, {
-      ...createProjectDocument([
-        createTextFixture({
-          id: 'faked-bold-outline',
-          name: 'faked bold outline',
-          zIndex: 1,
-          text: 'H',
-          // A family with a regular file only, and stems thin enough that the
-          // rings of the browser's stroke would fill them.
-          fontFamily: 'Poiret One',
-          fontWeight: 'bold',
-          fontSize: 200,
-          fill: '#00000000',
-          x: 40,
-          y: 40,
-          width: 320,
-          height: 240,
-          stroke: STROKE,
-          strokeWidth: STROKE_WIDTH,
-        }),
-      ]),
-      canvas: { width: 400, height: 320 },
+      ...createProjectDocument(
+        FAKED_BOLD_CASES.map((entry, index) =>
+          createTextFixture({
+            id: `faked-bold-${index}`,
+            name: entry.id,
+            zIndex: index + 1,
+            text: entry.text,
+            fontFamily: 'Poiret One',
+            fontWeight: entry.fontWeight,
+            fontSize: 200,
+            fill: entry.fill,
+            x: index * FAKED_CELL.width + 40,
+            y: 40,
+            width: 320,
+            height: 240,
+            stroke: STROKE,
+            strokeWidth: STROKE_WIDTH,
+          }),
+        ),
+      ),
+      canvas: { width: FAKED_BOLD_CASES.length * FAKED_CELL.width, height: FAKED_CELL.height },
     });
     const pngDownload = await captureDownload(page, async () => {
       await clickToolbarPopoverItem(page, 'Export', 'PNG');
@@ -511,53 +522,68 @@ test.describe('outline of faked bold', () => {
     const svg = await fs.readFile(await svgDownload.path(), 'utf8');
     await fs.writeFile(test.info().outputPath('faked-bold.svg'), svg);
 
-    // The bands of ink along a row a quarter of the way down the glyph, above
-    // its crossbar: how wide each is, by the coverage it adds up to.
+    // For every case, the bands of outline along a row a quarter of the way
+    // down the glyph, above its crossbar: how wide each is, by the coverage it
+    // adds up to. The outline is the only red there is: a fill over it leaves
+    // it red, and the fill alone is not.
     const bandsOf = (src: string) =>
-      page.evaluate(async (source) => {
-        const image = new Image();
-        image.src = source;
-        await image.decode();
-        const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth;
-        canvas.height = image.naturalHeight;
-        const context = canvas.getContext('2d', { willReadFrequently: true })!;
-        context.drawImage(image, 0, 0);
-        const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-        let top = -1;
-        let bottom = -1;
-        for (let y = 0; y < height; y += 1) {
-          for (let x = 0; x < width; x += 1) {
-            if (data[(y * width + x) * 4 + 3] < 128) continue;
-            if (top < 0) top = y;
-            bottom = y;
-            break;
-          }
-        }
-        const y = Math.round(top + (bottom - top) / 4);
-        const bands: number[] = [];
-        let band = 0;
-        for (let x = 0; x < width; x += 1) {
-          const alpha = data[(y * width + x) * 4 + 3] / 255;
-          if (alpha > 0.02) band += alpha;
-          else if (band > 0) {
-            bands.push(band);
-            band = 0;
-          }
-        }
-        return bands;
-      }, src);
+      page.evaluate(
+        async ({ source, count, cell }) => {
+          const image = new Image();
+          image.src = source;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext('2d', { willReadFrequently: true })!;
+          context.drawImage(image, 0, 0);
+          return Array.from({ length: count }, (_, index) => {
+            const { data, width, height } = context.getImageData(index * cell.width, 0, cell.width, cell.height);
+            const outlineAt = (x: number, y: number) => {
+              const at = (y * width + x) * 4;
+              return data[at + 1] < 128 ? data[at + 3] / 255 : 0;
+            };
+            let top = -1;
+            let bottom = -1;
+            for (let y = 0; y < height; y += 1) {
+              for (let x = 0; x < width; x += 1) {
+                if (outlineAt(x, y) < 0.5) continue;
+                if (top < 0) top = y;
+                bottom = y;
+                break;
+              }
+            }
+            const y = Math.round(top + (bottom - top) / 4);
+            const bands: number[] = [];
+            let band = 0;
+            for (let x = 0; x < width; x += 1) {
+              const outline = outlineAt(x, y);
+              if (outline > 0.02) band += outline;
+              else if (band > 0) {
+                bands.push(band);
+                band = 0;
+              }
+            }
+            return bands;
+          });
+        },
+        { source: src, count: FAKED_BOLD_CASES.length, cell: FAKED_CELL },
+      );
 
     const renderings = {
       canvas: await bandsOf(`data:image/png;base64,${png.toString('base64')}`),
       SVG: await bandsOf(`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`),
     };
-    for (const [name, bands] of Object.entries(renderings)) {
-      expect.soft(bands, `${name}: bands of outline across the two stems: ${bands}`).toHaveLength(4);
-      for (const band of bands) {
-        expect
-          .soft(Math.abs(band - STROKE_WIDTH), `${name}: a band of the outline is ${band} px wide`)
-          .toBeLessThanOrEqual(1);
+    for (const [name, cases] of Object.entries(renderings)) {
+      for (const [index, entry] of FAKED_BOLD_CASES.entries()) {
+        const bands = cases[index];
+        const where = `${name}, ${entry.id}`;
+        expect.soft(bands, `${where}: bands of outline across the two stems: ${bands}`).toHaveLength(4);
+        for (const band of bands) {
+          expect
+            .soft(Math.abs(band - STROKE_WIDTH), `${where}: a band of the outline is ${band} px wide`)
+            .toBeLessThanOrEqual(1);
+        }
       }
     }
   });

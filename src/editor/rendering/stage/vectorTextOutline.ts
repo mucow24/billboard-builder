@@ -21,10 +21,16 @@
  *    outline's width.
  *
  * The contours come from the font's file, which is read and parsed once per
- * font, off the main path: until that is done the text keeps the browser's
- * stroke. A text whose bold is not faked never comes here.
+ * font (see "The fonts' contours" below): until that is done the text keeps
+ * the browser's stroke.
+ *
+ * Only a text that needs it comes here (`wantsVectorOutline`): one with an
+ * outline, with faked bold, and with a fill that is see-through somewhere.
+ * Under an opaque fill the rings do not show, and the outline stays the
+ * browser's, as the SVG export leaves its stroke unmasked there.
  */
 import type { TextCanvasItem } from '../../document/documentTypes';
+import { parseRichText } from '../../document/richText';
 import { listRegisteredFonts } from '../../fonts/browserFontLoader';
 import {
   drawnText,
@@ -33,19 +39,27 @@ import {
   isInEmojiFallbackRange,
 } from '../../fonts/emojiFallback';
 import { toFontReference } from '../../fonts/fontModel';
+import { subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
 import { findFontForVariant } from '../../fonts/fontRegistry';
 import { browserFontDeps } from '../../io/svg/browserSvgExport';
 import { createCanvasTextMeasurer } from '../../io/svg/canvasTextMeasurer';
 import { syntheticStyle } from '../../io/svg/documentFontBytes';
-import { resolveFontOutlines, textItemsOf } from '../../io/svg/exportToSvg';
-import { fontVariantKey } from '../../io/svg/fontOutlineProvider';
+import { textItemsOf } from '../../io/svg/exportToSvg';
+import type { FontBytes } from '../../io/svg/exportToSvg';
+import { fontVariantKey, resolveOutline } from '../../io/svg/fontOutlineProvider';
+import { toSvgPaint } from '../../io/svg/svgColor';
 import type {
   FontOutlineProvider,
+  OutlineFont,
+  OutlineResult,
+  OutlineUnavailableReason,
   SvgExportWarning,
+  SyntheticFontStyle,
   TextMeasurer,
   TextOutlineShape,
 } from '../../io/svg/svgExportTypes';
 import { textSvg } from '../../io/svg/svgText';
+import { emojiFallbackOutline, hasGlyphsFor } from '../../io/svg/svgTextGlyphs';
 import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
 
 /** Whether the emoji fallback may draw any of `text` (see `fonts/emojiFallback`). */
@@ -68,24 +82,90 @@ export function hasFakedBold(item: TextCanvasItem): boolean {
   });
 }
 
-// ---------------------------------------------------------------------------
-// The fonts' contours, read once per font
-// ---------------------------------------------------------------------------
-
-/** What `item`'s contours depend on: its fonts as they are registered now, and whether it may need the fallback. */
-function fontsKey(item: TextCanvasItem): string {
-  return textItemsOf(item)
-    .map((run) =>
-      [fontVariantKey(run), getTextFontRegistrationCount(run.fontFamily), mayUseFallback(run.text)].join('|'),
-    )
-    .join(';');
+/**
+ * Whether any of `item`'s fills is see-through: the item's own two colours, or
+ * the colours of a tagged run. The same test the SVG export masks its stroke
+ * by (`strokeElements` in `svgText`), for the item as a whole.
+ */
+export function hasSeeThroughFill(item: TextCanvasItem): boolean {
+  const seeThrough = (color: string) => toSvgPaint(color).alpha < 1;
+  if (seeThrough(item.fill) || seeThrough(item.secondaryFill)) return true;
+  return parseRichText(item.text).runs.some(({ paint }) => {
+    if (!paint) return false;
+    return paint.kind === 'color' ? seeThrough(paint.color) : seeThrough(paint.start) || seeThrough(paint.end);
+  });
 }
 
-const resolved = new Map<string, FontOutlineProvider>();
-const pending = new Map<string, Promise<void>>();
-const listeners = new Set<() => void>();
+/**
+ * Whether `item`'s outline is drawn from its glyphs' contours rather than by
+ * the browser: it has one, some of its bold is faked, and the rings the
+ * browser would stroke inside the glyphs would show through its fill.
+ */
+export function wantsVectorOutline(item: TextCanvasItem): boolean {
+  if (!(item.strokeWidth > 0) || !item.stroke || toSvgPaint(item.stroke).alpha <= 0) return false;
+  return hasSeeThroughFill(item) && hasFakedBold(item);
+}
 
-/** Calls `listener` whenever the contours of another font have been read. Returns the unsubscribe function. */
+// ---------------------------------------------------------------------------
+// The fonts' contours
+// ---------------------------------------------------------------------------
+//
+// A font's file is read and parsed once, and kept by the font: its family,
+// weight and style, and how many files have been registered for the family,
+// so that a file registered later is read anew. The emoji fallback is a font
+// like any other here. What an item is drawn with is put together from these
+// each time it is asked for, by the item's text as it then is: changing the
+// text or its tags reads nothing that has been read, and an item never waits
+// for a font another item already has.
+
+/** One font as read: its contours, or why there are none. */
+type ReadFont =
+  | { ok: true; font: OutlineFont; synthetic?: SyntheticFontStyle }
+  | { ok: false; reason: OutlineUnavailableReason };
+
+interface KeptFont {
+  /** The family whose registrations the entry goes by, and their number when it was read. */
+  family: string;
+  registrations: number;
+  read: ReadFont;
+}
+
+const fonts = new Map<string, KeptFont>();
+/** Reads under way, by the same keys. */
+const reading = new Map<string, Promise<void>>();
+/** Everything an item is still waiting for: a font, and the fallback it may turn out to need after it. */
+const waiting = new Set<Promise<void>>();
+const listeners = new Set<() => void>();
+let version = 0;
+
+const ownKey = (run: TextCanvasItem) =>
+  `own|${fontVariantKey(run)}|${getTextFontRegistrationCount(run.fontFamily)}`;
+const fallbackKey = (run: TextCanvasItem) =>
+  `fallback|${run.fontWeight}|${run.fontStyle}|${getTextFontRegistrationCount(EMOJI_FALLBACK_FAMILY)}`;
+
+function changed(): void {
+  version += 1;
+  for (const listener of [...listeners]) listener();
+}
+
+// A file registered for a family may be the one the browser now draws with:
+// what was read for the family before is dropped.
+subscribeToFontRegistrations(() => {
+  let dropped = false;
+  for (const [key, kept] of fonts) {
+    if (kept.registrations === getTextFontRegistrationCount(kept.family)) continue;
+    fonts.delete(key);
+    dropped = true;
+  }
+  if (dropped) changed();
+});
+
+/** Whether `run`'s text has a character `font` lacks that the emoji fallback may draw. */
+function needsFallback(font: OutlineFont, run: TextCanvasItem): boolean {
+  return !hasGlyphsFor(font, [...drawnText(run.text)].filter(isInEmojiFallbackRange).join(''));
+}
+
+/** Calls `listener` whenever what has been read changes. Returns the unsubscribe function. */
 export function subscribeToFontOutlines(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
@@ -93,28 +173,86 @@ export function subscribeToFontOutlines(listener: () => void): () => void {
   };
 }
 
-/** The contours of `item`'s fonts, or null while they have not been read. */
-export function peekFontOutlines(item: TextCanvasItem): FontOutlineProvider | null {
-  return resolved.get(fontsKey(item)) ?? null;
+/** A number that changes whenever what has been read changes: what `peekFontOutlines` answers by. */
+export function fontOutlinesVersion(): number {
+  return version;
 }
 
-/** Start reading the contours of `item`'s fonts, unless that is done or under way. */
-export function requestFontOutlines(item: TextCanvasItem): void {
-  const key = fontsKey(item);
-  if (resolved.has(key) || pending.has(key)) return;
-  // Every registered family has a file, which is all the document's own font list says.
-  const deps = browserFontDeps(listRegisteredFonts().map(toFontReference));
-  const done = resolveFontOutlines(textItemsOf(item), deps)
-    .then((fontOutlines) => {
-      resolved.set(key, fontOutlines);
+/**
+ * The contours of the fonts `item` is drawn with as its text now is, or null
+ * while one of them has not been read.
+ */
+export function peekFontOutlines(item: TextCanvasItem): FontOutlineProvider | null {
+  const results = new Map<string, OutlineResult>();
+  for (const run of textItemsOf(item)) {
+    const own = fonts.get(ownKey(run))?.read;
+    if (!own) return null;
+    const variant = fontVariantKey(run);
+    let result: OutlineResult = results.get(variant) ?? own;
+    if (own.ok && needsFallback(own.font, run)) {
+      const fallback = fonts.get(fallbackKey(run))?.read;
+      if (!fallback) return null;
+      if (fallback.ok && result.ok) {
+        result = {
+          ...result,
+          fallback: { font: fallback.font, ...(fallback.synthetic ? { synthetic: fallback.synthetic } : {}) },
+        };
+      }
+    }
+    results.set(variant, result);
+  }
+  return { getOutlineFont: (run) => results.get(fontVariantKey(run)) ?? { ok: false, reason: 'no-bytes' } };
+}
+
+/** Read the font kept under `key`, unless it has been or is being read. */
+function ensureRead(
+  key: string,
+  family: string,
+  load: () => Promise<FontBytes>,
+  as: (font: OutlineFont) => OutlineFont = (font) => font,
+): Promise<void> {
+  if (fonts.has(key)) return Promise.resolve();
+  const underWay = reading.get(key);
+  if (underWay) return underWay;
+  const registrations = getTextFontRegistrationCount(family);
+  const keep = (read: ReadFont) => {
+    fonts.set(key, { family, registrations, read });
+  };
+  const done = load()
+    .then(({ kind, bytes, synthetic }) => {
+      const outline = resolveOutline(kind, bytes);
+      keep(outline.ok ? { ok: true, font: as(outline.font), ...(synthetic ? { synthetic } : {}) } : outline);
     })
-    // A font that cannot be read leaves the text with the browser's stroke.
-    .catch(() => undefined)
+    // A font that cannot be read is kept as that: the text keeps the browser's stroke.
+    .catch(() => keep({ ok: false, reason: 'no-bytes' }))
     .finally(() => {
-      pending.delete(key);
-      for (const listener of [...listeners]) listener();
+      reading.delete(key);
+      changed();
     });
-  pending.set(key, done);
+  reading.set(key, done);
+  return done;
+}
+
+/** Start reading whatever fonts of `item` have not been read, the fallback included where its text needs it. */
+export function requestFontOutlines(item: TextCanvasItem): void {
+  for (const run of textItemsOf(item)) {
+    const own = fonts.get(ownKey(run))?.read;
+    if (own && (!own.ok || !needsFallback(own.font, run) || fonts.has(fallbackKey(run)))) continue;
+
+    // Every registered family has a file, which is all the document's own font list says.
+    const deps = browserFontDeps(listRegisteredFonts().map(toFontReference));
+    const all = ensureRead(ownKey(run), run.fontFamily, () => deps.loadFontBytes(run))
+      .then(() => {
+        const read = fonts.get(ownKey(run))?.read;
+        const loadFallback = deps.loadFallbackFontBytes;
+        if (!read?.ok || !loadFallback || !needsFallback(read.font, run)) return undefined;
+        return ensureRead(fallbackKey(run), EMOJI_FALLBACK_FAMILY, () => loadFallback(run), emojiFallbackOutline);
+      })
+      .finally(() => {
+        waiting.delete(all);
+      });
+    waiting.add(all);
+  }
 }
 
 /**
@@ -122,9 +260,17 @@ export function requestFontOutlines(item: TextCanvasItem): void {
  * an export that must not catch the text half-way.
  */
 export async function fontOutlinesSettled(): Promise<boolean> {
-  const waited = pending.size > 0;
-  while (pending.size > 0) await Promise.all([...pending.values()]);
+  const waited = waiting.size > 0;
+  while (waiting.size > 0) await Promise.all([...waiting]);
   return waited;
+}
+
+/** Visible for tests: forget everything read. */
+export function _resetFontOutlines(): void {
+  fonts.clear();
+  reading.clear();
+  waiting.clear();
+  version = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +328,7 @@ export interface VectorOutlineImage {
  */
 const MAX_TEXELS = 8_000_000;
 
-interface Box {
+export interface Box {
   left: number;
   top: number;
   right: number;
@@ -196,7 +342,7 @@ interface Box {
  * font size around the lines. The `area` itself where the path data is not
  * the absolute moves, lines and curves that glyph contours are written in.
  */
-function outlineBox(shape: TextOutlineShape, strokeWidth: number): Box {
+export function outlineBox(shape: TextOutlineShape, strokeWidth: number): Box {
   const { area } = shape;
   const whole = { left: area.x, top: area.y, right: area.x + area.width, bottom: area.y + area.height };
   if (/[^MLQCZ\d\s.,eE+-]/.test(shape.d)) return whole;

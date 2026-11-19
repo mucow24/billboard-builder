@@ -47,6 +47,10 @@ import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor, type SyntheticBold } from '.
  * outlined from the fallback (`lookup.fallback`, see `lineGlyphs`), as the canvas
  * draws them. Their bold and italic are faked by what the fallback lacks, in a
  * path of their own.
+ *
+ * The canvas runs this too, for the outline of faked bold alone
+ * (`rendering/stage/vectorTextOutline`): it is drawn from the glyphs as they
+ * are laid out here, so a change to the layout moves it on the canvas.
  */
 export function textSvg(
   item: TextCanvasItem,
@@ -306,8 +310,13 @@ function glyphGroupElements(
  * fill neither shows. Where `paint`, the colours the glyphs are filled with, is
  * see-through, the stroke is cut back to the outline by a mask
  * (`boldOutlineMask`, `smearOutlineMask`) over `area`, which has to contain
- * all of the text's ink; `maskId` is unique in the document. `onTextOutline` is
- * told each group's glyphs (`SvgExportDeps.onTextOutline`).
+ * all of the text's ink; `maskId` is unique in the document.
+ *
+ * `onTextOutline` is told each group's glyphs (`SvgExportDeps.onTextOutline`).
+ * The canvas draws the outline of faked bold from them
+ * (`rendering/stage/vectorTextOutline`), and decides by the same test of
+ * `paint` whether to: a change to this layout, to what is told, or to when the
+ * stroke is masked changes what is on the canvas too.
  */
 function strokeElements(
   groups: GlyphGroups,

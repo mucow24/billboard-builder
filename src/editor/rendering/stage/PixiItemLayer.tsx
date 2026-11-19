@@ -61,12 +61,13 @@ import { useSvgImageCanvas } from '../useSvgImageCanvas';
 import { computeSvgPixelScale } from './svgRasterScale';
 import { rasteriseRichTextShadow } from './richTextShadow';
 import {
-  hasFakedBold,
+  fontOutlinesVersion,
   peekFontOutlines,
   rasteriseVectorOutline,
   requestFontOutlines,
   subscribeToFontOutlines,
   textOutlineShapes,
+  wantsVectorOutline,
 } from './vectorTextOutline';
 import type { TextOutlineShape } from '../../io/svg/svgExportTypes';
 import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
@@ -591,26 +592,24 @@ const isStrokeLayer = (layer: PixiTextLayer) => layer.key === 'stroke' || layer.
 
 /**
  * The pieces of `item`'s outline where it is drawn from the glyphs' contours
- * (see `vectorTextOutline`): where the item has an outline and the browser
- * fakes the bold of some of its text. Null everywhere else, and until the
- * contours of its fonts have been read; the outline is then the browser's
- * stroke.
+ * (`wantsVectorOutline`). Null everywhere else, and until the contours of its
+ * fonts have been read; the outline is then the browser's stroke.
  */
 function useVectorOutlineShapes(item: TextCanvasItem, fontRegistrations: number): TextOutlineShape[] | null {
-  const wanted = textStrokeOf(item) !== null && hasFakedBold(item);
-  const fontOutlines = useSyncExternalStore(subscribeToFontOutlines, () =>
-    wanted ? peekFontOutlines(item) : null,
-  );
+  const wanted = wantsVectorOutline(item);
+  // What has been read of the fonts' contours: nothing to an item that wants none.
+  const read = useSyncExternalStore(subscribeToFontOutlines, () => (wanted ? fontOutlinesVersion() : 0));
   useEffect(() => {
     if (wanted) requestFontOutlines(item);
   });
   // Where the item is plays no part in its outline: a move lays nothing out anew.
-  const itemKey = JSON.stringify({ ...item, x: 0, y: 0, rotation: 0 });
-  return useMemo(
-    () => (fontOutlines ? textOutlineShapes(JSON.parse(itemKey) as TextCanvasItem, fontOutlines) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fontRegistrations: the same item is laid out differently once its font is in.
-    [itemKey, fontOutlines, fontRegistrations],
-  );
+  const itemKey = wanted ? JSON.stringify({ ...item, x: 0, y: 0, rotation: 0 }) : null;
+  return useMemo(() => {
+    if (itemKey === null) return null;
+    const fontOutlines = peekFontOutlines(item);
+    return fontOutlines ? textOutlineShapes(item, fontOutlines) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- itemKey stands for item; read and fontRegistrations: the same item is laid out differently once its fonts are in.
+  }, [itemKey, read, fontRegistrations]);
 }
 
 /**
@@ -687,9 +686,10 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
     : null;
   const layers = fragments?.texts ?? buildTextLayers(item, requestedResolution);
 
-  // Where the browser fakes bold, its stroke runs inside the glyphs too: the
-  // outline is drawn from the glyphs' contours instead, in the place of the
-  // outline's Pixi texts (above the shadow, under every fill).
+  // Where the browser fakes bold, its stroke runs inside the glyphs too, which
+  // a see-through fill shows: the outline is then drawn from the glyphs'
+  // contours instead, in the place of the outline's Pixi texts (above the
+  // shadow, under every fill).
   const stroke = textStrokeOf(item);
   const outlineShapes = useVectorOutlineShapes(item, fontRegistrations);
   const vectorOutline =
