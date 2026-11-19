@@ -118,6 +118,28 @@ Do not pad the review. No praise section, no restating the diff, no style
 preferences the linter does not enforce. If a topic has no findings, it gets
 one word in the summary line and nothing else.
 
+## Bugs are never out of scope
+
+Every bug you find gets reported. "This does not belong in this PR" decides
+where a bug is fixed, never whether it is raised. Do not note a bug for
+yourself and move on, and do not leave one out because the review is about
+something else.
+
+- A bug in code this PR adds or changes, or one this PR causes, exposes or
+  makes worse, is a **[blocking] Correctness** finding. It is in scope by
+  definition, however far it sits from the PR's stated purpose.
+- A bug that was already there and that this PR neither touches nor
+  worsens goes in the review comment's **Found outside this PR** section.
+  It does not block this PR and does not change the verdict, and the
+  author must not fix it in this PR. Give each one enough for a separate
+  fix session to start from: the file and line, what goes wrong, how to
+  trigger it, and how sure you are. The author session reads that section
+  and offers Mike a fix session for each entry.
+
+If you are unsure which of the two a bug is, treat it as blocking and say
+why. Also name every such bug in your final message of the turn, after the
+stage and verdict, so it is seen in the session as well as on the PR.
+
 ## Always escalate
 
 If the PR changes any of these, the verdict is NEEDS MIKE however good the
@@ -176,6 +198,9 @@ Reviewed at `<head sha>`
 
 **No findings:** <the topics with nothing to report, comma-separated>
 
+**Found outside this PR**   (omit this section when there is nothing)
+- A. `src/file.ts:88`: <the bug, how to trigger it, how sure you are>
+
 **Verdict: <APPROVE @ `<head sha>` | NEEDS MIKE>**   (omit this line when waiting for the author)
 <for NEEDS MIKE: the reasons, as a short list Mike can read on its own>
 ```
@@ -188,4 +213,6 @@ Verdict (pass 2):
 
 <per finding number: settled, and how; or not settled, and why>
 <for NEEDS MIKE: the reasons, as a short list Mike can read on its own>
+
+**Found outside this PR**   (only for bugs found during pass 2; same form as in the review)
 ```
