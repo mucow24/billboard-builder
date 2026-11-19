@@ -439,6 +439,83 @@ test.describe('editor image crop', () => {
     expect(savedImage?.crop.width).toBeCloseTo(420, 3);
   });
 
+  test('dragging the whole picture in crop mode snaps to guides, and ctrl-drag disables snapping', async ({
+    page,
+  }) => {
+    // The picture is shown at 4x so that, at the fitted zoom, the middle of
+    // the crop frame is clear of the crop handles. Crop frame at (300,320)
+    // 400x240; the whole picture at (220,280) 640x360, so its right edge
+    // (x=860) starts 40 short of the rectangle's left edge.
+    const image = createImageFixture({
+      id: 'crop-pan-snap-image',
+      name: 'Crop Pan Snap Image',
+      x: 300,
+      y: 320,
+      width: 400,
+      height: 240,
+      crop: {
+        x: 20,
+        y: 10,
+        width: 100,
+        height: 60,
+      },
+      zIndex: 0,
+    });
+    const rectangle = createRectangleFixture({
+      id: 'crop-pan-snap-rect',
+      name: 'Crop Pan Snap Rect',
+      x: 900,
+      y: 100,
+      width: 100,
+      height: 100,
+      zIndex: 1,
+    });
+    const project = createGroupedProjectDocument([image, rectangle]);
+    const cropCenter = { x: 500, y: 440 };
+    const dragEnd = { x: cropCenter.x + 30, y: cropCenter.y };
+
+    await openFreshEditor(page);
+    await uploadProject(page, project, 'crop-pan-snap.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await doubleClickItem(page, 'crop-pan-snap-image');
+    let cropSession = await expectCropMode(page);
+    expect(cropSession.fullImageItem.x).toBeCloseTo(220, 1);
+    expect(cropSession.fullImageItem.width).toBeCloseTo(640, 1);
+
+    await beginCanvasDrag(page, cropCenter);
+    await movePointerToCanvasPoint(page, dragEnd);
+    await expect(page.getByTestId('guide-count')).not.toHaveText('0');
+    await releasePointer(page);
+    await expect(page.getByTestId('guide-count')).toHaveText('0');
+
+    // 30 px of pointer travel, then the snap carries the picture's right
+    // edge the rest of the way onto the rectangle's left edge. The crop
+    // frame stays where it was.
+    cropSession = await expectCropMode(page);
+    expect(cropSession.fullImageItem.x + cropSession.fullImageItem.width).toBeCloseTo(900, 5);
+    expect(cropSession.previewItem.x).toBe(300);
+    expect(cropSession.previewItem.width).toBe(400);
+
+    // Leave crop mode and re-upload the project to reset it, then repeat
+    // with Ctrl held.
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+    await uploadProject(page, project, 'crop-pan-snap-ctrl.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await doubleClickItem(page, 'crop-pan-snap-image');
+    cropSession = await expectCropMode(page);
+    expect(cropSession.fullImageItem.x).toBeCloseTo(220, 1);
+    await dragCanvasWithModifier(page, 'Control', cropCenter, dragEnd);
+    await expect(page.getByTestId('guide-count')).toHaveText('0');
+
+    cropSession = await expectCropMode(page);
+    const unsnappedRight = cropSession.fullImageItem.x + cropSession.fullImageItem.width;
+    expect(unsnappedRight).toBeGreaterThan(884);
+    expect(unsnappedRight).toBeLessThan(896);
+  });
+
   test('supports full-image resize and rotate inside crop mode, and Escape cancels the session', async ({
     page,
   }) => {
