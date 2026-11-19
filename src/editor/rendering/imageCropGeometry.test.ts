@@ -7,6 +7,7 @@ import {
   panImageUnderCrop,
   resizeImageCrop,
 } from './imageCropGeometry';
+import { localToStage, stageToLocal } from './interactionGeometry';
 
 describe('image crop geometry', () => {
   it('derives the full image transform item from a cropped visible image', () => {
@@ -279,6 +280,162 @@ describe('image crop geometry', () => {
     expect(snapped.guides).toEqual([
       { orientation: 'vertical', position: 132 },
     ]);
+  });
+
+  describe('snapping a rotated crop frame to the image edges', () => {
+    const stageRect = { x: 0, y: 0, width: 300, height: 200 };
+
+    // A 160 x 50 image shown through a 100 x 50 frame that starts 20 in from
+    // the image's left edge. In the frame's own axes the image spans x -20..140.
+    function createRotatedCroppedImage(rotation: number) {
+      const item = createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 50,
+        width: 100,
+        height: 50,
+      });
+      item.x = 100;
+      item.y = 100;
+      item.rotation = rotation;
+      item.crop = { x: 20, y: 0, width: 100, height: 50 };
+      item.sourceTransform = { x: -20, y: 0, width: 160, height: 50, rotation: 0 };
+      return item;
+    }
+
+    function framePoint(item: { x: number; y: number; rotation: number }, x: number, y: number) {
+      return localToStage({ x, y }, { x: item.x, y: item.y }, item.rotation);
+    }
+
+    it('snaps the right edge to the image edge when dragged back in across it', () => {
+      const item = createRotatedCroppedImage(30);
+
+      const snapped = resizeImageCrop({
+        baseItem: item,
+        handle: 'middle-right',
+        pointer: framePoint(item, 144, 25),
+        siblingItems: [],
+        stageRect,
+      });
+
+      expect(snapped.crop.x).toBeCloseTo(20, 10);
+      expect(snapped.crop.width).toBeCloseTo(140, 10);
+      expect(snapped.previewItem.width).toBeCloseTo(140, 10);
+      expect(snapped.previewItem.x).toBeCloseTo(100, 10);
+      expect(snapped.previewItem.y).toBeCloseTo(100, 10);
+      expect(snapped.guides).toEqual([
+        {
+          orientation: 'vertical',
+          position: 140,
+          frame: { origin: { x: 100, y: 100 }, rotation: 30 },
+        },
+      ]);
+    });
+
+    it('snaps the left and top edges from either side of the image edge', () => {
+      const item = createRotatedCroppedImage(-17);
+
+      for (const localX of [-25, -15]) {
+        const snapped = resizeImageCrop({
+          baseItem: item,
+          handle: 'top-left',
+          pointer: framePoint(item, localX, 3),
+          siblingItems: [],
+          stageRect,
+        });
+
+        expect(snapped.crop.x).toBeCloseTo(0, 10);
+        expect(snapped.crop.y).toBeCloseTo(0, 10);
+        expect(snapped.crop.width).toBeCloseTo(120, 10);
+        expect(snapped.crop.height).toBeCloseTo(50, 10);
+        const corner = framePoint(item, -20, 0);
+        expect(snapped.previewItem.x).toBeCloseTo(corner.x, 10);
+        expect(snapped.previewItem.y).toBeCloseTo(corner.y, 10);
+        expect(snapped.guides).toHaveLength(2);
+      }
+    });
+
+    it('leaves the edge alone beyond the threshold and with snapping off', () => {
+      const item = createRotatedCroppedImage(30);
+      const far = resizeImageCrop({
+        baseItem: item,
+        handle: 'middle-right',
+        pointer: framePoint(item, 152, 25),
+        siblingItems: [],
+        stageRect,
+      });
+      expect(far.previewItem.width).toBeCloseTo(152, 10);
+      expect(far.guides).toEqual([]);
+
+      const off = resizeImageCrop({
+        baseItem: item,
+        handle: 'middle-right',
+        pointer: framePoint(item, 144, 25),
+        siblingItems: [],
+        snapEnabled: false,
+        stageRect,
+      });
+      expect(off.previewItem.width).toBeCloseTo(144, 10);
+      expect(off.guides).toEqual([]);
+    });
+
+    it('does not snap a rotated frame to the axis-aligned stage and sibling guides', () => {
+      const item = createRotatedCroppedImage(30);
+      // The dragged handle lands on the stage's vertical centre line (x = 150)
+      // and on the sibling's left edge.
+      const local = stageToLocal({ x: 150, y: 150 }, { x: item.x, y: item.y }, item.rotation);
+      const sibling = createRectangleItem({ x: 150, y: 0, width: 40, height: 80 });
+
+      const resized = resizeImageCrop({
+        baseItem: item,
+        handle: 'middle-right',
+        pointer: { x: 151, y: 150 },
+        siblingItems: [sibling],
+        stageRect,
+      });
+
+      const expected = stageToLocal({ x: 151, y: 150 }, { x: item.x, y: item.y }, item.rotation);
+      expect(Math.abs(local.x - 140)).toBeGreaterThan(8);
+      expect(resized.previewItem.width).toBeCloseTo(expected.x, 10);
+      expect(resized.guides).toEqual([]);
+    });
+
+    it('snaps to the edges of an image turned a quarter turn inside the frame', () => {
+      const item = createRotatedCroppedImage(30);
+      // Turned 90 degrees about its top-left corner (60, 0), the 160 x 50
+      // image spans x 10..60 and y 0..160 in the frame's axes.
+      item.sourceTransform = { x: 60, y: 0, width: 160, height: 50, rotation: 90 };
+
+      const snapped = resizeImageCrop({
+        baseItem: item,
+        handle: 'bottom-right',
+        pointer: framePoint(item, 63, 156),
+        siblingItems: [],
+        stageRect,
+      });
+
+      expect(snapped.previewItem.width).toBeCloseTo(60, 10);
+      expect(snapped.previewItem.height).toBeCloseTo(160, 10);
+    });
+
+    it('does not snap to an image turned askew inside the frame', () => {
+      for (const rotation of [0, 30]) {
+        const item = createRotatedCroppedImage(rotation);
+        item.sourceTransform = { ...item.sourceTransform, rotation: 18 };
+
+        const resized = resizeImageCrop({
+          baseItem: item,
+          handle: 'middle-right',
+          pointer: framePoint(item, 144, 25),
+          siblingItems: [],
+          stageRect,
+        });
+
+        expect(resized.previewItem.width).toBeCloseTo(144, 10);
+        expect(resized.guides).toEqual([]);
+      }
+    });
   });
 
   it('pans the source image under a fixed crop frame', () => {

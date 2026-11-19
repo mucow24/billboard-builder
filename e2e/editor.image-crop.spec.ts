@@ -373,6 +373,72 @@ test.describe('editor image crop', () => {
     });
   });
 
+  test('a rotated crop edge snaps to the image edge when dragged back in across it', async ({
+    page,
+  }) => {
+    const rotation = 25;
+    // A 480 x 270 image shown at scale 1 through a 300 x 180 frame: the image's
+    // right edge is 120 beyond the frame's right edge, along the frame's x axis.
+    // (Large, so that at the fitted zoom the handles do not overlap.)
+    const image = createImageFixture({
+      id: 'crop-rotated-snap-image',
+      name: 'Crop Rotated Snap Image',
+      x: 520,
+      y: 320,
+      width: 300,
+      height: 180,
+      originalWidth: 480,
+      originalHeight: 270,
+      rotation,
+      crop: { x: 60, y: 30, width: 300, height: 180 },
+      zIndex: 0,
+    });
+    const axis = {
+      x: Math.cos((rotation * Math.PI) / 180),
+      y: Math.sin((rotation * Math.PI) / 180),
+    };
+    const along = (point: { x: number; y: number }, distance: number) => ({
+      x: point.x + axis.x * distance,
+      y: point.y + axis.y * distance,
+    });
+    async function rightHandle() {
+      const handle = (await expectCropMode(page)).cropHandlePoints?.['middle-right'];
+      if (!handle) {
+        throw new Error('Expected a crop right handle.');
+      }
+      return handle;
+    }
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-rotated-snap.json');
+    await setCanvasTestHooksEnabled(page, false);
+    await doubleClickItem(page, 'crop-rotated-snap-image');
+
+    // Out past the image edge (120 away) by 30.
+    const start = await rightHandle();
+    await dragEmptyCanvas(page, start, along(start, 150));
+    expect((await expectCropMode(page)).previewItem.width).toBeGreaterThan(420);
+
+    // Back in, across the image edge, stopping 3 short of it on the inside.
+    const outside = await rightHandle();
+    await beginCanvasDrag(page, outside);
+    await movePointerToCanvasPoint(page, along(outside, -33));
+    await expect(page.getByTestId('guide-count')).toHaveText('1');
+    await expect
+      .poll(async () => (await expectCropMode(page)).previewItem.width)
+      .toBeCloseTo(420, 3);
+    await releasePointer(page);
+    await expect(page.getByTestId('guide-count')).toHaveText('0');
+
+    await clickEmptyCanvas(page, { x: 120, y: 120 });
+    const savedProject = await saveAndReadProject(page);
+    const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-rotated-snap-image',
+    ) as { crop: { x: number; width: number } } | undefined;
+    expect(savedImage?.crop.x).toBeCloseTo(60, 3);
+    expect(savedImage?.crop.width).toBeCloseTo(420, 3);
+  });
+
   test('supports full-image resize and rotate inside crop mode, and Escape cancels the session', async ({
     page,
   }) => {
