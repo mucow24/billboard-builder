@@ -12,7 +12,11 @@ a pull request: $ARGUMENTS (if empty, the PR of the current branch).
 A separate reviewer session reviews the PR and posts its findings as a PR
 comment. You fix what needs fixing and answer in a PR comment. The reviewer
 then posts a verdict: APPROVE, and you merge; or NEEDS MIKE, and you hand
-Mike the reasons. There is exactly one fix round.
+Mike the reasons. There is one round of fixes for the reviewer's findings.
+An approval covers one commit: whenever the branch changes after a verdict,
+the reviewer reviews the change and gives a new verdict (step 4a), as many
+times as that happens. Neither session is limited in how many comments it
+posts.
 
 The PR thread is the record. Both sessions post from Mike's GitHub account,
 so the comment headers below are how readers tell them apart; use them
@@ -53,8 +57,11 @@ exactly.
      > `.claude/skills/start-review/reviewer-prompt.md` as it is on main: run
      > `git fetch origin`, then
      > `git show origin/main:.claude/skills/start-review/reviewer-prompt.md`, and follow
-     > it exactly. You will get a message in this session when the author
-     > has responded to your review.
+     > it exactly. (In Git Bash that argument is rewritten as a path and
+     > the command fails: run it in PowerShell, or put
+     > `MSYS_NO_PATHCONV=1` in front of it.) You will get a message in
+     > this session when the author has responded to your review, and
+     > again whenever the branch changes after your verdict.
 
    - `background`:
 
@@ -124,12 +131,14 @@ anything but a clean APPROVE, it goes to Mike.
 
 ## 4. Merge on approval
 
-Merge only when every one of these holds. If one does not, do not fix it
-up and try again; go to step 5 and say which one failed.
+Merge only when every one of these holds. If the SHA does not match, go
+to step 4a. If one of the others does not hold, do not fix it up and try
+again; go to step 5 and say which one failed.
 
 - The verdict comment is the newest reviewer comment and its author is the
   PR's author.
-- The SHA in `APPROVE @ <sha>` equals the PR's current `headRefOid`.
+- The SHA in `APPROVE @ <sha>` equals the PR's current `headRefOid`. Never
+  merge on an approval of an older commit.
 - `gh pr diff <number> --name-only` lists nothing under `.github/`,
   `.githooks/` or `.claude/`, and none of `CLAUDE.md`, `package.json`,
   `package-lock.json` or `scripts/preflight*`. (The reviewer escalates
@@ -151,10 +160,35 @@ Check `gh pr view <number> --json state`:
 
 - `MERGED` → stage `Merged`, tell Mike, archive the reviewer session.
 - still `OPEN` → stage `Waiting for CI`. Tell Mike that the PR is approved
-  and will merge by itself when CI passes, and end your turn. Push nothing
-  more to the branch. If you are woken by a CI failure, turn auto-merge off
-  (`gh pr merge <number> --disable-auto`) and go to step 5: a fix would
-  need a review the protocol does not have.
+  and will merge by itself when CI passes, and end your turn. If you are
+  woken because CI failed or main now conflicts, that is step 4a.
+
+## 4a. The head moved after a verdict
+
+This applies whenever the branch gets a new commit after the reviewer's
+verdict: main was merged in to resolve a conflict, CI needed a fix, or
+anything else. Do not ask Mike whether to re-review or merge; the answer is
+always to re-review.
+
+1. Turn auto-merge off if it is on: `gh pr merge <number> --disable-auto`.
+2. Make the change if it is not made yet. Bring main in with a merge, never
+   a rebase, and never force-push. Keep it to what is needed.
+3. Push, then post:
+
+   ```
+   ## 🤖 Author: head moved
+   Approved at `<approved sha>`, head is now `<full head sha>`
+
+   <why it moved; for a merge of main, each conflicted file and how you
+   resolved it; for a fix, what failed and what changed>
+   ```
+
+4. Message the reviewer session: `Head moved on PR <number> after your
+   verdict: <comment url>. Approved <old sha>, head is now <new sha>.
+   Please review the change and post a new verdict.`
+5. Stage: `Waiting for verdict`. Tell Mike what moved and that it has gone
+   back to the reviewer, and end your turn. The new verdict is handled as
+   in step 3. Repeat this step as often as the head moves.
 
 ## 5. Needs Mike
 
