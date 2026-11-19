@@ -410,6 +410,72 @@ test.describe('editor image crop', () => {
     });
   });
 
+  test('a rotated crop edge snaps to the image edge when dragged back in across it', async ({
+    page,
+  }) => {
+    const rotation = 25;
+    // A 480 x 270 image shown at scale 1 through a 300 x 180 frame: the image's
+    // right edge is 120 beyond the frame's right edge, along the frame's x axis.
+    // (Large, so that at the fitted zoom the handles do not overlap.)
+    const image = createImageFixture({
+      id: 'crop-rotated-snap-image',
+      name: 'Crop Rotated Snap Image',
+      x: 520,
+      y: 320,
+      width: 300,
+      height: 180,
+      originalWidth: 480,
+      originalHeight: 270,
+      rotation,
+      crop: { x: 60, y: 30, width: 300, height: 180 },
+      zIndex: 0,
+    });
+    const axis = {
+      x: Math.cos((rotation * Math.PI) / 180),
+      y: Math.sin((rotation * Math.PI) / 180),
+    };
+    const along = (point: { x: number; y: number }, distance: number) => ({
+      x: point.x + axis.x * distance,
+      y: point.y + axis.y * distance,
+    });
+    async function rightHandle() {
+      const handle = (await expectCropMode(page)).cropHandlePoints?.['middle-right'];
+      if (!handle) {
+        throw new Error('Expected a crop right handle.');
+      }
+      return handle;
+    }
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-rotated-snap.json');
+    await setCanvasTestHooksEnabled(page, false);
+    await doubleClickItem(page, 'crop-rotated-snap-image');
+
+    // Out past the image edge (120 away) by 30.
+    const start = await rightHandle();
+    await dragEmptyCanvas(page, start, along(start, 150));
+    expect((await expectCropMode(page)).previewItem.width).toBeGreaterThan(420);
+
+    // Back in, across the image edge, stopping 3 short of it on the inside.
+    const outside = await rightHandle();
+    await beginCanvasDrag(page, outside);
+    await movePointerToCanvasPoint(page, along(outside, -33));
+    await expect(page.getByTestId('guide-count')).toHaveText('1');
+    await expect
+      .poll(async () => (await expectCropMode(page)).previewItem.width)
+      .toBeCloseTo(420, 3);
+    await releasePointer(page);
+    await expect(page.getByTestId('guide-count')).toHaveText('0');
+
+    await clickEmptyCanvas(page, { x: 120, y: 120 });
+    const savedProject = await saveAndReadProject(page);
+    const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-rotated-snap-image',
+    ) as { crop: { x: number; width: number } } | undefined;
+    expect(savedImage?.crop.x).toBeCloseTo(60, 3);
+    expect(savedImage?.crop.width).toBeCloseTo(420, 3);
+  });
+
   test('dragging the whole picture in crop mode snaps to guides, and ctrl-drag disables snapping', async ({
     page,
   }) => {
@@ -681,7 +747,7 @@ test.describe('editor image crop', () => {
   // The Reset crop tests use boxes of 320 x 360 and up: at the fitted zoom,
   // about 28%, a smaller box's handles cover its middle, so a drag there
   // would crop instead of pan.
-  test('IC-17 Reset crop undoes a crop-mode pan and zoom, keeps the box, and is one undo step', async ({
+  test('IC-18 Reset crop undoes a crop-mode pan and zoom, keeps the box, and is one undo step', async ({
     page,
   }) => {
     // Placed, then moved, scaled up 4x and rotated on the canvas, but not
@@ -750,7 +816,7 @@ test.describe('editor image crop', () => {
     });
   });
 
-  test('IC-16 Reset crop after cutting with a crop handle grows the box back without stretching the image', async ({
+  test('IC-17 Reset crop after cutting with a crop handle grows the box back without stretching the image', async ({
     page,
   }) => {
     // The whole 160 x 90 image fills its 640 x 360 box: not cropped.
@@ -804,7 +870,7 @@ test.describe('editor image crop', () => {
     expect(reset.sourceTransform.height).toBeCloseTo(360, 6);
   });
 
-  test('IC-18 Reset crop in crop mode resets the open crop, and committing keeps the reset', async ({
+  test('IC-19 Reset crop in crop mode resets the open crop, and committing keeps the reset', async ({
     page,
   }) => {
     // Cut to its left half: a 320 x 360 box showing half of the image, drawn
@@ -856,7 +922,7 @@ test.describe('editor image crop', () => {
     expect(committed.sourceTransform.x).toBeGreaterThan(20);
   });
 
-  test('IC-19 an inspector edit made in crop mode shows at once and survives the commit', async ({
+  test('IC-20 an inspector edit made in crop mode shows at once and survives the commit', async ({
     page,
   }) => {
     const image = createImageFixture({

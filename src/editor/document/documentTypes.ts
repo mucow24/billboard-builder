@@ -381,6 +381,12 @@ export interface UploadedFont {
 export interface GuideLine {
   orientation: 'vertical' | 'horizontal';
   position: number;
+  /**
+   * When set, `orientation` and `position` are in axes that start at `origin`
+   * (stage coordinates) and are turned by `rotation` degrees, so the guide is
+   * drawn slanted. Unset: stage axes.
+   */
+  frame?: { origin: { x: number; y: number }; rotation: number };
 }
 
 export interface SnapRect {
