@@ -369,12 +369,7 @@ test.describe('text outline on the canvas', () => {
       expect
         .soft(Math.max(...(report.edgesOffBy ?? [NaN])), `${report.id}: SVG ink edges off by ${report.edgesOffBy} px`)
         .toBeLessThanOrEqual(1);
-      // The canvas draws the outline around the glyphs as the browser filled
-      // them: grid-fitted, and a fragment on whole texels. The SVG has the
-      // contours where the layout puts them. A row of an edge can fall either way.
-      expect
-        .soft(report.disagree, `${report.id}: pixels inked in only one of SVG and canvas`)
-        .toBeLessThanOrEqual(40);
+      expect.soft(report.disagree, `${report.id}: pixels inked in only one of SVG and canvas`).toBe(0);
       // The canvas places a fragment on whole texels, the SVG where the layout
       // has it: a sliver between two paints can fall either way.
       expect.soft(report.colourOff, `${report.id}: pixels painted another colour in the SVG`).toBeLessThanOrEqual(40);
@@ -475,7 +470,7 @@ test.describe('shadow of text with tags', () => {
  * the edge of the bold shape alone, which a see-through fill shows: across the
  * two stems of an "H" there are four bands of outline and nothing between.
  */
-test.describe('outline around the glyphs as they are filled', () => {
+test.describe('outline of faked bold', () => {
   const STROKE_WIDTH = 4;
 
   test('is one line around the bold shape, on the canvas and in the SVG', async ({ page }) => {
@@ -564,87 +559,6 @@ test.describe('outline around the glyphs as they are filled', () => {
           .soft(Math.abs(band - STROKE_WIDTH), `${name}: a band of the outline is ${band} px wide`)
           .toBeLessThanOrEqual(1);
       }
-    }
-  });
-
-  /**
-   * Below a certain size the browser grid-fits filled glyphs, and a stroke of
-   * its own would not: around this "C" it sat 1.8 px lower than the fill. The
-   * outline is drawn around the fill as it is, so as much of it shows above
-   * every stem as below.
-   */
-  test('sits on the glyphs as the browser fills them', async ({ page }) => {
-    const WIDTH = 6;
-    await openFreshEditor(page);
-    await waitForBundledFonts(page);
-
-    await uploadProject(page, {
-      ...createProjectDocument([
-        createTextFixture({
-          id: 'grid-fitted-outline',
-          name: 'grid-fitted outline',
-          zIndex: 1,
-          text: 'C',
-          fontFamily: 'Poiret One',
-          fontSize: 150,
-          fill: FILL,
-          x: 40,
-          y: 40,
-          width: 320,
-          height: 240,
-          stroke: STROKE,
-          strokeWidth: WIDTH,
-        }),
-      ]),
-      canvas: { width: 400, height: 320 },
-    });
-    const download = await captureDownload(page, async () => {
-      await clickToolbarPopoverItem(page, 'Export', 'PNG');
-    });
-    const png = await fs.readFile(await download.path());
-    await fs.writeFile(test.info().outputPath('grid-fitted.png'), png);
-
-    // Down the middle of the glyph, through its top and bottom stems: how much
-    // outline shows in each band of it, by the coverage it adds up to.
-    const bands = await page.evaluate(async (base64) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${base64}`;
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const context = canvas.getContext('2d', { willReadFrequently: true })!;
-      context.drawImage(image, 0, 0);
-      const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-      let left = width;
-      let right = 0;
-      for (let at = 0; at < data.length; at += 4) {
-        if (data[at + 3] < 128) continue;
-        const x = (at / 4) % width;
-        left = Math.min(left, x);
-        right = Math.max(right, x);
-      }
-      const x = Math.round((left + right) / 2);
-      const found: number[] = [];
-      let band = 0;
-      for (let y = 0; y < height; y += 1) {
-        const at = (y * width + x) * 4;
-        // Red where the outline shows, white where the fill covers it.
-        const outline = (data[at + 3] / 255) * (1 - data[at + 1] / 255);
-        if (outline > 0.02) band += outline;
-        else if (band > 0) {
-          found.push(band);
-          band = 0;
-        }
-      }
-      return found;
-    }, png.toString('base64'));
-
-    expect(bands, `bands of outline above and below the two stems: ${bands}`).toHaveLength(4);
-    for (const band of bands) {
-      expect
-        .soft(Math.abs(band - WIDTH / 2), `${band} px of the outline shows beside a stem, not ${WIDTH / 2}`)
-        .toBeLessThanOrEqual(0.75);
     }
   });
 });

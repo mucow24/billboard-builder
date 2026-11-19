@@ -41,10 +41,27 @@ export interface ExportToSvgDeps {
  * any unvectorizable-text warnings for the controller's block decision.
  */
 export async function exportToSvg(doc: ProjectDocument, deps: ExportToSvgDeps): Promise<SvgExportResult> {
+  const fontOutlines = await resolveFontOutlines(collectTextItems(doc), deps);
+
+  return documentToSvg(doc, {
+    fontOutlines,
+    measurer: deps.measurer,
+    rasterizer: deps.rasterizer,
+  });
+}
+
+/**
+ * The outline fonts of `items`, the items of `textItemsOf`: every distinct font
+ * among them loaded and parsed (the only async part), as a synchronous lookup.
+ */
+export async function resolveFontOutlines(
+  items: TextCanvasItem[],
+  deps: Pick<ExportToSvgDeps, 'loadFontBytes' | 'loadFallbackFontBytes'>,
+): Promise<FontOutlineProvider> {
   const resolved = new Map<string, OutlineResult>();
   // Font variants whose fallback has been asked for, whether it came or not.
   const fallbackAsked = new Set<string>();
-  for (const item of collectTextItems(doc)) {
+  for (const item of items) {
     const key = fontVariantKey(item);
     let outline = resolved.get(key);
     if (!outline) {
@@ -70,29 +87,28 @@ export async function exportToSvg(doc: ProjectDocument, deps: ExportToSvgDeps): 
     }
   }
 
-  const fontOutlines: FontOutlineProvider = {
+  return {
     getOutlineFont: (item) => resolved.get(fontVariantKey(item)) ?? { ok: false, reason: 'no-bytes' },
   };
-
-  return documentToSvg(doc, {
-    fontOutlines,
-    measurer: deps.measurer,
-    rasterizer: deps.rasterizer,
-  });
 }
 
-/**
- * Every text item, and for one with tags (see `document/richText`) the item in
- * the style of each of its runs, with that run's text: a bold run needs the
- * family's bold file, and the emoji fallback where its own text calls for it.
- */
+/** The items of `textItemsOf` for every text item of `doc`. */
 function collectTextItems(doc: ProjectDocument): TextCanvasItem[] {
   const items: TextCanvasItem[] = [];
   visitNodes(doc.nodes, (node) => {
-    if (!isCanvasItemNode(node) || node.kind !== 'text') return;
-    const rich = parseRichText(node.text);
-    if (!rich.hasMarkup) items.push(node);
-    else items.push(...rich.runs.map((run) => ({ ...richTextRunItem(node, run), text: run.text })));
+    if (isCanvasItemNode(node) && node.kind === 'text') items.push(...textItemsOf(node));
   });
   return items;
+}
+
+/**
+ * A text item as its fonts are resolved for: itself, or for one with tags (see
+ * `document/richText`) the item in the style of each of its runs, with that
+ * run's text. A bold run needs the family's bold file, and the emoji fallback
+ * where its own text calls for it.
+ */
+export function textItemsOf(item: TextCanvasItem): TextCanvasItem[] {
+  const rich = parseRichText(item.text);
+  if (!rich.hasMarkup) return [item];
+  return rich.runs.map((run) => ({ ...richTextRunItem(item, run), text: run.text }));
 }

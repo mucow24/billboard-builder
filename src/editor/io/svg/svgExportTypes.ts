@@ -156,6 +156,27 @@ export interface SvgExportDeps {
   fontOutlines: FontOutlineProvider;
   measurer: TextMeasurer;
   rasterizer: NodeRasterizer;
+  /**
+   * Told every piece of a text item's outline as it is written (see
+   * `TextOutlineShape`). The canvas draws the outline of faked bold from these
+   * (`rendering/stage/vectorTextOutline`).
+   */
+  onTextOutline?: (shape: TextOutlineShape) => void;
+}
+
+/**
+ * One piece of the outline of a text item: the glyphs one font draws, in a
+ * plain item or in one fragment of a tagged one, in the item's own coordinates.
+ */
+export interface TextOutlineShape {
+  /** The SVG path data of the glyphs as they are drawn, smeared copies included. */
+  d: string;
+  /** The same without the copies of a smear: the glyphs at their pen positions. */
+  unsmearedD: string;
+  /** How the browser fakes the glyphs' bold, where it does (see `syntheticFontStyle`). */
+  bold: { kind: 'stroke'; width: number } | { kind: 'smear'; offsets: readonly number[] } | null;
+  /** A box that holds all of the ink of the piece and its outline. */
+  area: { x: number; y: number; width: number; height: number };
 }
 
 /**

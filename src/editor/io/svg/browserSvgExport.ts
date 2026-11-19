@@ -4,7 +4,7 @@ import { defaultUploadedFontPersistenceService } from '../../persistence/uploade
 import { createCanvasTextMeasurer } from './canvasTextMeasurer';
 import { createDocumentFontLoader, createFallbackFontLoader, type FontByteLoaders } from './documentFontBytes';
 import { createGeneratorRasterizer } from './generatorRasterizer';
-import { exportToSvg } from './exportToSvg';
+import { exportToSvg, type ExportToSvgDeps } from './exportToSvg';
 import type { SvgExportResult } from './svgExportTypes';
 
 /**
@@ -14,6 +14,21 @@ import type { SvgExportResult } from './svgExportTypes';
  * the SVG and any block+warn warnings.
  */
 export function runSvgExport(doc: ProjectDocument): Promise<SvgExportResult> {
+  return exportToSvg(doc, {
+    ...browserFontDeps(doc.fonts),
+    measurer: createCanvasTextMeasurer(),
+    rasterizer: createGeneratorRasterizer(),
+  });
+}
+
+/**
+ * How font files are found and read in the browser, for `exportToSvg` and
+ * `resolveFontOutlines`: `fonts` are the document's font references, which say
+ * which families have a file at all.
+ */
+export function browserFontDeps(
+  fonts: ProjectDocument['fonts'],
+): Pick<ExportToSvgDeps, 'loadFontBytes' | 'loadFallbackFontBytes'> {
   const registeredFonts = listRegisteredFonts();
   const loaders: FontByteLoaders = {
     loadBundledBytes: async (sourceName) => {
@@ -28,10 +43,8 @@ export function runSvgExport(doc: ProjectDocument): Promise<SvgExportResult> {
     },
   };
 
-  return exportToSvg(doc, {
-    loadFontBytes: createDocumentFontLoader(doc, registeredFonts, loaders),
+  return {
+    loadFontBytes: createDocumentFontLoader({ fonts }, registeredFonts, loaders),
     loadFallbackFontBytes: createFallbackFontLoader(registeredFonts, loaders),
-    measurer: createCanvasTextMeasurer(),
-    rasterizer: createGeneratorRasterizer(),
-  });
+  };
 }

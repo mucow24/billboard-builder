@@ -47,29 +47,3 @@ export function clampRasterResolution(
   const cap = safeMax / Math.max(1, itemDimensionPx);
   return Math.max(MIN_RESOLUTION, Math.min(requested, cap));
 }
-
-// The outline of a text and the shape its shadow is cast from are worked out
-// on the main thread, texel by texel (`rendering/alphaOutline`), from an image
-// of the filled text. The time that takes goes by the number of texels: about
-// 30 ns each for a line of glyphs, measured in Chromium in November 2026, so
-// 100 ms for the 4 million here (the browser's own stroke of the same text
-// took under 10 ms). Past this budget the image is rasterised at a lower
-// resolution and shown scaled up, so the outline turns soft at deep zoom
-// before the fill does. Under it, outline and fill are rasterised at one
-// resolution, texel for texel.
-export const OUTLINE_TEXEL_BUDGET = 4_000_000;
-
-/**
- * The resolution to rasterise an image `widthPx` by `heightPx` at so that it
- * has no more than `budget` texels: `requested` where that fits.
- */
-export function clampResolutionToTexelBudget(
-  requested: number,
-  widthPx: number,
-  heightPx: number,
-  budget: number = OUTLINE_TEXEL_BUDGET,
-): number {
-  const area = Math.max(1, widthPx) * Math.max(1, heightPx);
-  const cap = Math.sqrt(Math.max(1, budget) / area);
-  return Math.max(MIN_RESOLUTION, Math.min(requested, cap));
-}

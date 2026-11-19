@@ -7,26 +7,10 @@
  * round join reaches exactly half the stroke past the glyph, which bounds the
  * room the stroke needs; a mitered one reaches several times as far at the
  * sharp corners of letters such as "M" and "V".
- *
- * The canvas does not draw it with the 2D canvas's `strokeText`, which gets
- * two things wrong (measured in Chromium on Windows, November 2026):
- *
- * - Below a certain size the browser grid-fits filled glyphs and not stroked
- *   ones, so the stroke does not sit on the fill: a filled 150 px "C" of
- *   Poiret One is drawn 1.8 px higher than its own outline.
- * - Where a family has no bold file the browser fakes one by growing the
- *   glyphs, and the path it strokes then holds the regular outline and both
- *   edges of the growth: rings inside every stem, which show wherever the fill
- *   is see-through. (Firefox fakes bold by smearing the glyph sideways, and
- *   strokes every copy.)
- *
- * So the outline is worked out from the image of the filled text
- * (`alphaOutline`, `stage/textOutlineImage`): a band around the edge of the
- * glyphs exactly as the layer shows them. The SVG export strokes the glyphs'
- * contours themselves, which have neither problem (`io/svg/svgText`).
  */
 import { splitColorAlpha } from '../generators/colorUtils';
 import type { TextCanvasItem } from '../document/documentTypes';
+import { snapPaddingToTexels } from './textInkOverhang';
 
 export const TEXT_STROKE_JOIN = 'round';
 
@@ -53,4 +37,33 @@ export function textStrokeOf(
   const { alpha, color } = splitColorAlpha(item.stroke);
   if (!(alpha > 0)) return null;
   return { width: item.strokeWidth, color, alpha };
+}
+
+/**
+ * Where a Pixi text with a stroke goes so that its glyphs land on those of the
+ * same text without one.
+ *
+ * Pixi draws a stroked text half the stroke further right and down inside its
+ * texture, so the text is moved back by `offset` on both axes. That alone would
+ * leave the glyphs between the texels the unstroked text has them on. Its
+ * `padding` is therefore chosen so that padding and half the stroke together
+ * come to whole blocks of texels (see `snapPaddingToTexels`): the stroke is
+ * then rasterised around glyphs that sit texel for texel where the fill's do.
+ *
+ * `inkRoom` is the room the stroked text needs as padding
+ * (`measureTextRasterPadding`), `resolution` the texels per px it is
+ * rasterised at.
+ */
+export function strokedTextPlacement(
+  inkRoom: number,
+  strokeWidth: number,
+  resolution: number,
+): { padding: number; offset: number } {
+  const halfStroke = strokeWidth > 0 && Number.isFinite(strokeWidth) ? strokeWidth / 2 : 0;
+  if (halfStroke === 0) return { padding: snapPaddingToTexels(inkRoom, resolution), offset: 0 };
+  const room = Number.isFinite(inkRoom) ? Math.max(0, inkRoom) : 0;
+  return {
+    padding: snapPaddingToTexels(room + halfStroke, resolution) - halfStroke,
+    offset: -halfStroke,
+  };
 }

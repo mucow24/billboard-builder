@@ -4,7 +4,7 @@ import { createDefaultProjectDocument, createTextItem } from '../../document/doc
 import type { TextCanvasItem } from '../../document/documentTypes';
 import { fakeMeasurer, fakeOutlineFont, makeSvgDeps } from '../../../test/svgExportFakes';
 import { documentToSvg } from './documentToSvg';
-import type { GlyphPathStyle, SyntheticFontStyle, TextMeasurer } from './svgExportTypes';
+import type { GlyphPathStyle, SyntheticFontStyle, TextMeasurer, TextOutlineShape } from './svgExportTypes';
 
 /**
  * The outline of a text layer as `svgText` writes it. That it looks like the
@@ -160,6 +160,54 @@ describe('text with an outline', () => {
       const outline = pathTags(svg.replace(/<mask.*?<\/mask>/gs, '')).find(isOutline);
       expect(outline).toContain('stroke-width="8"');
       expect(outline).toContain('mask="url(#outline-layer)"');
+    });
+  });
+
+  // The canvas draws the outline of faked bold from these (`vectorTextOutline`).
+  describe('telling the pieces of the outline', () => {
+    const shapesOf = (
+      overrides: Partial<TextCanvasItem>,
+      synthetic?: SyntheticFontStyle,
+      measurer: TextMeasurer = fakeMeasurer,
+    ): TextOutlineShape[] => {
+      const shapes: TextOutlineShape[] = [];
+      const item = createTextItem({ id: 'layer', text: 'AB', fontSize: 64, ...overrides });
+      documentToSvg(
+        { ...createDefaultProjectDocument(), nodes: [item] },
+        {
+          ...makeSvgDeps({
+            fontOutlines: { getOutlineFont: () => ({ ok: true, font: fakeOutlineFont, synthetic }) },
+            measurer,
+          }),
+          onTextOutline: (shape) => shapes.push(shape),
+        },
+      );
+      return shapes;
+    };
+
+    it('tells nothing for a text without an outline', () => {
+      expect(shapesOf({ stroke: '#ff0000ff', strokeWidth: 0 })).toEqual([]);
+    });
+
+    it('tells the stroked glyphs, with no bold where none is faked', () => {
+      const [shape, ...rest] = shapesOf(OUTLINED);
+      expect(rest).toEqual([]);
+      expect(shape.bold).toBeNull();
+      expect(shape.d).toBe(pathData(pathTags(exportText(OUTLINED))[0]));
+      expect(shape.unsmearedD).toBe(shape.d);
+      expect(shape.area.width).toBeGreaterThan(0);
+    });
+
+    it('tells how bold is faked, whatever the fill', () => {
+      const [grown] = shapesOf({ ...OUTLINED, fill: '#336699' }, { bold: true, italic: false });
+      expect(grown.bold).toEqual({ kind: 'stroke', width: 2 });
+
+      const smearing: TextMeasurer = { ...fakeMeasurer, syntheticBoldAdvance: () => 2 };
+      const [smeared] = shapesOf(OUTLINED, { bold: true, italic: false }, smearing);
+      expect(smeared.bold?.kind).toBe('smear');
+      // Every copy is in the path; the glyphs at their pen positions are a part of it.
+      expect(smeared.d.startsWith(smeared.unsmearedD)).toBe(false);
+      expect(smeared.d.length).toBeGreaterThan(smeared.unsmearedD.length * 2);
     });
   });
 

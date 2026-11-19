@@ -39,7 +39,7 @@ export interface FontByteLoaders {
  * Byte-load failures degrade to `bytes: null` (→ block+warn), never throw.
  */
 export function createDocumentFontLoader(
-  doc: ProjectDocument,
+  doc: Pick<ProjectDocument, 'fonts'>,
   registeredFonts: readonly UploadedFont[],
   loaders: FontByteLoaders,
 ) {
@@ -106,7 +106,7 @@ export function createFallbackFontLoader(registeredFonts: readonly UploadedFont[
  * What the browser fakes when it draws `item` with `font`, the file resolved for
  * it: whatever the canvas asks the browser for that the file is not.
  */
-function syntheticStyle(item: TextCanvasItem, font: UploadedFont): SyntheticFontStyle | undefined {
+export function syntheticStyle(item: TextCanvasItem, font: UploadedFont): SyntheticFontStyle | undefined {
   const drawn = getRenderableCombinedFontStyle(item);
   const bold = drawn.includes('bold') && font.weight !== '700';
   const italic = drawn.includes('italic') && font.style !== 'italic';

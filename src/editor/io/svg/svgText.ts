@@ -28,6 +28,7 @@ import type {
   SvgExportWarning,
   SyntheticFontStyle,
   TextMeasurer,
+  TextOutlineShape,
 } from './svgExportTypes';
 import { SYNTHETIC_OBLIQUE_SLANT, syntheticBoldFor, type SyntheticBold } from './syntheticFontStyle';
 
@@ -110,7 +111,7 @@ export function textSvg(
   const pathEls = glyphGroupElements(groups, item, fillAttr, area, defs, `bold-${item.id}`);
   // The outline goes under the fill, and the shadow is cast from both.
   const strokeEls = stroke
-    ? strokeLayer(strokeElements(groups, stroke, item, area, defs, `outline-${item.id}`), stroke)
+    ? strokeLayer(strokeElements(groups, stroke, item, area, defs, `outline-${item.id}`, deps.onTextOutline), stroke)
     : '';
   const filterAttr = pushTextFilter(item, defs, area);
   return wrapItem(item, effectiveOpacity, strokeEls + pathEls.join(''), filterAttr);
@@ -305,7 +306,8 @@ function glyphGroupElements(
  * fill neither shows. Where `paint`, the colours the glyphs are filled with, is
  * see-through, the stroke is cut back to the outline by a mask
  * (`boldOutlineMask`, `smearOutlineMask`) over `area`, which has to contain
- * all of the text's ink; `maskId` is unique in the document.
+ * all of the text's ink; `maskId` is unique in the document. `onTextOutline` is
+ * told each group's glyphs (`SvgExportDeps.onTextOutline`).
  */
 function strokeElements(
   groups: GlyphGroups,
@@ -314,6 +316,7 @@ function strokeElements(
   area: Area,
   defs: string[],
   maskId: string,
+  onTextOutline?: (shape: TextOutlineShape) => void,
 ): string[] {
   const seeThrough = toSvgPaint(paint.fill).alpha < 1 || toSvgPaint(paint.secondaryFill).alpha < 1;
   return [groups.own, ...(groups.fallback ? [groups.fallback] : [])]
@@ -321,6 +324,7 @@ function strokeElements(
     .map((group) => {
       const d = group.paths.join(' ');
       const boldWidth = group.bold?.kind === 'stroke' ? group.bold.width : 0;
+      onTextOutline?.({ d, unsmearedD: group.unsmearedPaths.join(' '), bold: group.bold, area });
       let mask = '';
       if (group.bold && seeThrough) {
         const id = group === groups.own ? maskId : `${maskId}-fallback`;
@@ -592,7 +596,9 @@ function richTextSvg(
       areas.push(area);
       elements.push(...glyphGroupElements(groups, colours, fillAttr, area, defs, `bold-${fragmentId}`));
       if (stroke) {
-        strokeEls.push(...strokeElements(groups, stroke, colours, area, defs, `outline-${fragmentId}`));
+        strokeEls.push(
+          ...strokeElements(groups, stroke, colours, area, defs, `outline-${fragmentId}`, deps.onTextOutline),
+        );
       }
     }
   });
