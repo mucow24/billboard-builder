@@ -238,6 +238,44 @@ test.describe('editor shortcuts', () => {
     await expect(page.getByTestId('canvas-group-rotater')).toBeAttached();
   });
 
+  test('KB-13 toggles bold and italic on the selected text with Cmd/Ctrl+B and Cmd/Ctrl+I', async ({ page }) => {
+    const text = createTextFixture({ id: 'styled-text', x: 180, y: 180 });
+    const shape = createRectangleFixture({ id: 'plain-shape', x: 600, y: 400, zIndex: 2 });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([text, shape]));
+    await clickItem(page, 'styled-text');
+    await openPropertiesTab(page);
+    const bold = page.getByRole('button', { name: 'Bold', exact: true });
+    const italic = page.getByRole('button', { name: 'Italic', exact: true });
+    await expect(bold).toHaveAttribute('aria-pressed', 'false');
+    await expect(italic).toHaveAttribute('aria-pressed', 'false');
+
+    await page.keyboard.press(`${modifier}+B`);
+    await expect(bold).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press(`${modifier}+I`);
+    await expect(italic).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press(`${modifier}+B`);
+    await expect(bold).toHaveAttribute('aria-pressed', 'false');
+
+    await page.keyboard.press(`${modifier}+Z`);
+    await expect(bold).toHaveAttribute('aria-pressed', 'true');
+    await expect(italic).toHaveAttribute('aria-pressed', 'true');
+
+    // With the shape selected the keys change nothing and add no undo step,
+    // so the next undo takes back the italic from earlier.
+    await clickItem(page, 'plain-shape');
+    await page.keyboard.press(`${modifier}+B`);
+    await page.keyboard.press(`${modifier}+I`);
+    await page.keyboard.press(`${modifier}+Z`);
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({ id: 'styled-text', fontWeight: 'bold', fontStyle: 'normal' }),
+      expect.objectContaining({ id: 'plain-shape', kind: 'rectangle' }),
+    ]);
+  });
+
   test('nudges, duplicates, deletes, undoes, and redoes grouped nodes as whole subtrees', async ({
     page,
   }) => {

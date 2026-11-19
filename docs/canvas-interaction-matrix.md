@@ -294,6 +294,7 @@ These are first-class invariants. Drilled-in editing must not silently fall back
 | KB-10 | Keyboard | Any non-editable state | Press Cmd/Ctrl+A | All top-level nodes visibly selected | Selection becomes all top-level selectable nodes | user-flow | Cross-browser subset | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | KB-11 | Keyboard | Selection or drill-in state exists | Press Escape | Selection climbs or clears visibly | Parent selected or selection cleared | user-flow | Cross-browser subset | Covered in [e2e/editor.groups.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.groups.spec.ts), [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 | KB-12 | Keyboard | History exists | Press undo/redo shortcuts | Visible state rewinds or reapplies | History changes applied | user-flow | Cross-browser subset | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
+| KB-13 | Keyboard | Text selected, focus outside a text field | Press Cmd/Ctrl+B or Cmd/Ctrl+I | Text turns bold or italic, or back; the Properties Bold and Italic buttons follow | Every selected text item, inside selected groups too, gets the style unless all already have it, in which case all lose it; other kinds untouched; one undo step | user-flow | Chromium | Covered in [e2e/editor.shortcuts.spec.ts](/home/mikek/src/billboard-builder/e2e/editor.shortcuts.spec.ts) |
 
 ## 12. Clipboard Flows
 

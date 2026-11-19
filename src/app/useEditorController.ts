@@ -104,6 +104,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
     setMissingFontFamilies,
     setSelectionLocked,
     toggleSelectedNode,
+    toggleSelectionTextStyle,
     undo,
     ungroupSelectedNode,
     updateSelectedGroup,
@@ -238,6 +239,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
     selectAllNodes,
     setActiveTool,
     toggleInspectorTab,
+    toggleSelectionTextStyle,
     undo,
     ungroupSelectedNode,
   });

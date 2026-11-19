@@ -30,6 +30,8 @@ interface UseEditorShortcutsArgs {
   selectAllNodes: EditorStoreState['selectAllNodes'];
   setActiveTool: EditorStoreState['setActiveTool'];
   toggleInspectorTab: (tab: InspectorTab) => void;
+  /** Toggles bold or italic on the selected text (Ctrl/Cmd+B, Ctrl/Cmd+I). */
+  toggleSelectionTextStyle: EditorStoreState['toggleSelectionTextStyle'];
   undo: EditorStoreState['undo'];
   ungroupSelectedNode: EditorStoreState['ungroupSelectedNode'];
 }
@@ -49,6 +51,7 @@ export function useEditorShortcuts({
   selectAllNodes,
   setActiveTool,
   toggleInspectorTab,
+  toggleSelectionTextStyle,
   undo,
   ungroupSelectedNode,
 }: UseEditorShortcutsArgs) {
@@ -112,6 +115,23 @@ export function useEditorShortcuts({
           return;
         }
         groupSelectedNodes();
+        return;
+      }
+      // Shift and Alt are left alone: Ctrl+Shift+I opens the developer tools,
+      // and AltGr (Ctrl+Alt on Windows) types characters on some layouts.
+      if (
+        hasModifier &&
+        !isEditable &&
+        !event.shiftKey &&
+        !event.altKey &&
+        (pressedKey === 'b' || pressedKey === 'i')
+      ) {
+        // Taken even with no text selected, so Firefox never opens its
+        // bookmarks sidebar (Ctrl+B) or page info (Ctrl+I) over the editor.
+        event.preventDefault();
+        if (!event.repeat) {
+          toggleSelectionTextStyle(pressedKey === 'b' ? 'bold' : 'italic');
+        }
         return;
       }
       if (hasModifier && !isEditable && event.key === 'ArrowUp') {
@@ -268,6 +288,7 @@ export function useEditorShortcuts({
     selectAllNodes,
     setActiveTool,
     toggleInspectorTab,
+    toggleSelectionTextStyle,
     undo,
     ungroupSelectedNode,
   ]);

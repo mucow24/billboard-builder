@@ -13,6 +13,7 @@ import {
   createTextItem,
 } from '../editor/document/documentDefaults';
 import type { CanvasItem, UploadedFont } from '../editor/document/documentTypes';
+import { createGroupNode, getNodeById } from '../editor/document/sceneGraph';
 import { useEditorStore } from '../editor/state/store';
 import { useEditorShortcuts } from './useEditorShortcuts';
 import { resetEditorStore } from '../test/editorStore';
@@ -92,6 +93,7 @@ function createShortcutHarness() {
   const selectParentNode = vi.fn().mockReturnValue(false);
   const setActiveTool = vi.fn();
   const toggleInspectorTab = vi.fn();
+  const toggleSelectionTextStyle = vi.fn();
   const undo = vi.fn();
   const ungroupSelectedNode = vi.fn();
 
@@ -110,6 +112,7 @@ function createShortcutHarness() {
     selectParentNode,
     setActiveTool,
     toggleInspectorTab,
+    toggleSelectionTextStyle,
     undo,
     ungroupSelectedNode,
   };
@@ -376,6 +379,126 @@ describe('useEditorShortcuts', () => {
 
       expect(currentDocument().nodes).toHaveLength(1);
       expect(currentDocument().fonts).toEqual([]);
+    });
+  });
+
+  describe('toggling bold and italic on the real store', () => {
+    /** The shortcuts wired to the store's text-style toggle, as in the app. */
+    function renderShortcutsOnStore(overrides: Partial<Parameters<typeof useEditorShortcuts>[0]> = {}) {
+      const { toggleSelectionTextStyle } = useEditorStore.getState();
+      renderHook(() =>
+        useEditorShortcuts({ ...createShortcutHarness().args, toggleSelectionTextStyle, ...overrides }),
+      );
+    }
+
+    function currentNode(id: string) {
+      return getNodeById(useEditorStore.getState().editor.document.nodes, id);
+    }
+
+    function selectTextItem(text: CanvasItem) {
+      resetEditorStore({
+        document: { ...createDefaultProjectDocument(), nodes: [text] },
+        session: { selectedNodeIds: [text.id] },
+      });
+    }
+
+    it('toggles bold with Ctrl+B and italic with Cmd+I, one undo step each', () => {
+      selectTextItem(createTextItem({ id: 'headline', fontWeight: 'normal', fontStyle: 'normal' }));
+      renderShortcutsOnStore();
+
+      const boldUnhandled = dispatchKeyDown(document.body, { key: 'b', ctrlKey: true });
+      expect(boldUnhandled).toBe(false);
+      expect(currentNode('headline')).toMatchObject({ fontWeight: 'bold', fontStyle: 'normal' });
+
+      const italicUnhandled = dispatchKeyDown(document.body, { key: 'i', metaKey: true });
+      expect(italicUnhandled).toBe(false);
+      expect(currentNode('headline')).toMatchObject({ fontWeight: 'bold', fontStyle: 'italic' });
+
+      dispatchKeyDown(document.body, { key: 'b', ctrlKey: true });
+      expect(currentNode('headline')).toMatchObject({ fontWeight: 'normal', fontStyle: 'italic' });
+
+      useEditorStore.getState().undo();
+      expect(currentNode('headline')).toMatchObject({ fontWeight: 'bold', fontStyle: 'italic' });
+      useEditorStore.getState().undo();
+      expect(currentNode('headline')).toMatchObject({ fontWeight: 'bold', fontStyle: 'normal' });
+    });
+
+    it('bolds every selected text, inside groups too, when only some of it is bold, and leaves shapes alone', () => {
+      const boldInGroup = createTextItem({ id: 'bold-in-group', fontWeight: 'bold' });
+      const shape = createRectangleItem({ id: 'shape' });
+      const group = createGroupNode([boldInGroup, shape], 'Group');
+      const plain = createTextItem({ id: 'plain', fontWeight: 'normal' });
+      resetEditorStore({
+        document: { ...createDefaultProjectDocument(), nodes: [group, plain] },
+        session: { selectedNodeIds: [group.id, plain.id] },
+      });
+      const shapeBefore = currentNode('shape');
+      renderShortcutsOnStore();
+
+      dispatchKeyDown(document.body, { key: 'b', ctrlKey: true });
+
+      expect(currentNode('bold-in-group')).toMatchObject({ fontWeight: 'bold' });
+      expect(currentNode('plain')).toMatchObject({ fontWeight: 'bold' });
+      expect(currentNode('shape')).toEqual(shapeBefore);
+
+      useEditorStore.getState().undo();
+      expect(currentNode('plain')).toMatchObject({ fontWeight: 'normal' });
+    });
+
+    it('takes Ctrl+B and Ctrl+I from the browser even with no text selected, without changing anything', () => {
+      selectItemsInStore([createRectangleItem({ id: 'shape' })]);
+      const before = useEditorStore.getState().editor;
+      renderShortcutsOnStore();
+
+      expect(dispatchKeyDown(document.body, { key: 'b', ctrlKey: true })).toBe(false);
+      expect(dispatchKeyDown(document.body, { key: 'i', ctrlKey: true })).toBe(false);
+
+      expect(useEditorStore.getState().editor.document).toBe(before.document);
+      expect(useEditorStore.getState().editor.history).toBe(before.history);
+    });
+
+    it('toggles once while Ctrl+B is held down', () => {
+      selectTextItem(createTextItem({ id: 'headline', fontWeight: 'normal' }));
+      renderShortcutsOnStore();
+
+      dispatchKeyDown(document.body, { key: 'b', ctrlKey: true });
+      const repeatUnhandled = dispatchKeyDown(document.body, { key: 'b', ctrlKey: true, repeat: true });
+
+      expect(repeatUnhandled).toBe(false);
+      expect(currentNode('headline')).toMatchObject({ fontWeight: 'bold' });
+    });
+
+    it('leaves Ctrl+Shift+I, AltGr, unmodified keys and text fields to the browser', () => {
+      const headline = createTextItem({ id: 'headline', fontWeight: 'normal', fontStyle: 'normal' });
+      selectTextItem(headline);
+      renderShortcutsOnStore();
+      const input = document.createElement('textarea');
+      document.body.appendChild(input);
+
+      const unhandled = [
+        dispatchKeyDown(document.body, { key: 'I', ctrlKey: true, shiftKey: true }),
+        dispatchKeyDown(document.body, { key: 'b', ctrlKey: true, altKey: true }),
+        dispatchKeyDown(document.body, { key: 'b' }),
+        dispatchKeyDown(document.body, { key: 'i' }),
+        dispatchKeyDown(input, { key: 'b', ctrlKey: true }),
+        dispatchKeyDown(input, { key: 'i', metaKey: true }),
+      ];
+
+      expect(unhandled).toEqual([true, true, true, true, true, true]);
+      expect(currentNode('headline')).toEqual(headline);
+
+      input.remove();
+    });
+
+    it('does nothing while suspended', () => {
+      const headline = createTextItem({ id: 'headline', fontWeight: 'normal', fontStyle: 'normal' });
+      selectTextItem(headline);
+      renderShortcutsOnStore({ suspended: true });
+
+      dispatchKeyDown(document.body, { key: 'b', ctrlKey: true });
+      dispatchKeyDown(document.body, { key: 'i', ctrlKey: true });
+
+      expect(currentNode('headline')).toEqual(headline);
     });
   });
 
