@@ -262,14 +262,16 @@ test.describe('editor shortcuts', () => {
     await expect(bold).toHaveAttribute('aria-pressed', 'true');
     await expect(italic).toHaveAttribute('aria-pressed', 'true');
 
-    // With the shape selected the keys change nothing.
+    // With the shape selected the keys change nothing and add no undo step,
+    // so the next undo takes back the italic from earlier.
     await clickItem(page, 'plain-shape');
     await page.keyboard.press(`${modifier}+B`);
     await page.keyboard.press(`${modifier}+I`);
+    await page.keyboard.press(`${modifier}+Z`);
 
     const savedProject = await saveAndReadProject(page);
     expect(savedProject.nodes).toEqual([
-      expect.objectContaining({ id: 'styled-text', fontWeight: 'bold', fontStyle: 'italic' }),
+      expect.objectContaining({ id: 'styled-text', fontWeight: 'bold', fontStyle: 'normal' }),
       expect.objectContaining({ id: 'plain-shape', kind: 'rectangle' }),
     ]);
   });

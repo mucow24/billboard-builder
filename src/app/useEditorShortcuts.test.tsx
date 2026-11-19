@@ -93,6 +93,7 @@ function createShortcutHarness() {
   const selectParentNode = vi.fn().mockReturnValue(false);
   const setActiveTool = vi.fn();
   const toggleInspectorTab = vi.fn();
+  const toggleSelectionTextStyle = vi.fn();
   const undo = vi.fn();
   const ungroupSelectedNode = vi.fn();
 
@@ -111,6 +112,7 @@ function createShortcutHarness() {
     selectParentNode,
     setActiveTool,
     toggleInspectorTab,
+    toggleSelectionTextStyle,
     undo,
     ungroupSelectedNode,
   };
@@ -381,10 +383,11 @@ describe('useEditorShortcuts', () => {
   });
 
   describe('toggling bold and italic on the real store', () => {
+    /** The shortcuts wired to the store's text-style toggle, as in the app. */
     function renderShortcutsOnStore(overrides: Partial<Parameters<typeof useEditorShortcuts>[0]> = {}) {
-      const { applyTransaction } = useEditorStore.getState();
+      const { toggleSelectionTextStyle } = useEditorStore.getState();
       renderHook(() =>
-        useEditorShortcuts({ ...createShortcutHarness().args, applyTransaction, ...overrides }),
+        useEditorShortcuts({ ...createShortcutHarness().args, toggleSelectionTextStyle, ...overrides }),
       );
     }
 

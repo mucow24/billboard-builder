@@ -10,8 +10,7 @@ import { getFirstImageFileFromClipboardData } from '../editor/io/images';
 import { cloneCanvasNode } from '../editor/document/sceneGraph';
 import type { CanvasTool } from '../editor/document/documentTypes';
 import { useEditorStore, type EditorStoreState } from '../editor/state/store';
-import { selectSelectedItems, selectSelectedNodes } from '../editor/core/selectors';
-import { buildTextStyleToggleCommands, type TextStyleToggle } from '../editor/core/textStyleToggle';
+import { selectSelectedNodes } from '../editor/core/selectors';
 import type { InspectorTab } from '../editor/ui/inspector/types';
 
 interface UseEditorShortcutsArgs {
@@ -31,6 +30,8 @@ interface UseEditorShortcutsArgs {
   selectAllNodes: EditorStoreState['selectAllNodes'];
   setActiveTool: EditorStoreState['setActiveTool'];
   toggleInspectorTab: (tab: InspectorTab) => void;
+  /** Toggles bold or italic on the selected text (Ctrl/Cmd+B, Ctrl/Cmd+I). */
+  toggleSelectionTextStyle: EditorStoreState['toggleSelectionTextStyle'];
   undo: EditorStoreState['undo'];
   ungroupSelectedNode: EditorStoreState['ungroupSelectedNode'];
 }
@@ -50,6 +51,7 @@ export function useEditorShortcuts({
   selectAllNodes,
   setActiveTool,
   toggleInspectorTab,
+  toggleSelectionTextStyle,
   undo,
   ungroupSelectedNode,
 }: UseEditorShortcutsArgs) {
@@ -63,15 +65,6 @@ export function useEditorShortcuts({
 
     function clearSelection() {
       applyTransaction([{ family: 'selection', command: { type: 'clear_selection' } }]);
-    }
-
-    /** Ctrl/Cmd+B and +I: toggles the style on the selected text, as one undo step. */
-    function toggleSelectedTextStyle(style: TextStyleToggle) {
-      const { editor } = useEditorStore.getState();
-      const commands = buildTextStyleToggleCommands(selectSelectedItems(editor.document, editor), style);
-      if (commands.length > 0) {
-        applyTransaction(commands.map((command) => ({ family: 'document' as const, command })));
-      }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -137,7 +130,7 @@ export function useEditorShortcuts({
         // bookmarks sidebar (Ctrl+B) or page info (Ctrl+I) over the editor.
         event.preventDefault();
         if (!event.repeat) {
-          toggleSelectedTextStyle(pressedKey === 'b' ? 'bold' : 'italic');
+          toggleSelectionTextStyle(pressedKey === 'b' ? 'bold' : 'italic');
         }
         return;
       }
@@ -295,6 +288,7 @@ export function useEditorShortcuts({
     selectAllNodes,
     setActiveTool,
     toggleInspectorTab,
+    toggleSelectionTextStyle,
     undo,
     ungroupSelectedNode,
   ]);
