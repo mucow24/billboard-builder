@@ -329,8 +329,97 @@ describe('selectionInspectorModel', () => {
       'Opacity',
       'Tint color',
       'Tint strength',
+      'Reset crop',
     ]);
     expect(labelsOf('shadow')).toEqual(['Opacity', 'Color', 'Blur Radius', 'Offset X', 'Offset Y']);
+  });
+
+  describe('Reset crop', () => {
+    const createImage = () => ({
+      ...createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+      }),
+      width: 160,
+      height: 90,
+      sourceTransform: { x: 0, y: 0, width: 160, height: 90, rotation: 0 },
+    });
+    const resetCropField = (items: ReturnType<typeof createImage>[]) =>
+      buildSelectionInspectorSections(items, buildInspectorEnvironment([], []))
+        .flatMap((section) => section.fields)
+        .find((field) => field.descriptor.propertyKey === 'resetCrop');
+
+    it('is disabled while the image fills its box exactly', () => {
+      expect(resetCropField([createImage()])?.disabled).toBe(true);
+      // Resizing leaves rounding dust behind, which is not a crop.
+      const resized = createImage();
+      resized.sourceTransform = { x: 0.004, y: -0.004, width: 160.004, height: 90, rotation: 0 };
+      expect(resetCropField([resized])?.disabled).toBe(true);
+    });
+
+    it('squeezes the whole image into the box it was cropped to, leaving the box where it is', () => {
+      // Cropped from the right to half the width: only the left half shows.
+      const cropped = {
+        ...createImage(),
+        x: 40,
+        y: 30,
+        width: 80,
+        rotation: 15,
+        crop: { x: 0, y: 0, width: 80, height: 90 },
+      };
+      const field = resetCropField([cropped]);
+
+      expect(field?.disabled).toBe(false);
+      expect(field?.descriptor.buildChange({ item: cropped }, true as never)).toEqual({
+        crop: { x: 0, y: 0, width: 160, height: 90 },
+        sourceTransform: { x: 0, y: 0, width: 80, height: 90, rotation: 0 },
+      });
+      const reset = {
+        ...cropped,
+        sourceTransform: { x: 0, y: 0, width: 80, height: 90, rotation: 0 },
+      };
+      expect(resetCropField([reset])?.disabled).toBe(true);
+    });
+
+    it('counts a picture moved, zoomed or shrunk inside its box as cropped', () => {
+      const panned = createImage();
+      panned.sourceTransform = { ...panned.sourceTransform, x: -20 };
+      const zoomed = createImage();
+      zoomed.sourceTransform = { x: -80, y: -45, width: 320, height: 180, rotation: 0 };
+      // Smaller than the box: nothing is cut off, but the box has empty space.
+      const shrunk = createImage();
+      shrunk.sourceTransform = { x: 40, y: 0, width: 80, height: 90, rotation: 0 };
+
+      for (const item of [panned, zoomed, shrunk]) {
+        const field = resetCropField([item]);
+        expect(field?.disabled).toBe(false);
+        expect(field?.descriptor.buildChange({ item }, true as never)).toEqual({
+          crop: { x: 0, y: 0, width: 160, height: 90 },
+          sourceTransform: { x: 0, y: 0, width: 160, height: 90, rotation: 0 },
+        });
+      }
+    });
+
+    it('fills the box as drawn when the image is scaled by percentage', () => {
+      const scaled = { ...createImage(), scaleX: 0.5, scaleY: 2 };
+      scaled.sourceTransform = { x: -10, y: 0, width: 100, height: 180, rotation: 0 };
+
+      expect(resetCropField([scaled])?.descriptor.buildChange({ item: scaled }, true as never)).toEqual({
+        crop: { x: 0, y: 0, width: 160, height: 90 },
+        sourceTransform: { x: 0, y: 0, width: 80, height: 180, rotation: 0 },
+      });
+    });
+
+    it('with several images selected, is enabled if any is cropped and leaves the others alone', () => {
+      const uncropped = createImage();
+      const cropped = { ...createImage(), width: 80 };
+      const field = resetCropField([uncropped, cropped]);
+
+      expect(field?.disabled).toBe(false);
+      expect(field?.descriptor.buildChange({ item: uncropped }, true as never)).toEqual({});
+    });
   });
 
   it('gives every property a tooltip, for every kind of item', () => {
