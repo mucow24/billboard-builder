@@ -24,6 +24,9 @@ function clamp(value: number, min: number, max: number): number {
 // the crop maths, not a crop anyone made.
 const UNCROPPED_TOLERANCE = 0.001;
 
+// Guards the reset's division against a degenerate, zero-sized image.
+const MIN_IMAGE_SIZE = 0.0001;
+
 /**
  * True when the whole image exactly fills its box: not moved, zoomed,
  * stretched or turned inside it. Such an image has no crop to reset.
@@ -40,21 +43,138 @@ export function isImageUncropped(item: ImageCanvasItem): boolean {
 }
 
 /**
- * Undoes every crop-mode edit: the whole image fills its box again, unmoved,
- * unturned and sized to the box. The box itself (its place, size, scale and
- * angle on the canvas) stays as it is.
+ * Undoes every crop-mode edit: the whole image fills its box again, unmoved
+ * and unturned, and is never stretched to do it. It keeps its proportions as
+ * last drawn (so a stretch made outside crop mode stays) and takes the
+ * smallest size that covers the box.
+ *
+ * After a pan, zoom or turn the box is left as it is. Where the box's
+ * proportions no longer match the image's, as after dragging a crop edge,
+ * the box grows to the image. It keeps its corner, scale and angle, so it
+ * grows to the right and down (it turns about its top-left corner).
  */
 export function buildImageCropResetChanges(
   item: ImageCanvasItem,
 ): Partial<ImageCanvasItem> {
+  const st = item.sourceTransform;
+  const boxWidth = item.width * item.scaleX;
+  const boxHeight = item.height * item.scaleY;
+  const scale = Math.max(
+    boxWidth / Math.max(st.width, MIN_IMAGE_SIZE),
+    boxHeight / Math.max(st.height, MIN_IMAGE_SIZE),
+  );
+  // Keep the box exactly as it is along a side the image already spans, so
+  // rounding does not nudge it.
+  const keepsWidth = Math.abs(st.width * scale - boxWidth) < UNCROPPED_TOLERANCE;
+  const keepsHeight = Math.abs(st.height * scale - boxHeight) < UNCROPPED_TOLERANCE;
+  const imageWidth = keepsWidth ? boxWidth : st.width * scale;
+  const imageHeight = keepsHeight ? boxHeight : st.height * scale;
+
   return {
+    width: keepsWidth ? item.width : imageWidth / item.scaleX,
+    height: keepsHeight ? item.height : imageHeight / item.scaleY,
     crop: createFullImageCropRect(item.originalWidth, item.originalHeight),
-    sourceTransform: {
-      x: 0,
-      y: 0,
-      width: item.width * item.scaleX,
-      height: item.height * item.scaleY,
-      rotation: 0,
+    sourceTransform: { x: 0, y: 0, width: imageWidth, height: imageHeight, rotation: 0 },
+  };
+}
+
+// What crop mode edits, and all a commit writes (see getCommitChanges).
+const IMAGE_GEOMETRY_KEYS = [
+  'x',
+  'y',
+  'width',
+  'height',
+  'rotation',
+  'scaleX',
+  'scaleY',
+  'crop',
+  'sourceTransform',
+] as const;
+
+type ImageGeometry = Pick<ImageCanvasItem, (typeof IMAGE_GEOMETRY_KEYS)[number]>;
+
+function pickImageGeometry(item: ImageCanvasItem): ImageGeometry {
+  return {
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
+    rotation: item.rotation,
+    scaleX: item.scaleX,
+    scaleY: item.scaleY,
+    crop: item.crop,
+    sourceTransform: item.sourceTransform,
+  };
+}
+
+// The document's copies are rebuilt on every change, so objects are compared
+// by content. Strings (an image's src can be large) are compared directly.
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) {
+    return true;
+  }
+  return (
+    typeof left === 'object' &&
+    typeof right === 'object' &&
+    left !== null &&
+    right !== null &&
+    JSON.stringify(left) === JSON.stringify(right)
+  );
+}
+
+function sameFields(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
+  return keys.every((key) => sameValue(left[key], right[key]));
+}
+
+interface CropSessionItems {
+  originalItem: ImageCanvasItem;
+  previewItem: ImageCanvasItem;
+  fullImageItem: ImageCanvasItem;
+  activeInteraction: unknown;
+}
+
+/**
+ * Keeps an open crop session in step with the document. Crop mode draws the
+ * image from its own copy, taken when it opened, and a commit writes that
+ * copy's geometry back, so a change made meanwhile by the inspector or by
+ * undo would neither show nor last. Returns:
+ *
+ * - 'restart' when the item's geometry changed (Reset crop, Dimensions,
+ *   Rotation, undo...): crop mode starts over from the document's item.
+ *   Crop-mode edits not yet committed are dropped.
+ * - a session showing the document's other settings (Brightness, Mirror...)
+ *   when only those changed, keeping the crop-mode edits in progress.
+ * - the same session when nothing changed, or while a drag is under way
+ *   (the caller checks again once it ends).
+ */
+export function syncImageCropSessionToDocument<T extends CropSessionItems>(
+  session: T,
+  documentItem: ImageCanvasItem,
+): T | 'restart' {
+  if (session.activeInteraction || documentItem === session.originalItem) {
+    return session;
+  }
+  const original = session.originalItem as unknown as Record<string, unknown>;
+  const current = documentItem as unknown as Record<string, unknown>;
+  if (!sameFields(original, current, IMAGE_GEOMETRY_KEYS)) {
+    return 'restart';
+  }
+  const allKeys = Array.from(new Set([...Object.keys(original), ...Object.keys(current)]));
+  if (sameFields(original, current, allKeys)) {
+    return session;
+  }
+  return {
+    ...session,
+    originalItem: documentItem,
+    previewItem: { ...documentItem, ...pickImageGeometry(session.previewItem) },
+    fullImageItem: {
+      ...documentItem,
+      ...pickImageGeometry(session.fullImageItem),
+      id: session.fullImageItem.id,
     },
   };
 }

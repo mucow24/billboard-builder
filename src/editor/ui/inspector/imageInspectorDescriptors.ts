@@ -143,7 +143,7 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
         selectedItems.every((item) => item.kind !== 'image' || isImageUncropped(item)),
       getValue: () => null,
       label: 'Reset crop',
-      tooltip: 'Undo all cropping: the whole image fills its box again, which stays where it is.',
+      tooltip: 'Undo all cropping: the whole image shows in its box again, unstretched. If a crop edge was moved, the box grows back to fit the image.',
       propertyKey: 'resetCrop',
       render: renderTextActionField,
       sectionKey: 'image',

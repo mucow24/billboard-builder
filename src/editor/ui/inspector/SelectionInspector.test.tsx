@@ -818,7 +818,7 @@ describe('SelectionInspector', () => {
       expect(screen.getByRole('button', { name: 'Reset crop' })).toBeDisabled();
     });
 
-    it('makes the whole image fill its box again when clicked, leaving the box alone', async () => {
+    it('shows the whole image in its box again when clicked', async () => {
       const user = userEvent.setup();
       const croppedImage = createCroppedImage('Photo');
       const onItemChange = renderImageInspector([croppedImage]);
@@ -829,7 +829,10 @@ describe('SelectionInspector', () => {
 
       await user.click(resetButton);
       expect(onItemChange).toHaveBeenCalledTimes(1);
+      // Panned and zoomed, not cut: the box keeps its size.
       expect(expectLatestChange(onItemChange, croppedImage)).toEqual({
+        width: 80,
+        height: 45,
         crop: { x: 0, y: 0, width: 160, height: 90 },
         sourceTransform: { x: 0, y: 0, width: 80, height: 45, rotation: 0 },
       });

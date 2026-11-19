@@ -9,6 +9,7 @@ import {
   isImageUncropped,
   panImageUnderCrop,
   resizeImageCrop,
+  syncImageCropSessionToDocument,
 } from './imageCropGeometry';
 import { getItemAABB } from './selectionGeometry';
 
@@ -603,62 +604,225 @@ describe('resetting an image crop', () => {
     expect(isImageUncropped(item)).toBe(false);
   });
 
+  // The 160 x 90 image starts in a 160 x 90 box at (30, 20). `drawnBox` is
+  // the box as drawn (width x scaleX, height x scaleY) after the reset.
   it.each([
     {
-      label: 'an image moved and zoomed inside its box',
+      label: 'moved and zoomed inside its box',
       change: {
         sourceTransform: { x: -35, y: -12, width: 240, height: 135, rotation: 0 },
       },
-      filledBox: { width: 160, height: 90 },
+      drawnBox: { width: 160, height: 90 },
     },
     {
-      label: 'a turned, moved image that was also turned inside its box',
+      label: 'turned on the canvas and inside its box',
       change: {
         x: 300,
         y: 140,
         rotation: 30,
         sourceTransform: { x: -20, y: -10, width: 240, height: 135, rotation: 18 },
       },
-      filledBox: { width: 160, height: 90 },
+      drawnBox: { width: 160, height: 90 },
     },
     {
-      label: 'a mirrored image turned inside its box',
+      label: 'mirrored and turned inside its box',
       change: {
         mirrorHorizontal: true,
         sourceTransform: { x: -60, y: -10, width: 200, height: 112.5, rotation: 25 },
       },
-      filledBox: { width: 160, height: 90 },
+      drawnBox: { width: 160, height: 90 },
     },
     {
-      label: 'an image whose crop box was resized in crop mode',
+      label: 'cut from the right with a crop edge',
+      change: {
+        width: 80,
+        sourceTransform: { x: 0, y: 0, width: 160, height: 90, rotation: 0 },
+      },
+      drawnBox: { width: 160, height: 90 },
+    },
+    {
+      label: 'cut from the left with a crop edge',
+      change: {
+        x: 110,
+        width: 80,
+        sourceTransform: { x: -80, y: 0, width: 160, height: 90, rotation: 0 },
+      },
+      drawnBox: { width: 160, height: 90 },
+    },
+    {
+      label: 'cut with a crop edge and zoomed',
+      change: {
+        width: 80,
+        sourceTransform: { x: -40, y: -20, width: 320, height: 180, rotation: 0 },
+      },
+      drawnBox: { width: 160, height: 90 },
+    },
+    {
+      // The stretch to 32:9 was made outside crop mode and stays.
+      label: 'stretched outside crop mode, then cut from the right',
+      change: {
+        sourceTransform: { x: 0, y: 0, width: 320, height: 90, rotation: 0 },
+      },
+      drawnBox: { width: 320, height: 90 },
+    },
+    {
+      label: 'scaled with Width % and Height %, then cropped',
       change: {
         width: 80,
         height: 45,
-        sourceTransform: { x: -20, y: -10, width: 160, height: 90, rotation: 0 },
-      },
-      filledBox: { width: 80, height: 45 },
-    },
-    {
-      label: 'a cropped image scaled since',
-      change: {
         scaleX: 1.5,
         scaleY: 2,
-        sourceTransform: { x: -30, y: -20, width: 360, height: 270, rotation: 0 },
+        sourceTransform: { x: -30, y: -20, width: 320, height: 180, rotation: 0 },
       },
-      filledBox: { width: 240, height: 180 },
+      drawnBox: { width: 160, height: 90 },
     },
-  ])('fills the box of $label with the whole image, and leaves the box alone', ({ change, filledBox }) => {
+  ])('shows all of an image $label, unstretched', ({ change, drawnBox }) => {
     const item: ImageCanvasItem = { ...createCroppableImage(), ...change };
     expect(isImageUncropped(item)).toBe(false);
 
-    const changes = buildImageCropResetChanges(item);
-    // Only what crop mode edits changes: the box keeps its place, size,
-    // scale and angle on the canvas.
-    expect(Object.keys(changes).sort()).toEqual(['crop', 'sourceTransform']);
+    const reset: ImageCanvasItem = { ...item, ...buildImageCropResetChanges(item) };
 
-    const reset: ImageCanvasItem = { ...item, ...changes };
     expect(isImageUncropped(reset)).toBe(true);
     expect(reset.crop).toEqual({ x: 0, y: 0, width: 160, height: 90 });
-    expect(reset.sourceTransform).toEqual({ x: 0, y: 0, ...filledBox, rotation: 0 });
+    // The image keeps its proportions as last drawn.
+    expect(reset.sourceTransform.width / reset.sourceTransform.height).toBeCloseTo(
+      item.sourceTransform.width / item.sourceTransform.height,
+      9,
+    );
+    expect(reset.sourceTransform).toMatchObject({ x: 0, y: 0, rotation: 0 });
+    // The box keeps its corner, angle and scale, never shrinks, and is drawn
+    // at the expected size.
+    expect(reset).toMatchObject({
+      x: item.x,
+      y: item.y,
+      rotation: item.rotation,
+      scaleX: item.scaleX,
+      scaleY: item.scaleY,
+      mirrorHorizontal: item.mirrorHorizontal,
+    });
+    expect(reset.width * reset.scaleX).toBeCloseTo(drawnBox.width, 9);
+    expect(reset.height * reset.scaleY).toBeCloseTo(drawnBox.height, 9);
+    expect(reset.width).toBeGreaterThanOrEqual(item.width);
+    expect(reset.height).toBeGreaterThanOrEqual(item.height);
+  });
+
+  it('leaves the box exactly as it is after a pan, zoom or turn', () => {
+    const item: ImageCanvasItem = {
+      ...createCroppableImage(),
+      width: 640,
+      height: 360,
+      rotation: 12,
+      // A zoom whose sides are rounded slightly differently.
+      sourceTransform: { x: -90.3, y: -41.7, width: 960.0000000001, height: 540, rotation: 7 },
+    };
+
+    const changes = buildImageCropResetChanges(item);
+
+    expect(changes.width).toBe(640);
+    expect(changes.height).toBe(360);
+    expect(changes.sourceTransform).toEqual({ x: 0, y: 0, width: 640, height: 360, rotation: 0 });
+  });
+});
+
+describe('keeping an open crop session in step with the document', () => {
+  function createSession(item: ImageCanvasItem) {
+    return {
+      originalItem: item,
+      previewItem: item,
+      fullImageItem: buildFullImageTransformItem(item),
+      activeInteraction: null as unknown,
+    };
+  }
+
+  function createCroppedImage(): ImageCanvasItem {
+    return {
+      ...createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+        x: 30,
+        y: 20,
+      }),
+      width: 80,
+      sourceTransform: { x: 0, y: 0, width: 160, height: 90, rotation: 0 },
+    };
+  }
+
+  it('keeps the session while the document item is unchanged, even as a rebuilt copy', () => {
+    const item = createCroppedImage();
+    const session = createSession(item);
+
+    expect(syncImageCropSessionToDocument(session, item)).toBe(session);
+    expect(
+      syncImageCropSessionToDocument(session, {
+        ...item,
+        crop: { ...item.crop },
+        sourceTransform: { ...item.sourceTransform },
+        shadow: { ...item.shadow },
+      }),
+    ).toBe(session);
+  });
+
+  it('starts over when the item was re-cropped, moved or resized outside crop mode', () => {
+    const item = createCroppedImage();
+    const session = createSession(item);
+
+    expect(
+      syncImageCropSessionToDocument(session, { ...item, ...buildImageCropResetChanges(item) }),
+    ).toBe('restart');
+    expect(syncImageCropSessionToDocument(session, { ...item, rotation: 20 })).toBe('restart');
+    expect(syncImageCropSessionToDocument(session, { ...item, scaleX: 2 })).toBe('restart');
+  });
+
+  it('shows other settings changed meanwhile and keeps the crop edits in progress', () => {
+    const item = createCroppedImage();
+    const panned = panImageUnderCrop({
+      baseItem: item,
+      pointerStart: { x: 50, y: 50 },
+      pointer: { x: 60, y: 55 },
+      siblingItems: [],
+      snapEnabled: false,
+      stageRect: { x: 0, y: 0, width: 1024, height: 1024 },
+    });
+    const session = {
+      ...createSession(item),
+      previewItem: panned.previewItem,
+      fullImageItem: panned.fullImageItem,
+    };
+    const brighter: ImageCanvasItem = {
+      ...item,
+      mirrorHorizontal: true,
+      adjustments: { ...item.adjustments, brightness: 140 },
+    };
+
+    const next = syncImageCropSessionToDocument(session, brighter);
+
+    if (next === 'restart') {
+      throw new Error('Expected the session to be kept.');
+    }
+    expect(next.originalItem).toBe(brighter);
+    expect(next.previewItem).toMatchObject({
+      mirrorHorizontal: true,
+      adjustments: { brightness: 140 },
+      sourceTransform: panned.previewItem.sourceTransform,
+      width: panned.previewItem.width,
+    });
+    expect(next.fullImageItem).toMatchObject({
+      id: panned.fullImageItem.id,
+      mirrorHorizontal: true,
+      adjustments: { brightness: 140 },
+      x: panned.fullImageItem.x,
+      y: panned.fullImageItem.y,
+    });
+    // Settled: the next check finds nothing to do.
+    expect(syncImageCropSessionToDocument(next, brighter)).toBe(next);
+  });
+
+  it('waits while a crop-mode drag is under way', () => {
+    const item = createCroppedImage();
+    const session = { ...createSession(item), activeInteraction: { kind: 'image-pan' } };
+
+    expect(syncImageCropSessionToDocument(session, { ...item, rotation: 20 })).toBe(session);
   });
 });
