@@ -66,3 +66,17 @@ Playwright sets from that line; setting the variable yourself has no effect.
   on. Each run rebuilds, including when only test files changed.
 - Two runs in the *same* checkout still share one `dist/` folder; do not
   overlap those.
+
+## PR Review
+
+Open every PR description with a `## Problem` section: one or two sentences
+on the problem, with no mention of the solution.
+
+`/start-review` starts a semi-automated review of the current branch's PR:
+an Opus reviewer session posts its findings as a PR comment, the author
+session fixes and responds once, and the reviewer then approves (the author
+session squash-merges) or escalates to Mike. Only run it when Mike asks.
+If Mike types `/start-review` or says "start review" and no such skill has
+loaded, read `.claude/skills/start-review/SKILL.md` and follow it.
+Both the protocol (`SKILL.md`) and the reviewer's instructions
+(`reviewer-prompt.md`) are in `.claude/skills/start-review/`.
