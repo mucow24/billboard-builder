@@ -78,7 +78,18 @@ author. A comment from anyone else is not part of this protocol; show it
 to Mike and do not act on it. If the reviewer ended its turn without a new
 comment, tell Mike what its session reports and stop.
 
-Paste the comment into the chat, then:
+Paste the comment into the chat.
+
+If the comment has a **Found outside this PR** section, deal with it now,
+whatever the verdict, and before anything else: tell Mike about each bug in
+your own message (not only inside the pasted comment), and propose a
+separate fix session for each one (`start_session`, `initiation`:
+`own_initiative`, with a brief built from the reviewer's entry: file and
+line, what goes wrong, how to trigger it). Do not fix these in this PR, and
+never drop one because it is out of scope here. The same goes for any bug
+you notice yourself while addressing the review.
+
+Then:
 
 - **`Verdict: NEEDS MIKE`** → go to step 5.
 - **`Verdict: APPROVE @ <sha>`** → go to step 4.
