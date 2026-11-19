@@ -516,7 +516,7 @@ test.describe('editor image crop', () => {
     expect(unsnappedRight).toBeLessThan(896);
   });
 
-  test('IC-21 an image at Width % 200 keeps its drawn box through a crop-mode pan, a crop-handle drag and the commit', async ({
+  test('IC-22 an image at Width % 200 keeps its drawn box through a crop-mode pan, a crop-handle drag and the commit', async ({
     page,
   }) => {
     // The 200x360 box shows a 50x90-pixel slice of the picture at 4x. At
