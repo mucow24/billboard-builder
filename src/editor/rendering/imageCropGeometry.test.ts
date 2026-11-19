@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { createImageItem, createRectangleItem } from '../document/documentDefaults';
+import type { ImageCanvasItem } from '../document/documentTypes';
 import {
   buildCroppedImagePreviewItem,
   buildFullImageTransformItem,
+  buildImageCropResetChanges,
+  isImageUncropped,
   panImageUnderCrop,
   resizeImageCrop,
 } from './imageCropGeometry';
@@ -386,5 +389,104 @@ describe('image crop geometry', () => {
         rotation: 0,
       },
     });
+  });
+});
+
+describe('resetting an image crop', () => {
+  function createCroppableImage(): ImageCanvasItem {
+    return createImageItem({
+      src: 'data:image/png;base64,AAA',
+      mimeType: 'image/png',
+      originalWidth: 160,
+      originalHeight: 90,
+      x: 30,
+      y: 20,
+    });
+  }
+
+  it('counts an image as uncropped when the whole image fills its box', () => {
+    const item = createCroppableImage();
+    expect(isImageUncropped(item)).toBe(true);
+
+    // Scaled with the box, by a resize or by Width % / Height %.
+    item.width = 80;
+    item.scaleX = 1.5;
+    item.sourceTransform = { x: 0, y: 0, width: 120, height: 90, rotation: 0 };
+    expect(isImageUncropped(item)).toBe(true);
+
+    // Rounding left over from the crop maths is not a crop.
+    item.sourceTransform = { x: 1e-9, y: -1e-9, width: 120 + 1e-9, height: 90, rotation: 1e-9 };
+    expect(isImageUncropped(item)).toBe(true);
+  });
+
+  it.each([
+    ['moved inside its box', { x: -10 }],
+    ['zoomed inside its box', { width: 200, height: 112.5 }],
+    ['cropped on one side', { width: 200 }],
+    ['turned inside its box', { rotation: 5 }],
+    ['moved by a fraction of a pixel', { y: 0.25 }],
+  ])('counts an image %s as cropped', (_label, sourceTransformChange) => {
+    const item = createCroppableImage();
+    item.sourceTransform = { ...item.sourceTransform, ...sourceTransformChange };
+    expect(isImageUncropped(item)).toBe(false);
+  });
+
+  it.each([
+    {
+      label: 'an image moved and zoomed inside its box',
+      change: {
+        sourceTransform: { x: -35, y: -12, width: 240, height: 135, rotation: 0 },
+      },
+      filledBox: { width: 160, height: 90 },
+    },
+    {
+      label: 'a turned, moved image that was also turned inside its box',
+      change: {
+        x: 300,
+        y: 140,
+        rotation: 30,
+        sourceTransform: { x: -20, y: -10, width: 240, height: 135, rotation: 18 },
+      },
+      filledBox: { width: 160, height: 90 },
+    },
+    {
+      label: 'a mirrored image turned inside its box',
+      change: {
+        mirrorHorizontal: true,
+        sourceTransform: { x: -60, y: -10, width: 200, height: 112.5, rotation: 25 },
+      },
+      filledBox: { width: 160, height: 90 },
+    },
+    {
+      label: 'an image whose crop box was resized in crop mode',
+      change: {
+        width: 80,
+        height: 45,
+        sourceTransform: { x: -20, y: -10, width: 160, height: 90, rotation: 0 },
+      },
+      filledBox: { width: 80, height: 45 },
+    },
+    {
+      label: 'a cropped image scaled since',
+      change: {
+        scaleX: 1.5,
+        scaleY: 2,
+        sourceTransform: { x: -30, y: -20, width: 360, height: 270, rotation: 0 },
+      },
+      filledBox: { width: 240, height: 180 },
+    },
+  ])('fills the box of $label with the whole image, and leaves the box alone', ({ change, filledBox }) => {
+    const item: ImageCanvasItem = { ...createCroppableImage(), ...change };
+    expect(isImageUncropped(item)).toBe(false);
+
+    const changes = buildImageCropResetChanges(item);
+    // Only what crop mode edits changes: the box keeps its place, size,
+    // scale and angle on the canvas.
+    expect(Object.keys(changes).sort()).toEqual(['crop', 'sourceTransform']);
+
+    const reset: ImageCanvasItem = { ...item, ...changes };
+    expect(isImageUncropped(reset)).toBe(true);
+    expect(reset.crop).toEqual({ x: 0, y: 0, width: 160, height: 90 });
+    expect(reset.sourceTransform).toEqual({ x: 0, y: 0, ...filledBox, rotation: 0 });
   });
 });

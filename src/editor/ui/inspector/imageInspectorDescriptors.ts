@@ -1,5 +1,10 @@
 import {
+  buildImageCropResetChanges,
+  isImageUncropped,
+} from '../../rendering/imageCropGeometry';
+import {
   renderMirrorField,
+  renderTextActionField,
 } from './selectionInspectorRenderers';
 import {
   createBooleanField,
@@ -125,6 +130,27 @@ export function createImageDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
 
       valueType: 'number',
+    }),
+    createCustomField({
+      // Images that are not cropped are left alone, so resetting a selection
+      // of several changes only the cropped ones.
+      buildChange: ({ item }) =>
+        item.kind === 'image' && !isImageUncropped(item)
+          ? buildImageCropResetChanges(item)
+          : {},
+      fieldOrder: 70,
+      getDisabled: ({ selectedItems }) =>
+        selectedItems.every((item) => item.kind !== 'image' || isImageUncropped(item)),
+      getValue: () => null,
+      label: 'Reset crop',
+      tooltip: 'Undo all cropping: the whole image fills its box again, which stays where it is.',
+      propertyKey: 'resetCrop',
+      render: renderTextActionField,
+      sectionKey: 'image',
+      sectionLabel: 'Image',
+      sectionOrder: SECTION_ORDER.image,
+
+      valueType: 'custom',
     }),
     createNumberField({
       buildChange: (_context, nextValue) => ({ opacity: nextValue }),

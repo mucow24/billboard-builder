@@ -19,6 +19,45 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+// Below this (in pixels or degrees) a difference is rounding left over from
+// the crop maths, not a crop anyone made.
+const UNCROPPED_TOLERANCE = 0.001;
+
+/**
+ * True when the whole image exactly fills its box: not moved, zoomed,
+ * stretched or turned inside it. Such an image has no crop to reset.
+ */
+export function isImageUncropped(item: ImageCanvasItem): boolean {
+  const st = item.sourceTransform;
+  return (
+    Math.abs(st.x) < UNCROPPED_TOLERANCE &&
+    Math.abs(st.y) < UNCROPPED_TOLERANCE &&
+    Math.abs(st.width - item.width * item.scaleX) < UNCROPPED_TOLERANCE &&
+    Math.abs(st.height - item.height * item.scaleY) < UNCROPPED_TOLERANCE &&
+    Math.abs(st.rotation) < UNCROPPED_TOLERANCE
+  );
+}
+
+/**
+ * Undoes every crop-mode edit: the whole image fills its box again, unmoved,
+ * unturned and sized to the box. The box itself (its place, size, scale and
+ * angle on the canvas) stays as it is.
+ */
+export function buildImageCropResetChanges(
+  item: ImageCanvasItem,
+): Partial<ImageCanvasItem> {
+  return {
+    crop: createFullImageCropRect(item.originalWidth, item.originalHeight),
+    sourceTransform: {
+      x: 0,
+      y: 0,
+      width: item.width * item.scaleX,
+      height: item.height * item.scaleY,
+      rotation: 0,
+    },
+  };
+}
+
 export function buildImagePreviewItem(
   baseItem: ImageCanvasItem,
   sourceTransform: ImageSourceTransform,
