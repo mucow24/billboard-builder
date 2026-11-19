@@ -450,6 +450,105 @@ test.describe('editor image crop', () => {
     expect(unsnappedRight).toBeLessThan(896);
   });
 
+  test('IC-21 an image at Width % 200 keeps its drawn box through a crop-mode pan, a crop-handle drag and the commit', async ({
+    page,
+  }) => {
+    // The 200x360 box shows a 50x90-pixel slice of the picture at 4x. At
+    // Width % 200 it is drawn 400x360 from (300,200), so its right edge is
+    // at x=700, and the box is big enough that, at the fitted zoom, the
+    // middle of the crop frame is clear of the crop handles.
+    const image = createImageFixture({
+      id: 'crop-scaled-image',
+      name: 'Crop Scaled Image',
+      x: 300,
+      y: 200,
+      width: 200,
+      height: 360,
+      crop: { x: 55, y: 0, width: 50, height: 90 },
+      zIndex: 0,
+    });
+    const drawnBox = { x: 300, y: 200, width: 400, height: 360 };
+    const widthPercent = page.getByRole('spinbutton', { name: 'Width %' });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createGroupedProjectDocument([image]), 'crop-scaled.json');
+    await setCanvasTestHooksEnabled(page, false);
+
+    await clickItem(page, 'crop-scaled-image');
+    await openPropertiesTab(page);
+    await page.getByRole('button', { name: 'Geometry' }).click();
+    await widthPercent.fill('200');
+    await widthPercent.press('Tab');
+    await expect
+      .poll(async () => (await readStageDebug(page)).documentItem ?? null)
+      .toMatchObject(drawnBox);
+
+    // Deselect first, so the double-click starts on an unselected image.
+    // A click on the selected image commits a zero-length drag, and that
+    // commit drops Width % on its own (a separate bug in the drag commit,
+    // outside crop mode).
+    await clickEmptyCanvas(page, { x: 120, y: 120 });
+    await doubleClickItem(page, 'crop-scaled-image');
+    let cropSession = await expectCropMode(page);
+    expect(cropSession.previewItem).toMatchObject(drawnBox);
+    expect(cropSession.crop.x).toBeCloseTo(55, 5);
+
+    await test.step('pan the picture under the crop frame', async () => {
+      // 100 px keeps every edge and the centre of the picture clear of a
+      // snap (the stage is 1024 wide).
+      const cropCenter = { x: 500, y: 380 };
+      await dragEmptyCanvas(page, cropCenter, { x: cropCenter.x + 100, y: cropCenter.y });
+
+      cropSession = await expectCropMode(page);
+      expect(cropSession.crop.x).toBeLessThan(54);
+      expect(cropSession.previewItem).toMatchObject(drawnBox);
+    });
+
+    await test.step('drag the left crop handle in; the right edge stays put', async () => {
+      const handle = cropSession.cropHandlePoints?.['middle-left'];
+      if (!handle) {
+        throw new Error('Expected a crop left handle.');
+      }
+      await dragEmptyCanvas(page, handle, { x: handle.x + 40, y: handle.y });
+
+      cropSession = await expectCropMode(page);
+      expect(cropSession.previewItem.x).toBeGreaterThan(330);
+      expect(cropSession.previewItem.x + cropSession.previewItem.width).toBeCloseTo(700, 5);
+      expect(cropSession.previewItem.height).toBeCloseTo(360, 5);
+    });
+
+    const committedLeft = cropSession.previewItem.x;
+    await test.step('double-click to commit', async () => {
+      // The crop frame takes any press within 400 ms of the pan's press as
+      // the second click of a double-click. Wait that out, so this is a
+      // double-click of its own and not one click and a stray second one.
+      await page.waitForTimeout(410);
+      await doubleClickCanvas(page, {
+        x: committedLeft + cropSession.previewItem.width / 2,
+        y: 380,
+      });
+      await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
+    });
+
+    // The box is drawn where crop mode left it, and still at 200%.
+    const documentItem = (await readStageDebug(page)).documentItem!;
+    expect(documentItem.x).toBeCloseTo(committedLeft, 5);
+    expect(documentItem.x + documentItem.width).toBeCloseTo(700, 5);
+    expect(documentItem.height).toBeCloseTo(360, 5);
+    // Selecting the image again folded the Geometry section away.
+    await page.getByRole('button', { name: 'Geometry' }).click();
+    await expect(widthPercent).toHaveValue('200');
+
+    const savedProject = await saveAndReadProject(page);
+    const savedImage = collectLeafNodes(savedProject.nodes as Array<Record<string, unknown>>).find(
+      (item) => item.id === 'crop-scaled-image',
+    ) as { x: number; width: number; height: number; scaleX: number; scaleY: number };
+    expect(savedImage.scaleX).toBe(2);
+    expect(savedImage.scaleY).toBe(1);
+    expect(savedImage.x + savedImage.width * savedImage.scaleX).toBeCloseTo(700, 5);
+    expect(savedImage.height).toBeCloseTo(360, 5);
+  });
+
   test('supports full-image resize and rotate inside crop mode, and Escape cancels the session', async ({
     page,
   }) => {

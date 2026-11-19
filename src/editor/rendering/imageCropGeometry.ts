@@ -7,6 +7,7 @@ import type {
   SnapRect,
 } from '../document/documentTypes';
 import { buildVisibleImageCropFromSourceTransform } from './imagePresentation';
+import { getCommitChanges } from './interactionSession';
 import { getItemAABB } from './selectionGeometry';
 import { buildCandidateCache, getResizeSnappedRect, getSnappedRect } from './snapping';
 import {
@@ -24,10 +25,29 @@ export function buildImagePreviewItem(
   baseItem: ImageCanvasItem,
   sourceTransform: ImageSourceTransform,
 ): ImageCanvasItem {
+  const drawnItem = bakeImageScale(baseItem);
   return {
-    ...baseItem,
-    crop: buildVisibleImageCropFromSourceTransform(baseItem, sourceTransform),
+    ...drawnItem,
+    crop: buildVisibleImageCropFromSourceTransform(drawnItem, sourceTransform),
     sourceTransform,
+  };
+}
+
+/**
+ * Crop mode works on the box as drawn. Width % and Height % in the inspector
+ * set scaleX and scaleY and leave width and height alone, so the box is drawn
+ * width * scaleX by height * scaleY, and sourceTransform is already in those
+ * drawn units. This folds the scale into width and height;
+ * buildImageCropCommitChanges gives the image its own scale back.
+ */
+export function bakeImageScale(item: ImageCanvasItem): ImageCanvasItem {
+  if (item.scaleX === 1 && item.scaleY === 1) {
+    return item;
+  }
+  return {
+    ...item,
+    width: item.width * item.scaleX,
+    height: item.height * item.scaleY,
     scaleX: 1,
     scaleY: 1,
   };
@@ -99,7 +119,6 @@ export function resizeImageCrop(params: {
   threshold?: number;
 }) {
   const {
-    baseItem,
     handle,
     pointer,
     pointerOffset = { x: 0, y: 0 },
@@ -108,6 +127,8 @@ export function resizeImageCrop(params: {
     stageRect,
     threshold,
   } = params;
+  // The edges that stay put are where the box is drawn.
+  const baseItem = bakeImageScale(params.baseItem);
   const adjustedPointer = {
     x: pointer.x - pointerOffset.x,
     y: pointer.y - pointerOffset.y,
@@ -278,5 +299,32 @@ export function panImageUnderCrop(params: {
     fullImageItem: buildFullImageTransformItem(previewItem),
     guides,
     previewItem,
+  };
+}
+
+/**
+ * The changes a crop-mode commit writes, or null when crop mode changed
+ * nothing. Crop mode works on the drawn box (see bakeImageScale), but the
+ * image keeps its own scaleX and scaleY, so its width and height are the
+ * drawn size divided by them again. A side crop mode left alone keeps its
+ * width or height exactly, without that round trip.
+ */
+export function buildImageCropCommitChanges(
+  originalItem: ImageCanvasItem,
+  previewItem: ImageCanvasItem,
+): Partial<ImageCanvasItem> | null {
+  const startItem = bakeImageScale(originalItem);
+  const changes = getCommitChanges(previewItem) as Partial<ImageCanvasItem>;
+  if (JSON.stringify(getCommitChanges(startItem)) === JSON.stringify(changes)) {
+    return null;
+  }
+  const unscaled = (drawn: number, startDrawn: number, own: number, scale: number) =>
+    drawn === startDrawn ? own : drawn / scale;
+  return {
+    ...changes,
+    width: unscaled(previewItem.width, startItem.width, originalItem.width, originalItem.scaleX),
+    height: unscaled(previewItem.height, startItem.height, originalItem.height, originalItem.scaleY),
+    scaleX: originalItem.scaleX,
+    scaleY: originalItem.scaleY,
   };
 }

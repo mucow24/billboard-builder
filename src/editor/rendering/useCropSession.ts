@@ -6,7 +6,6 @@ import {
   type ResizeHandle,
 } from './interactionGeometry';
 import {
-  getCommitChanges,
   createResizeSession,
   createRotateSession,
   type InteractionSession,
@@ -14,8 +13,10 @@ import {
   type SessionWithModifiers,
 } from './interactionSession';
 import {
+  bakeImageScale,
   buildCroppedImagePreviewItem,
   buildFullImageTransformItem,
+  buildImageCropCommitChanges,
   buildSourceTransformFromFullImageItem,
   panImageUnderCrop,
   resizeImageCrop,
@@ -108,11 +109,14 @@ export function useCropSession({
   }, []);
 
   const startCropSession = useCallback((item: ImageCanvasItem) => {
+    // The session works on the box as drawn; originalItem stays the
+    // document's item.
+    const previewItem = bakeImageScale(item);
     updateCropSession({
       itemId: item.id,
       originalItem: item,
-      previewItem: item,
-      fullImageItem: buildFullImageTransformItem(item),
+      previewItem,
+      fullImageItem: buildFullImageTransformItem(previewItem),
       crop: item.crop,
       activeInteraction: null,
     });
@@ -124,10 +128,9 @@ export function useCropSession({
       return false;
     }
     updateGuides([]);
-    const originalChanges = getCommitChanges(current.originalItem);
-    const nextChanges = getCommitChanges(current.previewItem);
-    if (JSON.stringify(originalChanges) !== JSON.stringify(nextChanges)) {
-      onUpdateItem(current.itemId, nextChanges);
+    const changes = buildImageCropCommitChanges(current.originalItem, current.previewItem);
+    if (changes) {
+      onUpdateItem(current.itemId, changes);
     }
     updateCropSession(null);
     return true;
