@@ -2,13 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { createImageItem, createRectangleItem } from '../document/documentDefaults';
 import {
+  bakeImageScale,
   buildCroppedImagePreviewItem,
   buildFullImageTransformItem,
+  buildImageCropCommitChanges,
   panImageUnderCrop,
   resizeImageCrop,
 } from './imageCropGeometry';
 import { localToStage, stageToLocal } from './interactionGeometry';
 import { getItemAABB } from './selectionGeometry';
+import { getRenderBox } from './transformGeometry';
 
 describe('image crop geometry', () => {
   it('derives the full image transform item from a cropped visible image', () => {
@@ -714,6 +717,161 @@ describe('image crop geometry', () => {
       expect(panned.guides).toEqual([]);
       expect(getItemAABB(panned.fullImageItem).x).toBeCloseTo(raw.x, 8);
       expect(getItemAABB(panned.fullImageItem).y).toBeCloseTo(raw.y, 8);
+    });
+  });
+
+  // Width % and Height % in the inspector set scaleX and scaleY, and leave
+  // width and height alone. The box is drawn at width * scaleX by
+  // height * scaleY, and sourceTransform is in those drawn units.
+  describe('an image scaled with Width % and Height %', () => {
+    const stageRect = { x: 0, y: 0, width: 400, height: 300 };
+
+    // An 80x45 box at 200%, drawn 160x90 at (30,20). The whole picture
+    // (160x90 pixels) is drawn 320x180 from (-10,0), so the box shows
+    // pixels (20,10) to (100,55).
+    function createScaledItem() {
+      const item = createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+        width: 80,
+        height: 45,
+      });
+      item.x = 30;
+      item.y = 20;
+      item.scaleX = 2;
+      item.scaleY = 2;
+      item.crop = { x: 20, y: 10, width: 80, height: 45 };
+      item.sourceTransform = { x: -40, y: -20, width: 320, height: 180, rotation: 0 };
+      return item;
+    }
+
+    it('works on the drawn box in crop mode', () => {
+      const item = createScaledItem();
+
+      expect(bakeImageScale(item)).toMatchObject({
+        x: 30,
+        y: 20,
+        width: 160,
+        height: 90,
+        scaleX: 1,
+        scaleY: 1,
+        crop: item.crop,
+        sourceTransform: item.sourceTransform,
+      });
+      const unscaled = createImageItem({
+        src: 'data:image/png;base64,AAA',
+        mimeType: 'image/png',
+        originalWidth: 160,
+        originalHeight: 90,
+      });
+      expect(bakeImageScale(unscaled)).toBe(unscaled);
+    });
+
+    it('pans the picture without changing the drawn box', () => {
+      const panned = panImageUnderCrop({
+        baseItem: createScaledItem(),
+        pointerStart: { x: 100, y: 60 },
+        pointer: { x: 110, y: 64 },
+        siblingItems: [],
+        snapEnabled: false,
+        stageRect,
+      });
+
+      expect(getRenderBox(panned.previewItem)).toEqual({ x: 30, y: 20, width: 160, height: 90 });
+      expect(panned.previewItem.sourceTransform).toEqual({
+        x: -30,
+        y: -16,
+        width: 320,
+        height: 180,
+        rotation: 0,
+      });
+      expect(panned.crop).toEqual({ x: 15, y: 8, width: 80, height: 45 });
+    });
+
+    it('keeps the far edges where they are drawn when a crop handle is dragged', () => {
+      const resized = resizeImageCrop({
+        baseItem: createScaledItem(),
+        handle: 'top-left',
+        pointer: { x: 50, y: 30 },
+        siblingItems: [],
+        snapEnabled: false,
+        stageRect,
+      });
+
+      // The right edge stays at x=190 and the bottom at y=110.
+      expect(getRenderBox(resized.previewItem)).toEqual({ x: 50, y: 30, width: 140, height: 80 });
+      expect(resized.crop).toEqual({ x: 30, y: 15, width: 70, height: 40 });
+      expect(resized.fullImageItem).toMatchObject({ x: -10, y: 0, width: 320, height: 180 });
+    });
+
+    it('resizes the whole picture without changing the drawn box', () => {
+      const preview = buildCroppedImagePreviewItem(createScaledItem(), {
+        x: -80,
+        y: -40,
+        width: 480,
+        height: 270,
+        rotation: 0,
+      });
+
+      expect(getRenderBox(preview)).toEqual({ x: 30, y: 20, width: 160, height: 90 });
+      expect(preview.crop.width).toBeCloseTo(160 / 3, 10);
+      expect(preview.crop.height).toBeCloseTo(30, 10);
+    });
+
+    it('commits a pan with the box and scale the image had', () => {
+      const item = createScaledItem();
+      const panned = panImageUnderCrop({
+        baseItem: bakeImageScale(item),
+        pointerStart: { x: 100, y: 60 },
+        pointer: { x: 110, y: 64 },
+        siblingItems: [],
+        snapEnabled: false,
+        stageRect,
+      });
+
+      expect(buildImageCropCommitChanges(item, panned.previewItem)).toEqual({
+        x: 30,
+        y: 20,
+        width: 80,
+        height: 45,
+        rotation: 0,
+        scaleX: 2,
+        scaleY: 2,
+        crop: { x: 15, y: 8, width: 80, height: 45 },
+        sourceTransform: { x: -30, y: -16, width: 320, height: 180, rotation: 0 },
+      });
+    });
+
+    it('commits a crop-handle drag as the new drawn box at the same scale', () => {
+      const item = createScaledItem();
+      const resized = resizeImageCrop({
+        baseItem: bakeImageScale(item),
+        handle: 'top-left',
+        pointer: { x: 50, y: 30 },
+        siblingItems: [],
+        snapEnabled: false,
+        stageRect,
+      });
+
+      const changes = buildImageCropCommitChanges(item, resized.previewItem);
+      expect(changes).toMatchObject({
+        x: 50,
+        y: 30,
+        width: 70,
+        height: 40,
+        scaleX: 2,
+        scaleY: 2,
+        sourceTransform: { x: -60, y: -30, width: 320, height: 180, rotation: 0 },
+      });
+      expect(getRenderBox({ ...item, ...changes })).toEqual({ x: 50, y: 30, width: 140, height: 80 });
+    });
+
+    it('commits nothing when crop mode changed nothing', () => {
+      const item = createScaledItem();
+
+      expect(buildImageCropCommitChanges(item, bakeImageScale(item))).toBeNull();
     });
   });
 });
