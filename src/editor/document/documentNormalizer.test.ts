@@ -8,6 +8,7 @@ import {
   createPolygonItem,
   createRectangleItem,
   createTextItem,
+  MIN_LINE_STROKE_WIDTH,
 } from './documentDefaults';
 import {
   normalizeProjectDocument,
@@ -282,6 +283,31 @@ describe('document normalizer', () => {
     });
     expect(normalize({ ...text, strokeWidth: -4 })).toMatchObject({ strokeWidth: 0 });
     expect(normalize({ ...text, strokeWidth: Number.NaN })).toMatchObject({ strokeWidth: 0 });
+  });
+
+  it('keeps any finite line height, zero and negative included', () => {
+    const text = createTextItem();
+    const normalize = (node: unknown) =>
+      normalizeProjectDocument({ version: 2, nodes: [node as never], fonts: [] }).nodes[0];
+
+    expect(normalize({ ...text, lineHeight: 0 })).toMatchObject({ lineHeight: 0 });
+    expect(normalize({ ...text, lineHeight: -1.5 })).toMatchObject({ lineHeight: -1.5 });
+    expect(normalize({ ...text, lineHeight: 12 })).toMatchObject({ lineHeight: 12 });
+    expect(normalize({ ...text, lineHeight: Number.NaN })).toMatchObject({ lineHeight: 1 });
+  });
+
+  it('lets a line be thinner than 1 but never 0, and a closed polygon drop its outline', () => {
+    const normalize = (node: unknown) =>
+      normalizeProjectDocument({ version: 2, nodes: [node as never], fonts: [] }).nodes[0];
+
+    expect(normalize(createLineItem({ strokeWidth: 0.5 }))).toMatchObject({ strokeWidth: 0.5 });
+    expect(normalize(createLineItem({ strokeWidth: 0 }))).toMatchObject({
+      strokeWidth: MIN_LINE_STROKE_WIDTH,
+    });
+    expect(normalize(createLineItem({ strokeWidth: -3 }))).toMatchObject({
+      strokeWidth: MIN_LINE_STROKE_WIDTH,
+    });
+    expect(normalize(createPolygonItem({ strokeWidth: 0 }))).toMatchObject({ strokeWidth: 0 });
   });
 
   it('re-derives the polygon AABB from its vertices and defaults closed/curveRadius', () => {

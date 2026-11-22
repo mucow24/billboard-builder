@@ -6,6 +6,7 @@ import { BREAKING_SPACES } from './textLineBreaking';
 import {
   inkWidthOf,
   layoutWrappedText,
+  measureWordWrappedTextBlockHeight,
   measureWordWrappedTextHeight,
   wrapLikePixi,
 } from './textMeasurement';
@@ -354,6 +355,40 @@ describe('text measurement', () => {
     const canvasElement = document.createElement('canvas');
     void canvasElement;
     expect(height).toBeGreaterThan(item.height);
+
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: originalNavigator,
+    });
+  });
+
+  it('stacks lines upwards for a negative line height, and still sizes a box at least 1 high', () => {
+    const item = createTextItem({
+      text: 'one\ntwo\nthree',
+      fontSize: 10,
+      lineHeight: -2,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+    });
+    const originalNavigator = globalThis.navigator;
+    const originalCreateElement = document.createElement.bind(document);
+
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { userAgent: 'Mozilla/5.0' },
+    });
+    vi.spyOn(document, 'createElement').mockImplementation(((tagName: string) => {
+      if (tagName === 'canvas') {
+        return {
+          getContext: () => ({ font: '', measureText: (text: string) => ({ width: text.length * 5 }) }),
+        } as unknown as HTMLCanvasElement;
+      }
+      return originalCreateElement(tagName);
+    }) as typeof document.createElement);
+
+    // Three lines, each 20 px above the one before.
+    expect(measureWordWrappedTextBlockHeight(item, 320)).toBe(-60);
+    expect(measureWordWrappedTextBlockHeight({ ...item, lineHeight: 0 }, 320)).toBe(0);
+    expect(measureWordWrappedTextHeight(item, 320)).toBe(1);
 
     Object.defineProperty(globalThis, 'navigator', {
       configurable: true,

@@ -109,8 +109,9 @@ export function textSvg(
   // Room around the lines for ink that leaves them, the stroke included.
   const stroke = textStrokeOf(item);
   const room = inkRoomOf(item, stroke);
-  const top = Math.min(0, textTop) - room;
-  const bottom = Math.max(box.height, textTop + measuredHeight) + room;
+  // The lines end above where they start when the line height is negative.
+  const top = Math.min(0, textTop, textTop + measuredHeight) - room;
+  const bottom = Math.max(box.height, textTop, textTop + measuredHeight) + room;
   const area = { x: inkLeft - room, y: top, width: inkRight - inkLeft + 2 * room, height: bottom - top };
   const pathEls = glyphGroupElements(groups, item, fillAttr, area, defs, `bold-${item.id}`);
   // The outline goes under the fill, and the shadow is cast from both.
@@ -598,9 +599,10 @@ function richTextSvg(
 
       const area = {
         x: left - room,
-        y: lineTop - room,
+        // A line box of negative height reaches up from `lineTop`.
+        y: lineTop + Math.min(0, lineHeight) - room,
         width: fragment.width + 2 * room,
-        height: lineHeight + 2 * room,
+        height: Math.abs(lineHeight) + 2 * room,
       };
       areas.push(area);
       elements.push(...glyphGroupElements(groups, colours, fillAttr, area, defs, `bold-${fragmentId}`));

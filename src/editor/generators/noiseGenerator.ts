@@ -11,7 +11,7 @@ export const noiseGeneratorSpec: GeneratorSpec<NoiseGeneratorParams> = {
   label: 'Noise',
   fields: [
     { key: 'intensity', label: 'Intensity', tooltip: 'Strength of the grain, from 0 (none) to 1 (strongest).', type: 'range', min: 0, max: 1, step: 0.001, textMin: 0, textMax: 1 },
-    { key: 'seedOverride', label: 'Seed Override', tooltip: "Fix the random pattern to a number of your choice. Leave at 0 to use the item's own random pattern.", type: 'optionalNumber', min: 0, max: 999999999 },
+    { key: 'seedOverride', label: 'Seed Override', tooltip: "Fix the random pattern to a number of your choice. Leave at 0 to use the item's own random pattern.", type: 'optionalNumber', min: 0 },
   ],
   createDefaultParams(): NoiseGeneratorParams {
     return {

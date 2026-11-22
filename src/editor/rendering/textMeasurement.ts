@@ -140,7 +140,20 @@ export function layoutRichTextRuns(
   });
 }
 
+/** Height of a box that holds the wrapped text and its padding: at least 1 px. */
 export function measureWordWrappedTextHeight(
+  item: TextCanvasItem,
+  width: number
+) {
+  return Math.max(1, measureWordWrappedTextBlockHeight(item, width));
+}
+
+/**
+ * Height of the wrapped lines plus the padding, in whole px. Lines stack by
+ * the line height, so this is 0 or less for a line height of 0 or below: the
+ * figure the text is vertically aligned by, where a box must not be sized by it.
+ */
+export function measureWordWrappedTextBlockHeight(
   item: TextCanvasItem,
   width: number
 ) {
@@ -177,5 +190,5 @@ export function measureWordWrappedTextHeight(
     ? layoutRichTextRuns(item, rich.runs, safeWidth, measuringContext).length
     : layoutWrappedText(item, safeWidth, (text) => canvasTextWidths(measuringContext, text)).length;
 
-  return Math.max(1, Math.ceil(verticalPadding + lineCount * item.fontSize * item.lineHeight));
+  return Math.ceil(verticalPadding + lineCount * item.fontSize * item.lineHeight);
 }

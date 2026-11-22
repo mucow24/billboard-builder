@@ -56,7 +56,6 @@ export function DimensionsWidget({
           digits={0}
           label="Width %"
           min={1}
-          max={10000}
           step={1}
           value={widthPct}
           onChange={(value) => onCommit({ kind: 'pctWidth', value, locked })}
@@ -103,7 +102,6 @@ export function DimensionsWidget({
           digits={0}
           label="Height %"
           min={1}
-          max={10000}
           step={1}
           value={heightPct}
           onChange={(value) => onCommit({ kind: 'pctHeight', value, locked })}

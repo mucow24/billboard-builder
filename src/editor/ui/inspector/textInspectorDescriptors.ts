@@ -204,7 +204,7 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
       fieldOrder: 10,
       getValue: (item) => (item.kind === 'text' ? item.lineHeight : 0),
       label: 'Line height',
-      tooltip: 'Spacing between lines, as a multiple of the font size. 1 means each line is exactly as tall as the font size.',
+      tooltip: 'Spacing between lines, as a multiple of the font size. 1 means each line is exactly as tall as the font size. 0 puts every line on the first, and negative values stack the lines upward.',
       max: 2,
       min: 0,
       propertyKey: 'lineHeight',

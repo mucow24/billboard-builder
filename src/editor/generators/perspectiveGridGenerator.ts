@@ -15,7 +15,7 @@ export const perspectiveGridGeneratorSpec: GeneratorSpec<PerspectiveGridGenerato
   label: 'Perspective Grid',
   fields: [
     { key: 'bandColorB', label: 'Grid Color', tooltip: 'Color of the grid lines.', type: 'color' },
-    { key: 'perspectiveHorizon', label: 'Horizon', tooltip: 'Height of the horizon line, from 0 (top of the canvas) to 1 (bottom).', type: 'range', min: 0.1, max: 0.9, step: 0.01, textMin: 0, textMax: 1 },
+    { key: 'perspectiveHorizon', label: 'Horizon', tooltip: 'Height of the horizon line, where 0 is the top of the canvas and 1 the bottom. Values outside that range put it off the canvas.', type: 'range', min: 0.1, max: 0.9, step: 0.01, textMin: -Infinity, textMax: Infinity },
     { key: 'perspectiveDepth', label: 'Depth Lines', tooltip: 'Number of lines running toward the horizon on each side of the center.', type: 'range', min: 2, max: 32, step: 1, textMin: 1, textMax: Infinity },
     { key: 'perspectiveNear', label: 'Near Point', tooltip: 'Where the closest edge of the grid sits: -1 is the bottom of the canvas, 0 is the horizon, 1 is the top.', type: 'range', min: -1, max: 1, step: 0.01, textMin: -Infinity, textMax: Infinity },
     { key: 'perspectiveExtent', label: 'Extent', tooltip: 'How far the grid reaches from its near edge toward the horizon. 1 reaches the vanishing point.', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },

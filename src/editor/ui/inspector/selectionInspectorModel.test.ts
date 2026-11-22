@@ -558,42 +558,50 @@ describe('selectionInspectorModel', () => {
     expect(findNumberField('bands', 'gen_stripeSpacingJitter')).toMatchObject({
       min: 0,
       max: 5,
+      textMin: 0,
+      textMax: Infinity,
     });
     expect(findNumberField('bands', 'gen_stripeSkew')).toMatchObject({
       min: 0,
       max: 3,
+      textMin: 0,
+      textMax: Infinity,
     });
     expect(findNumberField('burst', 'gen_burstRays')).toMatchObject({
       min: 1,
       max: 48,
       textMin: 1,
-      textMax: 48,
+      textMax: Infinity,
     });
     expect(findNumberField('burst', 'gen_offsetX')).toMatchObject({
       min: -768,
       max: 768,
+      textMin: -Infinity,
+      textMax: Infinity,
     });
     expect(findNumberField('burst', 'gen_offsetY')).toMatchObject({
       min: -768,
       max: 768,
+      textMin: -Infinity,
+      textMax: Infinity,
     });
     expect(findNumberField('zigzags', 'gen_count')).toMatchObject({
       min: 1,
       max: 48,
       textMin: 1,
-      textMax: 48,
+      textMax: Infinity,
     });
     expect(findNumberField('zigzags', 'gen_thickness')).toMatchObject({
       min: 1,
       max: 64,
       textMin: 1,
-      textMax: 64,
+      textMax: Infinity,
     });
     expect(findNumberField('flatGrid', 'gen_thickness')).toMatchObject({
       min: 1,
       max: 64,
       textMin: 1,
-      textMax: 64,
+      textMax: Infinity,
     });
     expect(findNumberField('noise', 'gen_intensity')).toMatchObject({
       min: 0,
@@ -605,19 +613,19 @@ describe('selectionInspectorModel', () => {
       min: 1,
       max: 256,
       textMin: 1,
-      textMax: 256,
+      textMax: Infinity,
     });
     expect(findNumberField('shapes', 'gen_shapeMinSize')).toMatchObject({
       min: 1,
       max: 384,
       textMin: 1,
-      textMax: 384,
+      textMax: Infinity,
     });
     expect(findNumberField('shapes', 'gen_shapeMaxSize')).toMatchObject({
       min: 1,
       max: 384,
       textMin: 1,
-      textMax: 384,
+      textMax: Infinity,
     });
     expect(findNumberField('shapes', 'gen_rotation')).toMatchObject({
       min: 0,

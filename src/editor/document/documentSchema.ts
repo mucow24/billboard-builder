@@ -196,7 +196,7 @@ const TextCanvasItemSchema = BaseCanvasItemSchema.extend({
   gradientAngle: z.number().optional(),
   align: z.enum(['left', 'center', 'right']),
   verticalAlign: z.enum(['top', 'middle', 'bottom']).optional(),
-  lineHeight: z.number().positive(),
+  lineHeight: z.number(),
   letterSpacing: z.number().optional(),
   padding: TextPaddingSchema.optional(),
   stroke: z.string().optional(),
