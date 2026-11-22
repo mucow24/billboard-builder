@@ -1,3 +1,4 @@
+import { MIN_LINE_STROKE_WIDTH } from '../../document/documentDefaults';
 import { mirrorPolygonVerticesHorizontally } from '../../document/polygonVertices';
 import { mirrorGradientAngleHorizontally } from '../../rendering/geometry/gradientGeometry';
 import {
@@ -108,6 +109,8 @@ export function createLineDescriptors(): InspectorFieldDescriptor[] {
       slider: true,
       step: 1,
       textMax: Infinity,
+      // Thinner than the slider goes, like an outline; never 0, as a line is only its stroke.
+      textMin: MIN_LINE_STROKE_WIDTH,
 
       valueType: 'number',
     }),

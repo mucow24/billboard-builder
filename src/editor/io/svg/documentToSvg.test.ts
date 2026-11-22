@@ -510,6 +510,28 @@ describe('documentToSvg — text outlines (font available)', () => {
     expect(Math.max(...baselines)).toBeCloseTo(8 + 42 * 1.1); // second line one lineHeight down
   });
 
+  it('puts every line on the first at a line height of 0, and stacks them upwards below 0', () => {
+    const baselinesAt = (lineHeight: number) =>
+      glyphPositions(
+        svgOf([
+          createTextItem({
+            text: 'AAAA BBBB',
+            width: 60,
+            lineHeight,
+            padding: { top: 0, right: 0, bottom: 0, left: 0 },
+          }),
+        ]),
+      ).map((p) => p.baselineY);
+
+    const flat = baselinesAt(0);
+    expect(flat).toHaveLength(8);
+    expect(Math.max(...flat)).toBeCloseTo(Math.min(...flat));
+
+    const upward = baselinesAt(-1);
+    // The first line's glyphs come first; the second line is one line height up.
+    expect(upward[4] - upward[0]).toBeCloseTo(-42);
+  });
+
   it('shifts the line origin for centre and right alignment', () => {
     const left = glyphPositions(svgOf([createTextItem({ text: 'AB', align: 'left' })]))[0].penX;
     const centre = glyphPositions(svgOf([createTextItem({ text: 'AB', align: 'center' })]))[0].penX;

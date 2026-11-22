@@ -929,6 +929,77 @@ test.describe('SVG export', () => {
       expect(line.overlap, name).toBeGreaterThan(0.7);
     });
   });
+
+  // A line height of 0 puts every line on the first, and a negative one stacks
+  // the lines upwards, out of the top of the box. Weird, but the canvas and the
+  // export have to agree on it, and neither may cut off the lines that leave
+  // the box or their outline.
+  test('stacks lines where the canvas does for a line height of zero and below', async ({ page }) => {
+    await openFreshEditor(page);
+    await waitForBundledFonts(page);
+
+    const fontSize = 100;
+    const layers = [
+      { id: 'upwards', text: 'HO\nVA\nTI', lineHeight: -1, verticalAlign: 'top' },
+      { id: 'upwards-middle', text: 'HO\nVA', lineHeight: -0.6, verticalAlign: 'middle' },
+      { id: 'upwards-bottom-outlined', text: 'HO\nVA', lineHeight: -1, verticalAlign: 'bottom', strokeWidth: 10 },
+      { id: 'on-one-line', text: 'HO\nVA', lineHeight: 0, verticalAlign: 'top' },
+      // Tags: every fragment is a text of its own on the canvas.
+      { id: 'upwards-tags-outlined', text: 'H<b>O</b>\nV<i>A</i>', lineHeight: -1, verticalAlign: 'top', strokeWidth: 10 },
+      { id: 'on-one-line-tags', text: 'H<b>O</b>\nVA', lineHeight: 0, verticalAlign: 'middle' },
+    ].map((layer, index) => ({
+      ...layer,
+      // A cell 500 x 500 around each box, with room above it for the lines.
+      cell: { x: (index % 3) * 500, y: Math.floor(index / 3) * 500, width: 500, height: 500 },
+    }));
+    const doc = {
+      ...createProjectDocument(
+        layers.map(({ cell, id, ...layer }, index) =>
+          createTextFixture({
+            ...layer,
+            id,
+            name: id,
+            fontFamily: 'Barlow',
+            fontSize,
+            fill: '#ffffff',
+            stroke: '#ff0000',
+            x: cell.x + 100,
+            y: cell.y + 300,
+            width: 300,
+            height: 140,
+            zIndex: index + 1,
+          }),
+        ),
+      ),
+      canvas: { width: 1500, height: 1000 },
+    };
+    await uploadProject(page, doc, 'line-height-zero-and-below.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    const compared = await compareShapesWithCanvas(
+      page,
+      svg,
+      png,
+      doc.canvas.width,
+      layers.map(({ cell }) => cell),
+    );
+    expect(compared).toHaveLength(layers.length);
+    layers.forEach((layer, index) => {
+      // The canvas drew the lines: each letter at 100px is over a thousand pixels.
+      expect(compared[index].canvasInk, `canvas ink of ${layer.id}`).toBeGreaterThan(3_000);
+      // The same shapes in the same places, the lines above the box included.
+      expect(compared[index].stray, `stray pixels of ${layer.id}`).toBeLessThan(100);
+    });
+  });
 });
 
 interface InkComparison {

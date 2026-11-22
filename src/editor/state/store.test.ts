@@ -8,6 +8,7 @@ import {
   createPolygonItem,
   createRectangleItem,
   createTextItem,
+  MIN_LINE_STROKE_WIDTH,
 } from '../document/documentDefaults';
 import { parseProjectDocument, serializeProjectDocument } from '../document/documentSchema';
 import { collectLeafItems, getNodeById } from '../document/sceneGraph';
@@ -239,7 +240,7 @@ describe('editor command reducer', () => {
     }
     expect(nextLine.closed).toBe(false);
     // A line is only its stroke, so its width never drops below 1.
-    expect(nextLine.strokeWidth).toBe(1);
+    expect(nextLine.strokeWidth).toBe(MIN_LINE_STROKE_WIDTH);
     expect(nextLine.x).toBe(5);
     expect(nextLine.y).toBe(0);
     expect(nextLine.width).toBe(35);

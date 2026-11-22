@@ -6,6 +6,7 @@ import {
   DEFAULT_CANVAS_NAME,
   DEFAULT_ITEM_SHADOW,
   DEFAULT_TEXT_STROKE,
+  MIN_LINE_STROKE_WIDTH,
 } from './documentDefaults';
 import { normalizeImageAdjustments } from './imageAdjustments';
 import { collectLeafItems, normalizeLeafZIndices, isGroupNode } from './sceneGraph';
@@ -34,6 +35,11 @@ import {
 
 function clampDimension(value: number): number {
   return clampFinite(value, 1, 1);
+}
+
+/** A line is only its stroke, so it never goes to 0 (see `MIN_LINE_STROKE_WIDTH`). */
+function clampLineStrokeWidth(value: number): number {
+  return clampFinite(value, 1, MIN_LINE_STROKE_WIDTH);
 }
 
 function clampOpacity(value: number, fallback = 1): number {
@@ -195,7 +201,9 @@ export function normalizeCanvasItem(item: CanvasItem | LegacyLineCanvasItem): Ca
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
         fontSize: clampFinite(item.fontSize, 1, 1),
-        lineHeight: clampFinite(item.lineHeight, 1, 0.1),
+        // Any finite value: 0 puts every line on the first, and a negative one
+        // stacks the lines upwards.
+        lineHeight: clampFinite(item.lineHeight, 1),
         letterSpacing: clampFinite(item.letterSpacing ?? 0, 0),
         padding: normalizeTextPadding(item.padding),
         // Text saved before it had an outline has neither field.
@@ -353,9 +361,9 @@ export function normalizeCanvasItem(item: CanvasItem | LegacyLineCanvasItem): Ca
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
-        // A line is only its stroke, so it never goes below 1; a closed
-        // polygon can drop its outline entirely.
-        strokeWidth: closed ? clampFinite(item.strokeWidth, 0, 0) : clampDimension(item.strokeWidth),
+        // A line is only its stroke, so it never goes to 0; a closed polygon
+        // can drop its outline entirely.
+        strokeWidth: closed ? clampFinite(item.strokeWidth, 0, 0) : clampLineStrokeWidth(item.strokeWidth),
         vertices,
         closed,
         curveRadius: clampFinite(item.curveRadius ?? 0, 0, 0),
@@ -397,6 +405,7 @@ export function normalizeCanvasItem(item: CanvasItem | LegacyLineCanvasItem): Ca
         opacity: clampOpacity(item.opacity),
         shadow: normalizeShadow(item.shadow),
         blurRadius: clampFinite(item.blurRadius ?? 0, 0, 0),
+        // A line saved in the old format was never drawn thinner than 1.
         strokeWidth: clampDimension(item.strokeWidth),
         vertices,
         closed: false,

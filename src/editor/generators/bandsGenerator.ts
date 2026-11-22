@@ -88,12 +88,12 @@ export const bandsGeneratorSpec: GeneratorSpec<BandsGeneratorParams> = {
     { key: 'stripeCount', label: 'Band Count', tooltip: 'Number of bands drawn.', type: 'range', min: 2, max: 64, step: 1, textMin: 1, textMax: Infinity },
     { key: 'stripeAngle', label: 'Band Angle', tooltip: 'Tilt of the bands in degrees. 0 is vertical.', type: 'range', min: -90, max: 90, step: 1, textMin: -Infinity, textMax: Infinity },
     { key: 'stripeThickness', label: 'Band Thickness', tooltip: 'Typical width of a band, in pixels.', type: 'range', min: 8, max: 220, step: 1, textMin: 1, textMax: Infinity },
-    { key: 'stripeSpacingJitter', label: 'Band Width Jitter', tooltip: 'How much band widths vary at random. 0 makes every band the same width.', type: 'range', min: 0, max: 5, step: 0.01, textMin: 0, textMax: 5 },
+    { key: 'stripeSpacingJitter', label: 'Band Width Jitter', tooltip: 'How much band widths vary at random. 0 makes every band the same width.', type: 'range', min: 0, max: 5, step: 0.01, textMin: 0, textMax: Infinity },
     { key: 'stripeOffset', label: 'Band Offset', tooltip: 'Slide the whole set of bands sideways.', type: 'range', min: -1, max: 1, step: 0.001, textMin: -Infinity, textMax: Infinity },
-    { key: 'stripeSkew', label: 'Skew Intensity', tooltip: 'How much each band slants at random, making it wedge-shaped. 0 keeps bands parallel.', type: 'range', min: 0, max: 3, step: 0.01, textMin: 0, textMax: 3 },
+    { key: 'stripeSkew', label: 'Skew Intensity', tooltip: 'How much each band slants at random, making it wedge-shaped. 0 keeps bands parallel.', type: 'range', min: 0, max: 3, step: 0.01, textMin: 0, textMax: Infinity },
     { key: 'stripeContrast', label: 'Color Contrast', tooltip: 'How evenly the bands blend from Band Color A to Band Color B. Lower values reach Band Color B sooner.', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
     { key: 'stripeGlow', label: 'Glow', tooltip: 'Strength of the soft glow around each band. 0 turns it off.', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
-    { key: 'seedOverride', label: 'Seed Override', tooltip: "Fix the random pattern to a number of your choice. Leave at 0 to use the item's own random pattern.", type: 'optionalNumber', min: 0, max: 999999999 },
+    { key: 'seedOverride', label: 'Seed Override', tooltip: "Fix the random pattern to a number of your choice. Leave at 0 to use the item's own random pattern.", type: 'optionalNumber', min: 0 },
   ],
   createDefaultParams(): BandsGeneratorParams {
     return {

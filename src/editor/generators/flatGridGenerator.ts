@@ -19,7 +19,7 @@ export const flatGridGeneratorSpec: GeneratorSpec<FlatGridGeneratorParams> = {
     { key: 'accentColor', label: 'Grid Color', tooltip: 'Color of the grid lines.', type: 'color' },
     { key: 'gridSpacingX', label: 'Spacing X', tooltip: 'Distance between vertical lines, in pixels.', type: 'range', min: 8, max: 180, step: 1, textMin: 1, textMax: Infinity },
     { key: 'gridSpacingY', label: 'Spacing Y', tooltip: 'Distance between horizontal lines, in pixels.', type: 'range', min: 8, max: 180, step: 1, textMin: 1, textMax: Infinity },
-    { key: 'thickness', label: 'Thickness', tooltip: 'Width of the grid lines, in pixels.', type: 'range', min: 1, max: 64, step: 1, textMin: 1, textMax: 64 },
+    { key: 'thickness', label: 'Thickness', tooltip: 'Width of the grid lines, in pixels.', type: 'range', min: 1, max: 64, step: 1, textMin: 1, textMax: Infinity },
     { key: 'offsetX', label: 'Offset X', tooltip: 'Slide the grid sideways, in pixels. The grid repeats, so the slider covers one Spacing X.', type: 'range', min: 0, max: 40, step: 1, textMin: -Infinity, textMax: Infinity, getBounds: offsetXBounds },
     { key: 'offsetY', label: 'Offset Y', tooltip: 'Slide the grid up or down, in pixels. The grid repeats, so the slider covers one Spacing Y.', type: 'range', min: 0, max: 40, step: 1, textMin: -Infinity, textMax: Infinity, getBounds: offsetYBounds },
     { key: 'rotation', label: 'Rotation', tooltip: 'Turn the grid around the center of the canvas, in degrees.', type: 'range', min: -180, max: 180, step: 1, textMin: -Infinity, textMax: Infinity },

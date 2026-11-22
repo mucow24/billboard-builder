@@ -51,7 +51,7 @@ import { strokedTextPlacement, TEXT_STROKE_JOIN, textStrokeOf } from '../textStr
 import type { TextStrokePaint } from '../textStroke';
 import {
   layoutRichTextRuns,
-  measureWordWrappedTextHeight,
+  measureWordWrappedTextBlockHeight,
   richTextRunItem,
 } from '../textMeasurement';
 import { useGeneratorCanvas } from '../../generators/useGeneratorCanvas';
@@ -169,7 +169,9 @@ function pixiFontStyleOf(item: TextCanvasItem) {
     fontWeight: effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const),
     fontStyle: effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const),
     letterSpacing: item.letterSpacing,
-    lineHeight: item.fontSize * item.lineHeight,
+    // Pixi reads a line height of 0 as "the font's own", so 0 is given as the
+    // smallest height that is not: every line then sits on the first.
+    lineHeight: item.fontSize * item.lineHeight || Number.EPSILON,
   };
 }
 
@@ -230,7 +232,7 @@ function buildTextLayers(item: TextCanvasItem, requestedResolution: number): Pix
 
   // Vertical alignment offset.
   const measuredHeight =
-    measureWordWrappedTextHeight(item, renderBox.width) - item.padding.top - item.padding.bottom;
+    measureWordWrappedTextBlockHeight(item, renderBox.width) - item.padding.top - item.padding.bottom;
   let textY = textBlockTop(item, renderBox.height, measuredHeight);
 
   const baseStyle = {

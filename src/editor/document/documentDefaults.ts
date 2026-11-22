@@ -30,6 +30,12 @@ export const DEFAULT_FONT_FAMILY = 'Arial';
 /** The colour a text's outline has until one is chosen. New text has no outline: its width is 0. */
 export const DEFAULT_TEXT_STROKE = '#000000ff';
 
+/**
+ * The thinnest a line can be, in px. A line is only its stroke, so unlike an
+ * outline it cannot go to 0; this is the smallest width the inspector shows.
+ */
+export const MIN_LINE_STROKE_WIDTH = 0.1;
+
 export const DEFAULT_CANVAS_NAME = 'Untitled canvas';
 
 export const CANVAS_PRESETS: CanvasPreset[] = [
