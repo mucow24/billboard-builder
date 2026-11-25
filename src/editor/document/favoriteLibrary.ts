@@ -3,6 +3,7 @@ import type {
   DocumentFontReference,
   ProjectDocument,
 } from './documentTypes';
+import { fontFamilyUseOf } from '../fonts/boldWeight';
 import { getItemDisplayKind, isLineItem } from './polygonVertices';
 import { collectLeafItems, isGroupNode } from './sceneGraph';
 
@@ -46,15 +47,12 @@ export function collectFavoriteFontReferences(
   nodes: CanvasNode[],
   fonts: readonly DocumentFontReference[],
 ): DocumentFontReference[] {
-  const referencedFamilies = new Set(
-    nodes.flatMap((node) =>
-      collectLeafItems(node)
-        .filter((item) => item.kind === 'text')
-        .map((item) => item.fontFamily),
-    ),
+  // The families the text is set in, and the heavier weights its bold is drawn in (see `boldWeight`).
+  const isUsed = fontFamilyUseOf(
+    nodes.flatMap(collectLeafItems).flatMap((item) => (item.kind === 'text' ? [item] : [])),
   );
 
-  return fonts.filter((font) => referencedFamilies.has(font.family));
+  return fonts.filter((font) => isUsed(font.family));
 }
 
 export function buildFavoriteSelectionPayload(

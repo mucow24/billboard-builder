@@ -1,4 +1,5 @@
 import { splitColorAlpha } from '../generators/colorUtils';
+import { fontFamilyUseOf } from '../fonts/boldWeight';
 import { clampFinite } from './clampFinite';
 import {
   createDefaultProjectDocument,
@@ -462,14 +463,13 @@ function normalizeDocumentFonts(
   nodes: CanvasNode[],
   fonts: ProjectDocument['fonts'],
 ): ProjectDocument['fonts'] {
-  const referencedFamilies = new Set(
-    nodes
-      .flatMap(collectLeafItems)
-      .filter((item) => item.kind === 'text')
-      .map((item) => item.fontFamily),
+  // A family stays referenced while text is set in it, or may be drawn in it:
+  // bold text is drawn in a heavier weight of its typeface (see `boldWeight`).
+  const isUsed = fontFamilyUseOf(
+    nodes.flatMap(collectLeafItems).flatMap((item) => (item.kind === 'text' ? [item] : [])),
   );
 
-  return fonts.filter((font) => referencedFamilies.has(font.family));
+  return fonts.filter((font) => isUsed(font.family));
 }
 
 type ProjectInput = Partial<ProjectDocument> | undefined;

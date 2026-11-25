@@ -12,10 +12,13 @@
  * Pure: no DOM, so it is testable on its own.
  */
 
+import { fontFamilyGroupKey } from './boldWeight';
+
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
 const registrationsByFamily = new Map<string, number>();
+const registrationsByTypeface = new Map<string, number>();
 
 /** The browser matches family names without regard to case. */
 function familyKey(family: string): string {
@@ -31,6 +34,17 @@ export function getFontRegistrationCount(family: string): number {
   return registrationsByFamily.get(familyKey(family)) ?? 0;
 }
 
+/**
+ * How many faces have been registered for every weight of `family`'s typeface
+ * (see `fontFamilyGroupKey`) since the page loaded. Bold text is drawn in a
+ * heavier weight of its typeface where one is registered (`boldWeight`), so
+ * this is the number that changes when what text set in `family` is drawn with
+ * may have changed.
+ */
+export function getTypefaceRegistrationCount(family: string): number {
+  return registrationsByTypeface.get(fontFamilyGroupKey(family)) ?? 0;
+}
+
 /** Calls `listener` after every registration, of any family. Returns the unsubscribe function. */
 export function subscribeToFontRegistrations(listener: Listener): () => void {
   listeners.add(listener);
@@ -43,6 +57,8 @@ export function subscribeToFontRegistrations(listener: Listener): () => void {
 export function announceFontRegistration(family: string): void {
   const key = familyKey(family);
   registrationsByFamily.set(key, (registrationsByFamily.get(key) ?? 0) + 1);
+  const typeface = fontFamilyGroupKey(family);
+  registrationsByTypeface.set(typeface, (registrationsByTypeface.get(typeface) ?? 0) + 1);
   for (const listener of [...listeners]) {
     listener();
   }

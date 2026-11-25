@@ -102,6 +102,14 @@ describe('hasFakedBold', () => {
     expect(hasFakedBold(text({ fontWeight: 'normal' }))).toBe(false);
   });
 
+  it('is false where a heavier weight of the typeface draws the bold', () => {
+    registered.push(font('Foo Light', '400'), font('Foo SemiBold', '400'));
+    expect(hasFakedBold(text({ fontWeight: 'bold', fontFamily: 'Foo Light' }))).toBe(false);
+    expect(hasFakedBold(text({ fontFamily: 'Foo Light', text: 'A<b>B</b>' }))).toBe(false);
+    // The heaviest weight has nothing heavier: its bold is faked.
+    expect(hasFakedBold(text({ fontWeight: 'bold', fontFamily: 'Foo SemiBold' }))).toBe(true);
+  });
+
   it('is false for a family without a registered file: a system font brings its own bold', () => {
     expect(hasFakedBold(text({ fontWeight: 'bold', fontFamily: 'Arial' }))).toBe(false);
   });
@@ -229,6 +237,32 @@ describe('the fonts read for an item', () => {
     // The plain item still has none: the fallback goes by each item's own text.
     const still = peekFontOutlines(latin)?.getOutlineFont(latin);
     expect(still && 'fallback' in still).toBe(false);
+  });
+
+  it('keeps the fallback by the weight a bold run is drawn in: real bold and faked bold each get their own', async () => {
+    // Bold "Foo Light" is drawn in "Foo SemiBold", regular; bold "Foo SemiBold" has its bold faked.
+    registered.push(font('Foo Light', '400'), font('Foo SemiBold', '400'));
+    const regularFallback: OutlineFont = { ...fakeOutlineFont };
+    const boldFallback: OutlineFont = { ...fakeOutlineFont };
+    loadFontBytes.mockResolvedValue(bytesFor(latinOnly));
+    loadFallbackFontBytes.mockImplementation(async (run) =>
+      run.fontFamily === 'Foo Light'
+        ? bytesFor(regularFallback)
+        : bytesFor(boldFallback, { bold: true, italic: false }),
+    );
+
+    const real = text({ ...bold, fontFamily: 'Foo Light', text: `A${EMOJI}` });
+    const faked = text({ ...bold, fontFamily: 'Foo SemiBold', text: `A${EMOJI}` });
+    requestFontOutlines(real);
+    requestFontOutlines(faked);
+    await fontOutlinesSettled();
+
+    expect(loadFallbackFontBytes).toHaveBeenCalledTimes(2);
+    const ofReal = peekFontOutlines(real)?.getOutlineFont(real);
+    const ofFaked = peekFontOutlines(faked)?.getOutlineFont(faked);
+    expect(ofReal).toMatchObject({ ok: true, fallback: {} });
+    expect(ofReal && 'fallback' in ofReal && ofReal.fallback && 'synthetic' in ofReal.fallback).toBe(false);
+    expect(ofFaked).toMatchObject({ ok: true, fallback: { synthetic: { bold: true, italic: false } } });
   });
 
   it('reads own font and fallback in one go for a text that needs both', async () => {
