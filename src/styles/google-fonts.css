@@ -105,6 +105,11 @@
   cursor: pointer;
 }
 
+.google-font-specimen-row.bundled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .google-font-specimen-label {
   color: var(--text-secondary);
   font-size: 0.76rem;

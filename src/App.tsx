@@ -149,6 +149,10 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
     () => availableFonts.map((font) => font.family),
     [availableFonts],
   );
+  const bundledFontFamilies = useMemo(
+    () => availableFonts.filter((font) => font.kind === 'bundled').map((font) => font.family),
+    [availableFonts],
+  );
 
   // Guides belong to the document they were dragged out for.
   const [guidesDocumentId, setGuidesDocumentId] = useState(documentId);
@@ -385,6 +389,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
         <GoogleFontImportDialog
           apiKey={googleFontsApiKey}
           existingFamilies={availableFontFamilies}
+          bundledFamilies={bundledFontFamilies}
           onClose={closeGoogleFontDialog}
           onImport={(request) => handleGoogleFontImport({ ...request, apiKey: googleFontsApiKey })}
         />

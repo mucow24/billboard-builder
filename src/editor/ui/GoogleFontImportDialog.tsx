@@ -52,6 +52,12 @@ interface GoogleFontImportDialogProps {
   apiKey: string;
   /** The names of the entries of the font list, to mark the families that are already there. */
   existingFamilies: readonly string[];
+  /**
+   * The names of the entries that are bundled fonts. A style that would be
+   * imported under one of these names cannot be added: it would sit beside the
+   * bundled entry under the same name, and take its place on the canvas.
+   */
+  bundledFamilies: readonly string[];
   onClose: () => void;
   /**
    * Imports the given styles of a family. Rejects when nothing could be
@@ -176,6 +182,8 @@ function Suggestion({ active, alreadyImported, family, id, onHover, onPick }: Su
 }
 
 interface SpecimenProps {
+  /** The styles that cannot be added, because a bundled font has their name. */
+  bundledKeys: ReadonlySet<string>;
   checkedKeys: ReadonlySet<string>;
   disabled: boolean;
   family: GoogleFontFamily;
@@ -183,7 +191,7 @@ interface SpecimenProps {
 }
 
 /** The picked family: a line of text in each of its styles, each with a box to leave it out. */
-function Specimen({ checkedKeys, disabled, family, onToggle }: SpecimenProps) {
+function Specimen({ bundledKeys, checkedKeys, disabled, family, onToggle }: SpecimenProps) {
   const cssFamily = useGoogleFontPreview(
     `specimen:${family.family}`,
     family,
@@ -222,12 +230,17 @@ function Specimen({ checkedKeys, disabled, family, onToggle }: SpecimenProps) {
             </div>
           );
         }
+        const bundled = bundledKeys.has(variant.key);
         return (
-          <label key={variant.key} className="google-font-specimen-row">
+          <label
+            key={variant.key}
+            className={bundled ? 'google-font-specimen-row bundled' : 'google-font-specimen-row'}
+            title={bundled ? 'Already a bundled font' : undefined}
+          >
             <input
               type="checkbox"
               checked={checkedKeys.has(variant.key)}
-              disabled={disabled}
+              disabled={disabled || bundled}
               onChange={() => onToggle(variant.key)}
             />
             <span className="google-font-specimen-label">{label}</span>
@@ -249,6 +262,7 @@ function Specimen({ checkedKeys, disabled, family, onToggle }: SpecimenProps) {
 export function GoogleFontImportDialog({
   apiKey,
   existingFamilies,
+  bundledFamilies,
   onClose,
   onImport,
 }: GoogleFontImportDialogProps) {
@@ -318,6 +332,22 @@ export function GoogleFontImportDialog({
     );
   }
 
+  const bundledNames = useMemo(
+    () => new Set(bundledFamilies.map((name) => name.toLowerCase())),
+    [bundledFamilies],
+  );
+  /** The styles of `family` that a bundled font already has the name of. */
+  function bundledKeysOf(family: GoogleFontFamily) {
+    return new Set(
+      family.variants
+        .filter((variant) =>
+          bundledNames.has(googleFontEntryName(family.family, variant).toLowerCase()),
+        )
+        .map((variant) => variant.key),
+    );
+  }
+  const pickedBundledKeys = picked ? bundledKeysOf(picked) : new Set<string>();
+
   const suggestions = useMemo(
     () =>
       catalog.status === 'ready' && !picked
@@ -336,7 +366,12 @@ export function GoogleFontImportDialog({
   function pick(family: GoogleFontFamily) {
     setPicked(family);
     setQuery(family.family);
-    setCheckedKeys(new Set(family.variants.map((variant) => variant.key)));
+    const bundledKeys = bundledKeysOf(family);
+    setCheckedKeys(
+      new Set(
+        family.variants.map((variant) => variant.key).filter((key) => !bundledKeys.has(key)),
+      ),
+    );
     setImportState({ status: 'idle' });
   }
 
@@ -425,6 +460,13 @@ export function GoogleFontImportDialog({
     status = `Downloading ${Math.min(importState.done + 1, importState.total)} of ${importState.total}…`;
   } else if (catalog.status === 'ready' && !picked && query.trim() !== '' && !showSuggestions) {
     status = `No Google font is called “${query.trim()}”.`;
+  } else if (picked && pickedBundledKeys.size === picked.variants.length) {
+    status = `${picked.family} is already a bundled font.`;
+  } else if (pickedBundledKeys.size > 0) {
+    status =
+      pickedBundledKeys.size === 1
+        ? '1 style is already a bundled font.'
+        : `${pickedBundledKeys.size} styles are already bundled fonts.`;
   }
 
   return (
@@ -497,6 +539,7 @@ export function GoogleFontImportDialog({
         {picked ? (
           <Specimen
             key={picked.family}
+            bundledKeys={pickedBundledKeys}
             checkedKeys={checkedKeys}
             disabled={importing}
             family={picked}

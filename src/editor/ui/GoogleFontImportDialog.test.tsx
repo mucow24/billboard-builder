@@ -42,13 +42,15 @@ type OnImport = (request: GoogleFontImportRequest) => Promise<GoogleFontImportRe
 
 function renderDialog({
   existingFamilies = [],
+  bundledFamilies = [],
   onImport = vi.fn<OnImport>(async (request) => ({ added: request.variants.length, failed: [] })),
-}: { existingFamilies?: string[]; onImport?: OnImport } = {}) {
+}: { existingFamilies?: string[]; bundledFamilies?: string[]; onImport?: OnImport } = {}) {
   const onClose = vi.fn();
   render(
     <GoogleFontImportDialog
       apiKey="test-key"
       existingFamilies={existingFamilies}
+      bundledFamilies={bundledFamilies}
       onClose={onClose}
       onImport={onImport}
     />,
@@ -223,6 +225,46 @@ describe('GoogleFontImportDialog', () => {
     expect(screen.getByRole('button', { name: 'Add font' })).toBeEnabled();
   });
 
+  it('leaves out the styles that a bundled font already has the name of', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn<OnImport>(async (request) => ({
+      added: request.variants.length,
+      failed: [],
+    }));
+    // Regular, italic and bold are all styles of the entry "Playfair Display".
+    const { input } = renderDialog({ bundledFamilies: ['playfair display'], onImport });
+
+    await user.type(input, 'playfair{Enter}');
+
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(boxes.map((box) => [box.checked, box.disabled])).toEqual([
+      [false, true],
+      [false, true],
+      [false, true],
+      [true, false],
+    ]);
+    expect(screen.getByRole('status')).toHaveTextContent('3 styles are already bundled fonts.');
+
+    await user.click(screen.getByRole('button', { name: 'Add font' }));
+
+    expect(onImport.mock.calls[0][0].variants.map((variant) => variant.key)).toEqual(['900']);
+  });
+
+  it('adds nothing of a family that is bundled whole', async () => {
+    const user = userEvent.setup();
+    const { input } = renderDialog({ bundledFamilies: ['Playball', 'Play'] });
+
+    await user.type(input, 'playball{Enter}');
+    expect(screen.getByRole('status')).toHaveTextContent('Playball is already a bundled font.');
+    expect(screen.getByRole('button', { name: 'Add font' })).toBeDisabled();
+
+    await user.clear(input);
+    await user.type(input, 'play');
+    await user.click(suggestion('Play'));
+    expect(screen.getByRole('status')).toHaveTextContent('Play is already a bundled font.');
+    expect(screen.getByRole('button', { name: 'Add font' })).toBeDisabled();
+  });
+
   it('goes back to the suggestions when the name is edited', async () => {
     const user = userEvent.setup();
     const { input } = renderDialog();
@@ -360,6 +402,7 @@ describe('GoogleFontImportDialog', () => {
       <GoogleFontImportDialog
         apiKey="test-key"
         existingFamilies={[]}
+        bundledFamilies={[]}
         onClose={vi.fn()}
         onImport={vi.fn()}
       />,

@@ -35,10 +35,15 @@ export interface GoogleFontDownloadRequest {
 }
 
 /**
- * Fetches the font file of each of `variants` and registers it. One style
- * failing does not stop the others. Rejects when the family's files cannot be
- * looked up at all, or when `signal` aborts; styles registered before that stay
- * registered.
+ * Fetches the font file of each of `variants`, then registers them all. One
+ * style failing does not stop the others. Rejects when the family's files
+ * cannot be looked up at all, or when `signal` aborts while files are still
+ * being fetched: nothing has been registered then.
+ *
+ * Once the files are in, an abort no longer has any effect: a registered font
+ * is live in the page at once, so every style is registered and returned, for
+ * the caller to list and store. Stopping halfway would leave fonts that text
+ * is drawn in but that are in no list and gone after a reload.
  */
 export async function downloadGoogleFontVariants({
   apiKey,
@@ -48,11 +53,11 @@ export async function downloadGoogleFontVariants({
   signal,
 }: GoogleFontDownloadRequest): Promise<GoogleFontDownloadResult> {
   const files = await fetchGoogleFontFiles(apiKey, family, signal);
-  const results: Array<GoogleFontDownload | null> = variants.map(() => null);
+  const fetched: Array<ArrayBuffer | null> = variants.map(() => null);
   let nextIndex = 0;
   let done = 0;
 
-  async function downloadVariant(variant: GoogleFontVariant): Promise<GoogleFontDownload> {
+  async function fetchVariant(variant: GoogleFontVariant): Promise<ArrayBuffer> {
     const address = files.get(variant.key);
     if (!address) {
       throw new Error(`Google Fonts lists no file for ${family} ${variant.key}.`);
@@ -61,13 +66,7 @@ export async function downloadGoogleFontVariants({
     if (!response.ok) {
       throw new Error(`The font file could not be fetched (${response.status}).`);
     }
-    const bytes = await response.arrayBuffer();
-    const font = await registerUploadedFontBytes({
-      ...toImportedFontMetadata(family, variant),
-      kind: 'uploaded',
-      bytes,
-    });
-    return { variant, font, bytes };
+    return response.arrayBuffer();
   }
 
   async function work(): Promise<void> {
@@ -75,12 +74,12 @@ export async function downloadGoogleFontVariants({
       const index = nextIndex;
       nextIndex += 1;
       try {
-        results[index] = await downloadVariant(variants[index]);
+        fetched[index] = await fetchVariant(variants[index]);
       } catch (error) {
         if (signal?.aborted) {
           throw error;
         }
-        console.warn(`Skipping a style of ${family} that could not be imported.`, error);
+        console.warn(`Skipping a style of ${family} that could not be fetched.`, error);
       }
       done += 1;
       onProgress?.(done, variants.length);
@@ -90,10 +89,29 @@ export async function downloadGoogleFontVariants({
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENT_DOWNLOADS, variants.length) }, () => work()),
   );
+  // The last point at which the import can still be called off.
   signal?.throwIfAborted();
 
-  return {
-    downloaded: results.flatMap((result) => (result ? [result] : [])),
-    failed: variants.filter((_, index) => results[index] === null),
-  };
+  const downloaded: GoogleFontDownload[] = [];
+  const failed: GoogleFontVariant[] = [];
+  for (const [index, variant] of variants.entries()) {
+    const bytes = fetched[index];
+    if (!bytes) {
+      failed.push(variant);
+      continue;
+    }
+    try {
+      const font = await registerUploadedFontBytes({
+        ...toImportedFontMetadata(family, variant),
+        kind: 'uploaded',
+        bytes,
+      });
+      downloaded.push({ variant, font, bytes });
+    } catch (error) {
+      console.warn(`Skipping a style of ${family} that is not a usable font.`, error);
+      failed.push(variant);
+    }
+  }
+
+  return { downloaded, failed };
 }

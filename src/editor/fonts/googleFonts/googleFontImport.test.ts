@@ -155,6 +155,55 @@ describe('downloadGoogleFontVariants', () => {
     expect(mockRegisterUploadedFontBytes).not.toHaveBeenCalled();
   });
 
+  it('registers nothing when it is aborted after some of the files have arrived', async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementation(async (address) => {
+      if (String(address) === fileAddress('700')) {
+        // The first two files are in by now.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        controller.abort();
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      return new Response(fontBytes('font'));
+    });
+
+    await expect(
+      downloadGoogleFontVariants({
+        apiKey: 'test-key',
+        family: 'Roboto',
+        variants: variants('regular', '300', '700'),
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(mockRegisterUploadedFontBytes).not.toHaveBeenCalled();
+  });
+
+  it('finishes and returns every style when it is aborted while registering', async () => {
+    const controller = new AbortController();
+    mockRegisterUploadedFontBytes.mockImplementation(async (record: PersistedUploadedFont) => {
+      // Called off as soon as the first font is live.
+      controller.abort();
+      return { ...record, bytes: undefined };
+    });
+
+    const result = await downloadGoogleFontVariants({
+      apiKey: 'test-key',
+      family: 'Roboto',
+      variants: variants('regular', '300', '700'),
+      signal: controller.signal,
+    });
+
+    // Nothing is left registered that the caller is not told about.
+    expect(mockRegisterUploadedFontBytes).toHaveBeenCalledTimes(3);
+    expect(result.downloaded.map((download) => download.variant.key)).toEqual([
+      'regular',
+      '300',
+      '700',
+    ]);
+    expect(result.failed).toEqual([]);
+  });
+
   it('fetches no more than four files at a time', async () => {
     mockFetchGoogleFontFiles.mockImplementation(
       async () =>
