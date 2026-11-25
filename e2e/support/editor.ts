@@ -1033,9 +1033,10 @@ export type HandleName =
  */
 
 // Per-page, per-item memory of the last clickItem time, used to avoid
-// accidentally triggering the editor's 400ms double-click detection.  Each
-// rendered item has its own `lastClickRef` in PixiItemLayer, so this map
-// must be keyed by item id, not just "the last clicked item".
+// accidentally triggering the editor's 400ms double-click detection.  The
+// editor pairs two presses only when both are on the same item (a press on
+// another item in between breaks the pair), so keying this map by item id
+// waits in every case the editor would pair, and sometimes when it would not.
 //
 // CDP-driven `page.mouse.click` was naturally throttled by ~tens of ms per
 // command, so the test never bumped into the 400ms threshold.  Our in-page

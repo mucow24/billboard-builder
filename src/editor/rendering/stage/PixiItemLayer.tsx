@@ -1130,6 +1130,10 @@ export function PixiItemLayer({
   rasterZoom,
 }: PixiItemLayerProps) {
   const interactive = activeTool === 'select';
+  // PixiJS federated events don't include dblclick, so detect manually: two
+  // presses on the same item in quick succession. One record for the layer,
+  // so a press on another item in between breaks the pair.
+  const lastClickRef = useRef<LastItemClick | null>(null);
 
   return (
     <>
@@ -1142,6 +1146,7 @@ export function PixiItemLayer({
             canvasHeight={canvasHeight}
             interactive={interactive}
             item={item}
+            lastClickRef={lastClickRef}
             onItemPointerDown={onItemPointerDown}
             onItemDoubleClick={onItemDoubleClick}
             onItemHoverChange={onItemHoverChange}
@@ -1157,11 +1162,19 @@ export function PixiItemLayer({
   );
 }
 
+/** The last press that could be the first half of a double-click. */
+interface LastItemClick {
+  itemId: string;
+  at: number;
+}
+
 interface PixiItemViewProps {
   canvasWidth: number;
   canvasHeight: number;
   interactive: boolean;
   item: RenderableCanvasItem;
+  /** Shared by the layer's items; see PixiItemLayer. */
+  lastClickRef: { current: LastItemClick | null };
   onItemPointerDown: PixiItemLayerProps['onItemPointerDown'];
   onItemDoubleClick: PixiItemLayerProps['onItemDoubleClick'];
   onItemHoverChange: PixiItemLayerProps['onItemHoverChange'];
@@ -1179,6 +1192,7 @@ const PixiItemView = memo(function PixiItemView({
   canvasHeight,
   interactive,
   item,
+  lastClickRef,
   onItemPointerDown,
   onItemDoubleClick,
   onItemHoverChange,
@@ -1217,9 +1231,6 @@ const PixiItemView = memo(function PixiItemView({
     // itemFilters (expensive filter construction) and hitArea (triggers PixiJS prop diffs).
   );
 
-  // PixiJS federated events don't include dblclick, so detect manually.
-  const lastClickRef = useRef(0);
-
   const handleMouseDown = useCallback(
     (e: FederatedPointerEvent) => {
       if (!interactive || item.locked) return;
@@ -1236,17 +1247,18 @@ const PixiItemView = memo(function PixiItemView({
       if (nativeEvent.altKey) {
         // Alt-clicks cycle the selection through the items under the pointer.
         // Rapid ones must each count, never pair up into a double-click.
-        lastClickRef.current = 0;
+        lastClickRef.current = null;
       } else {
         // Double-click detection
         const now = Date.now();
-        if (now - lastClickRef.current < 400) {
-          lastClickRef.current = 0;
+        const last = lastClickRef.current;
+        if (last && last.itemId === item.id && now - last.at < 400) {
+          lastClickRef.current = null;
           e.stopPropagation();
           onItemDoubleClick(item);
           return;
         }
-        lastClickRef.current = now;
+        lastClickRef.current = { itemId: item.id, at: now };
       }
 
       e.stopPropagation();
@@ -1258,7 +1270,7 @@ const PixiItemView = memo(function PixiItemView({
         nativeEvent,
       );
     },
-    [interactive, item, onItemDoubleClick, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
+    [interactive, item, lastClickRef, onItemDoubleClick, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
   );
 
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;
