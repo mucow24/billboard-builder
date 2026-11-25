@@ -125,6 +125,21 @@ describe('font registry', () => {
     ).toEqual(['Ghost Font', 'Missing Bundle']);
   });
 
+  it('takes an imported font for a bundled one of its family, and not the other way round', () => {
+    const imported: UploadedFont = { ...font('Gone.ttf', '400', 'normal'), family: 'Gone', kind: 'uploaded' };
+    const bundled: UploadedFont = { ...font('Kept.ttf', '400', 'normal'), family: 'Kept', kind: 'bundled' };
+
+    expect(
+      findMissingFonts(
+        [
+          { family: 'Gone', sourceName: 'Gone-Regular.otf', kind: 'bundled' },
+          { family: 'Kept', sourceName: 'Kept-Custom.ttf', kind: 'uploaded' },
+        ],
+        [imported, bundled],
+      ),
+    ).toEqual(['Kept']);
+  });
+
   it('reports a family the document references by several files once, and only when none of them is available', () => {
     const ghostFiles = [
       { family: 'Ghost Font', sourceName: 'GhostFont-Bold.ttf', kind: 'uploaded' as const },
