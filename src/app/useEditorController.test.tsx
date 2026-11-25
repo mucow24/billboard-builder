@@ -807,6 +807,8 @@ describe('useEditorController', () => {
     };
     const boldFont = { ...boldReference, weight: '700' as const, style: 'normal' as const };
     const regularFont = { ...regularReference, weight: '400' as const, style: 'normal' as const };
+    // The font list also has the Bold file as an entry of its own.
+    const boldEntry = { ...boldFont, family: 'Persist Probe Bold', weight: '400' as const };
     const storedFonts: PersistedUploadedFont[] = [
       { ...boldFont, bytes: new Uint8Array([7]).buffer },
       { ...regularFont, bytes: new Uint8Array([4]).buffer },
@@ -865,7 +867,7 @@ describe('useEditorController', () => {
       await act(async () => {
         await result.current.actions.handleFontUpload(fontUpload('PersistProbe-Regular.otf'));
       });
-      expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
+      expect(result.current.state.availableFonts).toEqual([boldFont, boldEntry, regularFont]);
       // Uploading alone does not put a font in the document.
       expect(result.current.state.document.fonts).toEqual([]);
 
@@ -905,7 +907,7 @@ describe('useEditorController', () => {
       const { result } = await renderControllerAfterStartup();
 
       await waitFor(() => {
-        expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
+        expect(result.current.state.availableFonts).toEqual([boldFont, boldEntry, regularFont]);
       });
       expect(mockUploadedFontPersistenceService.loadByReferences).toHaveBeenCalledWith([
         boldReference,
@@ -945,7 +947,7 @@ describe('useEditorController', () => {
         boldReference,
         regularReference,
       ]);
-      expect(result.current.state.availableFonts).toEqual([boldFont, regularFont]);
+      expect(result.current.state.availableFonts).toEqual([boldFont, boldEntry, regularFont]);
       expect(result.current.state.document.fonts).toEqual([boldReference, regularReference]);
     });
 

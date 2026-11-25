@@ -113,7 +113,8 @@ describe('restoreUploadedFontsForReferences', () => {
       reference(regularFont),
     ]);
     expect(registerAvailableFont.mock.calls).toEqual([[boldFont], [regularFont]]);
-    expect(restoredFamilies).toEqual(new Set(['Persist Probe']));
+    // The Bold file is its family's "Persist Probe Bold" entry too.
+    expect(restoredFamilies).toEqual(new Set(['Persist Probe', 'Persist Probe Bold']));
   });
 
   it('asks only for the files of a family that are not available yet', async () => {

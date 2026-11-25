@@ -336,8 +336,13 @@ test.describe('editor favorite library flows', () => {
     await uploadNamedFontFromPath(page, path.join(fontsDir, 'Barlow-Regular.ttf'), 'FavoriteFamily-Regular.otf');
     await uploadNamedFontFromPath(page, path.join(fontsDir, 'Barlow-Bold.ttf'), 'FavoriteFamily-Bold.otf');
     await page.getByTestId('font-family-picker-trigger').click();
-    await page.getByRole('option', { name: 'Favorite Family' }).first().click();
-    await expect(page.getByTestId('font-family-picker-trigger')).toContainText('Favorite Family');
+    // The family has its Bold as a weight of its own, so its row opens a submenu.
+    await page.getByRole('option', { name: 'Favorite Family', exact: true }).click();
+    await page
+      .getByTestId('font-family-picker-submenu')
+      .getByRole('option', { name: 'Favorite Family Regular' })
+      .click();
+    await expect(page.getByTestId('font-family-picker-trigger')).toHaveText('Favorite Family');
     await expectPersistedCanvasFontFiles(page, ['FavoriteFamily-Regular.otf', 'FavoriteFamily-Bold.otf']);
 
     await page.getByRole('button', { name: 'Save as favorite' }).click();

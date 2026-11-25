@@ -82,10 +82,19 @@ async function selectTextLayerInProperties(page: Page) {
   await openPropertiesTab(page);
 }
 
+/** Picks `family`'s regular weight, from its submenu where it has other weights (its Bold, say). */
 async function chooseFontFamily(page: Page, family: string) {
   await page.getByTestId('font-family-picker-trigger').click();
-  await page.getByRole('option', { name: family }).first().click();
-  await expect(page.getByTestId('font-family-picker-trigger')).toContainText(family);
+  const row = page.getByRole('option', { name: family, exact: true });
+  const hasWeights = (await row.getAttribute('aria-expanded')) !== null;
+  await row.click();
+  if (hasWeights) {
+    await page
+      .getByTestId('font-family-picker-submenu')
+      .getByRole('option', { name: `${family} Regular` })
+      .click();
+  }
+  await expect(page.getByTestId('font-family-picker-trigger')).toHaveText(family);
 }
 
 /**

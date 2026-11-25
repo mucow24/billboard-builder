@@ -2,13 +2,14 @@
  * The styles of a Google Fonts family, and what each becomes in the editor.
  *
  * Google lists a family's styles as keys: "regular", "italic", "300",
- * "300italic". The editor knows two weights per family, regular and bold, so a
- * Google family is imported the way the bundled families are laid out: its
- * regular and bold styles, with their italics, are the faces of one entry under
- * the family's own name, and every other weight is an entry of its own, named
- * after the family and the weight ("Roboto Light"), with that weight's italic as
- * its italic face. The font menu gathers those entries under the family again
- * (see `groupFontOptions`).
+ * "300italic". A Google family is imported the way the bundled families are
+ * laid out: its regular and bold styles, with their italics, are the faces of
+ * one entry under the family's own name, and every other weight is an entry of
+ * its own, named after the family and the weight ("Roboto Light"), with that
+ * weight's italic as its italic face. The bold files are registered as a
+ * "Roboto Bold" entry as well, as every bold file is (`fontEntriesForFile`).
+ * The font menu gathers those entries under the family again (see
+ * `groupFontOptions`).
  *
  * Pure: no DOM, so it is testable on its own.
  */

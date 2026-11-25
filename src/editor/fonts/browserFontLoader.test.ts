@@ -181,6 +181,33 @@ describe('browser font loader', () => {
     });
   });
 
+  it('registers a Bold file as its family\'s bold face and as an entry of its own', async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const file = new File([bytes], 'SessionSans-BoldItalic.ttf');
+    Object.defineProperty(file, 'arrayBuffer', { configurable: true, value: async () => bytes.buffer });
+    // What is returned, and stored, is the file's own entry.
+    expect((await registerFontFile(file)).family).toBe('Session Sans');
+    await registerUploadedFontBytes({
+      family: 'Stored Sans',
+      sourceName: 'StoredSans-Bold.ttf',
+      weight: '700',
+      style: 'normal',
+      kind: 'uploaded',
+      bytes: bytes.buffer,
+    });
+
+    const faces = vi
+      .mocked(document.fonts.add)
+      .mock.calls.map(([fontFace]) => fontFace as unknown as MockFontFace)
+      .map(({ family, descriptors }) => [family, descriptors?.weight, descriptors?.style]);
+    expect(faces).toEqual([
+      ['Session Sans', '700', 'italic'],
+      ['Session Sans Bold', '400', 'italic'],
+      ['Stored Sans', '700', 'normal'],
+      ['Stored Sans Bold', '400', 'normal'],
+    ]);
+  });
+
   it('registers persisted uploaded font bytes with preserved metadata', async () => {
     const persistedFont: PersistedUploadedFont = {
       family: 'Stored Sans',
@@ -228,7 +255,8 @@ describe('browser font loader', () => {
 
       expect(getFontRegistrationCount('Announced Sans')).toBe(before + 3);
       // Each announcement came after its face had been added to document.fonts.
-      expect(registeredWhenAnnounced).toEqual([1, 2, 3]);
+      // The Bold file has two faces, the second for "Announced Sans Bold".
+      expect(registeredWhenAnnounced).toEqual([1, 2, 3, 4]);
     } finally {
       unsubscribe();
     }
@@ -367,6 +395,23 @@ describe('browser font loader', () => {
       expect(reported).toEqual(['Canvas One', 'Another One']);
     });
 
+    it('loads a Bold file first when its "<Family> Bold" entry is needed first', async () => {
+      const familiesInDocumentFonts = () =>
+        [...document.fonts].map((fontFace) => fontFace.family);
+      const loading = loadFontEntriesInStages(
+        [
+          ['src/assets/fonts/Canvas-One.ttf', '/fonts/canvas-one.ttf'],
+          ['src/assets/fonts/Canvas-One-Bold.ttf', '/fonts/canvas-one-bold.ttf'],
+        ],
+        { first: ['Canvas One Bold'] },
+      );
+
+      await loading.first;
+      expect(familiesInDocumentFonts()).toEqual(['Canvas One', 'Canvas One Bold']);
+      await loading.all;
+      expect(familiesInDocumentFonts()).toEqual(['Canvas One', 'Canvas One Bold', 'Canvas One']);
+    });
+
     it('keeps loading when a listener for a loaded family throws', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
@@ -428,9 +473,11 @@ describe('browser font loader', () => {
         }
         await loading;
 
-        // "Poster Bold.otf" is a different variant and was ready at once. The two
-        // regular files follow in entry order, so the later entry wins either way.
+        // "Poster Bold.otf" is a different variant and was ready at once (twice:
+        // as Poster's bold face and as "Poster Bold"). The two regular files
+        // follow in entry order, so the later entry wins either way.
         expect(urlsInDocumentFonts(posterEntries)).toEqual([
+          '/fonts/poster-bold.otf',
           '/fonts/poster-bold.otf',
           '/deferred/poster-book.otf',
           '/deferred/poster-regular.ttf',
@@ -444,12 +491,16 @@ describe('browser font loader', () => {
         const loading = loadFontEntries(posterEntries);
         await finishLoad('/deferred/poster-regular.ttf');
         // Loaded, but held back while the earlier file for its variant is still loading.
-        expect(urlsInDocumentFonts(posterEntries)).toEqual(['/fonts/poster-bold.otf']);
+        expect(urlsInDocumentFonts(posterEntries)).toEqual([
+          '/fonts/poster-bold.otf',
+          '/fonts/poster-bold.otf',
+        ]);
 
         await failLoad('/deferred/poster-book.otf');
         const fonts = await loading;
 
         expect(urlsInDocumentFonts(posterEntries)).toEqual([
+          '/fonts/poster-bold.otf',
           '/fonts/poster-bold.otf',
           '/deferred/poster-regular.ttf',
         ]);
@@ -471,13 +522,15 @@ describe('browser font loader', () => {
     it('lists registered files in the order their faces joined document.fonts, not filename order', async () => {
       const loading = loadFontEntries(posterEntries);
       await new Promise((settle) => setTimeout(settle, 0));
-      // Nothing is listed until its face has loaded and been added.
-      expect(listRegisteredFonts().map((font) => font.sourceName)).toEqual(['Poster Bold.otf']);
+      // Nothing is listed until its face has loaded and been added. The Bold
+      // file is listed twice: as Poster's bold face and as "Poster Bold".
+      const boldOnly = ['Poster Bold.otf', 'Poster Bold.otf'];
+      expect(listRegisteredFonts().map((font) => font.sourceName)).toEqual(boldOnly);
 
       // The later of the two regular files finishes loading first. It is not
       // listed yet: its face waits for the earlier file's.
       await finishLoad('/deferred/poster-regular.ttf');
-      expect(listRegisteredFonts().map((font) => font.sourceName)).toEqual(['Poster Bold.otf']);
+      expect(listRegisteredFonts().map((font) => font.sourceName)).toEqual(boldOnly);
       await finishLoad('/deferred/poster-book.otf');
       const fonts = await loading;
 
@@ -490,6 +543,7 @@ describe('browser font loader', () => {
       // ...while the registry reports the order the browser matches faces in.
       expect(listRegisteredFonts()).toEqual([
         { family: 'Poster', sourceName: 'Poster Bold.otf', weight: '700', style: 'normal', kind: 'bundled' },
+        { family: 'Poster Bold', sourceName: 'Poster Bold.otf', weight: '400', style: 'normal', kind: 'bundled' },
         { family: 'Poster', sourceName: 'Poster Book.otf', weight: '400', style: 'normal', kind: 'bundled' },
         { family: 'Poster', sourceName: 'Poster Regular.ttf', weight: '400', style: 'normal', kind: 'bundled' },
       ]);
@@ -509,6 +563,7 @@ describe('browser font loader', () => {
       expect(listRegisteredFonts()).toEqual([
         { family: 'Good One', sourceName: 'Good-One.ttf', weight: '400', style: 'normal', kind: 'bundled' },
         { family: 'Good One', sourceName: 'GoodOne-Bold.ttf', weight: '700', style: 'normal', kind: 'uploaded' },
+        { family: 'Good One Bold', sourceName: 'GoodOne-Bold.ttf', weight: '400', style: 'normal', kind: 'uploaded' },
       ]);
     });
 

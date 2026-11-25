@@ -429,6 +429,21 @@ describe('font references of the families text is set in', () => {
     ]);
   });
 
+  it('lists a Bold file as its family\'s bold face and as "<Family> Bold", once however often it is registered', () => {
+    const state = makeAvailable(createDefaultEditorState(), bold, regular, bold);
+    const boldEntry = { ...bold, family: 'Poster Sans Bold', weight: '400' as const };
+
+    expect(state.session.availableFonts).toEqual([bold, boldEntry, regular]);
+  });
+
+  it('references a Bold file by its "<Family> Bold" entry for text set in that entry alone', () => {
+    const state = makeAvailable(stateWithText('Poster Sans Bold'), regular, bold);
+
+    expect(state.document.fonts).toEqual([
+      { family: 'Poster Sans Bold', sourceName: 'PosterSans-Bold.ttf', kind: 'uploaded' },
+    ]);
+  });
+
   it('keeps an explicitly registered file first, whichever of the family was uploaded first', () => {
     const state = makeAvailable(createDefaultEditorState(), bold, regular);
 

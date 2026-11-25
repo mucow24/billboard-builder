@@ -2,6 +2,7 @@ import type { UploadedFont } from '../document/documentTypes';
 import { EMOJI_FALLBACK_UNICODE_RANGE, isEmojiFallbackFamily } from './emojiFallback';
 import { announceFontRegistration } from './fontRegistrations';
 import {
+  fontEntriesForFile,
   parseFontSourceName,
   type ParsedFontMetadata,
   type PersistedUploadedFont,
@@ -104,16 +105,44 @@ export function listRegisteredFonts(): UploadedFont[] {
   return fonts;
 }
 
+/**
+ * Load the faces of every font-list entry a font file stands for
+ * (`fontEntriesForFile`), the file's own entry first. None is registered: a
+ * file the browser cannot use adds nothing.
+ */
+function loadFontFaces(
+  metadata: ParsedFontMetadata,
+  source: ArrayBuffer | string
+): Promise<FontFace[]> {
+  return Promise.all(fontEntriesForFile(metadata).map((entry) => loadFontFace(entry, source)));
+}
+
+/**
+ * Register the faces `loadFontFaces` loaded for a file, and return the file's
+ * own entry. The others need no return of their own: the font list derives them
+ * from it, as this does.
+ */
+function registerFontFaces(
+  fontFaces: readonly FontFace[],
+  metadata: ParsedFontMetadata,
+  kind: UploadedFont['kind']
+): UploadedFont {
+  const [font] = fontEntriesForFile(metadata).map((entry, index) =>
+    registerFontFace(fontFaces[index], entry, kind)
+  );
+  return font;
+}
+
 export async function registerFontFile(file: File): Promise<UploadedFont> {
   const metadata = parseFontSourceName(file.name);
-  const fontFace = await loadFontFace(metadata, await file.arrayBuffer());
-  return registerFontFace(fontFace, metadata, 'uploaded');
+  const fontFaces = await loadFontFaces(metadata, await file.arrayBuffer());
+  return registerFontFaces(fontFaces, metadata, 'uploaded');
 }
 
 export async function registerUploadedFontBytes(
   record: PersistedUploadedFont,
 ): Promise<UploadedFont> {
-  return registerFontFace(await loadFontFace(record, record.bytes), record, 'uploaded');
+  return registerFontFaces(await loadFontFaces(record, record.bytes), record, 'uploaded');
 }
 
 export interface FontLoadOptions {
@@ -169,9 +198,9 @@ export function loadFontEntriesInStages(
       const variant = JSON.stringify([metadata.family, metadata.weight, metadata.style]);
       const earlierRegistrations = registrationsByVariant.get(variant) ?? [];
       const registration = (async () => {
-        const fontFace = await loadFontFace(metadata, entry.url);
+        const fontFaces = await loadFontFaces(metadata, entry.url);
         await Promise.allSettled(earlierRegistrations);
-        return registerFontFace(fontFace, metadata, 'bundled');
+        return registerFontFaces(fontFaces, metadata, 'bundled');
       })();
       registrationsByVariant.set(variant, [...earlierRegistrations, registration]);
       const settled = registration.then(
@@ -205,8 +234,11 @@ export function loadFontEntriesInStages(
     );
   };
 
-  const firstEntries = entries.filter((entry) => firstFamilies.has(entry.metadata.family));
-  const otherEntries = entries.filter((entry) => !firstFamilies.has(entry.metadata.family));
+  // A Bold file is needed first for its "<Family> Bold" entry as much as for its family's.
+  const isNeededFirst = (entry: (typeof entries)[number]) =>
+    fontEntriesForFile(entry.metadata).some((font) => firstFamilies.has(font.family));
+  const firstEntries = entries.filter(isNeededFirst);
+  const otherEntries = entries.filter((entry) => !isNeededFirst(entry));
   // With nothing to load first, the others start at once rather than a tick later.
   const first = firstEntries.length > 0 ? loadStage(firstEntries) : undefined;
   const others = first ? first.then(() => loadStage(otherEntries)) : loadStage(otherEntries);
