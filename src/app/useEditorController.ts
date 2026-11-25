@@ -10,6 +10,7 @@ import { useEditorShortcuts } from './useEditorShortcuts';
 import { useFavoritesController } from './useFavoritesController';
 import { useFileIOController } from './useFileIOController';
 import { useFontController } from './useFontController';
+import { useMissingGoogleFonts } from './useMissingGoogleFonts';
 import { useUploadedFontPersistence } from './useUploadedFontPersistence';
 import { findMissingFonts } from '../editor/fonts';
 import {
@@ -214,6 +215,12 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
     }
     setMissingFontFamilies(findMissingFonts(document.fonts, availableFonts));
   }, [availableFonts, document.fonts, fontsReady, setMissingFontFamilies]);
+  useMissingGoogleFonts({
+    missingFontFamilies,
+    documentFonts: document.fonts,
+    // Nobody asked for this import: an error on screen is not its to clear.
+    importGoogleFont: (request) => handleGoogleFontImport(request, { clearError: false }),
+  });
 
   useCanvasPersistence({ document, documentId: libraryState.documentId });
   useUploadedFontPersistence({

@@ -71,6 +71,11 @@ export function findFontForVariant(
   return undefined;
 }
 
+/**
+ * The families a document references that the session has no font for. A
+ * reference is to a font of its own kind, with one exception: a bundled font
+ * that is no longer shipped is supplied by an imported font of its family.
+ */
 export function findMissingFonts(
   fonts: DocumentFontReference[],
   availableFonts: UploadedFont[]
@@ -81,7 +86,8 @@ export function findMissingFonts(
       (font) =>
         !availableFonts.some(
           (availableFont) =>
-            availableFont.family === font.family && availableFont.kind === font.kind
+            availableFont.family === font.family &&
+            (availableFont.kind === font.kind || font.kind === 'bundled')
         )
     )
     .map((font) => font.family)
