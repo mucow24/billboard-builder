@@ -102,7 +102,14 @@ export function resolveBoldFont(
  */
 export function drawnFontOf<T extends FontOfText>(item: T, fonts: readonly FontFile[]): T {
   if (item.fontWeight !== 'bold') return item;
-  const bold = resolveBoldFont(item.fontFamily, item.fontStyle, fonts);
+  return inBoldFont(item, resolveBoldFont(item.fontFamily, item.fontStyle, fonts));
+}
+
+/**
+ * Bold `item` as it is drawn, given `bold`, what `resolveBoldFont` answers for
+ * it: `item` itself where that is nothing, or no other font than its own.
+ */
+export function inBoldFont<T extends FontOfText>(item: T, bold: ReturnType<typeof resolveBoldFont>): T {
   if (!bold || (bold.fontFamily === item.fontFamily && bold.fontWeight === item.fontWeight)) {
     return item;
   }

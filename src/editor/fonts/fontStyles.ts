@@ -1,5 +1,5 @@
 import type { TextCanvasItem, UploadedFont } from '../document/documentTypes';
-import { resolveBoldFont } from './boldWeight';
+import { inBoldFont, resolveBoldFont } from './boldWeight';
 import { listRegisteredFonts } from './browserFontLoader';
 import { textFontFamilies } from './emojiFallback';
 import { subscribeToFontRegistrations } from './fontRegistrations';
@@ -101,10 +101,7 @@ export function getDrawnFontItem<T extends Pick<TextCanvasItem, 'fontFamily' | '
     bold = resolveBoldFont(item.fontFamily, item.fontStyle, registeredFonts());
     drawnBoldFonts.set(key, bold);
   }
-  if (!bold || (bold.fontFamily === item.fontFamily && bold.fontWeight === item.fontWeight)) {
-    return item;
-  }
-  return { ...item, ...bold };
+  return inBoldFont(item, bold);
 }
 
 /**

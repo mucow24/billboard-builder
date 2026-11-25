@@ -72,11 +72,14 @@ export function textFontFamilies(family: string): string[] {
  * may be drawn with. It changes whenever what the browser draws such text with
  * may have changed: when a file of its own family arrives, or of a heavier
  * weight of its typeface, which its bold text is drawn in (see `boldWeight`),
- * and when the emoji fallback does.
+ * and when the emoji fallback does. Text that is known to have no bold
+ * (`hasBold` false) follows its own family alone, so that it is not drawn anew
+ * for every other weight of its typeface that arrives.
  */
-export function getTextFontRegistrationCount(family: string): number {
+export function getTextFontRegistrationCount(family: string, hasBold = true): number {
   const fallback = isEmojiFallbackFamily(family) ? 0 : getFontRegistrationCount(EMOJI_FALLBACK_FAMILY);
-  return getTypefaceRegistrationCount(family) + fallback;
+  const own = hasBold ? getTypefaceRegistrationCount(family) : getFontRegistrationCount(family);
+  return own + fallback;
 }
 
 /**

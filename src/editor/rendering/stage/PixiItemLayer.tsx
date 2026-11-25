@@ -39,6 +39,7 @@ import type {
 } from '../../document/documentTypes';
 import { drawnText, getTextFontRegistrationCount, textFontFamilies } from '../../fonts/emojiFallback';
 import { subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
+import { usesBold } from '../../fonts/boldWeight';
 import { getDrawnFontItem, getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
 import { computeGradientEndpoints, computeGradientTextureMatrix } from '../geometry/gradientGeometry';
@@ -693,11 +694,13 @@ const PixiTextContent = memo(function PixiTextContent({
   // the item changes when the file arrives, so follow the family instead: a
   // registration re-renders this layer, and every render measures, lays out
   // and rasterises the text anew. Layers in other typefaces are left alone.
-  // Every weight of the item's typeface counts as its family, since its bold
-  // text is drawn in a heavier one (see `boldWeight`), and so does the emoji
-  // fallback: the text may have characters only it can draw.
+  // For an item with bold text every weight of its typeface counts as its
+  // family, since the bold is drawn in a heavier one (see `boldWeight`). The
+  // emoji fallback counts for every item: the text may have characters only it
+  // can draw.
+  const hasBold = usesBold(item);
   const fontRegistrations = useSyncExternalStore(subscribeToFontRegistrations, () =>
-    getTextFontRegistrationCount(item.fontFamily),
+    getTextFontRegistrationCount(item.fontFamily, hasBold),
   );
 
   // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.

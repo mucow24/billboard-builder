@@ -143,8 +143,11 @@ let version = 0;
 
 const ownKey = (run: TextCanvasItem) =>
   `own|${fontVariantKey(run)}|${getTextFontRegistrationCount(run.fontFamily)}`;
+// The fallback is asked for in the weight the run is drawn in, which is regular
+// where a heavier weight of its typeface draws its bold (`drawnFontOf`): two
+// bold runs may need the fallback in different weights.
 const fallbackKey = (run: TextCanvasItem) =>
-  `fallback|${run.fontWeight}|${run.fontStyle}|${getTextFontRegistrationCount(EMOJI_FALLBACK_FAMILY)}`;
+  `fallback|${drawnFontOf(run, listRegisteredFonts()).fontWeight}|${run.fontStyle}|${getTextFontRegistrationCount(EMOJI_FALLBACK_FAMILY)}`;
 
 function changed(): void {
   version += 1;
