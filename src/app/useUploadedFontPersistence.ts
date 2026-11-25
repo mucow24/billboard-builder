@@ -7,6 +7,8 @@ import type { StoredFavorite } from '../editor/persistence/favoriteLibraryServic
 
 interface UseUploadedFontPersistenceArgs {
   documentFonts: DocumentFontReference[];
+  /** The imported font files behind the fonts starred in the font menu. */
+  favoriteFontFiles: DocumentFontReference[];
   favorites: StoredFavorite[];
   favoritesReady: boolean;
   /** The fonts used by the saved versions of the documents in the library. */
@@ -17,6 +19,7 @@ interface UseUploadedFontPersistenceArgs {
 
 export function useUploadedFontPersistence({
   documentFonts,
+  favoriteFontFiles,
   favorites,
   favoritesReady,
   libraryFonts,
@@ -36,7 +39,10 @@ export function useUploadedFontPersistence({
     // temporarily removes all canvas references before closing the window.
     hasPrunedOnBootstrapRef.current = true;
     void defaultUploadedFontPersistenceService.pruneUnreferenced(
-      collectRetainedUploadedFontReferences([...documentFonts, ...libraryFonts], favorites),
+      collectRetainedUploadedFontReferences(
+        [...documentFonts, ...libraryFonts, ...favoriteFontFiles],
+        favorites,
+      ),
     );
-  }, [documentFonts, favorites, favoritesReady, libraryFonts, libraryReady]);
+  }, [documentFonts, favoriteFontFiles, favorites, favoritesReady, libraryFonts, libraryReady]);
 }

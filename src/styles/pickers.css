@@ -52,13 +52,17 @@
 }
 
 .font-family-picker-popover {
-  position: absolute;
-  top: calc(100% - 1px);
-  /* 50% wider than the picker row, growing leftward (the inspector sits on
-     the right edge of the window). */
-  right: 0;
-  width: 150%;
-  z-index: 14;
+  /* One height for every line of the menu: a font, a weight, an import command. */
+  --font-menu-row-height: 1.7rem;
+  /* The size of the names in the menu: 12pt. */
+  --font-menu-text-size: 1rem;
+  /* The headers of the sections: they stay at the top while their section is scrolled through. */
+  --font-menu-header-height: 1.55rem;
+  /* Drawn on the page itself, not in the properties panel, which is narrower
+     than the menu and would clip it; FontFamilyPicker sets where it goes and
+     how wide it is. */
+  position: fixed;
+  z-index: 9999;
   padding: 3px;
   border: 1px solid var(--border-active);
   border-radius: 0 0 3px 3px;
@@ -68,35 +72,69 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-/* The ways to add a font: above the list of fonts, which scrolls under them,
-   and ruled off from it. */
-.font-family-picker-imports {
-  position: relative;
-  margin-bottom: 4px;
-  padding-bottom: 4px;
+/* Everything in the menu scrolls together, under the header of the section in view. */
+.font-family-picker-scroller {
+  max-height: min(30rem, var(--font-menu-list-room, 26rem));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.font-family-picker-imports::after {
-  content: '';
-  position: absolute;
-  left: 0.44rem;
-  right: 0.44rem;
-  bottom: 0;
-  height: 1px;
-  background: rgba(68, 143, 224, 0.32);
+.font-family-picker-listbox:focus-visible {
+  /* The menu around the list already has the border of an active control, and
+     the highlighted row shows where the keyboard is. */
+  outline: none;
+}
+
+/* A section's header looks like the headers of the properties pane. It is
+   pinned to the top of the menu while its section scrolls under it, and the
+   next section's header pushes it out: `sticky` holds it inside its section. */
+.font-menu-section-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: var(--font-menu-header-height);
+  min-height: 0;
+  cursor: pointer;
+  /* Opaque: rows pass under it. */
+  background: linear-gradient(180deg, #111a29, #0b121e);
+}
+
+.font-menu-section.expanded > .font-menu-section-toggle {
+  border-color: rgba(125, 211, 252, 0.36);
+}
+
+.font-menu-section-toggle:hover {
+  background: linear-gradient(180deg, #162338, #0e1726);
+}
+
+.font-menu-section-body,
+.font-family-picker-imports {
+  padding: 2px 0;
+}
+
+.font-menu-section-empty {
+  height: var(--font-menu-row-height);
+  /* In line with the names of the fonts. */
+  padding: 0 0.4rem 0 1.5rem;
+  color: var(--text-muted, #8fa2c4);
+  font-size: 0.74rem;
+  font-style: italic;
+  line-height: var(--font-menu-row-height);
 }
 
 .font-family-picker-import {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 2.1rem;
-  padding: 0.3rem 0.44rem;
+  height: var(--font-menu-row-height);
+  /* In line with the names of the fonts. */
+  padding: 0 0.4rem 0 1.5rem;
   border: none;
   border-radius: var(--radius-base);
   background: transparent;
   color: var(--text-primary);
-  font-size: 0.82rem;
+  font-size: var(--font-menu-text-size);
   font-weight: 600;
   cursor: pointer;
 }
@@ -105,23 +143,39 @@
   background: rgba(68, 143, 224, 0.16);
 }
 
-.font-family-picker-listbox {
-  max-height: 260px;
-  overflow: auto;
+/* Shown, but not to be had: this build has no key for Google Fonts. */
+.font-family-picker-import[aria-disabled='true'] {
+  color: var(--text-primary);
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
-/* The menu around the list already has the border of an active control, and
-   the highlighted row shows where the keyboard is. */
-.font-family-picker-listbox:focus-visible {
-  outline: none;
+.font-family-picker-import[aria-disabled='true']:hover {
+  background: transparent;
 }
 
+/* A font, or a family: [arrow] name [star]. The arrow's column is kept on
+   every row, so all the names start at the same place. */
 .font-family-picker-option {
-  min-height: 2.5rem;
-  padding: 0.38rem 0.44rem;
+  display: grid;
+  grid-template-columns: 0.8rem minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.3rem;
+  height: var(--font-menu-row-height);
+  padding: 0 0.15rem 0 0.4rem;
   border-radius: var(--radius-base);
   color: #f8fafc;
+  /* The size of the import commands, in the font's regular face. */
+  font-size: var(--font-menu-text-size);
+  font-style: normal;
+  font-weight: 400;
+  line-height: var(--font-menu-row-height);
   cursor: pointer;
+  /* Not hidden behind the header pinned at the top when the keyboard brings it into view. */
+  scroll-margin-top: var(--font-menu-header-height);
+  /* Nothing inside a row changes anything outside it: giving a row its font,
+     or highlighting it, lays out and paints that row alone. */
+  contain: layout paint;
 }
 
 .font-family-picker-option:hover,
@@ -134,8 +188,7 @@
 }
 
 .font-family-picker-option-text {
-  display: block;
-  font-size: 1.2em;
+  grid-column: 2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -143,35 +196,73 @@
 
 /* A family: one row for all the weights of a typeface, which opens a submenu
    of them to the left of the menu. */
-.font-family-picker-family {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
 .font-family-picker-family.open {
   background: rgba(68, 143, 224, 0.16);
 }
 
-.font-family-picker-family .font-family-picker-option-text {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 /* Points at where the submenu opens. */
 .font-family-picker-family-arrow {
-  flex: 0 0 auto;
+  justify-self: center;
   width: 0;
   height: 0;
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  border-right: 5px solid currentColor;
-  opacity: 0.72;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 7px solid #7dd3fc;
+}
+
+.font-family-picker-family:hover .font-family-picker-family-arrow,
+.font-family-picker-family.active .font-family-picker-family-arrow,
+.font-family-picker-family.open .font-family-picker-family-arrow {
+  border-right-color: #e0f2fe;
+}
+
+/* Marks the row as a favorite. Faint until the row or the star is pointed at,
+   so a column of them does not compete with the names. */
+.font-family-picker-star {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-base);
+  background: transparent;
+  color: #8fa2c4;
+  opacity: 0.45;
+  cursor: pointer;
+}
+
+.font-family-picker-star svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+
+.font-family-picker-option:hover .font-family-picker-star {
+  opacity: 0.85;
+}
+
+.font-family-picker-star:hover {
+  background: rgba(148, 163, 184, 0.18);
+  color: #f8fafc;
+  opacity: 1;
+}
+
+.font-family-picker-star[aria-pressed='true'] {
+  color: #fbbf24;
+  opacity: 1;
+}
+
+.font-family-picker-star[aria-pressed='true'] svg {
+  fill: currentColor;
 }
 
 /* Drawn on the page itself, not in the menu, which scrolls and would clip it;
    FontFamilyPicker sets where it goes. */
 .font-family-picker-submenu {
+  --font-menu-row-height: 1.7rem;
+  --font-menu-text-size: 1rem;
   position: fixed;
   z-index: 10000;
   width: max-content;
@@ -185,6 +276,16 @@
   border-radius: 3px;
   background: var(--surface-hover);
   box-shadow: 0 24px 44px rgba(2, 6, 23, 0.42);
+}
+
+/* A weight in the submenu: its name only. */
+.font-family-picker-member {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 0.5rem;
+}
+
+.font-family-picker-member .font-family-picker-option-text {
+  grid-column: 1;
 }
 
 /* ── Color picker ────────────────────────────────────────────────────────── */

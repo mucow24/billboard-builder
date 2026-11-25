@@ -7,6 +7,7 @@ import {
   type LeaveRequest,
 } from './useDocumentLibraryController';
 import { useEditorShortcuts } from './useEditorShortcuts';
+import { useFavoriteFontsController } from './useFavoriteFontsController';
 import { useFavoritesController } from './useFavoritesController';
 import { useFileIOController } from './useFileIOController';
 import { useFontController } from './useFontController';
@@ -155,6 +156,12 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
     setErrorMessage,
   });
 
+  const { favoriteFontFiles, favoriteFontNames, toggleFavoriteFont } = useFavoriteFontsController({
+    availableFonts,
+    registerAvailableFont,
+    setErrorMessage,
+  });
+
   const { handleFontUpload, handleGoogleFontImport } = useFontController({
     registerAvailableFont,
     setErrorMessage,
@@ -218,6 +225,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
   useCanvasPersistence({ document, documentId: libraryState.documentId });
   useUploadedFontPersistence({
     documentFonts: document.fonts,
+    favoriteFontFiles,
     favorites,
     favoritesReady,
     libraryFonts,
@@ -290,6 +298,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       setSelectionLocked,
       insertFavorite,
       toggleInspectorTab,
+      toggleFavoriteFont,
       toggleSelectedNode,
       undo,
       ungroupSelectedNode,
@@ -305,6 +314,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       document,
       documentId: libraryState.documentId,
       errorMessage,
+      favoriteFontNames,
       hasUnsavedChanges: libraryState.hasUnsavedChanges,
       inspectorPanel,
       leavePrompt,

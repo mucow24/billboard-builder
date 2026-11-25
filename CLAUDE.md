@@ -71,8 +71,8 @@ Playwright sets from that line; setting the variable yourself has no effect.
 
 "Import font from Google…" in the font menu calls the Google Fonts Developer
 API, which needs an API key. The build reads it from
-`VITE_GOOGLE_FONTS_API_KEY`; a build without it leaves the menu item out, and
-only "Import font from file…" is offered.
+`VITE_GOOGLE_FONTS_API_KEY`; a build without it lists the menu item greyed
+out, with a tooltip that says the key is missing.
 
 - **Local dev:** put the key in `.env.local` in the checkout
   (`VITE_GOOGLE_FONTS_API_KEY=...`). The file is git-ignored, so a new

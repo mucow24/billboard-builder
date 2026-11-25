@@ -18,8 +18,9 @@ import { Toolbar } from './editor/ui/Toolbar';
 import { PropertiesPanel } from './editor/ui/PropertiesPanel';
 import { createGeneratorItem } from './editor/document/documentDefaults';
 import { FontImportProvider } from './editor/ui/FontImportContext';
+import { FontMenuProvider } from './editor/ui/FontMenuContext';
 import type { GuideLine } from './editor/document/documentTypes';
-import { canGroupNodes, canReorderNodes, canUngroupNode, getNodeById, isGroupNode } from './editor/document/sceneGraph';
+import { canGroupNodes, canReorderNodes, canUngroupNode, collectLeafItems, getNodeById, isGroupNode } from './editor/document/sceneGraph';
 
 /**
  * The editor appears once startup has put the saved canvas in place, and the
@@ -62,7 +63,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
     [],
   );
   const getRendererHandle = useCallback(() => stageRef.current, []);
-  // Without a key for the Google Fonts API the font menu does not offer Google at all.
+  // Without a key for the Google Fonts API the font menu lists Google greyed out.
   const googleFontsApiKey = useMemo(() => getGoogleFontsApiKey(), []);
   const [googleFontDialogOpen, setGoogleFontDialogOpen] = useState(false);
   const importFontFromFile = useCallback(() => fontInputRef.current?.click(), []);
@@ -109,6 +110,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       setCanvasSize,
       setSelectionLocked,
       insertFavorite,
+      toggleFavoriteFont,
       toggleInspectorTab,
       toggleSelectedNode,
       undo,
@@ -125,6 +127,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       document,
       documentId,
       errorMessage,
+      favoriteFontNames,
       hasUnsavedChanges,
       inspectorPanel: { tab: inspectorTab, collapsed: panelCollapsed },
       layerRows,
@@ -152,6 +155,27 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
   const bundledFontFamilies = useMemo(
     () => availableFonts.filter((font) => font.kind === 'bundled').map((font) => font.family),
     [availableFonts],
+  );
+
+  // The fonts the text of the canvas is set in, for the font menu. The list is
+  // the same one until the fonts in use change, whatever else about the canvas
+  // does: the menu is not drawn again on every frame of a drag.
+  const canvasFontFamiliesKey = useMemo(
+    () =>
+      JSON.stringify(
+        [
+          ...new Set(
+            document.nodes
+              .flatMap(collectLeafItems)
+              .flatMap((item) => (item.kind === 'text' ? [item.fontFamily] : [])),
+          ),
+        ].sort(),
+      ),
+    [document.nodes],
+  );
+  const canvasFontFamilies = useMemo(
+    () => JSON.parse(canvasFontFamiliesKey) as string[],
+    [canvasFontFamiliesKey],
   );
 
   // Guides belong to the document they were dragged out for.
@@ -194,6 +218,11 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       <FontImportProvider
         importFromFile={importFontFromFile}
         importFromGoogle={googleFontsApiKey ? openGoogleFontDialog : null}
+      >
+      <FontMenuProvider
+        canvasFamilies={canvasFontFamilies}
+        favoriteNames={favoriteFontNames}
+        toggleFavorite={toggleFavoriteFont}
       >
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
@@ -356,6 +385,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
           </div>
         </div>
       </main>
+      </FontMenuProvider>
       </FontImportProvider>
 
       {libraryOpen ? (

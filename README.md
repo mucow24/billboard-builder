@@ -67,9 +67,11 @@ The dev server starts at `http://localhost:5173` with hot module replacement.
 
 Place `.ttf`, `.otf`, `.woff`, or `.woff2` files in `src/assets/fonts/`. The app automatically loads every supported font file in that directory at startup and adds it to the font picker.
 
-Users can also add fonts at runtime from the font menu: "Import font from file…" takes a font file, and "Import font from Google…" finds a family on Google Fonts by name and downloads the styles that are ticked. Imported fonts are stored in the browser (IndexedDB).
+Users can also add fonts at runtime from the font menu: "Import font from file…" takes a font file, and "Import font from Google…" finds a family on Google Fonts by name and downloads the styles that are ticked. Imported fonts are stored in the browser (IndexedDB) for as long as a canvas, a favorite or a starred font uses them.
 
-"Import font from Google…" uses the Google Fonts Developer API, which needs an API key. The build reads it from `VITE_GOOGLE_FONTS_API_KEY` (for local development, in a git-ignored `.env.local`); a build without it leaves that menu item out.
+The font menu lists the fonts of the open canvas and the starred ones above the full list. A star marks a font, or a family with all its weights, as a favorite; favorites are kept in the browser, apart from any canvas.
+
+"Import font from Google…" uses the Google Fonts Developer API, which needs an API key. The build reads it from `VITE_GOOGLE_FONTS_API_KEY` (for local development, in a git-ignored `.env.local`); a build without it lists that menu item greyed out.
 
 ### Rich text
 
