@@ -122,6 +122,8 @@ interface PixiCanvasSceneProps {
   toCanvasPointer: (pointer: Point) => Point;
   viewportPan: { x: number; y: number };
   zoom: number;
+  /** The zoom that text, SVG images and generators are rasterised for (see `useSettledZoom`). */
+  rasterZoom: number;
 }
 
 export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneProps>(
@@ -167,6 +169,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
       toCanvasPointer,
       viewportPan,
       zoom,
+      rasterZoom,
     },
     ref,
   ) {
@@ -458,6 +461,7 @@ export const PixiCanvasScene = forwardRef<CanvasRendererHandle, PixiCanvasSceneP
                   startPanDrag={startPanDrag}
                   toCanvasPointer={toCanvasPointer}
                   zoom={zoom}
+                  rasterZoom={rasterZoom}
                 />
               </pixiContainer>
               {/* The image being cropped is content too; its controls are not. */}

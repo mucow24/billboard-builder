@@ -172,11 +172,12 @@ async function waitForStartupAndFonts(
 
 /**
  * Texels per px the canvas rasterises text at: one per device pixel, and as many
- * more as the editor is zoomed in.
+ * more as the editor is zoomed in. The zoom that counts is the one the text was
+ * last drawn for, which follows the viewport's once that has held still.
  */
 async function textTexelsPerPx(page: Page): Promise<number> {
-  const { zoom } = (await readStageDebug(page)).viewport;
-  return Math.max(1, zoom) * (await page.evaluate(() => window.devicePixelRatio || 1));
+  const { rasterZoom } = (await readStageDebug(page)).viewport;
+  return Math.max(1, rasterZoom) * (await page.evaluate(() => window.devicePixelRatio || 1));
 }
 
 interface CaseReport {
@@ -799,13 +800,22 @@ test.describe('text rendering on the canvas', () => {
 
     // Past 100% the text is rasterised at the zoom level: a new texture at a
     // fractional scale.
+    expect((await readStageDebug(page)).viewport.rasterZoom).toBeLessThanOrEqual(1);
     for (let attempt = 0; attempt < 12; attempt += 1) {
       const { zoom } = (await readStageDebug(page)).viewport;
       if (zoom >= 1.5) break;
       await wheelAt(page, { x: CANVAS.width / 2, y: CANVAS.height / 2 }, -240);
       await expect.poll(async () => (await readStageDebug(page)).viewport.zoom).toBeGreaterThan(zoom);
     }
-    expect((await readStageDebug(page)).viewport.zoom).toBeGreaterThanOrEqual(1.5);
+    const { zoom } = (await readStageDebug(page)).viewport;
+    expect(zoom).toBeGreaterThanOrEqual(1.5);
+    // The text is drawn for the new zoom once the zoom has held still for a
+    // moment. Until then the export would show the texture of the old zoom.
+    await expect
+      .poll(async () => (await readStageDebug(page)).viewport.rasterZoom, {
+        message: 'waiting for text to be rasterised for the zoom',
+      })
+      .toBe(zoom);
 
     // The export scales that texture back down, which moves anti-aliased edges
     // and hairlines by a fraction of a pixel: compare where the ink ends, not

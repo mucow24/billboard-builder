@@ -25,6 +25,9 @@ export function formatDisplayedNumber(value: number, digits = 1): string {
   return Number(value.toFixed(digits)).toString();
 }
 
+/** Orders font families as the picker lists them: by name, whatever their case or accents. */
+const FONT_FAMILY_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' });
+
 /**
  * The fonts the font picker lists: the web-safe ones, every font file
  * available, and the fonts the document refers to.
@@ -33,11 +36,28 @@ export function formatDisplayedNumber(value: number, digits = 1): string {
  * and picked as a text's own font it would draw no ASCII character (see
  * `EMOJI_FALLBACK_UNICODE_RANGE`): the letters would come from the browser's
  * default font. A document that refers to it still lists it.
+ *
+ * The inspector builds this list on every render, so on every frame of a drag,
+ * and there are a couple of hundred fonts: each is looked up once to drop the
+ * ones listed twice, and one collator orders them all.
  */
 export function buildFontOptions(
   availableFonts: UploadedFont[],
   fonts: DocumentFontReference[],
 ): FontOption[] {
+  // The families already listed, by kind: the first of a family and kind stays.
+  const listedByKind = new Map<string, Set<string>>();
+  const isFirstOfItsKind = (font: FontOption) => {
+    let families = listedByKind.get(font.kind);
+    if (!families) {
+      families = new Set();
+      listedByKind.set(font.kind, families);
+    }
+    if (families.has(font.family)) return false;
+    families.add(font.family);
+    return true;
+  };
+
   return [
     ...WEB_SAFE_FONTS.map((family) => ({
       family,
@@ -50,16 +70,9 @@ export function buildFontOptions(
       kind: font.kind,
     })),
     ...fonts,
-  ].filter(
-    (font, index, list) =>
-      list.findIndex(
-        (entry) => entry.family === font.family && entry.kind === font.kind,
-      ) === index,
-  ).sort((left, right) =>
-    left.family.localeCompare(right.family, undefined, {
-      sensitivity: 'base',
-    }),
-  );
+  ]
+    .filter(isFirstOfItsKind)
+    .sort((left, right) => FONT_FAMILY_COLLATOR.compare(left.family, right.family));
 }
 
 export function getDefaultFontFamily(textItem?: TextCanvasItem): string {

@@ -68,10 +68,11 @@ export function createPixiRendererHandle(
       // blurred or shadowed item comes out cropped to its on-screen size,
       // moved by the pan, and blurred by a zoom-dependent amount. So for the
       // duration of the (synchronous) extract, take the viewport transform off
-      // the ancestors and set the filters for a zoom of 1. Nothing is drawn to
-      // the screen in between.
+      // the ancestors and set the filters for a zoom of 1, and for a file: on
+      // screen they cover only what is in view. Nothing is drawn to the screen
+      // in between.
       const restoreViewport = neutralizeAncestorTransforms(exportContainer);
-      configureZoomScaledFilters(exportContainer, 1, pixelRatio);
+      configureZoomScaledFilters(exportContainer, 1, pixelRatio, 'export');
       try {
         const canvas = extractStraightAlphaCanvas(app.renderer, {
           target: exportContainer,
@@ -82,7 +83,7 @@ export function createPixiRendererHandle(
         return canvas.toDataURL(mimeType);
       } finally {
         const zoom = restoreViewport();
-        configureZoomScaledFilters(exportContainer, zoom, app.renderer.resolution);
+        configureZoomScaledFilters(exportContainer, zoom, app.renderer.resolution, 'screen');
       }
     },
   };

@@ -1,4 +1,13 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   CanvasSource,
   CanvasTextMetrics,
@@ -10,9 +19,10 @@ import {
   Texture,
 } from 'pixi.js';
 import type { FederatedPointerEvent, Filter } from 'pixi.js';
-import { DropShadowFilter } from 'pixi-filters';
 
+import { gaussianBlurResolution } from './blurDownsampling';
 import { ClampingBlurFilter } from './clampingBlurFilter';
+import { DownsampledDropShadowFilter } from './downsampledDropShadowFilter';
 import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
 
 import type {
@@ -73,7 +83,7 @@ import type { TextOutlineShape } from '../../io/svg/svgExportTypes';
 import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
 import { measureTextBaselineShift } from './textBaselineShift';
 import { getTextMeasuringContext, measureTextRasterPadding } from './textRasterPadding';
-import { registerZoomScaledFilter } from './zoomScaledFilters';
+import { configureZoomScaledFilter, registerZoomScaledFilter } from './zoomScaledFilters';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
 const ZERO_PIVOT = { x: 0, y: 0 } as const;
@@ -662,7 +672,19 @@ function VectorTextOutline({
 // before React re-renders the text layers that follow the registration.
 subscribeToFontRegistrations(() => CanvasTextMetrics.clearMetrics());
 
-function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number }) {
+// Memoised: every render gives each Pixi text a new style object, which Pixi
+// takes as a new style and rasterises the text for again. So this renders only
+// for a change to the item or to the zoom it is rasterised for, not whenever
+// the item view does (a pointer handler changing during a drag of another
+// item, the space bar, a zoom step that leaves `zoom` here as it was).
+const PixiTextContent = memo(function PixiTextContent({
+  item,
+  zoom,
+}: {
+  item: TextCanvasItem;
+  /** The zoom the text is rasterised for (see `useSettledZoom`). */
+  zoom: number;
+}) {
   // The text is rasterised with whatever the browser has for its family at that
   // moment: a fallback font, if the family's file has not been registered yet
   // (bundled fonts still loading at startup, an uploaded font restored after
@@ -729,7 +751,7 @@ function PixiTextContent({ item, zoom }: { item: TextCanvasItem; zoom: number })
       {shown.slice(under).map(pixiTextOf)}
     </>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Individual item drawers
@@ -857,7 +879,14 @@ function buildImageAdjustmentFilters(
 // Image content component (uses hooks for async image loading + masking)
 // ---------------------------------------------------------------------------
 
-export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zoom?: number }) {
+export const PixiImageContent = memo(function PixiImageContent({
+  item,
+  zoom = 1,
+}: {
+  item: ImageCanvasItem;
+  /** The zoom an SVG source is rasterised for (see `useSettledZoom`). */
+  zoom?: number;
+}) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
 
@@ -972,7 +1001,7 @@ export function PixiImageContent({ item, zoom = 1 }: { item: ImageCanvasItem; zo
       </pixiContainer>
     </>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // Generator content component (renders full-canvas pattern via Canvas2D texture)
@@ -987,7 +1016,7 @@ function quantizeGeneratorPixelScale(zoom: number): number {
   return 4;
 }
 
-function PixiGeneratorContent({
+const PixiGeneratorContent = memo(function PixiGeneratorContent({
   item,
   canvasWidth,
   canvasHeight,
@@ -996,6 +1025,7 @@ function PixiGeneratorContent({
   item: GeneratorCanvasItem;
   canvasWidth: number;
   canvasHeight: number;
+  /** The zoom the pattern is rasterised for (see `useSettledZoom`). */
   zoom: number;
 }) {
   const pixelScale = quantizeGeneratorPixelScale(zoom);
@@ -1042,7 +1072,7 @@ function PixiGeneratorContent({
       eventMode="none"
     />
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // PixiItemLayer component
@@ -1070,6 +1100,12 @@ interface PixiItemLayerProps {
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   zoom: number;
+  /**
+   * The zoom that text, SVG images and generators are rasterised for: `zoom`
+   * once it has held still (`useSettledZoom`), so that a run of zoom steps
+   * scales the textures that are there instead of drawing each anew.
+   */
+  rasterZoom: number;
 }
 
 export function PixiItemLayer({
@@ -1084,6 +1120,7 @@ export function PixiItemLayer({
   startPanDrag,
   toCanvasPointer,
   zoom,
+  rasterZoom,
 }: PixiItemLayerProps) {
   const interactive = activeTool === 'select';
 
@@ -1101,6 +1138,7 @@ export function PixiItemLayer({
             onItemPointerDown={onItemPointerDown}
             onItemDoubleClick={onItemDoubleClick}
             onItemHoverChange={onItemHoverChange}
+            rasterZoom={rasterZoom}
             spacebarHeld={spacebarHeld}
             startPanDrag={startPanDrag}
             toCanvasPointer={toCanvasPointer}
@@ -1120,9 +1158,12 @@ interface PixiItemViewProps {
   onItemPointerDown: PixiItemLayerProps['onItemPointerDown'];
   onItemDoubleClick: PixiItemLayerProps['onItemDoubleClick'];
   onItemHoverChange: PixiItemLayerProps['onItemHoverChange'];
+  /** The zoom the item's content is rasterised for: `zoom`, once it has settled. */
+  rasterZoom: number;
   spacebarHeld: boolean;
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
+  /** The zoom on screen, which the item's filters follow step by step. */
   zoom: number;
 }
 
@@ -1134,6 +1175,7 @@ const PixiItemView = memo(function PixiItemView({
   onItemPointerDown,
   onItemDoubleClick,
   onItemHoverChange,
+  rasterZoom,
   spacebarHeld,
   startPanDrag,
   toCanvasPointer,
@@ -1238,14 +1280,24 @@ const PixiItemView = memo(function PixiItemView({
   // Build combined filters: blur + shadow (text handles its own shadow via dropShadow style).
   // DropShadowFilter is a post-processing effect that operates in screen space,
   // so offset and blur must be scaled by the current zoom to match item-space values.
+  //
+  // The filters are built once per item, not once per zoom: every
+  // zoom-dependent setting is written by the function registered with the
+  // filter, which runs before the filter is first drawn and whenever the zoom
+  // changes (the layout effect below), and which the PNG export calls for its
+  // own 1:1 scale and to put the filters back (see zoomScaledFilters.ts).
+  //
+  // On screen a filter covers only the part of the item that is in view
+  // (`clipToViewport`), plus its padding. The padding is as far as the blur
+  // reaches, so everything a pixel in view is blurred from is still drawn,
+  // and what is in view comes out the same as from the whole item. The whole
+  // item, with a wide blur around it, is several times the screen once it is
+  // zoomed in on: every pass over it costs that much more, and so do the
+  // textures it is drawn into. An export covers the whole item.
   const itemFilters = useMemo(() => {
     const filters: Filter[] = [];
-    const dpr = window.devicePixelRatio || 1;
     const maxTextureSize = getMaxTextureSize();
     const itemMaxDim = Math.max(renderBox.width, renderBox.height, 1);
-    // Every zoom-dependent setting is written by the function registered with
-    // the filter, so the PNG export can set the same filters for its own 1:1
-    // scale and put them back (see zoomScaledFilters.ts).
     if (item.blurRadius > 0) {
       const blurRadius = item.blurRadius;
       // ClampingBlurFilter is a Gaussian BlurFilter with shaders that clamp
@@ -1254,12 +1306,9 @@ const PixiItemView = memo(function PixiItemView({
       // of-two textures whose pixels between the frame and po2 boundary
       // keep stale data from previous use, and the blur kernel pulls those
       // bright values into the result. Clamping eliminates that read.
-      const blurFilter = new ClampingBlurFilter({
-        strength: blurRadius * zoom,
-        clipToViewport: false,
-      });
+      const blurFilter = new ClampingBlurFilter({ strength: blurRadius });
       filters.push(
-        registerZoomScaledFilter(blurFilter, zoom, dpr, (filterZoom, baseResolution) => {
+        registerZoomScaledFilter(blurFilter, (filterZoom, baseResolution, target) => {
           const strength = blurRadius * filterZoom;
           blurFilter.strength = strength;
           // With clamping in place, padding determines where the visible blur
@@ -1268,7 +1317,14 @@ const PixiItemView = memo(function PixiItemView({
           // so pad to 6× for a smooth fadeout.
           blurFilter.padding = strength * 6;
           const blurRegionPx = (itemMaxDim + blurFilter.padding * 2) * filterZoom;
-          blurFilter.resolution = clampRasterResolution(baseResolution, blurRegionPx, maxTextureSize);
+          const resolution = clampRasterResolution(baseResolution, blurRegionPx, maxTextureSize);
+          // On screen the item is drawn and blurred on a smaller texture,
+          // which looks the same; a file gets every pass at full size.
+          blurFilter.resolution =
+            target === 'screen'
+              ? Math.min(resolution, gaussianBlurResolution(baseResolution, strength))
+              : resolution;
+          blurFilter.clipToViewport = target === 'screen';
         }),
       );
     }
@@ -1276,16 +1332,13 @@ const PixiItemView = memo(function PixiItemView({
       const s = item.shadow;
       const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
       if (hasShadow) {
-        const shadowFilter = new DropShadowFilter({
+        const shadowFilter = new DownsampledDropShadowFilter({
           color: s.color,
           alpha: s.opacity,
-          blur: (s.blur / 2) * zoom,
-          offset: { x: s.offsetX * zoom, y: s.offsetY * zoom },
           quality: 8,
         });
-        shadowFilter.clipToViewport = false;
         filters.push(
-          registerZoomScaledFilter(shadowFilter, zoom, dpr, (filterZoom, baseResolution) => {
+          registerZoomScaledFilter(shadowFilter, (filterZoom, baseResolution, target) => {
             const shadowBlur = (s.blur / 2) * filterZoom;
             const shadowOffsetX = s.offsetX * filterZoom;
             const shadowOffsetY = s.offsetY * filterZoom;
@@ -1301,12 +1354,25 @@ const PixiItemView = memo(function PixiItemView({
               32;
             const shadowRegionPx = (itemMaxDim + shadowFilter.padding * 2) * filterZoom;
             shadowFilter.resolution = clampRasterResolution(baseResolution, shadowRegionPx, maxTextureSize);
+            shadowFilter.clipToViewport = target === 'screen';
+            // On screen the shadow is blurred on a smaller texture, which
+            // looks the same; a file gets every pass at full size.
+            shadowFilter.downsampleBlur = target === 'screen';
           }),
         );
       }
     }
     return filters.length > 0 ? filters : undefined;
-  }, [item.blurRadius, item.shadow, item.kind, renderBox.width, renderBox.height, zoom]);
+  }, [item.blurRadius, item.shadow, item.kind, renderBox.width, renderBox.height]);
+
+  // A layout effect: it runs in the commit that gives the container its
+  // filters or the viewport its zoom, so no frame is drawn with one and not
+  // the other.
+  useLayoutEffect(() => {
+    if (!itemFilters) return;
+    const dpr = window.devicePixelRatio || 1;
+    for (const filter of itemFilters) configureZoomScaledFilter(filter, zoom, dpr);
+  }, [itemFilters, zoom]);
 
   const shapeHitArea = useMemo(
     () => new Rectangle(0, 0, renderBox.width, renderBox.height),
@@ -1363,7 +1429,7 @@ const PixiItemView = memo(function PixiItemView({
           item={item as GeneratorCanvasItem}
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
-          zoom={zoom}
+          zoom={rasterZoom}
         />
       </pixiContainer>
     );
@@ -1372,9 +1438,11 @@ const PixiItemView = memo(function PixiItemView({
   // All other items share the same container layout (position, rotation, hitArea).
   let children: React.ReactNode;
   if (item.kind === 'text') {
-    children = <PixiTextContent item={item} zoom={zoom} />;
+    // Text is rasterised the same at every zoom up to 100%: one value for all
+    // of them, so that zooming there renders nothing anew.
+    children = <PixiTextContent item={item} zoom={Math.max(1, rasterZoom)} />;
   } else if (item.kind === 'image') {
-    children = <PixiImageContent item={item as ImageCanvasItem} zoom={zoom} />;
+    children = <PixiImageContent item={item as ImageCanvasItem} zoom={rasterZoom} />;
   } else {
     children = <pixiGraphics draw={draw} eventMode="none" />;
   }

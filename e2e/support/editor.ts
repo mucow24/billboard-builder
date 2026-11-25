@@ -46,6 +46,8 @@ export interface StageDebugInfo {
   } | null;
   viewport: {
     zoom: number;
+    /** The zoom text is rasterised for: `zoom`, once it has held still for a moment. */
+    rasterZoom: number;
     panX: number;
     panY: number;
   };
