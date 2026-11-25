@@ -36,8 +36,14 @@ jobs:
 
       # Production build uses a relative base (see vite.config.ts), so the same
       # dist/ resolves under the /billboard-builder/ Pages subpath and at root.
+      # The key for the Google Fonts API is a repository variable, not a secret:
+      # it ends up in the page's scripts either way, and is protected by its
+      # restriction to this site's addresses. Without it the build has no
+      # "Import font from Google…".
       - name: Build
         run: npm run build
+        env:
+          VITE_GOOGLE_FONTS_API_KEY: ${{ vars.GOOGLE_FONTS_API_KEY }}
 
       - uses: actions/configure-pages@v5
 

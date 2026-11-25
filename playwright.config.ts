@@ -11,7 +11,13 @@ import { defineConfig, devices } from '@playwright/test';
 // Do not add `port`, `url` or `reuseExistingServer` to `webServer`: with any
 // of them Playwright probes an address and accepts whatever answers there,
 // which is how a run used to end up testing another checkout's build.
-const playwrightEnv = { ...process.env };
+//
+// The build under test is given a placeholder key for the Google Fonts API, in
+// place of whatever key the machine has: "Import font from Google…" is only in
+// the font menu of a build that has a key. No spec reaches Google with it; the
+// specs that open the dialog answer its requests themselves (see
+// e2e/support/googleFonts.ts).
+const playwrightEnv = { ...process.env, VITE_GOOGLE_FONTS_API_KEY: 'e2e-placeholder-key' };
 
 // Playwright child processes set FORCE_COLOR, which makes Node warn if NO_COLOR is inherited too.
 delete playwrightEnv.NO_COLOR;

@@ -67,7 +67,9 @@ The dev server starts at `http://localhost:5173` with hot module replacement.
 
 Place `.ttf`, `.otf`, `.woff`, or `.woff2` files in `src/assets/fonts/`. The app automatically loads every supported font file in that directory at startup and adds it to the font picker.
 
-Users can also upload fonts at runtime through the editor UI. Uploaded fonts are persisted in local storage.
+Users can also add fonts at runtime from the font menu: "Import font from file…" takes a font file, and "Import font from Google…" finds a family on Google Fonts by name and downloads the styles that are ticked. Imported fonts are stored in the browser (IndexedDB).
+
+"Import font from Google…" uses the Google Fonts Developer API, which needs an API key. The build reads it from `VITE_GOOGLE_FONTS_API_KEY` (for local development, in a git-ignored `.env.local`); a build without it leaves that menu item out.
 
 ### Rich text
 

@@ -155,7 +155,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
     setErrorMessage,
   });
 
-  const { handleFontUpload } = useFontController({
+  const { handleFontUpload, handleGoogleFontImport } = useFontController({
     registerAvailableFont,
     setErrorMessage,
   });
@@ -262,6 +262,7 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
       handleExportSvg,
       handleExportToClipboard,
       handleFontUpload,
+      handleGoogleFontImport,
       handleImageUpload,
       handleMakeCopy,
       handleNewProject,

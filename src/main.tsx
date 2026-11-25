@@ -17,6 +17,7 @@ import './styles/inspector-list.css';
 import './styles/pickers.css';
 import './styles/layers.css';
 import './styles/library.css';
+import './styles/google-fonts.css';
 
 const runtimeFlags = readEditorRuntimeFlags();
 const app = <App />;

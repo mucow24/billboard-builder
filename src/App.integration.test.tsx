@@ -326,7 +326,7 @@ describe('App integration', () => {
       expect(useEditorStore.getState().editor.document.nodes.flatMap(collectLeafItems).some((item) => item.kind === 'image')).toBe(true);
     });
 
-    // Font upload UI path (font picker → Import font…) is covered by e2e tests;
+    // Font upload UI path (font picker → Import font from file…) is covered by e2e tests;
     // here we verify the processing pipeline via the hidden input directly.
     fireEvent.change(screen.getByTestId('font-upload-input'), {
       target: {

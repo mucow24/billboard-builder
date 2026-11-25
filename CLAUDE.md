@@ -67,6 +67,26 @@ Playwright sets from that line; setting the variable yourself has no effect.
 - Two runs in the *same* checkout still share one `dist/` folder; do not
   overlap those.
 
+## Google Fonts
+
+"Import font from Google…" in the font menu calls the Google Fonts Developer
+API, which needs an API key. The build reads it from
+`VITE_GOOGLE_FONTS_API_KEY`; a build without it leaves the menu item out, and
+only "Import font from file…" is offered.
+
+- **Local dev:** put the key in `.env.local` in the checkout
+  (`VITE_GOOGLE_FONTS_API_KEY=...`). The file is git-ignored, so a new
+  worktree does not have it: copy it from a checkout that does.
+- **Deploy:** the Pages workflow takes the key from the repository variable
+  `GOOGLE_FONTS_API_KEY`.
+- **E2E:** the build under test gets a placeholder key from
+  `playwright.config.ts`, and the specs answer every Google request
+  themselves (`e2e/support/googleFonts.ts`). No test reaches Google.
+
+The key is in the page's scripts, so it is not a secret. What protects it is
+its restriction in the Google Cloud console to this site's addresses and to
+the Web Fonts Developer API. Never commit it.
+
 ## PR Review
 
 Open every PR description with a `## Problem` section: one or two sentences

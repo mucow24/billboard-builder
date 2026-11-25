@@ -3,6 +3,8 @@
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 node_modules
+.env.local
+.env.*.local
 dist
 coverage
 playwright-report
