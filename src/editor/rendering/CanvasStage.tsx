@@ -34,6 +34,24 @@ export interface CanvasStageProps {
   stageRef: React.RefObject<CanvasRendererHandle | null>;
 }
 
+/**
+ * A press on the stage can change the selection, and the browser moves focus
+ * only after the press has been handled. A field outside the stage that enters
+ * its value on blur (the inspector's number boxes) would then enter it for the
+ * newly selected item. Taking focus from it first, before the scene sees the
+ * press, enters the value for the selection it was edited for.
+ */
+function commitFocusedField(event: React.PointerEvent<HTMLElement>) {
+  const stage = event.currentTarget;
+  const active = stage.ownerDocument.activeElement;
+  if (
+    (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+    !stage.contains(active)
+  ) {
+    active.blur();
+  }
+}
+
 export function CanvasStage({
   debugMode = false,
   showCanvasTestHooks = false,
@@ -234,6 +252,7 @@ export function CanvasStage({
       // The node the hover outline is drawn around, if any.
       data-hover-outline={hoverOutline?.nodeId}
       style={{ cursor: viewport.getStageCursor(Boolean(session)) }}
+      onPointerDownCapture={commitFocusedField}
     >
       <CanvasViewportHud
         canvasHeight={document.canvas.height}
