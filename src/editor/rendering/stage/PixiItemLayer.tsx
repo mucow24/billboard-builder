@@ -23,6 +23,12 @@ import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { gaussianBlurResolution } from './blurDownsampling';
 import { ClampingBlurFilter } from './clampingBlurFilter';
 import { DownsampledDropShadowFilter } from './downsampledDropShadowFilter';
+import {
+  blurFilterPadding,
+  hasVisibleShadow,
+  itemFilterPadding,
+  shadowFilterPadding,
+} from './itemFilterPadding';
 import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
 
 import type {
@@ -882,10 +888,16 @@ function buildImageAdjustmentFilters(
 export const PixiImageContent = memo(function PixiImageContent({
   item,
   zoom = 1,
+  filterZoom = 1,
 }: {
   item: ImageCanvasItem;
   /** The zoom an SVG source is rasterised for (see `useSettledZoom`). */
   zoom?: number;
+  /**
+   * The zoom the item is drawn at now, if the item has a blur or a shadow
+   * filter around this content: the adjustment filters are padded for it.
+   */
+  filterZoom?: number;
 }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
@@ -952,9 +964,31 @@ export const PixiImageContent = memo(function PixiImageContent({
     // max texture size on large items at extreme zoom (clipping shows up as
     // rectangular edges on filtered output).
     const filterResolution = Math.min(2, Math.max(1, zoom)) * (window.devicePixelRatio || 1);
-    for (const f of filters) f.resolution = filterResolution;
+    // Pixi draws a filter only where its object is in view, and these are
+    // inside the item's blur and shadow filters, which read past the view by
+    // their padding: a shadow is cast by a part of the image that is out of
+    // view, a blur at the edge of the view mixes in what lies beyond it. With
+    // the same padding the adjusted image is drawn everywhere they read. (Not
+    // by drawing the whole image instead: zoomed in, that is many times the
+    // screen on every frame.) The padding depends on the zoom, on screen and
+    // in an export: see zoomScaledFilters.ts.
+    const outer = { kind: item.kind, blurRadius: item.blurRadius, shadow: item.shadow };
+    for (const f of filters) {
+      f.resolution = filterResolution;
+      registerZoomScaledFilter(f, (outerZoom) => {
+        f.padding = itemFilterPadding(outer, outerZoom);
+      });
+    }
     return filters;
-  }, [item.adjustments, zoom]);
+  }, [item.adjustments, item.kind, item.blurRadius, item.shadow, zoom]);
+
+  // A layout effect, as for the item's own filters: no frame is drawn with
+  // the padding of another zoom.
+  useLayoutEffect(() => {
+    if (!adjustmentFilters) return;
+    const dpr = window.devicePixelRatio || 1;
+    for (const filter of adjustmentFilters) configureZoomScaledFilter(filter, filterZoom, dpr);
+  }, [adjustmentFilters, filterZoom]);
 
   const drawClipMask = useCallback(
     (g: Graphics) => {
@@ -1311,11 +1345,7 @@ const PixiItemView = memo(function PixiItemView({
         registerZoomScaledFilter(blurFilter, (filterZoom, baseResolution, target) => {
           const strength = blurRadius * filterZoom;
           blurFilter.strength = strength;
-          // With clamping in place, padding determines where the visible blur
-          // halo ends. Pixi's auto-padding (strength*2) cuts the Gaussian tail
-          // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
-          // so pad to 6× for a smooth fadeout.
-          blurFilter.padding = strength * 6;
+          blurFilter.padding = blurFilterPadding(blurRadius, filterZoom);
           const blurRegionPx = (itemMaxDim + blurFilter.padding * 2) * filterZoom;
           const resolution = clampRasterResolution(baseResolution, blurRegionPx, maxTextureSize);
           // On screen the item is drawn and blurred on a smaller texture,
@@ -1330,8 +1360,7 @@ const PixiItemView = memo(function PixiItemView({
     }
     if (item.kind !== 'text') {
       const s = item.shadow;
-      const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
-      if (hasShadow) {
+      if (hasVisibleShadow(s)) {
         const shadowFilter = new DownsampledDropShadowFilter({
           color: s.color,
           alpha: s.opacity,
@@ -1344,14 +1373,9 @@ const PixiItemView = memo(function PixiItemView({
             const shadowOffsetY = s.offsetY * filterZoom;
             shadowFilter.blur = shadowBlur;
             shadowFilter.offset = { x: shadowOffsetX, y: shadowOffsetY };
-            // DropShadowFilter wraps a Kawase blur whose reach scales with
-            // blur × quality. Auto-padding (offset + blur*2 + quality*4) clips
-            // the tail; extend it the same way as BlurFilter. Set last: the
-            // blur and offset setters reset the padding to the auto value.
-            shadowFilter.padding =
-              Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
-              shadowBlur * 6 +
-              32;
+            // Set last: the blur and offset setters reset the padding to the
+            // auto value.
+            shadowFilter.padding = shadowFilterPadding(s, filterZoom);
             const shadowRegionPx = (itemMaxDim + shadowFilter.padding * 2) * filterZoom;
             shadowFilter.resolution = clampRasterResolution(baseResolution, shadowRegionPx, maxTextureSize);
             shadowFilter.clipToViewport = target === 'screen';
@@ -1442,7 +1466,15 @@ const PixiItemView = memo(function PixiItemView({
     // of them, so that zooming there renders nothing anew.
     children = <PixiTextContent item={item} zoom={Math.max(1, rasterZoom)} />;
   } else if (item.kind === 'image') {
-    children = <PixiImageContent item={item as ImageCanvasItem} zoom={rasterZoom} />;
+    // The live zoom only where there is a filter to pad for: without one the
+    // content is not rendered again while zooming.
+    children = (
+      <PixiImageContent
+        item={item as ImageCanvasItem}
+        zoom={rasterZoom}
+        filterZoom={itemFilters ? zoom : 1}
+      />
+    );
   } else {
     children = <pixiGraphics draw={draw} eventMode="none" />;
   }
