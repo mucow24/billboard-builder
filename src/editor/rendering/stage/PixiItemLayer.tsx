@@ -882,10 +882,16 @@ function buildImageAdjustmentFilters(
 export const PixiImageContent = memo(function PixiImageContent({
   item,
   zoom = 1,
+  adjustmentsOnItem = false,
 }: {
   item: ImageCanvasItem;
   /** The zoom an SVG source is rasterised for (see `useSettledZoom`). */
   zoom?: number;
+  /**
+   * The item's container applies the colour adjustments, ahead of its blur
+   * and shadow filters (see `itemFilters`): the sprite gets none here.
+   */
+  adjustmentsOnItem?: boolean;
 }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
@@ -945,6 +951,7 @@ export const PixiImageContent = memo(function PixiImageContent({
   }, [texture, svgCanvas]);
 
   const adjustmentFilters = useMemo(() => {
+    if (adjustmentsOnItem) return undefined;
     const filters = buildImageAdjustmentFilters(item.adjustments);
     if (!filters) return undefined;
     // Match filter resolution to displayed size so color-corrected pixels
@@ -954,7 +961,7 @@ export const PixiImageContent = memo(function PixiImageContent({
     const filterResolution = Math.min(2, Math.max(1, zoom)) * (window.devicePixelRatio || 1);
     for (const f of filters) f.resolution = filterResolution;
     return filters;
-  }, [item.adjustments, zoom]);
+  }, [adjustmentsOnItem, item.adjustments, zoom]);
 
   const drawClipMask = useCallback(
     (g: Graphics) => {
@@ -1277,6 +1284,8 @@ const PixiItemView = memo(function PixiItemView({
     [item.kind, item.x, item.y, item.width, item.height, item.scaleX, item.scaleY],
   );
 
+  const imageAdjustments = item.kind === 'image' ? (item as ImageCanvasItem).adjustments : undefined;
+
   // Build combined filters: blur + shadow (text handles its own shadow via dropShadow style).
   // DropShadowFilter is a post-processing effect that operates in screen space,
   // so offset and blur must be scaled by the current zoom to match item-space values.
@@ -1362,8 +1371,25 @@ const PixiItemView = memo(function PixiItemView({
         );
       }
     }
-    return filters.length > 0 ? filters : undefined;
-  }, [item.blurRadius, item.shadow, item.kind, renderBox.width, renderBox.height]);
+    if (filters.length === 0) return undefined;
+    // An image's colour adjustments go first in the same list, not onto the
+    // sprite inside (where PixiImageContent puts them for an image with
+    // neither blur nor shadow). Pixi draws a filter only where its object is
+    // in view, a nested one too, while the blur and the shadow read past the
+    // view by their padding: nested, the adjusted image ended at the edge of
+    // the view for them, so the shadow of a part out of view was missing and
+    // a blur faded out towards the edge. In one list all the filters work on
+    // one area. The container holds nothing but the image, and the
+    // adjustments leave alpha alone, so the result is the same otherwise.
+    const adjustmentFilters = imageAdjustments ? buildImageAdjustmentFilters(imageAdjustments) : undefined;
+    if (adjustmentFilters) {
+      // Pixi runs a list at the lowest resolution of its filters: these take
+      // whatever the blur and the shadow are set to.
+      for (const f of adjustmentFilters) f.resolution = Number.POSITIVE_INFINITY;
+      filters.unshift(...adjustmentFilters);
+    }
+    return filters;
+  }, [item.blurRadius, item.shadow, item.kind, imageAdjustments, renderBox.width, renderBox.height]);
 
   // A layout effect: it runs in the commit that gives the container its
   // filters or the viewport its zoom, so no frame is drawn with one and not
@@ -1442,7 +1468,13 @@ const PixiItemView = memo(function PixiItemView({
     // of them, so that zooming there renders nothing anew.
     children = <PixiTextContent item={item} zoom={Math.max(1, rasterZoom)} />;
   } else if (item.kind === 'image') {
-    children = <PixiImageContent item={item as ImageCanvasItem} zoom={rasterZoom} />;
+    children = (
+      <PixiImageContent
+        item={item as ImageCanvasItem}
+        zoom={rasterZoom}
+        adjustmentsOnItem={Boolean(itemFilters)}
+      />
+    );
   } else {
     children = <pixiGraphics draw={draw} eventMode="none" />;
   }
