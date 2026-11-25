@@ -250,6 +250,28 @@ describe('GoogleFontImportDialog', () => {
     expect(onImport.mock.calls[0][0].variants.map((variant) => variant.key)).toEqual(['900']);
   });
 
+  it('leaves out a style whose bundled font arrives after the family was picked', async () => {
+    const user = userEvent.setup();
+    const onImport = vi.fn<OnImport>(async (request) => ({
+      added: request.variants.length,
+      failed: [],
+    }));
+    const props = { apiKey: 'test-key', existingFamilies: [], onClose: vi.fn(), onImport };
+    const { rerender } = render(<GoogleFontImportDialog {...props} bundledFamilies={[]} />);
+
+    await user.type(screen.getByRole('combobox', { name: 'Font name' }), 'playfair{Enter}');
+    expect(screen.getByRole('button', { name: 'Add 4 fonts' })).toBeEnabled();
+
+    rerender(<GoogleFontImportDialog {...props} bundledFamilies={['Playfair Display Black']} />);
+    await user.click(screen.getByRole('button', { name: 'Add 3 fonts' }));
+
+    expect(onImport.mock.calls[0][0].variants.map((variant) => variant.key)).toEqual([
+      'regular',
+      'italic',
+      '700',
+    ]);
+  });
+
   it('adds nothing of a family that is bundled whole', async () => {
     const user = userEvent.setup();
     const { input } = renderDialog({ bundledFamilies: ['Playball', 'Play'] });

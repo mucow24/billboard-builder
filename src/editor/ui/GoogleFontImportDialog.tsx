@@ -359,8 +359,11 @@ export function GoogleFontImportDialog({
   const activeSuggestionIndex = Math.min(activeIndex, suggestions.length - 1);
   const activeSuggestion = suggestions[activeSuggestionIndex];
   const importing = importState.status === 'running';
+  // A style ticked before a bundled font of its name was in the list is left out too.
   const checkedVariants = picked
-    ? picked.variants.filter((variant) => checkedKeys.has(variant.key))
+    ? picked.variants.filter(
+        (variant) => checkedKeys.has(variant.key) && !pickedBundledKeys.has(variant.key),
+      )
     : [];
 
   function pick(family: GoogleFontFamily) {
