@@ -5,7 +5,10 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 export interface FontImportActions {
   /** Opens the file chooser for a font file. */
   importFromFile: () => void;
-  /** Opens the Google Fonts dialog. Null when this build cannot reach Google Fonts. */
+  /**
+   * Opens the Google Fonts dialog. Null when this build has no key for Google
+   * Fonts: the menu then lists the command greyed out.
+   */
   importFromGoogle: (() => void) | null;
 }
 

@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { useCallback, useState } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FontFamilyPicker } from './FontFamilyPicker';
 import { FontImportProvider } from './FontImportContext';
+import { FontMenuProvider } from './FontMenuContext';
 
 const FONT_OPTIONS = [
   { family: 'Arial', sourceName: 'Arial', kind: 'system' as const },
@@ -180,15 +182,26 @@ describe('FontFamilyPicker', () => {
     expect(onChange).toHaveBeenLastCalledWith('Georgia');
   });
 
-  it('renders open-menu previews with a larger font size', async () => {
+  it('names each font in a tooltip, for the fonts whose preview cannot be read', async () => {
     const user = userEvent.setup();
     const { trigger } = renderFontFamilyPicker();
 
     await user.click(trigger);
 
-    expect(screen.getByRole('option', { name: 'Georgia' })).toHaveStyle({
-      fontSize: '1.3em',
-    });
+    expect(screen.getByRole('option', { name: 'Georgia' })).toHaveAttribute('title', 'Georgia');
+  });
+
+  it('lists the fonts under one header, without stars, outside the editor', async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderFontFamilyPicker();
+
+    await user.click(trigger);
+
+    expect(
+      screen.getAllByRole('group').map((section) => section.getAttribute('data-testid')),
+    ).toEqual(['font-menu-section-all']);
+    expect(screen.getByRole('button', { name: 'All fonts' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.queryByRole('button', { name: /favorites/ })).not.toBeInTheDocument();
   });
 
   it('shows a mixed trigger state while still cycling from the first selected value', async () => {
@@ -352,17 +365,16 @@ describe('FontFamilyPicker families', () => {
     try {
       const { trigger } = renderFamilyPicker();
       fireEvent.click(trigger);
-      // React takes pointerenter from pointerover.
-      fireEvent.pointerOver(screen.getByRole('option', { name: 'Barlow' }));
+      fireEvent.pointerMove(screen.getByRole('option', { name: 'Barlow' }));
       expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
 
-      fireEvent.pointerOver(screen.getByRole('option', { name: 'Georgia' }));
+      fireEvent.pointerMove(screen.getByRole('option', { name: 'Georgia' }));
       act(() => {
         vi.advanceTimersByTime(100);
       });
       expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
 
-      // Reaching the submenu in time keeps it.
+      // Reaching the submenu in time keeps it. React takes pointerenter from pointerover.
       fireEvent.pointerOver(screen.getByRole('listbox', { name: 'Barlow weights' }));
       act(() => {
         vi.advanceTimersByTime(1000);
@@ -370,7 +382,7 @@ describe('FontFamilyPicker families', () => {
       expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
 
       // Staying on another row closes it.
-      fireEvent.pointerOver(screen.getByRole('option', { name: 'Georgia' }));
+      fireEvent.pointerMove(screen.getByRole('option', { name: 'Arial' }));
       act(() => {
         vi.advanceTimersByTime(1000);
       });
@@ -378,6 +390,53 @@ describe('FontFamilyPicker families', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('closes a submenu when the pointer leaves the menu and does not go to the submenu', async () => {
+    vi.useFakeTimers();
+    try {
+      const { trigger } = renderFamilyPicker();
+      fireEvent.click(trigger);
+      const family = screen.getByRole('option', { name: 'Barlow' });
+      fireEvent.pointerMove(family);
+      expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
+
+      // React takes pointerleave from pointerout: here, out of the menu onto the page.
+      fireEvent.pointerOut(family, { relatedTarget: document.body });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.queryByRole('listbox', { name: 'Barlow weights' })).not.toBeInTheDocument();
+      expect(screen.getByRole('listbox', { name: 'Font family' })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not open the submenus of the rows that scroll past under a resting pointer', async () => {
+    const { trigger } = renderFamilyPicker();
+    fireEvent.click(trigger);
+    fireEvent.pointerMove(screen.getByRole('option', { name: 'Arial' }), { clientX: 40, clientY: 40 });
+
+    // The list scrolls, and the browser reports the row now under the pointer.
+    fireEvent.scroll(screen.getByTestId('font-family-picker-scroller'));
+    fireEvent.pointerMove(screen.getByRole('option', { name: 'Barlow' }), { clientX: 40, clientY: 40 });
+    expect(screen.queryByRole('listbox', { name: 'Barlow weights' })).not.toBeInTheDocument();
+
+    // The pointer itself moving onto the row opens it.
+    fireEvent.pointerMove(screen.getByRole('option', { name: 'Barlow' }), { clientX: 41, clientY: 40 });
+    expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
+
+    // A scroll that leaves the row where it is, reported late, changes nothing.
+    fireEvent.scroll(screen.getByTestId('font-family-picker-scroller'));
+    expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
+
+    // Scrolling on closes it: its row is moving away.
+    const family = screen.getByRole('option', { name: 'Barlow' });
+    vi.spyOn(family, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, -30, 100, 20));
+    fireEvent.scroll(screen.getByTestId('font-family-picker-scroller'));
+    expect(screen.queryByRole('listbox', { name: 'Barlow weights' })).not.toBeInTheDocument();
   });
 
   it('closes on a pointerdown outside the menu and its submenu, not on one inside the submenu', async () => {
@@ -485,15 +544,242 @@ describe('FontFamilyPicker imports', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('does not offer Google when the build cannot reach it', async () => {
+  it('lists Google greyed out, with the reason, when the build has no key for it', async () => {
     const user = userEvent.setup();
-    const { trigger } = renderWithImports(null);
+    const { importFromFile, trigger } = renderWithImports(null);
 
     await user.click(trigger);
 
     expect(screen.getByRole('button', { name: 'Import font from file…' })).toBeInTheDocument();
+    const google = screen.getByRole('button', { name: 'Import font from Google…' });
+    expect(google).toHaveAttribute('aria-disabled', 'true');
+    expect(google.title).toContain('VITE_GOOGLE_FONTS_API_KEY');
+
+    // Clicking it does nothing, and the menu stays open.
+    await user.click(google);
+    expect(importFromFile).not.toHaveBeenCalled();
+    expect(screen.getByRole('listbox', { name: 'Font family' })).toBeInTheDocument();
+  });
+
+  it('does not grey Google out when the build has a key for it', async () => {
+    const user = userEvent.setup();
+    const { trigger } = renderWithImports(vi.fn());
+
+    await user.click(trigger);
+
+    const google = screen.getByRole('button', { name: 'Import font from Google…' });
+    expect(google).not.toHaveAttribute('aria-disabled');
+    expect(google).not.toHaveAttribute('title');
+  });
+});
+
+describe('FontFamilyPicker sections', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  interface HarnessProps {
+    canvasFamilies?: string[];
+    initialFavorites?: string[];
+    onChange?: (family: string) => void;
+    onToggleFavorite?: (name: string) => void;
+    value?: string;
+  }
+
+  /** The picker as the editor shows it: with the import commands, the canvas's fonts and favorites that are kept. */
+  function Harness({
+    canvasFamilies = ['Arial'],
+    initialFavorites = [],
+    onChange = () => {},
+    onToggleFavorite,
+    value = 'Arial',
+  }: HarnessProps) {
+    const [favoriteNames, setFavoriteNames] = useState(initialFavorites);
+    const toggleFavorite = useCallback(
+      (name: string) => {
+        onToggleFavorite?.(name);
+        setFavoriteNames((current) =>
+          current.includes(name) ? current.filter((other) => other !== name) : [...current, name],
+        );
+      },
+      [onToggleFavorite],
+    );
+    return (
+      <FontImportProvider importFromFile={() => {}} importFromGoogle={null}>
+        <FontMenuProvider
+          canvasFamilies={canvasFamilies}
+          favoriteNames={favoriteNames}
+          toggleFavorite={toggleFavorite}
+        >
+          <span id="font-family-label">Font family</span>
+          <FontFamilyPicker
+            fonts={FAMILY_FONT_OPTIONS}
+            labelId="font-family-label"
+            onChange={onChange}
+            value={value}
+          />
+        </FontMenuProvider>
+      </FontImportProvider>
+    );
+  }
+
+  const section = (id: string) => within(screen.getByTestId(`font-menu-section-${id}`));
+  const rowNames = (id: string) =>
+    section(id)
+      .queryAllByRole('option')
+      .map((row) => row.textContent);
+
+  it('lists the import commands, the fonts of the canvas, the favorites and every font, each under a header', async () => {
+    const user = userEvent.setup();
+    render(<Harness canvasFamilies={['Georgia', 'Barlow Light']} initialFavorites={['Arial']} />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+
+    const popover = screen.getByTestId('font-family-picker-scroller');
     expect(
-      screen.queryByRole('button', { name: 'Import font from Google…' }),
-    ).not.toBeInTheDocument();
+      [...popover.querySelectorAll('.font-menu-section-toggle')].map((header) => header.textContent),
+    ).toEqual(['Import▾', 'In this canvas▾', 'Favorites▾', 'All fonts▾']);
+    expect(section('import').getByRole('button', { name: 'Import font from file…' })).toBeInTheDocument();
+    // A family is in the canvas when one of its weights is.
+    expect(rowNames('canvas')).toEqual(['Barlow', 'Georgia']);
+    expect(rowNames('favorites')).toEqual(['Arial']);
+    // Every font, the ones of the other sections included.
+    expect(rowNames('all')).toEqual(['Arial', 'Barlow', 'Georgia']);
+  });
+
+  it('says so when a section has nothing in it', async () => {
+    const user = userEvent.setup();
+    render(<Harness canvasFamilies={[]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+
+    expect(rowNames('favorites')).toEqual([]);
+    expect(section('favorites').getByText('Star a font to keep it here.')).toBeInTheDocument();
+    expect(section('canvas').getByText('No text on the canvas yet.')).toBeInTheDocument();
+  });
+
+  it('shows one star for a font wherever it is listed, and keeps the menu open when it is clicked', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+    const menu = screen.getByRole('listbox', { name: 'Font family' });
+    expect(screen.getAllByRole('button', { name: 'Add Arial to favorites' })).toHaveLength(2);
+
+    await user.click(section('all').getByRole('button', { name: 'Add Arial to favorites' }));
+
+    // In the canvas, in the favorites and in the full list: the same filled star.
+    expect(rowNames('favorites')).toEqual(['Arial']);
+    const stars = screen.getAllByRole('button', { name: 'Remove Arial from favorites' });
+    expect(stars).toHaveLength(3);
+    for (const star of stars) {
+      expect(star).toHaveAttribute('aria-pressed', 'true');
+    }
+    expect(
+      section('all').getByRole('button', { name: 'Add Georgia to favorites' }),
+    ).toHaveAttribute('aria-pressed', 'false');
+    // Starring picks nothing, and the keys still go to the list.
+    expect(onChange).not.toHaveBeenCalled();
+    expect(menu).toHaveFocus();
+
+    await user.click(section('canvas').getByRole('button', { name: 'Remove Arial from favorites' }));
+
+    expect(rowNames('favorites')).toEqual([]);
+    expect(screen.getAllByRole('button', { name: 'Add Arial to favorites' })).toHaveLength(2);
+    expect(screen.getByRole('listbox', { name: 'Font family' })).toBeInTheDocument();
+  });
+
+  it('stars a family as a whole, by its name', async () => {
+    const user = userEvent.setup();
+    const onToggleFavorite = vi.fn();
+    render(<Harness onToggleFavorite={onToggleFavorite} />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+    await user.click(screen.getByRole('button', { name: 'Add Barlow to favorites' }));
+
+    expect(onToggleFavorite).toHaveBeenCalledWith('Barlow');
+    // The favorite is the family's row, which opens the same submenu.
+    const favorite = section('favorites').getByRole('option', { name: 'Barlow' });
+    await user.click(favorite);
+    expect(favorite).toHaveAttribute('aria-expanded', 'true');
+    expect(section('all').getByRole('option', { name: 'Barlow' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(screen.getByRole('listbox', { name: 'Barlow weights' })).toBeInTheDocument();
+  });
+
+  it('marks the selected font in every section, and opens on its first row', async () => {
+    const user = userEvent.setup();
+    render(<Harness canvasFamilies={['Georgia']} initialFavorites={['Georgia']} value="Georgia" />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+
+    const rows = screen.getAllByRole('option', { name: 'Georgia' });
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(row).toHaveAttribute('aria-selected', 'true');
+    }
+    expect(
+      screen.getByRole('listbox', { name: 'Font family' }).getAttribute('aria-activedescendant'),
+    ).toBe(section('canvas').getByRole('option', { name: 'Georgia' }).id);
+  });
+
+  it('moves through the rows of all sections with the arrow keys', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness canvasFamilies={['Georgia']} onChange={onChange} value="Georgia" />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+    const menu = screen.getByRole('listbox', { name: 'Font family' });
+    // From the one row of the canvas, past the empty favorites, into the full list.
+    await user.keyboard('{ArrowDown}');
+    expect(menu.getAttribute('aria-activedescendant')).toBe(
+      section('all').getByRole('option', { name: 'Arial' }).id,
+    );
+    await user.keyboard('{End}');
+    expect(menu.getAttribute('aria-activedescendant')).toBe(
+      section('all').getByRole('option', { name: 'Georgia' }).id,
+    );
+    await user.keyboard('{Home}{ArrowDown}{Enter}');
+
+    expect(onChange).toHaveBeenCalledWith('Arial');
+  });
+
+  it('closes and opens a section from its header, and remembers which are closed', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<Harness />);
+
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+    const menu = screen.getByRole('listbox', { name: 'Font family' });
+    const header = screen.getByRole('button', { name: 'All fonts' });
+    await user.click(header);
+
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(rowNames('all')).toEqual([]);
+    expect(rowNames('canvas')).toEqual(['Arial']);
+    expect(menu).toHaveFocus();
+    // The keyboard stays within the rows that are shown.
+    await user.keyboard('{End}');
+    expect(menu.getAttribute('aria-activedescendant')).toBe(
+      section('canvas').getByRole('option', { name: 'Arial' }).id,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Import' }));
+    expect(screen.queryByRole('button', { name: 'Import font from file…' })).not.toBeInTheDocument();
+
+    unmount();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Font family' }));
+
+    expect(screen.getByRole('button', { name: 'All fonts' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'Import' })).toHaveAttribute('aria-expanded', 'false');
+    await user.click(screen.getByRole('button', { name: 'All fonts' }));
+    expect(rowNames('all')).toEqual(['Arial', 'Barlow', 'Georgia']);
   });
 });

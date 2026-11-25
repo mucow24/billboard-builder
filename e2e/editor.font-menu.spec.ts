@@ -12,9 +12,11 @@ import {
 } from './support/editor';
 import { mockGoogleFonts, type GoogleFontFixture } from './support/googleFonts';
 import {
+  collectPersistedTextFontFamilies,
   expectPersistedCanvasFontFiles,
   expectPersistedCanvasToReferenceFontFamily,
   expectStoredUploadedFontFiles,
+  readPersistedCanvasDocument,
 } from './support/persistence';
 
 // The stand-in Google Fonts. Each style of the family under test is served as
@@ -45,6 +47,10 @@ const GOOGLE_FONTS: GoogleFontFixture[] = [
 
 const trigger = (page: Page) => page.getByTestId('font-family-picker-trigger');
 const menu = (page: Page) => page.getByTestId('font-family-picker-listbox');
+/** A section of the menu: 'import', 'canvas', 'favorites' or 'all'. */
+const section = (page: Page, id: string) => page.getByTestId(`font-menu-section-${id}`);
+/** The full list. A font is also a row of each other section it belongs to. */
+const allFonts = (page: Page) => section(page, 'all');
 const submenu = (page: Page) => page.getByTestId('font-family-picker-submenu');
 
 async function openEditorWithSelectedText(page: Page) {
@@ -79,9 +85,9 @@ test.describe('font menu', () => {
     await trigger(page).click();
 
     // One row for the family, and none for its weights.
-    const family = menu(page).getByRole('option', { name: 'Barlow', exact: true });
+    const family = allFonts(page).getByRole('option', { name: 'Barlow', exact: true });
     await expect(family).toHaveAttribute('aria-expanded', 'false');
-    await expect(menu(page).getByRole('option', { name: /^Barlow / })).toHaveCount(0);
+    await expect(allFonts(page).getByRole('option', { name: /^Barlow / })).toHaveCount(0);
     await expect(submenu(page)).toHaveCount(0);
 
     await family.scrollIntoViewIfNeeded();
@@ -119,10 +125,13 @@ test.describe('font menu', () => {
     await expect(submenu(page)).toHaveCount(0);
     await expectPersistedCanvasToReferenceFontFamily(page, 'Barlow Thin', ['Barlow Thin']);
 
-    // Reopened, the menu is on the family, and its submenu on the weight in use.
+    // Reopened, the menu is on the family, now one of the canvas's fonts, and
+    // its submenu on the weight in use.
     await trigger(page).click();
+    const familyInCanvas = section(page, 'canvas').getByRole('option', { name: 'Barlow', exact: true });
+    await expect(familyInCanvas).toHaveAttribute('aria-selected', 'true');
+    await expect(familyInCanvas).toBeInViewport();
     await expect(family).toHaveAttribute('aria-selected', 'true');
-    await expect(family).toBeInViewport();
     await page.keyboard.press('ArrowLeft');
     await expect(submenu(page).getByRole('option', { name: 'Barlow Thin' })).toHaveAttribute(
       'aria-selected',
@@ -137,7 +146,7 @@ test.describe('font menu', () => {
     await openEditorWithSelectedText(page);
     await waitForBundledFonts(page);
     await trigger(page).click();
-    await menu(page).getByRole('option', { name: 'Barlow', exact: true }).click();
+    await allFonts(page).getByRole('option', { name: 'Barlow', exact: true }).click();
     await submenu(page).getByRole('option', { name: 'Barlow Regular' }).click();
     await expect(trigger(page)).toHaveText('Barlow');
 
@@ -156,7 +165,7 @@ test.describe('font menu', () => {
     await waitForBundledFonts(page);
 
     await trigger(page).click();
-    const family = menu(page).getByRole('option', { name: 'Barlow', exact: true });
+    const family = allFonts(page).getByRole('option', { name: 'Barlow', exact: true });
     await family.scrollIntoViewIfNeeded();
     await family.hover();
     await submenu(page).getByRole('option', { name: 'Barlow Bold' }).click();
@@ -170,7 +179,7 @@ test.describe('font menu', () => {
 
     // Super16Bit is published in Bold and Bold Oblique only: one row, named for what it draws.
     await trigger(page).click();
-    await expect(menu(page).getByRole('option', { name: /^Super16Bit/ })).toHaveText(['Super16Bit Bold']);
+    await expect(allFonts(page).getByRole('option', { name: /^Super16Bit/ })).toHaveText(['Super16Bit Bold']);
   });
 
   test('imports a family from Google Fonts into the menu', async ({ page }) => {
@@ -265,7 +274,7 @@ test.describe('font menu', () => {
 
     // The family is one row of the menu, its weights in the submenu, Bold among them.
     await trigger(page).click();
-    const family = menu(page).getByRole('option', { name: 'Testfont Grotesk', exact: true });
+    const family = allFonts(page).getByRole('option', { name: 'Testfont Grotesk', exact: true });
     await family.scrollIntoViewIfNeeded();
     await family.click();
     await expect(submenu(page).getByRole('option')).toHaveText(['Light', 'Regular', 'Bold', 'Black']);
@@ -376,5 +385,176 @@ test.describe('font menu', () => {
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
     await expect(trigger(page)).toHaveText('Arial');
+  });
+
+  test('lays the menu out in sections, wider than the panel, with headers that stay at the top', async ({ page }) => {
+    await openEditorWithSelectedText(page);
+    await waitForBundledFonts(page);
+    await trigger(page).click();
+
+    const scroller = page.getByTestId('font-family-picker-scroller');
+    const header = (id: string) => section(page, id).locator('.font-menu-section-toggle');
+    await expect(scroller.locator('.font-menu-section-toggle')).toHaveText([
+      /^Import/,
+      /^In this canvas/,
+      /^Favorites/,
+      /^All fonts/,
+    ]);
+    await expect(section(page, 'import').getByRole('button', { name: /^Import font from/ })).toHaveText([
+      'Import font from file…',
+      'Import font from Google…',
+    ]);
+    await expect(section(page, 'canvas').getByRole('option')).toHaveText(['Arial']);
+    await expect(section(page, 'favorites')).toContainText('Star a font to keep it here.');
+
+    // The menu is wider than the properties panel, and all of it shows: the
+    // panel does not clip it, and it is wholly on the page.
+    const menuBox = (await page.locator('.font-family-picker-popover').boundingBox())!;
+    const panelBox = (await page.locator('.properties-panel').boundingBox())!;
+    const viewport = page.viewportSize()!;
+    expect(menuBox.width).toBeGreaterThan(panelBox.width);
+    expect(menuBox.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport.width);
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(viewport.height);
+    expect(
+      await page.evaluate(
+        ([x, y]) =>
+          Boolean(document.elementFromPoint(x, y)?.closest('.font-family-picker-popover')),
+        [menuBox.x + 6, menuBox.y + 12] as const,
+      ),
+    ).toBe(true);
+
+    // The names start at the same place, with or without the arrow of a family
+    // before them, and a font's name is also its tooltip.
+    const barlow = allFonts(page).getByRole('option', { name: 'Barlow', exact: true });
+    const arial = allFonts(page).getByRole('option', { name: 'Arial', exact: true });
+    const nameLeft = async (row: typeof barlow) =>
+      (await row.locator('.font-family-picker-option-text').boundingBox())!.x;
+    expect(await nameLeft(barlow)).toBe(await nameLeft(arial));
+    await expect(barlow.locator('.font-family-picker-family-arrow')).toBeVisible();
+    await expect(barlow).toHaveAttribute('title', 'Barlow');
+    // A preview is the size of the import commands.
+    expect(await arial.evaluate((row) => getComputedStyle(row).fontSize)).toBe(
+      await page
+        .getByRole('button', { name: 'Import font from file…' })
+        .evaluate((button) => getComputedStyle(button).fontSize),
+    );
+
+    // A row far down the list is given its font when it comes near view, not before.
+    const lastRow = allFonts(page).getByRole('option').last();
+    await expect(arial).toHaveAttribute('data-preview-shown', 'true');
+    await expect(lastRow).not.toHaveAttribute('data-preview-shown', 'true');
+
+    // Scrolled into the full list, its header is at the top of the menu and
+    // the ones before it are gone.
+    await scroller.evaluate((element) => {
+      element.scrollTop = 1500;
+    });
+    const scrollerBox = (await scroller.boundingBox())!;
+    const pinnedBox = (await header('all').boundingBox())!;
+    expect(Math.abs(pinnedBox.y - scrollerBox.y)).toBeLessThan(1);
+    await expect(header('import')).not.toBeInViewport();
+    await expect(header('favorites')).not.toBeInViewport();
+
+    await lastRow.scrollIntoViewIfNeeded();
+    await expect(lastRow).toHaveAttribute('data-preview-shown', 'true');
+    expect(await lastRow.evaluate((row) => row.style.fontFamily)).not.toBe('');
+
+    // A header closes its section, and opens it again.
+    await header('all').click();
+    await expect(header('all')).toHaveAttribute('aria-expanded', 'false');
+    await expect(allFonts(page).getByRole('option')).toHaveCount(0);
+    await expect(section(page, 'canvas').getByRole('option')).toHaveText(['Arial']);
+    await header('all').click();
+    await expect(arial).toBeVisible();
+  });
+
+  test('closes a submenu when the list scrolls or the pointer leaves the menu', async ({ page }) => {
+    await openEditorWithSelectedText(page);
+    await waitForBundledFonts(page);
+    await trigger(page).click();
+
+    const family = allFonts(page).getByRole('option', { name: 'Barlow', exact: true });
+    await family.scrollIntoViewIfNeeded();
+    await family.hover();
+    await expect(submenu(page)).toBeVisible();
+
+    // The wheel moves the rows under a pointer that stays where it is: the
+    // submenu goes, and none opens for the families that pass under the pointer.
+    await page.mouse.wheel(0, 300);
+    await expect(submenu(page)).toHaveCount(0);
+    await page.mouse.wheel(0, -300);
+    await page.waitForTimeout(400);
+    await expect(submenu(page)).toHaveCount(0);
+
+    // Moving the pointer brings a submenu back; leaving the menu for the canvas closes it.
+    await family.hover({ position: { x: 60, y: 6 } });
+    await expect(submenu(page)).toBeVisible();
+    await page.mouse.move(300, 300, { steps: 5 });
+    await expect(submenu(page)).toHaveCount(0);
+    await expect(menu(page)).toBeVisible();
+  });
+
+  test('stars a font in every section that lists it, and keeps favorites across a reload, imported fonts too', async ({ page }) => {
+    await mockGoogleFonts(page, GOOGLE_FONTS);
+    await openEditorWithSelectedText(page);
+    await waitForBundledFonts(page);
+
+    // An imported font that no canvas uses.
+    await trigger(page).click();
+    await page.getByRole('button', { name: 'Import font from Google…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import font from Google' });
+    await dialog.getByRole('combobox', { name: 'Font name' }).pressSequentially('testfont d');
+    await dialog.getByRole('option').first().click();
+    await dialog.getByRole('button', { name: 'Add font' }).click();
+    await expect(dialog).toHaveCount(0);
+    await expectStoredUploadedFontFiles(page, ['TestfontDisplay-Regular.ttf']);
+
+    await trigger(page).click();
+    const favorites = section(page, 'favorites');
+    await allFonts(page).getByRole('button', { name: 'Add Arial to favorites' }).click();
+    await allFonts(page).getByRole('button', { name: 'Add Testfont Display to favorites' }).click();
+    await allFonts(page).getByRole('button', { name: 'Add Barlow to favorites' }).click();
+
+    // Starring picks nothing and leaves the menu open.
+    await expect(trigger(page)).toHaveText('Arial');
+    await expect(favorites.getByRole('option')).toHaveText(['Arial', 'Barlow', 'Testfont Display']);
+    // Arial is in the canvas, in the favorites and in the full list: one star, shown in each.
+    await expect(page.getByRole('button', { name: 'Remove Arial from favorites' })).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Remove Barlow from favorites' })).toHaveCount(2);
+    await expect(
+      section(page, 'canvas').getByRole('button', { name: 'Remove Arial from favorites' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    // A starred family is its row, submenu and all.
+    await favorites.getByRole('option', { name: 'Barlow', exact: true }).hover();
+    await expect(submenu(page).getByRole('option', { name: 'Barlow Black' })).toBeVisible();
+
+    // The saved canvas does not use the imported font; only the favorite keeps it.
+    await expect
+      .poll(async () => {
+        const saved = await readPersistedCanvasDocument(page);
+        const nodes = Array.isArray(saved?.nodes) ? saved.nodes : [];
+        return nodes.flatMap((node) => collectPersistedTextFontFamilies(node));
+      })
+      .toEqual(['Arial']);
+    await page.reload();
+    await waitForEditor(page);
+    await selectTextLayer(page);
+    await waitForBundledFonts(page);
+    await trigger(page).click();
+
+    await expect(favorites.getByRole('option')).toHaveText(['Arial', 'Barlow', 'Testfont Display']);
+    await expectStoredUploadedFontFiles(page, ['TestfontDisplay-Regular.ttf']);
+    expect(await measureSample(page, 'Testfont Display')).toBe(await measureSample(page, 'Righteous'));
+
+    // Unstarred from any of its rows, it is unstarred in all, and leaves the favorites.
+    await favorites.getByRole('button', { name: 'Remove Arial from favorites' }).click();
+    await expect(favorites.getByRole('option')).toHaveText(['Barlow', 'Testfont Display']);
+    await expect(page.getByRole('button', { name: 'Add Arial to favorites' })).toHaveCount(2);
+
+    // A favorite is picked like any other row.
+    await favorites.getByRole('option', { name: 'Testfont Display', exact: true }).click();
+    await expect(trigger(page)).toHaveText('Testfont Display');
+    await expect(menu(page)).toHaveCount(0);
   });
 });
