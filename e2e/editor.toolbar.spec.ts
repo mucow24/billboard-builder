@@ -333,7 +333,7 @@ test.describe('editor toolbar flows', () => {
 
     const [fontChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Import font…' }).click(),
+      page.getByRole('button', { name: 'Import font from file…' }).click(),
     ]);
     await fontChooser.setFiles(path.join(process.cwd(), 'src/assets/fonts/CalSans-Regular.ttf'));
 

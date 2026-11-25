@@ -152,7 +152,7 @@ export async function uploadNamedFontFromPath(
   await page.getByTestId('font-family-picker-trigger').click();
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Import font…' }).click(),
+    page.getByRole('button', { name: 'Import font from file…' }).click(),
   ]);
   await chooser.setFiles({
     name: uploadedName,

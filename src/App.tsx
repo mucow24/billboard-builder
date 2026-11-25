@@ -9,7 +9,9 @@ import { useKeyHeld } from './app/useKeyHeld';
 import { useStatusToast } from './app/useStatusToast';
 import { removeBootShell } from './bootstrapShell';
 import { CanvasStage } from './editor/rendering/CanvasStage';
+import { getGoogleFontsApiKey } from './editor/fonts/googleFonts/googleFontsApi';
 import { DocumentLibraryDialog } from './editor/ui/DocumentLibraryDialog';
+import { GoogleFontImportDialog } from './editor/ui/GoogleFontImportDialog';
 import { UnsavedChangesDialog } from './editor/ui/UnsavedChangesDialog';
 import { ToolPalette } from './editor/ui/ToolPalette';
 import { Toolbar } from './editor/ui/Toolbar';
@@ -60,6 +62,12 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
     [],
   );
   const getRendererHandle = useCallback(() => stageRef.current, []);
+  // Without a key for the Google Fonts API the font menu does not offer Google at all.
+  const googleFontsApiKey = useMemo(() => getGoogleFontsApiKey(), []);
+  const [googleFontDialogOpen, setGoogleFontDialogOpen] = useState(false);
+  const importFontFromFile = useCallback(() => fontInputRef.current?.click(), []);
+  const openGoogleFontDialog = useCallback(() => setGoogleFontDialogOpen(true), []);
+  const closeGoogleFontDialog = useCallback(() => setGoogleFontDialogOpen(false), []);
 
   const {
     actions: {
@@ -85,6 +93,7 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
       handleExportSvg,
       handleExportToClipboard,
       handleFontUpload,
+      handleGoogleFontImport,
       handleImageUpload,
       handleMakeCopy,
       handleNewProject,
@@ -136,6 +145,11 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
     },
   } = useEditorController({ fontsReady, getRendererHandle });
 
+  const availableFontFamilies = useMemo(
+    () => availableFonts.map((font) => font.family),
+    [availableFonts],
+  );
+
   // Guides belong to the document they were dragged out for.
   const [guidesDocumentId, setGuidesDocumentId] = useState(documentId);
   if (guidesDocumentId !== documentId) {
@@ -173,7 +187,10 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
 
   return (
     <div className="app-shell" data-fonts-ready={fontsReady} data-library-busy={libraryBusy}>
-      <FontImportProvider onImportFont={() => fontInputRef.current?.click()}>
+      <FontImportProvider
+        importFromFile={importFontFromFile}
+        importFromGoogle={googleFontsApiKey ? openGoogleFontDialog : null}
+      >
       <main className="editor-layout editor-layout-overlay">
         <CanvasStage
           debugMode={runtimeFlags.debugMode}
@@ -362,6 +379,14 @@ function Editor({ fontsReady }: { fontsReady: boolean }) {
           onExportJson={(id) => {
             void exportLibraryDocument(id);
           }}
+        />
+      ) : null}
+      {googleFontDialogOpen && googleFontsApiKey ? (
+        <GoogleFontImportDialog
+          apiKey={googleFontsApiKey}
+          existingFamilies={availableFontFamilies}
+          onClose={closeGoogleFontDialog}
+          onImport={(request) => handleGoogleFontImport({ ...request, apiKey: googleFontsApiKey })}
         />
       ) : null}
       {libraryBusy ? <div className="library-busy-overlay" aria-hidden="true" /> : null}

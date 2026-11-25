@@ -1,7 +1,20 @@
 import { registerFontFile } from '../editor/fonts';
+import {
+  downloadGoogleFontVariants,
+  type GoogleFontDownloadRequest,
+} from '../editor/fonts/googleFonts/googleFontImport';
+import { describeGoogleFontVariant } from '../editor/fonts/googleFonts/googleFontVariants';
 import { defaultUploadedFontPersistenceService } from '../editor/persistence/uploadedFontPersistenceService';
 import type { UploadedFont } from '../editor/document/documentTypes';
 import { getErrorMessage } from './errorUtils';
+
+/** What became of a request to import styles of a Google Fonts family. */
+export interface GoogleFontImportOutcome {
+  /** How many styles are now in the font list. */
+  added: number;
+  /** The names of the styles that could not be imported ("Light Italic"). */
+  failed: string[];
+}
 
 async function readBlobArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
   if (typeof blob.arrayBuffer === 'function') {
@@ -46,7 +59,37 @@ export function useFontController({
     }
   }
 
+  /**
+   * Imports styles of a Google Fonts family: each is downloaded, added to the
+   * font list and stored like a font file the user picked. Rejects when the
+   * family cannot be looked up or the request is aborted; styles that failed
+   * on their own are named in the outcome.
+   */
+  async function handleGoogleFontImport(
+    request: GoogleFontDownloadRequest,
+  ): Promise<GoogleFontImportOutcome> {
+    const { downloaded, failed } = await downloadGoogleFontVariants(request);
+    let persistError: unknown = null;
+    for (const { font, bytes } of downloaded) {
+      registerAvailableFont(font);
+      try {
+        await defaultUploadedFontPersistenceService.save(font, bytes);
+      } catch (error) {
+        persistError = error;
+      }
+    }
+    if (persistError) {
+      setErrorMessage(
+        `Imported fonts are ready for this session, but failed to persist: ${getErrorMessage(persistError, 'Unknown error.')}`,
+      );
+    } else if (downloaded.length > 0) {
+      setErrorMessage(null);
+    }
+    return { added: downloaded.length, failed: failed.map(describeGoogleFontVariant) };
+  }
+
   return {
     handleFontUpload,
+    handleGoogleFontImport,
   };
 }
