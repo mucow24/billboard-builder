@@ -1,4 +1,5 @@
 import { registerUploadedFontBytes } from '../editor/fonts';
+import { fontEntriesForFile } from '../editor/fonts/fontModel';
 import type {
   DocumentFontReference,
   UploadedFont,
@@ -74,7 +75,10 @@ export async function restoreUploadedFontsForReferences({
     try {
       const restoredFont = await registerUploadedFontBytes(persistedFont);
       registerAvailableFont(restoredFont);
-      restoredFamilies.add(restoredFont.family);
+      // A Bold file is its family's "<Family> Bold" entry too.
+      for (const entry of fontEntriesForFile(restoredFont)) {
+        restoredFamilies.add(entry.family);
+      }
     } catch (error) {
       console.warn('Skipping persisted uploaded font that failed to restore.', error);
     }

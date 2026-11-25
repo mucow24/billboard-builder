@@ -60,15 +60,15 @@ async function selectTextLayer(page: Page) {
 }
 
 /** How wide the browser draws a sample in `family`: it differs between the font files used here. */
-async function measureSample(page: Page, family: string) {
-  return page.evaluate((fontFamily) => {
+async function measureSample(page: Page, family: string, weight = 'normal') {
+  return page.evaluate(([fontFamily, fontWeight]) => {
     const context = document.createElement('canvas').getContext('2d');
     if (!context) {
       throw new Error('2D canvas is unavailable.');
     }
-    context.font = `48px "${fontFamily}"`;
+    context.font = `${fontWeight} 48px "${fontFamily}"`;
     return context.measureText('Hamburgefonstiv 0123').width;
-  }, family);
+  }, [family, weight] as const);
 }
 
 test.describe('font menu', () => {
@@ -94,6 +94,7 @@ test.describe('font menu', () => {
       'Regular',
       'Medium',
       'Semibold',
+      'Bold',
       'Extrabold',
       'Black',
     ]);
@@ -142,12 +143,34 @@ test.describe('font menu', () => {
 
     // The flat list is in name order, as before the menu had families.
     const next = page.getByRole('button', { name: 'Next font' });
-    for (const family of ['Barlow Black', 'Barlow Extra Light', 'Barlow Extrabold', 'Barlow Light']) {
+    for (const family of ['Barlow Black', 'Barlow Bold', 'Barlow Extra Light', 'Barlow Extrabold']) {
       await next.click();
       await expect(trigger(page)).toHaveText(family);
     }
     await page.getByRole('button', { name: 'Previous font' }).click();
-    await expect(trigger(page)).toHaveText('Barlow Extrabold');
+    await expect(trigger(page)).toHaveText('Barlow Extra Light');
+  });
+
+  test('offers Bold as a weight, and a family with only Bold files only as its Bold', async ({ page }) => {
+    await openEditorWithSelectedText(page);
+    await waitForBundledFonts(page);
+
+    await trigger(page).click();
+    const family = menu(page).getByRole('option', { name: 'Barlow', exact: true });
+    await family.scrollIntoViewIfNeeded();
+    await family.hover();
+    await submenu(page).getByRole('option', { name: 'Barlow Bold' }).click();
+
+    // The weight is the text's font, with Bold off, and draws with the Bold file.
+    await expect(trigger(page)).toHaveText('Barlow Bold');
+    await expect(page.getByRole('button', { name: 'Bold', exact: true })).toHaveAttribute('aria-pressed', 'false');
+    await expectPersistedCanvasToReferenceFontFamily(page, 'Barlow Bold', ['Barlow Bold']);
+    expect(await measureSample(page, 'Barlow Bold')).toBe(await measureSample(page, 'Barlow', 'bold'));
+    expect(await measureSample(page, 'Barlow Bold')).not.toBe(await measureSample(page, 'Barlow'));
+
+    // Super16Bit is published in Bold and Bold Oblique only: one row, named for what it draws.
+    await trigger(page).click();
+    await expect(menu(page).getByRole('option', { name: /^Super16Bit/ })).toHaveText(['Super16Bit Bold']);
   });
 
   test('imports a family from Google Fonts into the menu', async ({ page }) => {
@@ -240,13 +263,12 @@ test.describe('font menu', () => {
       ),
     ).toEqual([]);
 
-    // The family is one row of the menu, its weights in the submenu; bold is a
-    // face of the regular entry, not a weight of its own.
+    // The family is one row of the menu, its weights in the submenu, Bold among them.
     await trigger(page).click();
     const family = menu(page).getByRole('option', { name: 'Testfont Grotesk', exact: true });
     await family.scrollIntoViewIfNeeded();
     await family.click();
-    await expect(submenu(page).getByRole('option')).toHaveText(['Light', 'Regular', 'Black']);
+    await expect(submenu(page).getByRole('option')).toHaveText(['Light', 'Regular', 'Bold', 'Black']);
     await submenu(page).getByRole('option', { name: 'Testfont Grotesk Black' }).click();
     await expect(trigger(page)).toHaveText('Testfont Grotesk Black');
 

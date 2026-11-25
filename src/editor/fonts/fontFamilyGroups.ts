@@ -1,10 +1,10 @@
 /**
  * Groups the font picker's entries into families, for its menu.
  *
- * The editor knows two weights per family, regular and bold, so every other
- * weight of a typeface is an entry of its own: "Barlow", "Barlow Light",
- * "Barlow Black". The menu shows those as one "Barlow" row with a submenu of
- * weights. The grouping is by name alone: entries whose names differ only in
+ * Every weight of a typeface is an entry of its own: "Barlow", "Barlow Light",
+ * "Barlow Bold", "Barlow Black" (a Bold file is also the bold face of the
+ * regular entry, for the Bold button; see `fontEntriesForFile`). The menu
+ * shows those as one "Barlow" row with a submenu of weights. The grouping is by name alone: entries whose names differ only in
  * a weight word at the end belong together, and the one without a weight word
  * is the family's "Regular". Nothing about a document changes, and the flat
  * list, which the picker's arrow buttons step through, stays as it is.
@@ -20,8 +20,9 @@ const REGULAR_WEIGHT = 400;
 /**
  * The weight words a family name can end in, with the CSS weight each stands
  * for. A two-part word may be written with or without the space ("Extra Light",
- * "ExtraLight", "Extralight"). "Bold" is not among them: bold is a face of the
- * regular entry, reached with the Bold button.
+ * "ExtraLight", "Extralight"). "Bold" is one of them: a Bold file is listed as
+ * the family's "<Family> Bold" entry, as well as being the bold face of its
+ * regular entry.
  */
 const WEIGHT_WORDS: ReadonlyArray<readonly [pattern: string, weight: number]> = [
   ['hairline', 50],
@@ -32,6 +33,7 @@ const WEIGHT_WORDS: ReadonlyArray<readonly [pattern: string, weight: number]> = 
   ['medium', 500],
   ['semi ?bold', 600],
   ['demi ?bold', 600],
+  ['bold', 700],
   ['extra ?bold', 800],
   ['ultra ?bold', 800],
   ['black', 900],
