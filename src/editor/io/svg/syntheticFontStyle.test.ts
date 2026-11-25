@@ -73,7 +73,36 @@ describe('syntheticBoldFor', () => {
 
   it('is a stroke for a text with nothing to draw, without measuring', () => {
     const syntheticBoldAdvance = vi.fn(() => 2);
-    expect(syntheticBoldFor(item, '  ', { ...fakeMeasurer, syntheticBoldAdvance }).kind).toBe('stroke');
+    const drawsBoldAsRegular = vi.fn(() => true);
+    const measurer = { ...fakeMeasurer, syntheticBoldAdvance, drawsBoldAsRegular };
+    expect(syntheticBoldFor(item, '  ', measurer)?.kind).toBe('stroke');
     expect(syntheticBoldAdvance).not.toHaveBeenCalled();
+    expect(drawsBoldAsRegular).not.toHaveBeenCalled();
+  });
+
+  // Chromium with a file that is itself heavy, such as Barlow Black.
+  it('is nothing when the browser draws bold exactly as regular: it fakes no bold with the file', () => {
+    const measurer = { ...fakeMeasurer, syntheticBoldAdvance: () => 0, drawsBoldAsRegular: () => true };
+    expect(syntheticBoldFor(item, 'AB', measurer)).toBeNull();
+    expect(syntheticBoldFor(item, 'AB', { ...fakeMeasurer, drawsBoldAsRegular: () => true })).toBeNull();
+  });
+
+  it('is a stroke when the browser draws bold differently and no wider', () => {
+    const measurer = { ...fakeMeasurer, syntheticBoldAdvance: () => 0, drawsBoldAsRegular: () => false };
+    expect(syntheticBoldFor(item, 'AB', measurer)).toEqual({ kind: 'stroke', width: 3 });
+  });
+
+  it('is a smear when bold is wider, without looking at how it is drawn', () => {
+    const drawsBoldAsRegular = vi.fn(() => true);
+    const measurer = { ...fakeMeasurer, syntheticBoldAdvance: () => 2, drawsBoldAsRegular };
+    expect(syntheticBoldFor(item, 'AB', measurer)?.kind).toBe('smear');
+    expect(drawsBoldAsRegular).not.toHaveBeenCalled();
+  });
+
+  it('compares how the grapheme it measures is drawn', () => {
+    const drawsBoldAsRegular = vi.fn(() => false);
+    const handWithSkinTone = String.fromCodePoint(0x261d, 0x1f3fd);
+    syntheticBoldFor(item, ` ${handWithSkinTone}A`, { ...fakeMeasurer, drawsBoldAsRegular });
+    expect(drawsBoldAsRegular).toHaveBeenCalledWith(item, handWithSkinTone);
   });
 });

@@ -77,8 +77,10 @@ export type OutlineUnavailableReason = 'system-font' | 'no-bytes' | 'parse-faile
 
 /**
  * What the browser fakes when it draws a text with the font file resolved for it:
- * bold when the text is bold and the file is not, italic likewise. The export
- * fakes the same (see syntheticFontStyle).
+ * bold when the text is bold and the file is not registered as bold, italic
+ * likewise. The export fakes the same (see syntheticFontStyle). For bold this is
+ * what the browser may fake: Chromium leaves a file that is itself heavy as it
+ * is, which `syntheticBoldFor` finds out from the browser.
  */
 export interface SyntheticFontStyle {
   bold: boolean;
@@ -138,6 +140,19 @@ export interface TextMeasurer {
    * Optional: without it faked bold is exported as a grown outline.
    */
   syntheticBoldAdvance?(item: TextCanvasItem, sample: string): number;
+  /**
+   * Whether the browser draws `sample` (one grapheme) in the item's bold exactly
+   * as it draws it in the same font at regular weight. Only meaningful for an
+   * item whose family has no bold file: both weights then come from one file,
+   * and drawing them the same means the browser does not fake bold with it.
+   * Chromium does not where the file is itself heavy (see syntheticFontStyle).
+   *
+   * False where it cannot be told: nothing to draw with, or a sample that
+   * leaves no ink (a zero-width space), which is drawn the same in any weight.
+   *
+   * Optional: without it the bold of such an item is taken as faked.
+   */
+  drawsBoldAsRegular?(item: TextCanvasItem, sample: string): boolean;
   /**
    * Distance in px from the top of the item's first line box to its baseline,
    * where the canvas draws it: the font's capitals centred in the line box (see

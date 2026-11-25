@@ -15,6 +15,26 @@ import { graphemes } from '../../rendering/graphemes';
  * Only shapes are faked here. Where the faking moves glyphs or changes a line's
  * width, the canvas measurer already reports it, because it measures with the
  * font declaration the canvas draws with.
+ *
+ * Whether bold is faked at all is not settled by the weight a file is registered
+ * with. Measured on Windows with the Barlow files, each registered as a family
+ * of its own at weight 400 and drawn with `bold` (Chromium 145.0.7632.6, Firefox
+ * 146.0.1, WebKit 26.0; November 2026):
+ *
+ * - Firefox and WebKit go by the registered weight alone and fake the bold of
+ *   every such file, Barlow Black included. (They stop at a registered weight
+ *   of 600, which this app never registers: its files are 400 or 700.)
+ * - Chromium also looks into the file, and draws bold exactly as regular where
+ *   the file says it is heavy: an OS/2 weight class of 600 or more (Semibold,
+ *   Bold, Extrabold and Black; 599 is faked), or the bold bit of OS/2
+ *   `fsSelection` on a file of weight class 400. `head.macStyle` alone changes
+ *   nothing. Barlow Black and Bold stayed unfaked with weight class 400 and
+ *   both bits cleared, so something else counts too, most likely the names in
+ *   the file, and what counts is likely to differ by platform.
+ *
+ * So the file's tables do not say what a browser will do with it, and
+ * `syntheticBoldFor` asks the browser instead: bold that it draws exactly as
+ * regular is not faked.
  */
 
 /**
@@ -80,11 +100,14 @@ export function smearOffsets(distance: number, fontSize: number): number[] {
 const SMEAR_DETECTION_PX = 0.01;
 
 /**
- * How the browser fakes bold for `item`, told from what it measures rather than
- * from which browser it is: a character that is wider in faked bold than in the
- * regular weight is being smeared, by that difference. `text` is the text drawn
- * with the font in question; a grapheme out of it is measured so that the font
- * has a glyph for it.
+ * How the browser fakes bold for `item`, whose family has no bold file, told
+ * from what it measures and draws rather than from which browser it is: a
+ * character that is wider in faked bold than in the regular weight is being
+ * smeared, by that difference. Null where the browser does not fake bold with
+ * the file after all: it draws the character in bold exactly as in the regular
+ * weight (see the top of this file). `text` is the text drawn with the font in
+ * question; a grapheme out of it is measured so that the font has a glyph for
+ * it.
  *
  * A whole grapheme, because the browser picks the font for a grapheme as a
  * whole: a hand with a skin tone comes from the emoji fallback even when the
@@ -95,9 +118,11 @@ export function syntheticBoldFor(
   item: TextCanvasItem,
   text: string,
   measurer: TextMeasurer,
-): SyntheticBold {
+): SyntheticBold | null {
   const sample = graphemes(text).find((piece) => piece.trim().length > 0);
   const smear = sample ? (measurer.syntheticBoldAdvance?.(item, sample) ?? 0) : 0;
+  // A smeared character is wider, which settles it without drawing anything.
+  if (sample && !(smear > SMEAR_DETECTION_PX) && measurer.drawsBoldAsRegular?.(item, sample)) return null;
   return smear > SMEAR_DETECTION_PX
     ? { kind: 'smear', offsets: smearOffsets(smear, item.fontSize) }
     : { kind: 'stroke', width: syntheticBoldStrokeWidth(item.fontSize) };
