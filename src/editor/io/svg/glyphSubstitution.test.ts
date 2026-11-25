@@ -1066,7 +1066,7 @@ describe('text substitutions for the exporter', () => {
   });
 
   it('Linefont: the chart segments are withheld', () => {
-    const font = loadFont('Linefont-VariableFont_wdth,wght.ttf');
+    const font = loadFont('Linefont-Regular.ttf');
     expect(createTextSubstitutions(font, english)('0369')).toBeNull();
   });
 
@@ -1159,13 +1159,13 @@ describe('glyph substitution: bundled fonts', () => {
   it('Linefont: every glyph is drawn from the one before it (reverse chaining)', () => {
     // The digits stand for the levels 1, 30, 60 and 90; each glyph but the first is
     // the step up from the level before it, followed by a joint.
-    expect(shapeNames('Linefont-VariableFont_wdth,wght.ttf', '0369')).toEqual([
+    expect(shapeNames('Linefont-Regular.ttf', '0369')).toEqual([
       '_1', 'pos.29+join', 'pos.30+join', 'pos.30+join',
     ]);
     // a, b, c are the levels 1, 2 and 4: up one, up two, down three.
-    expect(shapeNames('Linefont-VariableFont_wdth,wght.ttf', 'abca')).toEqual([
+    expect(shapeNames('Linefont-Regular.ttf', 'abca')).toEqual([
       '_1', 'pos.1+join', 'pos.2+join', 'neg.3+join',
     ]);
-    expect(shapeNames('Linefont-VariableFont_wdth,wght.ttf', 'a')).toBeNull();
+    expect(shapeNames('Linefont-Regular.ttf', 'a')).toBeNull();
   });
 });

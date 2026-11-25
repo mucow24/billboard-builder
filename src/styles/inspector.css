@@ -198,19 +198,11 @@
   font-weight: 600;
 }
 
-.inspector-toggle-button:hover:not(:disabled) {
+/* An "on" toggle keeps its active look under the pointer, like an active
+   segmented button; .active and .mixed are with the segmented controls below,
+   after the .properties-panel reset that would otherwise override them. */
+.inspector-toggle-button:not(.active):hover:not(:disabled) {
   background: var(--surface-hover);
-}
-
-.inspector-toggle-button.active {
-  background: rgba(50, 132, 214, 0.24);
-  border-color: var(--border-active);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-}
-
-.inspector-toggle-button.mixed {
-  border-style: dashed;
-  color: #d4e1f7;
 }
 
 .inspector-action-button {
@@ -420,9 +412,15 @@
   padding: 0 0.28rem;
 }
 
-.segmented-control-button.active {
+.segmented-control-button.active,
+.inspector-toggle-button.active {
   background: rgba(50, 132, 214, 0.24);
   border-color: var(--border-active);
+}
+
+.inspector-toggle-button.mixed {
+  border-style: dashed;
+  color: #d4e1f7;
 }
 
 .inspector-segmented-control {
