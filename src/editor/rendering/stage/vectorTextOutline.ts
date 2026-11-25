@@ -40,6 +40,7 @@ import {
 } from '../../fonts/emojiFallback';
 import { toFontReference } from '../../fonts/fontModel';
 import { subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
+import { drawnFontOf } from '../../fonts/boldWeight';
 import { findFontForVariant } from '../../fonts/fontRegistry';
 import { browserFontDeps } from '../../io/svg/browserSvgExport';
 import { createCanvasTextMeasurer } from '../../io/svg/canvasTextMeasurer';
@@ -73,11 +74,13 @@ const mayUseFallback = (text: string) => [...drawnText(text)].some(isInEmojiFall
 export function hasFakedBold(item: TextCanvasItem): boolean {
   const registered = listRegisteredFonts();
   return textItemsOf(item).some((run) => {
-    if (run.fontWeight !== 'bold') return false;
-    const families = [run.fontFamily, ...(mayUseFallback(run.text) ? [EMOJI_FALLBACK_FAMILY] : [])];
+    // Bold that a heavier weight of the typeface draws is not faked.
+    const drawn = drawnFontOf(run, registered);
+    if (drawn.fontWeight !== 'bold') return false;
+    const families = [drawn.fontFamily, ...(mayUseFallback(run.text) ? [EMOJI_FALLBACK_FAMILY] : [])];
     return families.some((family) => {
-      const file = findFontForVariant(registered, family, '700', run.fontStyle);
-      return file ? syntheticStyle(run, file)?.bold === true : false;
+      const file = findFontForVariant(registered, family, '700', drawn.fontStyle);
+      return file ? syntheticStyle(drawn, file)?.bold === true : false;
     });
   });
 }

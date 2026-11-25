@@ -8,6 +8,7 @@ import {
   createTextItem,
 } from '../document/documentDefaults';
 import { normalizeProjectDocument } from '../document/documentNormalizer';
+import { drawnFontFamiliesOf } from '../fonts/boldWeight';
 import { isStraightLine } from '../document/polygonVertices';
 import {
   collectLeafItems,
@@ -486,8 +487,11 @@ function toFontReference({ family, sourceName, kind }: UploadedFont): DocumentFo
  * reference as a system font it cannot outline. So text whose family has no
  * reference loses an uploaded font on the next reload, and cannot be exported.
  *
- * 1. A family that text is set in gets a reference to the first file the session
- *    has for it, unless it already has one. Text reaches the document in many
+ * 1. A family that text is drawn with gets a reference to the first file the
+ *    session has for it, unless it already has one. That is the family the text
+ *    is set in and, for bold text, the heavier weight of its typeface that the
+ *    bold is drawn in (`drawnFontFamiliesOf`): without a reference an uploaded
+ *    heavier weight would be gone after a reload, and the bold faked from then on. Text reaches the document in many
  *    ways (font picker, paste, favorite, text tool, opened project, undo/redo),
  *    and a reference is dropped as soon as no text uses its family, so a cut
  *    followed by a paste has to put it back.
@@ -510,13 +514,18 @@ function reconcileFontReferences(state: EditorState): EditorState {
   const added: DocumentFontReference[] = [];
 
   for (const item of nodes.flatMap(collectLeafItems)) {
-    if (item.kind !== 'text' || referencedFamilies.has(item.fontFamily)) {
+    if (item.kind !== 'text') {
       continue;
     }
-    const firstFile = availableFonts.find((font) => font.family === item.fontFamily);
-    if (firstFile) {
-      referencedFamilies.add(firstFile.family);
-      added.push(toFontReference(firstFile));
+    for (const family of drawnFontFamiliesOf(item, availableFonts)) {
+      if (referencedFamilies.has(family)) {
+        continue;
+      }
+      const firstFile = availableFonts.find((font) => font.family === family);
+      if (firstFile) {
+        referencedFamilies.add(firstFile.family);
+        added.push(toFontReference(firstFile));
+      }
     }
   }
 

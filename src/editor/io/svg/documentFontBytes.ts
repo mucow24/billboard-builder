@@ -4,6 +4,7 @@ import type {
   TextCanvasItem,
   UploadedFont,
 } from '../../document/documentTypes';
+import { drawnFontOf } from '../../fonts/boldWeight';
 import { EMOJI_FALLBACK_FAMILY } from '../../fonts/emojiFallback';
 import { toFontReference } from '../../fonts/fontModel';
 import { findFontForVariant } from '../../fonts/fontRegistry';
@@ -49,14 +50,17 @@ export function createDocumentFontLoader(
       return { kind: 'system', bytes: null };
     }
 
+    // Bold text is drawn in a heavier weight of its typeface where there is one,
+    // and that weight's file is the one to outline.
+    const drawn = drawnFontOf(item, registeredFonts);
     const registeredFont = findFontForVariant(
       registeredFonts,
-      item.fontFamily,
-      item.fontWeight === 'bold' ? '700' : '400',
-      item.fontStyle,
+      drawn.fontFamily,
+      drawn.fontWeight === 'bold' ? '700' : '400',
+      drawn.fontStyle,
     );
     const source = registeredFont ? toFontReference(registeredFont) : ref;
-    const synthetic = registeredFont ? syntheticStyle(item, registeredFont) : undefined;
+    const synthetic = registeredFont ? syntheticStyle(drawn, registeredFont) : undefined;
     try {
       const bytes =
         source.kind === 'bundled'
@@ -80,16 +84,19 @@ export function createDocumentFontLoader(
  */
 export function createFallbackFontLoader(registeredFonts: readonly UploadedFont[], loaders: FontByteLoaders) {
   return async (item: TextCanvasItem): Promise<FontBytes> => {
+    // The fallback is asked for in the weight the text's own family is: regular
+    // where a heavier weight of the typeface draws the text's bold.
+    const drawn = drawnFontOf(item, registeredFonts);
     const font = findFontForVariant(
       registeredFonts,
       EMOJI_FALLBACK_FAMILY,
-      item.fontWeight === 'bold' ? '700' : '400',
-      item.fontStyle,
+      drawn.fontWeight === 'bold' ? '700' : '400',
+      drawn.fontStyle,
     );
     if (!font) {
       return { kind: 'system', bytes: null };
     }
-    const synthetic = syntheticStyle(item, font);
+    const synthetic = syntheticStyle(drawn, font);
     try {
       const bytes =
         font.kind === 'bundled'

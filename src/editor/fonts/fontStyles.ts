@@ -1,4 +1,6 @@
-import type { TextCanvasItem } from '../document/documentTypes';
+import type { TextCanvasItem, UploadedFont } from '../document/documentTypes';
+import { resolveBoldFont } from './boldWeight';
+import { listRegisteredFonts } from './browserFontLoader';
 import { textFontFamilies } from './emojiFallback';
 import { subscribeToFontRegistrations } from './fontRegistrations';
 
@@ -72,7 +74,47 @@ function canUseFontVariant(
   return supported;
 }
 
-export function getRenderableCombinedFontStyle(item: TextCanvasItem): CombinedFontStyle {
+/** The registered font files, or none where the browser's font set cannot be listed (as `canUseFontVariant` is permissive there). */
+function registeredFonts(): UploadedFont[] {
+  const fonts = typeof document === 'undefined' ? undefined : (document.fonts as Partial<FontFaceSet> | undefined);
+  return typeof fonts?.[Symbol.iterator] === 'function' ? listRegisteredFonts() : [];
+}
+
+const drawnBoldFonts = new Map<string, ReturnType<typeof resolveBoldFont>>();
+
+// A file registered for any weight of a typeface may be what its bold text is now drawn with.
+subscribeToFontRegistrations(() => drawnBoldFonts.clear());
+
+/**
+ * `item` as the browser is asked to draw it: itself, or, where it is bold and
+ * its typeface has a heavier weight registered, the same text in that weight's
+ * family (see `drawnFontOf` in `boldWeight`). Kept by family and style until
+ * the next font is registered, since every measurement of a text comes here.
+ */
+export function getDrawnFontItem<T extends Pick<TextCanvasItem, 'fontFamily' | 'fontWeight' | 'fontStyle'>>(
+  item: T,
+): T {
+  if (item.fontWeight !== 'bold') return item;
+  const key = `${item.fontFamily}::${item.fontStyle}`;
+  let bold = drawnBoldFonts.get(key);
+  if (bold === undefined) {
+    bold = resolveBoldFont(item.fontFamily, item.fontStyle, registeredFonts());
+    drawnBoldFonts.set(key, bold);
+  }
+  if (!bold || (bold.fontFamily === item.fontFamily && bold.fontWeight === item.fontWeight)) {
+    return item;
+  }
+  return { ...item, ...bold };
+}
+
+/**
+ * The style `item` is drawn in, of the styles the browser can draw its family
+ * in. `item` is the text as drawn (`getDrawnFontItem`): its family is the one
+ * the browser is asked for.
+ */
+function renderableCombinedFontStyleOf(
+  item: Pick<TextCanvasItem, 'fontFamily' | 'fontWeight' | 'fontStyle'>,
+): CombinedFontStyle {
   const wantsBold = item.fontWeight === 'bold';
   const wantsItalic = item.fontStyle === 'italic';
 
@@ -101,16 +143,26 @@ export function getRenderableCombinedFontStyle(item: TextCanvasItem): CombinedFo
 }
 
 /**
+ * The bold and italic the browser is asked for when it draws `item`. Bold that
+ * a heavier weight of the typeface draws is not among them: that text is drawn
+ * in the heavier weight's family, in its regular weight (`getDrawnFontItem`).
+ */
+export function getRenderableCombinedFontStyle(item: TextCanvasItem): CombinedFontStyle {
+  return renderableCombinedFontStyleOf(getDrawnFontItem(item));
+}
+
+/**
  * The canvas `font` that `item` is drawn with: its renderable style, its size,
- * and its family followed by the emoji fallback (see `textFontFamilies`), the
- * same font Pixi draws it with.
+ * and the family it is drawn in (`getDrawnFontItem`) followed by the emoji
+ * fallback (see `textFontFamilies`), the same font Pixi draws it with.
  */
 export function getRenderableCanvasFontDeclaration(item: TextCanvasItem): string {
-  const effective = getRenderableCombinedFontStyle(item);
+  const drawn = getDrawnFontItem(item);
+  const effective = renderableCombinedFontStyleOf(drawn);
   const parts: string[] = [];
   if (effective.includes('italic')) parts.push('italic');
   if (effective.includes('bold')) parts.push('bold');
   parts.push(`${item.fontSize}px`);
-  parts.push(textFontFamilies(item.fontFamily).map(quoteFontFamily).join(', '));
+  parts.push(textFontFamilies(drawn.fontFamily).map(quoteFontFamily).join(', '));
   return parts.join(' ');
 }

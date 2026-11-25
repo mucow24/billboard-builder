@@ -15,3 +15,9 @@ weight of its own, however the two are joined ("SemiBold", "Semi Bold",
 entry in the font list, with the weight written as one word:
 `Example-SemiBold.ttf` and `Example-SemiBoldItalic.ttf` are the regular and
 italic of "Example SemiBold", not bold faces of "Example Semi".
+
+Entries whose names differ only in the weight word are the weights of one
+typeface, and bold text is drawn with them: text set in "Example Light" and
+made bold is drawn with the file of the weight nearest to 300 above its own
+("Example SemiBold"), as bold "Example" is drawn with `Example-Bold.ttf`. The
+browser fakes the bold only where the typeface has no heavier file.

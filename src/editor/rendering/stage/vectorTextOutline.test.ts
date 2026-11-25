@@ -94,6 +94,14 @@ describe('hasFakedBold', () => {
     expect(hasFakedBold(text({ fontWeight: 'normal' }))).toBe(false);
   });
 
+  it('is false where a heavier weight of the typeface draws the bold', () => {
+    registered.push(font('Foo Light', '400'), font('Foo SemiBold', '400'));
+    expect(hasFakedBold(text({ fontWeight: 'bold', fontFamily: 'Foo Light' }))).toBe(false);
+    expect(hasFakedBold(text({ fontFamily: 'Foo Light', text: 'A<b>B</b>' }))).toBe(false);
+    // The heaviest weight has nothing heavier: its bold is faked.
+    expect(hasFakedBold(text({ fontWeight: 'bold', fontFamily: 'Foo SemiBold' }))).toBe(true);
+  });
+
   it('is false for a family without a registered file: a system font brings its own bold', () => {
     expect(hasFakedBold(text({ fontWeight: 'bold', fontFamily: 'Arial' }))).toBe(false);
   });

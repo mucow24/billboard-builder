@@ -419,6 +419,25 @@ describe('font references of the families text is set in', () => {
     );
   }
 
+  it('references the heavier weight bold text is drawn in, and drops it when the text is no longer bold', () => {
+    const light = fontFile('PosterSans-Light.ttf', { family: 'Poster Sans Light' });
+    const semiBold = fontFile('PosterSans-SemiBold.ttf', { family: 'Poster Sans SemiBold' });
+    const black = fontFile('PosterSans-Black.ttf', { family: 'Poster Sans Black' });
+    const setWeight = (state: EditorState, fontWeight: 'normal' | 'bold') =>
+      reduceEditorState(
+        state,
+        toEditorAction({ type: 'update_node', itemId: 'headline', changes: { fontWeight } }),
+      );
+
+    const regularText = makeAvailable(stateWithText('Poster Sans Light'), light, semiBold, black);
+    expect(regularText.document.fonts).toEqual([reference(light)]);
+
+    const boldText = setWeight(regularText, 'bold');
+    expect(boldText.document.fonts).toEqual([reference(light), reference(semiBold)]);
+
+    expect(setWeight(boldText, 'normal').document.fonts).toEqual([reference(light)]);
+  });
+
   it('references every uploaded file of a family that text is set in', () => {
     const state = makeAvailable(stateWithText(), regular, bold, italic);
 

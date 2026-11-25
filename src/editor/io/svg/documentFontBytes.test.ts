@@ -395,3 +395,45 @@ describe('createFallbackFontLoader', () => {
     expect(await load(textItem('Barlow'))).toEqual({ kind: 'bundled', bytes: null });
   });
 });
+
+describe('bold text in a typeface with a heavier weight', () => {
+  const lightRef: DocumentFontReference = { family: 'Foo Light', sourceName: 'Foo-Light.ttf', kind: 'bundled' };
+  const fonts = [
+    registered('Foo Light', 'Foo-Light.ttf', '400', 'normal'),
+    registered('Foo SemiBold', 'Foo-SemiBold.ttf', '400', 'normal'),
+    registered('Noto Emoji', 'NotoEmoji-Regular.ttf', '400', 'normal'),
+  ];
+
+  it('loads the heavier weight, with nothing faked', async () => {
+    const loaders = trackingLoaders();
+    const load = createDocumentFontLoader(docWithFonts([lightRef]), fonts, loaders);
+
+    expect(await load(textItem('Foo Light', 'bold'))).toEqual({
+      kind: 'bundled',
+      bytes: loaders.bytesFor('Foo-SemiBold.ttf'),
+    });
+    expect(await load(textItem('Foo Light'))).toEqual({ kind: 'bundled', bytes: loaders.bytesFor('Foo-Light.ttf') });
+  });
+
+  it('fakes the bold of the heaviest weight', async () => {
+    const loaders = trackingLoaders();
+    const semiBoldRef = { ...lightRef, family: 'Foo SemiBold', sourceName: 'Foo-SemiBold.ttf' };
+    const load = createDocumentFontLoader(docWithFonts([semiBoldRef]), fonts, loaders);
+
+    expect(await load(textItem('Foo SemiBold', 'bold'))).toEqual({
+      kind: 'bundled',
+      bytes: loaders.bytesFor('Foo-SemiBold.ttf'),
+      synthetic: { bold: true, italic: false },
+    });
+  });
+
+  it('does not fake the bold of its emoji: the text is asked for in the regular weight', async () => {
+    const loaders = trackingLoaders();
+    const load = createFallbackFontLoader(fonts, loaders);
+
+    expect(await load(textItem('Foo Light', 'bold'))).toEqual({
+      kind: 'bundled',
+      bytes: loaders.bytesFor('NotoEmoji-Regular.ttf'),
+    });
+  });
+});
