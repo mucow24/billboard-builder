@@ -45,6 +45,17 @@ describe('emojiFallback', () => {
     expect(getTextFontRegistrationCount('Emoji Fallback Test Family')).not.toBe(afterOwn);
   });
 
+  it('gives a new registration count when another weight of the typeface gets a face: bold text may be drawn in it', () => {
+    const before = getTextFontRegistrationCount('Weight Test Family Light');
+
+    const beforeWithoutBold = getTextFontRegistrationCount('Weight Test Family Light', false);
+
+    announceFontRegistration('Weight Test Family SemiBold');
+    expect(getTextFontRegistrationCount('Weight Test Family Light')).not.toBe(before);
+    // Text without bold is never drawn in another weight, and does not follow them.
+    expect(getTextFontRegistrationCount('Weight Test Family Light', false)).toBe(beforeWithoutBold);
+  });
+
   it('is used for no ASCII character', () => {
     expect(EMOJI_FALLBACK_UNICODE_RANGE).toBe('U+80-10FFFF');
     for (const ch of [' ', '0', '9', '#', '*', 'A', String.fromCharCode(0x7f)]) {

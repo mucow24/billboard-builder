@@ -40,6 +40,7 @@ import {
 } from '../../fonts/emojiFallback';
 import { toFontReference } from '../../fonts/fontModel';
 import { subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
+import { drawnFontOf } from '../../fonts/boldWeight';
 import { findFontForVariant } from '../../fonts/fontRegistry';
 import { browserFontDeps } from '../../io/svg/browserSvgExport';
 import { createCanvasTextMeasurer } from '../../io/svg/canvasTextMeasurer';
@@ -77,11 +78,13 @@ const mayUseFallback = (text: string) => [...drawnText(text)].some(isInEmojiFall
 export function hasFakedBold(item: TextCanvasItem): boolean {
   const registered = listRegisteredFonts();
   return textItemsOf(item).some((run) => {
-    if (run.fontWeight !== 'bold') return false;
-    const families = [run.fontFamily, ...(mayUseFallback(run.text) ? [EMOJI_FALLBACK_FAMILY] : [])];
+    // Bold that a heavier weight of the typeface draws is not faked.
+    const drawn = drawnFontOf(run, registered);
+    if (drawn.fontWeight !== 'bold') return false;
+    const families = [drawn.fontFamily, ...(mayUseFallback(run.text) ? [EMOJI_FALLBACK_FAMILY] : [])];
     return families.some((family) => {
-      const file = findFontForVariant(registered, family, '700', run.fontStyle);
-      return file ? syntheticStyle(run, file)?.bold === true : false;
+      const file = findFontForVariant(registered, family, '700', drawn.fontStyle);
+      return file ? syntheticStyle(drawn, file)?.bold === true : false;
     });
   });
 }
@@ -144,8 +147,11 @@ let version = 0;
 
 const ownKey = (run: TextCanvasItem) =>
   `own|${fontVariantKey(run)}|${getTextFontRegistrationCount(run.fontFamily)}`;
+// The fallback is asked for in the weight the run is drawn in, which is regular
+// where a heavier weight of its typeface draws its bold (`drawnFontOf`): two
+// bold runs may need the fallback in different weights.
 const fallbackKey = (run: TextCanvasItem) =>
-  `fallback|${run.fontWeight}|${run.fontStyle}|${getTextFontRegistrationCount(EMOJI_FALLBACK_FAMILY)}`;
+  `fallback|${drawnFontOf(run, listRegisteredFonts()).fontWeight}|${run.fontStyle}|${getTextFontRegistrationCount(EMOJI_FALLBACK_FAMILY)}`;
 
 function changed(): void {
   version += 1;

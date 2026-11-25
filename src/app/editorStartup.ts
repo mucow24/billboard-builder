@@ -30,13 +30,21 @@ export interface EditorStartupDeps {
 
 /**
  * The font families the text of a document is drawn with: the ones it is set
- * in, and the emoji fallback when any of it has emoji.
+ * in, the others it references, and the emoji fallback when any of it has emoji.
  */
 function collectTextFontFamilies(document: ProjectDocument): string[] {
   const textItems = document.nodes
     .flatMap(collectLeafItems)
     .flatMap((item) => (item.kind === 'text' ? [item] : []));
   const families = new Set(textItems.map((item) => item.fontFamily));
+  // Bold text is drawn in a heavier weight of its typeface, which the document
+  // references like the families its text is set in (see `boldWeight`). Its
+  // uploaded fonts are restored by their references as it is.
+  for (const font of document.fonts) {
+    if (font.kind === 'bundled') {
+      families.add(font.family);
+    }
+  }
   if (textItems.some((item) => hasEmojiCharacter(item.text))) {
     families.add(EMOJI_FALLBACK_FAMILY);
   }

@@ -64,6 +64,25 @@ describe('useFontController: Google fonts', () => {
     expect(setErrorMessage).toHaveBeenCalledWith(null);
   });
 
+  it('leaves the error message alone after an import nobody asked for, but still says when a font cannot be stored', async () => {
+    const regular = download('Roboto', 'Roboto-Regular.ttf', 'regular');
+    mockDownload.mockResolvedValue({ downloaded: [regular], failed: [] });
+    const { handleGoogleFontImport, registerAvailableFont, setErrorMessage } = createController();
+
+    await handleGoogleFontImport(REQUEST, { clearError: false });
+
+    expect(registerAvailableFont).toHaveBeenCalledWith(regular.font);
+    expect(mockSave).toHaveBeenCalledWith(regular.font, regular.bytes);
+    expect(setErrorMessage).not.toHaveBeenCalled();
+
+    mockSave.mockRejectedValue(new Error('Quota exceeded'));
+    await handleGoogleFontImport(REQUEST, { clearError: false });
+
+    expect(setErrorMessage.mock.calls).toEqual([
+      ['Imported fonts are ready for this session, but failed to persist: Quota exceeded'],
+    ]);
+  });
+
   it('names the styles that could not be downloaded', async () => {
     mockDownload.mockResolvedValue({
       downloaded: [download('Roboto', 'Roboto-Regular.ttf', 'regular')],

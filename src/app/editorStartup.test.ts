@@ -125,6 +125,19 @@ describe('runEditorStartup', () => {
     expect(startup.events[0]).toBe('load bundled fonts, first: Barlow, Arial, Noto Emoji');
   });
 
+  it('asks first for the bundled fonts the saved canvas references too: the heavier weight its bold text is drawn in', async () => {
+    const savedCanvas = savedCanvasSetIn('Barlow Light');
+    savedCanvas.fonts.push(
+      { family: 'Barlow Light', sourceName: 'BarlowLight-Regular.ttf', kind: 'bundled' },
+      { family: 'Barlow SemiBold', sourceName: 'BarlowSemiBold-Regular.ttf', kind: 'bundled' },
+    );
+    const startup = startStartup();
+    startup.savedCanvas.resolve(savedCanvas);
+    await settle();
+
+    expect(startup.events[0]).toBe('load bundled fonts, first: Barlow Light, Barlow SemiBold');
+  });
+
   it('puts the saved canvas in the editor only once its bundled and uploaded fonts are registered', async () => {
     const startup = startStartup();
     startup.savedCanvas.resolve(savedCanvasSetIn('Barlow'));

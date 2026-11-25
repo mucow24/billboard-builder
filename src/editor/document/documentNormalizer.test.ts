@@ -246,6 +246,22 @@ describe('document normalizer', () => {
     expect(normalized.fonts).toEqual(posterFiles);
   });
 
+  it('keeps the references of the heavier weights of a typeface while text in it is bold', () => {
+    const light = { family: 'Poster Sans Light', sourceName: 'PosterSans-Light.ttf', kind: 'uploaded' as const };
+    const semiBold = { family: 'Poster Sans SemiBold', sourceName: 'PosterSans-SemiBold.ttf', kind: 'uploaded' as const };
+    const thin = { family: 'Poster Sans Thin', sourceName: 'PosterSans-Thin.ttf', kind: 'uploaded' as const };
+    const fontsOf = (text: Parameters<typeof createTextItem>[0]) =>
+      normalizeProjectDocument({
+        version: 2,
+        nodes: [createTextItem({ id: 'poster-text', fontFamily: 'Poster Sans Light', ...text })],
+        fonts: [light, semiBold, thin],
+      }).fonts;
+
+    expect(fontsOf({ fontWeight: 'bold' })).toEqual([light, semiBold]);
+    expect(fontsOf({ text: 'Grand <b>opening</b>' })).toEqual([light, semiBold]);
+    expect(fontsOf({})).toEqual([light]);
+  });
+
   it('defaults missing blurRadius to zero and preserves valid values', () => {
     const rectangle = createRectangleItem();
     const withBlur = { ...rectangle, blurRadius: 10 };

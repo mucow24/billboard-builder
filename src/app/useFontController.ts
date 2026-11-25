@@ -64,9 +64,15 @@ export function useFontController({
    * font list and stored like a font file the user picked. Rejects when the
    * family cannot be looked up or the request is aborted; styles that failed
    * on their own are named in the outcome.
+   *
+   * An import the user asked for clears the error message when it succeeds.
+   * One they did not ask for (`clearError: false`, for the fonts a canvas is
+   * missing) leaves alone a message it did not cause; it still reports fonts
+   * that could not be stored.
    */
   async function handleGoogleFontImport(
     request: GoogleFontDownloadRequest,
+    { clearError = true }: { clearError?: boolean } = {},
   ): Promise<GoogleFontImportOutcome> {
     const { downloaded, failed } = await downloadGoogleFontVariants(request);
     let persistError: unknown = null;
@@ -82,7 +88,7 @@ export function useFontController({
       setErrorMessage(
         `Imported fonts are ready for this session, but failed to persist: ${getErrorMessage(persistError, 'Unknown error.')}`,
       );
-    } else if (downloaded.length > 0) {
+    } else if (clearError && downloaded.length > 0) {
       setErrorMessage(null);
     }
     return { added: downloaded.length, failed: failed.map(describeGoogleFontVariant) };

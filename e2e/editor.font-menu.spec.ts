@@ -308,6 +308,52 @@ test.describe('font menu', () => {
     );
   });
 
+  test('gets the fonts a canvas is missing from Google Fonts, and names the ones that are not there', async ({ page }) => {
+    const google = await mockGoogleFonts(page, GOOGLE_FONTS);
+    await openFreshEditor(page);
+    await waitForBundledFonts(page);
+    expect(google.requests).toEqual([]);
+
+    // A canvas from another computer: its fonts are not in this browser.
+    await uploadProject(page, {
+      ...createProjectDocument([
+        createTextFixture({ id: 'google-text', fontFamily: 'Testfont Grotesk Black' }),
+        createTextFixture({ id: 'ghost-text', name: 'Ghost', y: 300, fontFamily: 'Ghost Font' }),
+      ]),
+      fonts: [
+        { family: 'Testfont Grotesk Black', sourceName: 'TestfontGrotesk-Black.ttf', kind: 'uploaded' },
+        { family: 'Ghost Font', sourceName: 'GhostFont-Regular.ttf', kind: 'uploaded' },
+      ],
+    });
+
+    // The Google font is fetched, stored and drawn with; the other stays missing.
+    await expectStoredUploadedFontFiles(page, ['TestfontGrotesk-Black.ttf']);
+    const warning = page.locator('.panel-section-banner.warning');
+    await expect(warning).toContainText('Missing fonts');
+    await expect(warning.locator('p')).toHaveText('Ghost Font');
+    expect(await measureSample(page, 'Testfont Grotesk Black')).toBe(
+      await measureSample(page, 'Barlow Black'),
+    );
+    // Only the file the canvas names was fetched, so the canvas is as it was saved.
+    expect(google.requests.filter((url) => url.includes('fonts.gstatic.com'))).toEqual([
+      'https://fonts.gstatic.com/s/testfontgrotesk/v1/900.ttf',
+    ]);
+    await expectPersistedCanvasFontFiles(page, ['TestfontGrotesk-Black.ttf', 'GhostFont-Regular.ttf']);
+
+    // After a reload the font comes from storage: Google is not asked for it again.
+    const fontFileRequests = google.requests.filter((url) => url.includes('fonts.gstatic.com')).length;
+    await page.reload();
+    await waitForEditor(page);
+    await waitForBundledFonts(page);
+    await expect(warning.locator('p')).toHaveText('Ghost Font');
+    expect(await measureSample(page, 'Testfont Grotesk Black')).toBe(
+      await measureSample(page, 'Barlow Black'),
+    );
+    expect(google.requests.filter((url) => url.includes('fonts.gstatic.com')).length).toBe(
+      fontFileRequests,
+    );
+  });
+
   test('says so in the dialog when Google Fonts cannot be reached, and tries again on request', async ({ page }) => {
     let reachable = false;
     await mockGoogleFonts(page, GOOGLE_FONTS);

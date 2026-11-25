@@ -39,7 +39,8 @@ import type {
 } from '../../document/documentTypes';
 import { drawnText, getTextFontRegistrationCount, textFontFamilies } from '../../fonts/emojiFallback';
 import { subscribeToFontRegistrations } from '../../fonts/fontRegistrations';
-import { getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
+import { usesBold } from '../../fonts/boldWeight';
+import { getDrawnFontItem, getRenderableCombinedFontStyle } from '../../fonts/fontStyles';
 import { getRenderableImageAdjustments } from '../imageAdjustments';
 import { computeGradientEndpoints, computeGradientTextureMatrix } from '../geometry/gradientGeometry';
 import { computeNgonPoints } from '../geometry/ngonGeometry';
@@ -172,9 +173,10 @@ function pixiDropShadowOf(item: TextCanvasItem) {
 function pixiFontStyleOf(item: TextCanvasItem) {
   const effectiveStyle = getRenderableCombinedFontStyle(item);
   return {
-    // The item's family, then the emoji fallback for emoji it does not have.
+    // The family the item is drawn in (its own, or a heavier weight's for its
+    // bold), then the emoji fallback for emoji it does not have.
     // A new array each time: Pixi quotes the names in place.
-    fontFamily: textFontFamilies(item.fontFamily),
+    fontFamily: textFontFamilies(getDrawnFontItem(item).fontFamily),
     fontSize: item.fontSize,
     fontWeight: effectiveStyle.includes('bold') ? ('bold' as const) : ('normal' as const),
     fontStyle: effectiveStyle.includes('italic') ? ('italic' as const) : ('normal' as const),
@@ -691,11 +693,14 @@ const PixiTextContent = memo(function PixiTextContent({
   // the saved canvas is shown, a missing font imported later). Nothing about
   // the item changes when the file arrives, so follow the family instead: a
   // registration re-renders this layer, and every render measures, lays out
-  // and rasterises the text anew. Layers in other families are left alone. The
-  // emoji fallback counts as one of every layer's families: the text may have
-  // characters only it can draw.
+  // and rasterises the text anew. Layers in other typefaces are left alone.
+  // For an item with bold text every weight of its typeface counts as its
+  // family, since the bold is drawn in a heavier one (see `boldWeight`). The
+  // emoji fallback counts for every item: the text may have characters only it
+  // can draw.
+  const hasBold = usesBold(item);
   const fontRegistrations = useSyncExternalStore(subscribeToFontRegistrations, () =>
-    getTextFontRegistrationCount(item.fontFamily),
+    getTextFontRegistrationCount(item.fontFamily, hasBold),
   );
 
   // Pixi rasterizes Text to a texture at `resolution * devicePixelRatio`.
@@ -1130,6 +1135,10 @@ export function PixiItemLayer({
   rasterZoom,
 }: PixiItemLayerProps) {
   const interactive = activeTool === 'select';
+  // PixiJS federated events don't include dblclick, so detect manually: two
+  // presses on the same item in quick succession. One record for the layer,
+  // so a press on another item in between breaks the pair.
+  const lastClickRef = useRef<LastItemClick | null>(null);
 
   return (
     <>
@@ -1142,6 +1151,7 @@ export function PixiItemLayer({
             canvasHeight={canvasHeight}
             interactive={interactive}
             item={item}
+            lastClickRef={lastClickRef}
             onItemPointerDown={onItemPointerDown}
             onItemDoubleClick={onItemDoubleClick}
             onItemHoverChange={onItemHoverChange}
@@ -1157,11 +1167,19 @@ export function PixiItemLayer({
   );
 }
 
+/** The last press that could be the first half of a double-click. */
+interface LastItemClick {
+  itemId: string;
+  at: number;
+}
+
 interface PixiItemViewProps {
   canvasWidth: number;
   canvasHeight: number;
   interactive: boolean;
   item: RenderableCanvasItem;
+  /** Shared by the layer's items; see PixiItemLayer. */
+  lastClickRef: { current: LastItemClick | null };
   onItemPointerDown: PixiItemLayerProps['onItemPointerDown'];
   onItemDoubleClick: PixiItemLayerProps['onItemDoubleClick'];
   onItemHoverChange: PixiItemLayerProps['onItemHoverChange'];
@@ -1179,6 +1197,7 @@ const PixiItemView = memo(function PixiItemView({
   canvasHeight,
   interactive,
   item,
+  lastClickRef,
   onItemPointerDown,
   onItemDoubleClick,
   onItemHoverChange,
@@ -1217,9 +1236,6 @@ const PixiItemView = memo(function PixiItemView({
     // itemFilters (expensive filter construction) and hitArea (triggers PixiJS prop diffs).
   );
 
-  // PixiJS federated events don't include dblclick, so detect manually.
-  const lastClickRef = useRef(0);
-
   const handleMouseDown = useCallback(
     (e: FederatedPointerEvent) => {
       if (!interactive || item.locked) return;
@@ -1236,17 +1252,18 @@ const PixiItemView = memo(function PixiItemView({
       if (nativeEvent.altKey) {
         // Alt-clicks cycle the selection through the items under the pointer.
         // Rapid ones must each count, never pair up into a double-click.
-        lastClickRef.current = 0;
+        lastClickRef.current = null;
       } else {
         // Double-click detection
         const now = Date.now();
-        if (now - lastClickRef.current < 400) {
-          lastClickRef.current = 0;
+        const last = lastClickRef.current;
+        if (last && last.itemId === item.id && now - last.at < 400) {
+          lastClickRef.current = null;
           e.stopPropagation();
           onItemDoubleClick(item);
           return;
         }
-        lastClickRef.current = now;
+        lastClickRef.current = { itemId: item.id, at: now };
       }
 
       e.stopPropagation();
@@ -1258,7 +1275,7 @@ const PixiItemView = memo(function PixiItemView({
         nativeEvent,
       );
     },
-    [interactive, item, onItemDoubleClick, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
+    [interactive, item, lastClickRef, onItemDoubleClick, onItemPointerDown, spacebarHeld, startPanDrag, toCanvasPointer],
   );
 
   const eventMode = interactive && !item.locked ? 'static' as const : 'none' as const;

@@ -71,7 +71,9 @@ Users can also add fonts at runtime from the font menu: "Import font from file�
 
 The font menu lists the fonts of the open canvas and the starred ones above the full list. A star marks a font, or a family with all its weights, as a favorite; favorites are kept in the browser, apart from any canvas.
 
-"Import font from Google…" uses the Google Fonts Developer API, which needs an API key. The build reads it from `VITE_GOOGLE_FONTS_API_KEY` (for local development, in a git-ignored `.env.local`); a build without it lists that menu item greyed out.
+A canvas that uses fonts the browser does not have (it was made on another computer, or its stored fonts are gone) gets them back by itself: when such a canvas is opened, each missing font is looked up on Google Fonts by name, and the ones found there are downloaded and stored like an imported font, with no action from the user. A font that is not on Google Fonts stays listed under "Missing fonts".
+
+Both use the Google Fonts Developer API, which needs an API key. The build reads it from `VITE_GOOGLE_FONTS_API_KEY` (for local development, in a git-ignored `.env.local`); a build without it lists the "Import font from Google…" menu item greyed out and does not look missing fonts up.
 
 ### Rich text
 
