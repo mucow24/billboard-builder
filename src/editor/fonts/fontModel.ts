@@ -13,6 +13,8 @@ export interface PersistedUploadedFont extends UploadedFont {
 }
 
 const WEIGHT_TOKENS = new Set(['bold']);
+// A word that turns the "Bold" after it into another weight: "SemiBold", "Extra Bold".
+const BOLD_MODIFIER_TOKENS = new Set(['semi', 'demi', 'extra', 'ultra']);
 const ITALIC_TOKENS = new Set(['italic', 'oblique']);
 const NORMAL_TOKENS = new Set(['regular', 'roman', 'book']);
 
@@ -34,6 +36,14 @@ export function parseFontSourceName(fileName: string): ParsedFontMetadata {
   for (const token of tokens) {
     const lower = token.toLowerCase();
     if (WEIGHT_TOKENS.has(lower)) {
+      const modifier = familyTokens.at(-1);
+      if (modifier && BOLD_MODIFIER_TOKENS.has(modifier.toLowerCase())) {
+        // Not the bold of the family but a weight of its own, which the editor
+        // lists as a separate regular-weight entry: the two tokens go back
+        // together as one word of the name ("Roboto SemiBold").
+        familyTokens[familyTokens.length - 1] = modifier + token;
+        continue;
+      }
       weight = '700';
       continue;
     }
