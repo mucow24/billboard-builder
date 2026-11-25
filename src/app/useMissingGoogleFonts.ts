@@ -59,13 +59,17 @@ export function useMissingGoogleFonts({
       }
     };
 
+    // The references of the canvas these entries are missing from: another
+    // canvas may be open by the time the catalog is in.
+    const references = latestRef.current.documentFonts;
+
     void (async () => {
       let imports;
       try {
         imports = planMissingGoogleFontImports(
           await loadGoogleFontCatalog(apiKey),
           entries,
-          latestRef.current.documentFonts,
+          references,
         );
       } catch (error) {
         console.warn('Missing fonts could not be looked up on Google Fonts.', error);

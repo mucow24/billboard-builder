@@ -218,7 +218,8 @@ export function useEditorController({ fontsReady, getRendererHandle }: UseEditor
   useMissingGoogleFonts({
     missingFontFamilies,
     documentFonts: document.fonts,
-    importGoogleFont: handleGoogleFontImport,
+    // Nobody asked for this import: an error on screen is not its to clear.
+    importGoogleFont: (request) => handleGoogleFontImport(request, { clearError: false }),
   });
 
   useCanvasPersistence({ document, documentId: libraryState.documentId });
