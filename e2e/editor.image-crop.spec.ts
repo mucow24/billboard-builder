@@ -686,13 +686,22 @@ test.describe('editor image crop', () => {
   test('Reset crop squeezes the whole image into its crop box, straight from crop mode', async ({
     page,
   }) => {
+    // Big enough that, at the zoom the canvas opens with, the image is still
+    // far wider on screen than a selection handle's hit area after both crops
+    // below. On a smaller image the handles close over its centre as soon as
+    // it is selected, and the second click of a double-click lands on a handle.
+    const imageWidth = 480;
+    const imageHeight = 270;
     const image = createImageFixture({
       id: 'reset-crop-image',
       name: 'Reset Crop Image',
-      x: 520,
+      x: 280,
       y: 320,
-      width: 160,
-      height: 90,
+      width: imageWidth,
+      height: imageHeight,
+      originalWidth: imageWidth,
+      originalHeight: imageHeight,
+      crop: { x: 0, y: 0, width: imageWidth, height: imageHeight },
     });
     const readSavedImage = async () => {
       const savedProject = await saveAndReadProject(page);
@@ -700,7 +709,7 @@ test.describe('editor image crop', () => {
         (item) => item.id === 'reset-crop-image',
       );
     };
-    /** Drags the crop box's right edge 80px to the left, about halving it. */
+    /** Drags the crop box's right edge 80px to the left. */
     const cropFromTheRight = async () => {
       await doubleClickItem(page, 'reset-crop-image');
       const cropSession = await expectCropMode(page);
@@ -723,8 +732,8 @@ test.describe('editor image crop', () => {
     await expect(resetCrop).toBeDisabled();
 
     const croppedBox = await cropFromTheRight();
-    expect(croppedBox.width).toBeLessThan(120);
-    expect(croppedBox.height).toBe(90);
+    expect(croppedBox.width).toBeLessThan(imageWidth - 40);
+    expect(croppedBox.height).toBe(imageHeight);
 
     // Still in crop mode: the button already knows about the crop.
     await expect(resetCrop).toBeEnabled();
@@ -741,8 +750,8 @@ test.describe('editor image crop', () => {
     const squeezed = await readSavedImage();
     expect(squeezed).toMatchObject({
       ...croppedBox,
-      crop: { x: 0, y: 0, width: 160, height: 90 },
-      sourceTransform: { x: 0, y: 0, width: croppedBox.width, height: 90, rotation: 0 },
+      crop: { x: 0, y: 0, width: imageWidth, height: imageHeight },
+      sourceTransform: { x: 0, y: 0, width: croppedBox.width, height: imageHeight, rotation: 0 },
     });
 
     // Escape still puts back the image crop mode started with, Reset crop included.
@@ -755,7 +764,7 @@ test.describe('editor image crop', () => {
     await expect.poll(async () => (await readStageDebug(page)).cropSession ?? null).toBeNull();
     expect(await readSavedImage()).toMatchObject({
       ...croppedBox,
-      sourceTransform: { x: 0, y: 0, width: croppedBox.width, height: 90, rotation: 0 },
+      sourceTransform: { x: 0, y: 0, width: croppedBox.width, height: imageHeight, rotation: 0 },
     });
   });
 
