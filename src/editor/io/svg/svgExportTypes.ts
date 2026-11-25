@@ -147,6 +147,9 @@ export interface TextMeasurer {
    * and drawing them the same means the browser does not fake bold with it.
    * Chromium does not where the file is itself heavy (see syntheticFontStyle).
    *
+   * False where it cannot be told: nothing to draw with, or a sample that
+   * leaves no ink (a zero-width space), which is drawn the same in any weight.
+   *
    * Optional: without it the bold of such an item is taken as faked.
    */
   drawsBoldAsRegular?(item: TextCanvasItem, sample: string): boolean;

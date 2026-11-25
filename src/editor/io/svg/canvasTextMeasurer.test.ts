@@ -11,6 +11,9 @@ import { createCanvasTextMeasurer } from './canvasTextMeasurer';
  * tells Chromium's unfaked bold from faked bold is proven in e2e.
  */
 
+/** A character that draws no ink: a zero-width space. */
+const INVISIBLE = String.fromCodePoint(0x200b);
+
 /** Families whose bold the stand-in browser fakes. */
 const fakedFamilies = new Set<string>();
 /** Every `fillText` call: the font it was drawn with and the text. */
@@ -27,7 +30,7 @@ function standInContext() {
       drawn.push({ font: this.font, text });
       const family = /"([^"]+)"/.exec(this.font)?.[1] ?? '';
       const faked = this.font.includes('bold') && fakedFamilies.has(family);
-      pixel = family.length + (faked ? 100 : 0);
+      pixel = text === INVISIBLE ? 0 : family.length + (faked ? 100 : 0);
     },
     getImageData: () => ({ data: new Uint8ClampedArray([0, 0, 0, pixel]) }),
     measureText: () => ({ width: 0 }),
@@ -62,6 +65,12 @@ describe('drawsBoldAsRegular', () => {
   it('is false when the bold is drawn differently', () => {
     fakedFamilies.add('Thin');
     expect(createCanvasTextMeasurer().drawsBoldAsRegular?.(bold('Thin'), 'H')).toBe(false);
+  });
+
+  // Text pasted from the web can start with one. Both weights are then drawn
+  // the same, empty, which says nothing about whether bold is faked.
+  it('is false for a sample that leaves no ink: it cannot be told, and bold is taken as faked', () => {
+    expect(createCanvasTextMeasurer().drawsBoldAsRegular?.(bold('Heavy'), INVISIBLE)).toBe(false);
   });
 
   it('draws at one size whatever the size of the text, and once for a font and sample', () => {

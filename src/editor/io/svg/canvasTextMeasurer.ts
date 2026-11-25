@@ -70,10 +70,12 @@ export function createCanvasTextMeasurer(): TextMeasurer {
       if (same === undefined) {
         const boldPixels = drawn(bold, sample);
         const regularPixels = drawn(getRenderableCanvasFontDeclaration({ ...probed, fontWeight: 'normal' }), sample);
-        // Nothing to draw with: it cannot be told, and bold is taken as faked.
+        // Nothing to draw with, or a sample that leaves no ink (a zero-width
+        // space, a soft hyphen): it cannot be told, and bold is taken as faked.
         same =
           boldPixels !== null &&
           regularPixels !== null &&
+          regularPixels.some((value) => value !== 0) &&
           boldPixels.every((value, index) => value === regularPixels[index]);
         drawnAsRegular.set(key, same);
       }
