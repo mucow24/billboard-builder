@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
+  canvasPointToPage,
   clickItem,
   clickLayerRow,
   createEllipseFixture,
@@ -704,5 +705,47 @@ test.describe('editor properties flows', () => {
     await mirror.click();
     await expect(mirror).toHaveAttribute('aria-pressed', 'true');
     await expectLook(mirror, alignOn);
+  });
+
+  test('keeps a size edit on the text box it was made for when another is clicked', async ({
+    page,
+  }) => {
+    const upper = createTextFixture({ id: 'size-upper', name: 'Upper', x: 200, y: 120, fontSize: 40 });
+    const lower = createTextFixture({ id: 'size-lower', name: 'Lower', x: 200, y: 320, fontSize: 40 });
+    const sizeBox = page.getByRole('spinbutton', { name: 'Size value', exact: true });
+    // Real mouse input throughout: the browser moves focus only after the
+    // press has been handled, which is the order this test is about.
+    const clickText = async (item: { x: number; y: number }) => {
+      const point = await canvasPointToPage(page, { x: item.x + 60, y: item.y + 20 });
+      await page.mouse.click(point.x, point.y);
+    };
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([upper, lower]), 'properties-size-leak.json');
+    await openPropertiesTab(page);
+
+    // Wheel over the focused size box, then click the other text box.
+    await clickText(upper);
+    await expect(sizeBox).toHaveValue('40');
+    await sizeBox.click();
+    await page.mouse.wheel(0, -100);
+    await expect(sizeBox).not.toHaveValue('40');
+    const wheeledSize = Number(await sizeBox.inputValue());
+    expect(wheeledSize).toBeGreaterThan(40);
+    await clickText(lower);
+    await expect(sizeBox).toHaveValue('40');
+
+    // A typed size that is not yet entered goes to the box it was typed for.
+    await sizeBox.click();
+    await sizeBox.press('ControlOrMeta+a');
+    await page.keyboard.type('90');
+    await clickText(upper);
+    await expect(sizeBox).toHaveValue(String(wheeledSize));
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({ id: 'size-upper', fontSize: wheeledSize }),
+      expect.objectContaining({ id: 'size-lower', fontSize: 90 }),
+    ]);
   });
 });

@@ -465,7 +465,8 @@ export function useCanvasTestApi({
       const merged = applyHeldModifiers(opts);
       // pointermove primes Pixi's hover/hit state for the upcoming press.
       // No yield between down and up — keeping these synchronous preserves
-      // the editor's per-item double-click cadence (diff < 400ms = double).
+      // the editor's double-click cadence (it pairs only presses on the same
+      // item, less than 400ms apart).
       // Only a single trailing yield so tests see the post-up commit.
       dispatchPointerEvent('pointermove', clientX, clientY, merged);
       dispatchPointerEvent('pointerdown', clientX, clientY, merged);

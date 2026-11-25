@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   assertFocusNotInToolbarOrInputs,
   assertNoDocumentTextSelection,
+  canvasPointsToPage,
   clickEmptyCanvas,
   clickItem,
   clickToolbarPopoverItem,
@@ -22,6 +23,7 @@ import {
   openFreshEditor,
   openLayersTab,
   openPropertiesTab,
+  readRenderSnapshot,
   readStageDebug,
   saveAndReadProject,
   savedLineEnds,
@@ -1104,6 +1106,33 @@ test.describe('editor groups', () => {
     expect(savedLineEndPoints.endX).toBeGreaterThan(440);
     expect(savedLineEndPoints.endY).toBeCloseTo(280, 0);
     expect(savedLineEndPoints.endX - savedLineEndPoints.startX).toBeGreaterThan(290);
+  });
+
+  test('does not pair two quick presses on an item into a double-click when another item is pressed in between', async ({
+    page,
+  }) => {
+    const first = createRectangleFixture({ id: 'pair-first', x: 140, y: 240, width: 140, height: 80, zIndex: 0 });
+    const second = createRectangleFixture({ id: 'pair-second', x: 560, y: 240, width: 140, height: 80, zIndex: 1 });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([first, second]), 'double-click-pairing.json');
+    // Real mouse input, with the points worked out beforehand: the three
+    // presses come at a quick hand's pace, the first and third well inside
+    // the double-click interval.
+    const [onFirst, onSecond] = await canvasPointsToPage(
+      page,
+      [first, second].map((item) => ({ x: item.x + 70, y: item.y + 40 })),
+    );
+
+    await page.mouse.click(onFirst.x, onFirst.y);
+    await page.waitForTimeout(100);
+    await page.mouse.click(onSecond.x, onSecond.y);
+    await page.waitForTimeout(100);
+    await page.mouse.click(onFirst.x, onFirst.y);
+    // The third press is a plain click: it selects the item again.
+    await expect
+      .poll(async () => (await readRenderSnapshot(page)).selectedNodeIds)
+      .toEqual(['pair-first']);
   });
 
 });
