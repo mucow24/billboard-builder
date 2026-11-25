@@ -83,7 +83,6 @@ import type { TextOutlineShape } from '../../io/svg/svgExportTypes';
 import type { RichTextShadowInput, ShadowCaster } from './richTextShadow';
 import { measureTextBaselineShift } from './textBaselineShift';
 import { getTextMeasuringContext, measureTextRasterPadding } from './textRasterPadding';
-import { useSettledZoom } from './useSettledZoom';
 import { configureZoomScaledFilter, registerZoomScaledFilter } from './zoomScaledFilters';
 
 // Stable reference so `pivot` prop doesn't trigger reconciliation every render.
@@ -1101,6 +1100,12 @@ interface PixiItemLayerProps {
   startPanDrag: (pointer: Point) => void;
   toCanvasPointer: (pointer: Point) => Point;
   zoom: number;
+  /**
+   * The zoom that text, SVG images and generators are rasterised for: `zoom`
+   * once it has held still (`useSettledZoom`), so that a run of zoom steps
+   * scales the textures that are there instead of drawing each anew.
+   */
+  rasterZoom: number;
 }
 
 export function PixiItemLayer({
@@ -1115,9 +1120,9 @@ export function PixiItemLayer({
   startPanDrag,
   toCanvasPointer,
   zoom,
+  rasterZoom,
 }: PixiItemLayerProps) {
   const interactive = activeTool === 'select';
-  const rasterZoom = useSettledZoom(zoom);
 
   return (
     <>

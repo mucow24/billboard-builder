@@ -105,6 +105,11 @@ interface UseCanvasDebugSnapshotParams {
   pan: Point;
   lastDrilldownSource: 'item-hit' | 'stage-surface' | null;
   previewItem: CanvasItem | null;
+  /**
+   * The zoom that text, SVG images and generators are rasterised for: `zoom`
+   * once it has held still (`useSettledZoom`). `zoom` where it is left out.
+   */
+  rasterZoom?: number;
   renderedItems: CanvasItem[];
   renderedSelectedItems: CanvasItem[];
   selectedDocumentItem: CanvasItem | null;
@@ -152,6 +157,7 @@ export function useCanvasDebugSnapshot({
   pan,
   lastDrilldownSource,
   previewItem,
+  rasterZoom,
   renderedItems,
   renderedSelectedItems,
   selectedDocumentItem,
@@ -194,6 +200,7 @@ export function useCanvasDebugSnapshot({
       renderedItemCount: renderedItems.length,
       viewport: {
         zoom,
+        rasterZoom: rasterZoom ?? zoom,
         panX: pan.x,
         panY: pan.y,
       },
@@ -336,6 +343,7 @@ export function useCanvasDebugSnapshot({
       subgroupOutlineFrames,
       viewportSize,
       zoom,
+      rasterZoom,
       cropFullImageHandleViewportPoints,
       cropFullImageRotaterViewportPoint,
       cropHandleViewportPoints,

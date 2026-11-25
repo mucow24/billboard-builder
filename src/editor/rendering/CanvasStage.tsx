@@ -16,6 +16,7 @@ import { buildStageSceneHandlers } from './stage/stageHandlers';
 import { resolveHoverOutline } from './stage/hoverOutline';
 import { useCanvasDebugSnapshot } from './stage/useCanvasDebugSnapshot';
 import { useCanvasViewport, type FitObstructionRefs } from './stage/useCanvasViewport';
+import { useSettledZoom } from './stage/useSettledZoom';
 import { toOverlayStyle } from './stage/viewportMath';
 import { useEditorStore } from '../state/store';
 
@@ -152,6 +153,8 @@ export function CanvasStage({
       : null;
 
   const viewport = viewportState;
+  // The zoom that text, SVG images and generators are rasterised for.
+  const rasterZoom = useSettledZoom(viewport.zoom);
 
   const previewItem = session && 'previewItem' in session ? session.previewItem : null;
   // A locked selection can't be transformed, so it gets no handles; neither
@@ -263,6 +266,7 @@ export function CanvasStage({
         handleItemDoubleClick={handleItemDoubleClick}
         handleItemPointerDown={handleItemPointerDown}
         hoverOutline={hoverOutline}
+        rasterZoom={rasterZoom}
         onItemHoverChange={handleItemHoverChange}
         onStageMouseDown={sceneHandlers.onStageMouseDown}
         onStageMouseLeave={handleStageMouseLeave}
@@ -312,6 +316,7 @@ export function CanvasStage({
           nodeClientRect={nodeClientRect}
           pan={viewport.pan}
           previewItem={previewItem}
+          rasterZoom={rasterZoom}
           renderedItems={renderedItems}
           renderedSelectedItems={renderedSelectedItems}
           selectedDocumentItem={selectedDocumentItem}
@@ -390,6 +395,7 @@ function CanvasStageDebug({
   nodeClientRect,
   pan,
   previewItem,
+  rasterZoom,
   renderedItems,
   renderedSelectedItems,
   selectedDocumentItem,
@@ -427,6 +433,7 @@ function CanvasStageDebug({
     nodeClientRect,
     pan,
     previewItem,
+    rasterZoom,
     renderedItems,
     renderedSelectedItems,
     rendererReady,
