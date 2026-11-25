@@ -23,12 +23,6 @@ import type { FederatedPointerEvent, Filter } from 'pixi.js';
 import { gaussianBlurResolution } from './blurDownsampling';
 import { ClampingBlurFilter } from './clampingBlurFilter';
 import { DownsampledDropShadowFilter } from './downsampledDropShadowFilter';
-import {
-  blurFilterPadding,
-  hasVisibleShadow,
-  itemFilterPadding,
-  shadowFilterPadding,
-} from './itemFilterPadding';
 import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
 
 import type {
@@ -888,16 +882,16 @@ function buildImageAdjustmentFilters(
 export const PixiImageContent = memo(function PixiImageContent({
   item,
   zoom = 1,
-  filterZoom = 1,
+  adjustmentsOnItem = false,
 }: {
   item: ImageCanvasItem;
   /** The zoom an SVG source is rasterised for (see `useSettledZoom`). */
   zoom?: number;
   /**
-   * The zoom the item is drawn at now, if the item has a blur or a shadow
-   * filter around this content: the adjustment filters are padded for it.
+   * The item's container applies the colour adjustments, ahead of its blur
+   * and shadow filters (see `itemFilters`): the sprite gets none here.
    */
-  filterZoom?: number;
+  adjustmentsOnItem?: boolean;
 }) {
   const imageElement = useImageElement(item.src);
   const [maskNode, setMaskNode] = useState<Graphics | null>(null);
@@ -957,6 +951,7 @@ export const PixiImageContent = memo(function PixiImageContent({
   }, [texture, svgCanvas]);
 
   const adjustmentFilters = useMemo(() => {
+    if (adjustmentsOnItem) return undefined;
     const filters = buildImageAdjustmentFilters(item.adjustments);
     if (!filters) return undefined;
     // Match filter resolution to displayed size so color-corrected pixels
@@ -964,31 +959,9 @@ export const PixiImageContent = memo(function PixiImageContent({
     // max texture size on large items at extreme zoom (clipping shows up as
     // rectangular edges on filtered output).
     const filterResolution = Math.min(2, Math.max(1, zoom)) * (window.devicePixelRatio || 1);
-    // Pixi draws a filter only where its object is in view, and these are
-    // inside the item's blur and shadow filters, which read past the view by
-    // their padding: a shadow is cast by a part of the image that is out of
-    // view, a blur at the edge of the view mixes in what lies beyond it. With
-    // the same padding the adjusted image is drawn everywhere they read. (Not
-    // by drawing the whole image instead: zoomed in, that is many times the
-    // screen on every frame.) The padding depends on the zoom, on screen and
-    // in an export: see zoomScaledFilters.ts.
-    const outer = { kind: item.kind, blurRadius: item.blurRadius, shadow: item.shadow };
-    for (const f of filters) {
-      f.resolution = filterResolution;
-      registerZoomScaledFilter(f, (outerZoom) => {
-        f.padding = itemFilterPadding(outer, outerZoom);
-      });
-    }
+    for (const f of filters) f.resolution = filterResolution;
     return filters;
-  }, [item.adjustments, item.kind, item.blurRadius, item.shadow, zoom]);
-
-  // A layout effect, as for the item's own filters: no frame is drawn with
-  // the padding of another zoom.
-  useLayoutEffect(() => {
-    if (!adjustmentFilters) return;
-    const dpr = window.devicePixelRatio || 1;
-    for (const filter of adjustmentFilters) configureZoomScaledFilter(filter, filterZoom, dpr);
-  }, [adjustmentFilters, filterZoom]);
+  }, [adjustmentsOnItem, item.adjustments, zoom]);
 
   const drawClipMask = useCallback(
     (g: Graphics) => {
@@ -1311,6 +1284,8 @@ const PixiItemView = memo(function PixiItemView({
     [item.kind, item.x, item.y, item.width, item.height, item.scaleX, item.scaleY],
   );
 
+  const imageAdjustments = item.kind === 'image' ? (item as ImageCanvasItem).adjustments : undefined;
+
   // Build combined filters: blur + shadow (text handles its own shadow via dropShadow style).
   // DropShadowFilter is a post-processing effect that operates in screen space,
   // so offset and blur must be scaled by the current zoom to match item-space values.
@@ -1345,7 +1320,11 @@ const PixiItemView = memo(function PixiItemView({
         registerZoomScaledFilter(blurFilter, (filterZoom, baseResolution, target) => {
           const strength = blurRadius * filterZoom;
           blurFilter.strength = strength;
-          blurFilter.padding = blurFilterPadding(blurRadius, filterZoom);
+          // With clamping in place, padding determines where the visible blur
+          // halo ends. Pixi's auto-padding (strength*2) cuts the Gaussian tail
+          // off mid-falloff; the optimized 4-pass kernel reaches ~5× strength,
+          // so pad to 6× for a smooth fadeout.
+          blurFilter.padding = strength * 6;
           const blurRegionPx = (itemMaxDim + blurFilter.padding * 2) * filterZoom;
           const resolution = clampRasterResolution(baseResolution, blurRegionPx, maxTextureSize);
           // On screen the item is drawn and blurred on a smaller texture,
@@ -1360,7 +1339,8 @@ const PixiItemView = memo(function PixiItemView({
     }
     if (item.kind !== 'text') {
       const s = item.shadow;
-      if (hasVisibleShadow(s)) {
+      const hasShadow = s && (s.blur > 0 || s.offsetX !== 0 || s.offsetY !== 0) && s.opacity > 0;
+      if (hasShadow) {
         const shadowFilter = new DownsampledDropShadowFilter({
           color: s.color,
           alpha: s.opacity,
@@ -1373,9 +1353,14 @@ const PixiItemView = memo(function PixiItemView({
             const shadowOffsetY = s.offsetY * filterZoom;
             shadowFilter.blur = shadowBlur;
             shadowFilter.offset = { x: shadowOffsetX, y: shadowOffsetY };
-            // Set last: the blur and offset setters reset the padding to the
-            // auto value.
-            shadowFilter.padding = shadowFilterPadding(s, filterZoom);
+            // DropShadowFilter wraps a Kawase blur whose reach scales with
+            // blur × quality. Auto-padding (offset + blur*2 + quality*4) clips
+            // the tail; extend it the same way as BlurFilter. Set last: the
+            // blur and offset setters reset the padding to the auto value.
+            shadowFilter.padding =
+              Math.max(Math.abs(shadowOffsetX), Math.abs(shadowOffsetY)) +
+              shadowBlur * 6 +
+              32;
             const shadowRegionPx = (itemMaxDim + shadowFilter.padding * 2) * filterZoom;
             shadowFilter.resolution = clampRasterResolution(baseResolution, shadowRegionPx, maxTextureSize);
             shadowFilter.clipToViewport = target === 'screen';
@@ -1386,8 +1371,25 @@ const PixiItemView = memo(function PixiItemView({
         );
       }
     }
-    return filters.length > 0 ? filters : undefined;
-  }, [item.blurRadius, item.shadow, item.kind, renderBox.width, renderBox.height]);
+    if (filters.length === 0) return undefined;
+    // An image's colour adjustments go first in the same list, not onto the
+    // sprite inside (where PixiImageContent puts them for an image with
+    // neither blur nor shadow). Pixi draws a filter only where its object is
+    // in view, a nested one too, while the blur and the shadow read past the
+    // view by their padding: nested, the adjusted image ended at the edge of
+    // the view for them, so the shadow of a part out of view was missing and
+    // a blur faded out towards the edge. In one list all the filters work on
+    // one area. The container holds nothing but the image, and the
+    // adjustments leave alpha alone, so the result is the same otherwise.
+    const adjustmentFilters = imageAdjustments ? buildImageAdjustmentFilters(imageAdjustments) : undefined;
+    if (adjustmentFilters) {
+      // Pixi runs a list at the lowest resolution of its filters: these take
+      // whatever the blur and the shadow are set to.
+      for (const f of adjustmentFilters) f.resolution = Number.POSITIVE_INFINITY;
+      filters.unshift(...adjustmentFilters);
+    }
+    return filters;
+  }, [item.blurRadius, item.shadow, item.kind, imageAdjustments, renderBox.width, renderBox.height]);
 
   // A layout effect: it runs in the commit that gives the container its
   // filters or the viewport its zoom, so no frame is drawn with one and not
@@ -1466,13 +1468,11 @@ const PixiItemView = memo(function PixiItemView({
     // of them, so that zooming there renders nothing anew.
     children = <PixiTextContent item={item} zoom={Math.max(1, rasterZoom)} />;
   } else if (item.kind === 'image') {
-    // The live zoom only where there is a filter to pad for: without one the
-    // content is not rendered again while zooming.
     children = (
       <PixiImageContent
         item={item as ImageCanvasItem}
         zoom={rasterZoom}
-        filterZoom={itemFilters ? zoom : 1}
+        adjustmentsOnItem={Boolean(itemFilters)}
       />
     );
   } else {
