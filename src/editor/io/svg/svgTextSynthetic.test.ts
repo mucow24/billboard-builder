@@ -108,6 +108,16 @@ describe('text whose bold the browser fakes by growing the outline', () => {
     expect(glyphPathTag(exportText({}, undefined))).not.toContain('stroke');
   });
 
+  // Chromium with a file that is itself heavy: the family has no bold file, and
+  // the browser draws its bold as its regular all the same.
+  it('adds no stroke, and asks for no closed contours, when the browser draws the bold as regular', () => {
+    const unfaked: TextMeasurer = { ...fakeMeasurer, drawsBoldAsRegular: () => true };
+    const svg = exportText({ fontWeight: 'bold' }, BOLD, { measurer: unfaked });
+    expect(glyphPathTag(svg)).not.toContain('stroke');
+    expect(svg).toBe(exportText({ fontWeight: 'bold' }, undefined));
+    expect(stylesAskedFor(BOLD, unfaked).map((style) => style?.closed)).toEqual([false, false]);
+  });
+
   // Fill and stroke overlap along the outline. See-through each on its own, they
   // would show through one another there and darken that band.
   it('makes a see-through colour opaque and the element see-through instead', () => {

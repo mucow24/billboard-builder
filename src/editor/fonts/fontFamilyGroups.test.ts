@@ -54,8 +54,19 @@ describe('splitFontFamilyVariant', () => {
     expect(splitFontFamilyVariant('Barlow Condensed').variant).toBeNull();
   });
 
-  it('does not treat bold as a weight of its own', () => {
-    expect(splitFontFamilyVariant('Example Bold').variant).toBeNull();
+  it('treats bold as a weight of its own, apart from the other bold words', () => {
+    expect(splitFontFamilyVariant('Example Bold')).toEqual({
+      base: 'Example',
+      variant: 'Bold',
+      weight: 700,
+    });
+    expect(splitFontFamilyVariant('Example Semi Bold')).toEqual({
+      base: 'Example',
+      variant: 'Semi Bold',
+      weight: 600,
+    });
+    expect(splitFontFamilyVariant('Example ExtraBold').weight).toBe(800);
+    expect(splitFontFamilyVariant('Boldonse').variant).toBeNull();
   });
 });
 
@@ -87,6 +98,17 @@ describe('groupFontOptions', () => {
       'Barlow > Thin, Extra Light, Light, Regular, Medium, Semibold, Extrabold, Black',
       'Georgia',
     ]);
+  });
+
+  it('lists Bold among the weights, at 700', () => {
+    expect(
+      describeEntries(['Barlow', 'Barlow Black', 'Barlow Bold', 'Barlow Extrabold', 'Barlow Semibold']),
+    ).toEqual(['Barlow > Regular, Semibold, Bold, Extrabold, Black']);
+  });
+
+  it('makes a family of weights without a regular one, named after them', () => {
+    expect(describeEntries(['Super16Bit Bold'])).toEqual(['Super16Bit Bold']);
+    expect(describeEntries(['Sulphur Bold', 'Sulphur Light'])).toEqual(['Sulphur > Light, Bold']);
   });
 
   it('puts the family row where its first font stood, and keeps the fonts between its members', () => {

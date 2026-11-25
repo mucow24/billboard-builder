@@ -1,4 +1,5 @@
 import type { DocumentFontReference, UploadedFont } from '../document/documentTypes';
+import { isEmojiFallbackFamily } from './emojiFallback';
 
 export interface ParsedFontMetadata {
   family: string;
@@ -63,6 +64,30 @@ export function parseFontSourceName(fileName: string): ParsedFontMetadata {
     weight,
     style,
   };
+}
+
+/**
+ * Every font-list entry a font file is registered as.
+ *
+ * A Bold file is two: the bold face of the family's own entry ("Roboto" at
+ * weight 700, which the Bold button and documents from before Bold was a
+ * weight of its own use), and an entry of its own, "Roboto Bold" at weight
+ * 400, which the font menu lists among the family's weights like "Roboto
+ * Light". The menu leaves out the first, and the plain "Roboto" altogether
+ * where the family has no other upright file, so that a family is never
+ * offered as a plain "Roboto" that draws bold (see `buildFontOptions`). The emoji fallback's family gets no
+ * second entry: it draws no letters of its own, and is not listed anyway.
+ *
+ * Derived from the file's own metadata wherever a file is registered (the font
+ * loader, which adds a face for each entry, and the font list), so fonts
+ * stored before Bold had an entry of its own get one too, and only the file's
+ * own metadata is ever stored.
+ */
+export function fontEntriesForFile<T extends ParsedFontMetadata>(metadata: T): T[] {
+  if (metadata.weight !== '700' || isEmojiFallbackFamily(metadata.family)) {
+    return [metadata];
+  }
+  return [metadata, { ...metadata, family: `${metadata.family} Bold`, weight: '400' }];
 }
 
 export function fontFamilyFromSourceName(fileName: string): string {

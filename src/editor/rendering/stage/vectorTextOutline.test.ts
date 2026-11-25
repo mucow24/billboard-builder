@@ -31,10 +31,17 @@ vi.mock('../../io/svg/fontOutlineProvider', async (importOriginal) => ({
   },
 }));
 
-// jsdom has no 2D canvas to measure with.
+// jsdom has no 2D canvas to measure with. Bold is drawn as regular in the
+// families named here, as Chromium draws a file that is itself heavy.
+const drawnAsRegular = new Set<string>();
 vi.mock('../../io/svg/canvasTextMeasurer', async () => {
   const { fakeMeasurer } = await import('../../../test/svgExportFakes');
-  return { createCanvasTextMeasurer: () => fakeMeasurer };
+  return {
+    createCanvasTextMeasurer: () => ({
+      ...fakeMeasurer,
+      drawsBoldAsRegular: (item: TextCanvasItem) => drawnAsRegular.has(item.fontFamily),
+    }),
+  };
 });
 
 import {
@@ -76,6 +83,7 @@ const latinOnly: OutlineFont = { ...fakeOutlineFont, hasGlyph: (ch) => (ch.codeP
 
 beforeEach(() => {
   registered.length = 0;
+  drawnAsRegular.clear();
   fontOfBytes.clear();
   loadFontBytes.mockReset();
   loadFallbackFontBytes.mockReset();
@@ -323,6 +331,14 @@ describe('textOutlineShapes', () => {
 
   it('is null where no bold is faked after all', () => {
     expect(textOutlineShapes(text(outlined), provider())).toBeNull();
+  });
+
+  // The family has no bold file, so `hasFakedBold` sends the item here, and the
+  // browser turns out to draw its bold as its regular: the outline is its own.
+  it('is null where the browser draws the bold of a heavy file as it is', () => {
+    drawnAsRegular.add('Heavy');
+    const item = text({ ...outlined, fontFamily: 'Heavy' });
+    expect(textOutlineShapes(item, provider({ bold: true, italic: false }))).toBeNull();
   });
 
   it('is null where part of the text has no contours', () => {

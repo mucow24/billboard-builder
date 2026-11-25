@@ -9,6 +9,7 @@ import {
 } from '../document/documentDefaults';
 import { normalizeProjectDocument } from '../document/documentNormalizer';
 import { drawnFontFamiliesOf } from '../fonts/boldWeight';
+import { fontEntriesForFile } from '../fonts/fontModel';
 import { isStraightLine } from '../document/polygonVertices';
 import {
   collectLeafItems,
@@ -242,13 +243,22 @@ function applyDocumentCommandWithEffects(
   };
 }
 
+/**
+ * Adds a registered font file to the font list, as every entry the font loader
+ * registered it as: a Bold file is also its family's "<Family> Bold" entry
+ * (`fontEntriesForFile`).
+ */
 function registerAvailableFont(session: SessionState, font: UploadedFont): SessionState {
-  const alreadyRegistered = session.availableFonts.some(
-    (entry) => entry.family === font.family && entry.sourceName === font.sourceName
+  const added = fontEntriesForFile(font).filter(
+    (entry) =>
+      !session.availableFonts.some(
+        (available) =>
+          available.family === entry.family && available.sourceName === entry.sourceName
+      )
   );
-  return alreadyRegistered
+  return added.length === 0
     ? session
-    : { ...session, availableFonts: [...session.availableFonts, font] };
+    : { ...session, availableFonts: [...session.availableFonts, ...added] };
 }
 
 function applyDocumentSelectionEffects(

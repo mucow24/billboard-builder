@@ -66,6 +66,15 @@ describe('resolveBoldFont', () => {
     expect(resolveBoldFont('Foo', 'normal', fonts)).toEqual({ fontFamily: 'Foo Black', fontWeight: 'normal' });
   });
 
+  it('takes a family\'s bold face, not the entry of its own the Bold file also has', () => {
+    // As the font loader registers a Bold file: the bold face of "Foo", and "Foo Bold".
+    const fonts = [file('Foo Light'), file('Foo'), file('Foo Bold'), file('Foo', '700'), file('Foo Black')];
+    expect(resolveBoldFont('Foo', 'normal', fonts)).toEqual({ fontFamily: 'Foo', fontWeight: 'bold' });
+    expect(resolveBoldFont('Foo Light', 'normal', fonts)).toEqual({ fontFamily: 'Foo', fontWeight: 'bold' });
+    // Text set in the Bold entry itself is drawn 300 heavier still, or as near as there is.
+    expect(resolveBoldFont('Foo Bold', 'normal', fonts)).toEqual({ fontFamily: 'Foo Black', fontWeight: 'normal' });
+  });
+
   it('never takes a lighter weight or the same one', () => {
     expect(resolveBoldFont('Foo Black', 'normal', [file('Foo Light'), file('Foo'), file('Foo Black')])).toBeNull();
   });

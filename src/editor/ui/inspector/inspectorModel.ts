@@ -37,6 +37,14 @@ const FONT_FAMILY_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base' 
  * `EMOJI_FALLBACK_UNICODE_RANGE`): the letters would come from the browser's
  * default font. A document that refers to it still lists it.
  *
+ * So are the bold files of a family's own entry. Each is also an entry of its
+ * own ("Roboto Bold", see `fontEntriesForFile`), which is how the menu offers
+ * it. And a family whose only upright file is its Bold one is not listed under
+ * its own name at all, even with other files, such as an Italic: the browser
+ * settles style before weight, so a plain "Roboto" would draw text with Bold
+ * and Italic off in that Bold file. A family that is all italic is still
+ * listed. A document that refers to the family still lists it.
+ *
  * The inspector builds this list on every render, so on every frame of a drag,
  * and there are a couple of hundred fonts: each is looked up once to drop the
  * ones listed twice, and one collator orders them all.
@@ -58,17 +66,35 @@ export function buildFontOptions(
     return true;
   };
 
+  // The families that would draw upright text with Bold off in their Bold file.
+  const uprightAtOtherWeights = new Set<string>();
+  const uprightBold = new Set<string>();
+  for (const font of availableFonts) {
+    if (font.style === 'normal') {
+      (font.weight === '700' ? uprightBold : uprightAtOtherWeights).add(font.family);
+    }
+  }
+  const drawsBoldWithBoldOff = (family: string) =>
+    uprightBold.has(family) && !uprightAtOtherWeights.has(family);
+
   return [
     ...WEB_SAFE_FONTS.map((family) => ({
       family,
       sourceName: family,
       kind: 'system' as const,
     })),
-    ...availableFonts.filter((font) => !isEmojiFallbackFamily(font.family)).map((font) => ({
-      family: font.family,
-      sourceName: font.sourceName,
-      kind: font.kind,
-    })),
+    ...availableFonts
+      .filter(
+        (font) =>
+          font.weight !== '700' &&
+          !drawsBoldWithBoldOff(font.family) &&
+          !isEmojiFallbackFamily(font.family),
+      )
+      .map((font) => ({
+        family: font.family,
+        sourceName: font.sourceName,
+        kind: font.kind,
+      })),
     ...fonts,
   ]
     .filter(isFirstOfItsKind)

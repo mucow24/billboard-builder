@@ -111,7 +111,10 @@ export function createFallbackFontLoader(registeredFonts: readonly UploadedFont[
 
 /**
  * What the browser fakes when it draws `item` with `font`, the file resolved for
- * it: whatever the canvas asks the browser for that the file is not.
+ * it: whatever the canvas asks the browser for that the file is not registered
+ * as. For bold that is what the browser may fake, told without reading the file
+ * or drawing anything: Chromium leaves the bold of a file that is itself heavy
+ * unfaked, and `syntheticBoldFor` settles that when the text is laid out.
  */
 export function syntheticStyle(item: TextCanvasItem, font: UploadedFont): SyntheticFontStyle | undefined {
   const drawn = getRenderableCombinedFontStyle(item);

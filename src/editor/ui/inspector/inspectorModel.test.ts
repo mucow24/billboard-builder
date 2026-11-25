@@ -133,6 +133,39 @@ describe('inspectorModel', () => {
     ).toContain('Noto Emoji');
   });
 
+  it('lists a Bold file as "<Family> Bold" only, and its family only while it has another file', () => {
+    const file = (family: string, sourceName: string, weight: UploadedFont['weight']): UploadedFont => ({
+      family,
+      sourceName,
+      weight,
+      style: 'normal',
+      kind: 'uploaded',
+    });
+    // The font list has a Bold file twice: as Foo's bold face and as "Foo Bold".
+    const bold = [file('Foo', 'Foo-Bold.ttf', '700'), file('Foo Bold', 'Foo-Bold.ttf', '400')];
+    const regular = file('Foo', 'Foo-Regular.ttf', '400');
+    const fooFamilies = (options: ReturnType<typeof buildFontOptions>) =>
+      options.map((font) => font.family).filter((family) => family.startsWith('Foo'));
+
+    // Bold only: no plain "Foo", which would draw bold with Bold off.
+    expect(fooFamilies(buildFontOptions(bold, []))).toEqual(['Foo Bold']);
+    // A regular file joins: Foo is back, listed by that file.
+    const withRegular = buildFontOptions([...bold, regular], []);
+    expect(fooFamilies(withRegular)).toEqual(['Foo', 'Foo Bold']);
+    expect(withRegular.find((font) => font.family === 'Foo')?.sourceName).toBe('Foo-Regular.ttf');
+    // And gone again with it.
+    expect(fooFamilies(buildFontOptions(bold, []))).toEqual(['Foo Bold']);
+    // Nor with an Italic beside the Bold: upright text would still draw with the Bold file.
+    const italic = { ...file('Foo', 'Foo-Italic.ttf', '400'), style: 'italic' as const };
+    expect(fooFamilies(buildFontOptions([...bold, italic], []))).toEqual(['Foo Bold']);
+    // A family that is all italic is listed all the same.
+    expect(fooFamilies(buildFontOptions([italic], []))).toEqual(['Foo']);
+    // A document whose text uses the plain family still lists it.
+    expect(
+      fooFamilies(buildFontOptions(bold, [{ family: 'Foo', sourceName: 'Foo-Bold.ttf', kind: 'uploaded' }])),
+    ).toEqual(['Foo', 'Foo Bold']);
+  });
+
   it('lists a family once however many of its files are available or referenced by the document', () => {
     const options = buildFontOptions(
       [
@@ -159,8 +192,9 @@ describe('inspectorModel', () => {
       ],
     );
 
+    // Listed by its regular file: the bold one is listed as "Persist Probe Bold".
     expect(options.filter((font) => font.family === 'Persist Probe')).toEqual([
-      { family: 'Persist Probe', sourceName: 'PersistProbe-Bold.otf', kind: 'uploaded' },
+      { family: 'Persist Probe', sourceName: 'PersistProbe-Regular.otf', kind: 'uploaded' },
     ]);
     // A family whose files are all missing stays selectable, also just once.
     expect(options.filter((font) => font.family === 'Ghost Font')).toEqual([

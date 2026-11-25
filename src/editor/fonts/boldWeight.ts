@@ -75,8 +75,13 @@ export function resolveBoldFont(
     const thanDistance = Math.abs(thanWeight - target);
     if (distance !== thanDistance) return distance < thanDistance;
     if (weight !== thanWeight) return weight > thanWeight;
-    // The same weight twice: the text's own family first, then by name, so the answer never depends on order.
+    // The same weight twice: the text's own family first. Then a family's bold
+    // face before the entry of its own the same Bold file also has ("Barlow
+    // Bold", see `fontEntriesForFile`): the face is what bold "Barlow" is drawn
+    // with, and the family a document references for it. Then by name, so the
+    // answer never depends on order.
     if ((font.family === family) !== (than.family === family)) return font.family === family;
+    if (font.weight !== than.weight) return font.weight === '700';
     return font.family < than.family;
   };
 

@@ -3,12 +3,40 @@ import { describe, expect, it } from 'vitest';
 import {
   createBundledFont,
   createUploadedFont,
+  fontEntriesForFile,
   fontFamilyFromSourceName,
   parseFontSourceName,
   toFontReference,
 } from './fontModel';
 
 describe('font model', () => {
+  describe('fontEntriesForFile', () => {
+    it('makes a Bold file its family\'s bold face and a "<Family> Bold" entry at the regular weight', () => {
+      expect(fontEntriesForFile(parseFontSourceName('Roboto-BoldItalic.ttf'))).toEqual([
+        { family: 'Roboto', sourceName: 'Roboto-BoldItalic.ttf', weight: '700', style: 'italic' },
+        { family: 'Roboto Bold', sourceName: 'Roboto-BoldItalic.ttf', weight: '400', style: 'italic' },
+      ]);
+    });
+
+    it('keeps the fields it does not change, such as the kind of a registered font', () => {
+      expect(
+        fontEntriesForFile({ ...parseFontSourceName('Roboto-Bold.ttf'), kind: 'uploaded' as const })[1],
+      ).toEqual({ family: 'Roboto Bold', sourceName: 'Roboto-Bold.ttf', weight: '400', style: 'normal', kind: 'uploaded' });
+    });
+
+    it('leaves every other file as the one entry it is', () => {
+      for (const fileName of ['Roboto-Regular.ttf', 'Roboto-Italic.ttf', 'Roboto-SemiBold.ttf', 'Roboto-Black.ttf']) {
+        const metadata = parseFontSourceName(fileName);
+        expect(fontEntriesForFile(metadata)).toEqual([metadata]);
+      }
+    });
+
+    it('gives the emoji fallback no second entry', () => {
+      const metadata = parseFontSourceName('NotoEmoji-Bold.ttf');
+      expect(fontEntriesForFile(metadata)).toEqual([metadata]);
+    });
+  });
+
   it('derives a readable font family from a source file name', () => {
     expect(fontFamilyFromSourceName('Acme-Sans_Bold.otf')).toBe('Acme Sans');
   });
