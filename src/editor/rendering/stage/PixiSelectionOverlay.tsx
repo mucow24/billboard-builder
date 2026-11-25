@@ -20,8 +20,11 @@ import { getRenderBox } from '../transformGeometry';
 import type { HoverOutline } from './hoverOutline';
 import {
   BASE_POLYGON_SELECTION_OUTSET,
+  getHandleFreeCore,
+  handleTakesPress,
   hasTransformBox,
   showsEdgeAddHandle,
+  type HandleFreeCore,
 } from './overlayGeometry';
 
 // ── Colours ──────────────────────────────────────────────────────────────────
@@ -35,6 +38,8 @@ const HOVER_STROKE = 0xfbbf24;
 
 // ── Base overlay dimensions (divided by zoom at draw time) ───────────────────
 const BASE_HANDLE_RADIUS = 8;
+// A handle takes presses in a square reaching this many radii from its centre.
+const HANDLE_REACH_IN_RADII = 1.5;
 const BASE_HANDLE_STROKE_WIDTH = 2;
 const BASE_SELECTION_STROKE_WIDTH = 2;
 const BASE_ROTATE_HANDLE_OFFSET = 50;
@@ -82,6 +87,7 @@ function InteractiveHandle({
   strokeWidth,
   fillColor = HANDLE_FILL,
   plusGlyph = false,
+  freeCore = null,
   onMouseDown,
 }: {
   name: string;
@@ -92,6 +98,10 @@ function InteractiveHandle({
   fillColor?: number;
   // Draws a small "+" over the disc — the polygon edge-split affordance.
   plusGlyph?: boolean;
+  // The middle of the selection box, where presses stay with the item. On a
+  // box small on screen the handles would otherwise cover all of it, and the
+  // item could be neither dragged nor double-clicked.
+  freeCore?: HandleFreeCore | null;
   onMouseDown: (e: FederatedPointerEvent) => void;
 }) {
   const draw = useCallback(
@@ -111,10 +121,15 @@ function InteractiveHandle({
     [radius, strokeWidth, fillColor, plusGlyph],
   );
 
-  const hitArea = useMemo(
-    () => new Rectangle(-radius * 1.5, -radius * 1.5, radius * 3, radius * 3),
-    [radius],
-  );
+  const hitArea = useMemo(() => {
+    const reach = radius * HANDLE_REACH_IN_RADII;
+    if (!freeCore) return new Rectangle(-reach, -reach, reach * 2, reach * 2);
+    const handleCenter = { x, y };
+    return {
+      contains: (localX: number, localY: number) =>
+        handleTakesPress({ x: localX, y: localY }, handleCenter, reach, freeCore),
+    };
+  }, [radius, freeCore, x, y]);
 
   return (
     <pixiGraphics
@@ -397,6 +412,18 @@ function GroupSelectionOverlay({
     ) as Record<ResizeHandle | 'rotater', Point>;
   }, [cx, cy, hw, hh, rotation, rotateOffset]);
 
+  const freeCore = useMemo(
+    () =>
+      getHandleFreeCore(
+        { x: cx, y: cy },
+        hw * 2,
+        hh * 2,
+        rotation,
+        handleRadius * HANDLE_REACH_IN_RADII,
+      ),
+    [cx, cy, hw, hh, rotation, handleRadius],
+  );
+
   // Draw bounding rect (in center-based local space, inside rotated container).
   const drawGroupOutline = useCallback(
     (g: Graphics) => {
@@ -473,6 +500,7 @@ function GroupSelectionOverlay({
               y={point.y}
               radius={handleRadius}
               strokeWidth={handleStroke}
+              freeCore={freeCore}
               onMouseDown={groupHandleMouseDownMap[name]}
             />
           ))}
@@ -541,6 +569,18 @@ function ShapeSelectionOverlay({
       ]),
     ) as Record<ResizeHandle | 'rotater', Point>;
   }, [box, item.rotation, rotateOffset]);
+
+  const freeCore = useMemo(
+    () =>
+      getHandleFreeCore(
+        localToStage({ x: box.width / 2, y: box.height / 2 }, { x: box.x, y: box.y }, item.rotation),
+        box.width,
+        box.height,
+        item.rotation,
+        handleRadius * HANDLE_REACH_IN_RADII,
+      ),
+    [box, item.rotation, handleRadius],
+  );
 
   // Draw selection outline rectangle (inside a rotated container).
   const drawOutline = useCallback(
@@ -623,6 +663,7 @@ function ShapeSelectionOverlay({
           y={point.y}
           radius={handleRadius}
           strokeWidth={handleStroke}
+          freeCore={freeCore}
           onMouseDown={shapeHandleMouseDownMap[name]}
         />
       ))}

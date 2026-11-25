@@ -3,6 +3,7 @@ import { isStraightLine } from '../../document/polygonVertices';
 import {
   localToStage,
   RESIZE_HANDLE_NAMES,
+  stageToLocal,
   type Point,
   type ResizeHandle,
 } from '../interactionGeometry';
@@ -143,4 +144,57 @@ export function getResizeHandleViewportRects(
       getViewportHandleRect(toViewportPoint(points[handle])),
     ]),
   ) as Record<ResizeHandle | 'rotater', ReturnType<typeof getViewportHandleRect>>;
+}
+
+/**
+ * The part of a selection box that its handles leave to the item: the box,
+ * pulled in on each side by the handles' reach, and by no more than a quarter
+ * of that side's length. A box at least four reaches long keeps every handle
+ * whole; a shorter one keeps its middle half for presses on the item itself,
+ * which the handles would otherwise cover.
+ */
+export interface HandleFreeCore {
+  /** Centre of the box, in stage coordinates. */
+  center: Point;
+  halfWidth: number;
+  halfHeight: number;
+  /** Rotation of the box around its centre, in degrees. */
+  rotation: number;
+}
+
+export function getHandleFreeCore(
+  center: Point,
+  width: number,
+  height: number,
+  rotation: number,
+  handleReach: number,
+): HandleFreeCore {
+  return {
+    center,
+    halfWidth: width / 2 - Math.min(handleReach, width / 4),
+    halfHeight: height / 2 - Math.min(handleReach, height / 4),
+    rotation,
+  };
+}
+
+/**
+ * Whether a handle takes a press at `offset` from its centre (stage axes):
+ * inside its square of `reach` each way, and outside the core.
+ */
+export function handleTakesPress(
+  offset: Point,
+  handleCenter: Point,
+  reach: number,
+  core: HandleFreeCore | null,
+): boolean {
+  if (offset.x < -reach || offset.x >= reach || offset.y < -reach || offset.y >= reach) {
+    return false;
+  }
+  if (!core) return true;
+  const inCore = stageToLocal(
+    { x: handleCenter.x + offset.x, y: handleCenter.y + offset.y },
+    core.center,
+    core.rotation,
+  );
+  return Math.abs(inCore.x) >= core.halfWidth || Math.abs(inCore.y) >= core.halfHeight;
 }
