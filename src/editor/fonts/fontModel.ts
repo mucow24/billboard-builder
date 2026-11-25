@@ -73,9 +73,9 @@ export function parseFontSourceName(fileName: string): ParsedFontMetadata {
  * weight 700, which the Bold button and documents from before Bold was a
  * weight of its own use), and an entry of its own, "Roboto Bold" at weight
  * 400, which the font menu lists among the family's weights like "Roboto
- * Light". The menu leaves out the first wherever the family has no other
- * file, so that a Bold-only family is never offered as a plain "Roboto" that
- * draws bold (see `buildFontOptions`). The emoji fallback's family gets no
+ * Light". The menu leaves out the first, and the plain "Roboto" altogether
+ * where the family has no other upright file, so that a family is never
+ * offered as a plain "Roboto" that draws bold (see `buildFontOptions`). The emoji fallback's family gets no
  * second entry: it draws no letters of its own, and is not listed anyway.
  *
  * Derived from the file's own metadata wherever a file is registered (the font

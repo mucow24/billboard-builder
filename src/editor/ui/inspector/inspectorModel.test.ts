@@ -155,6 +155,11 @@ describe('inspectorModel', () => {
     expect(withRegular.find((font) => font.family === 'Foo')?.sourceName).toBe('Foo-Regular.ttf');
     // And gone again with it.
     expect(fooFamilies(buildFontOptions(bold, []))).toEqual(['Foo Bold']);
+    // Nor with an Italic beside the Bold: upright text would still draw with the Bold file.
+    const italic = { ...file('Foo', 'Foo-Italic.ttf', '400'), style: 'italic' as const };
+    expect(fooFamilies(buildFontOptions([...bold, italic], []))).toEqual(['Foo Bold']);
+    // A family that is all italic is listed all the same.
+    expect(fooFamilies(buildFontOptions([italic], []))).toEqual(['Foo']);
     // A document whose text uses the plain family still lists it.
     expect(
       fooFamilies(buildFontOptions(bold, [{ family: 'Foo', sourceName: 'Foo-Bold.ttf', kind: 'uploaded' }])),

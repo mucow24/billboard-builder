@@ -9,6 +9,12 @@ italic, and "Regular", "Roman" and "Book" are dropped. Two files that come out
 the same, such as `Example Book.otf` and `Example Regular.ttf`, cannot both be
 used: text renders with the one whose file name sorts last.
 
+A Bold file is listed twice: it is the bold face of its family, which the Bold
+button uses, and also an entry of its own, "Example Bold", among the family's
+weights in the font menu. A family whose only upright file is its Bold one
+(such as Super16Bit, which has Bold and Bold Oblique only) is listed only as
+"Example Bold": a plain "Example" would draw bold with Bold off.
+
 A variable font is one file, so it gets one entry at one weight, and SVG
 export draws only the weight the file opens at. Bundle a family that has
 several weights as one static file per weight instead (`Example-Thin.ttf` to
@@ -21,7 +27,7 @@ this way.
 
 "Bold" straight after "Semi", "Demi", "Extra" or "Ultra" is not bold but a
 weight of its own, however the two are joined ("SemiBold", "Semi Bold",
-"Semi-Bold"). Like every weight other than regular and bold, it gets its own
-entry in the font list, with the weight written as one word:
+"Semi-Bold"). Like every weight other than regular, it gets its own entry in
+the font list, with the weight written as one word:
 `Example-SemiBold.ttf` and `Example-SemiBoldItalic.ttf` are the regular and
 italic of "Example SemiBold", not bold faces of "Example Semi".
