@@ -98,5 +98,11 @@ session fixes and responds once, and the reviewer then approves (the author
 session squash-merges) or escalates to Mike. Only run it when Mike asks.
 If Mike types `/start-review` or says "start review" and no such skill has
 loaded, read `.claude/skills/start-review/SKILL.md` and follow it.
-Both the protocol (`SKILL.md`) and the reviewer's instructions
-(`reviewer-prompt.md`) are in `.claude/skills/start-review/`.
+
+The files are in `.claude/skills/start-review/`. `SKILL.md` is only the
+entry point: it has the author session fetch the protocol,
+`author-protocol.md`, from `origin/main`, and the reviewer session reads
+its instructions, `reviewer-prompt.md`, from `origin/main` too. Both sides
+therefore run the version on main, whatever the PR's branch contains, and a
+change to either file takes effect when it merges. Change how a review runs
+in those two files, not in `SKILL.md`.
