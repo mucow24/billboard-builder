@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import {
   clickItem,
@@ -638,5 +638,71 @@ test.describe('editor properties flows', () => {
       expect.objectContaining({ id: 'lock-rect', locked: true, x: 140, width: 180 }),
       expect.objectContaining({ id: 'lock-ellipse', locked: false }),
     ]);
+  });
+
+  // The .properties-panel reset of every control's border and background came
+  // after .inspector-toggle-button.active and .mixed and won: an "on" Bold,
+  // Italic or Mirror button looked the same as an "off" one, and a mixed one
+  // lost its dashed border. Only the browser applies the CSS, so this is e2e.
+  test('Bold, Italic and Mirror look like an active alignment button when on', async ({
+    page,
+  }) => {
+    const look = (button: Locator) =>
+      button.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          borderColor: style.borderTopColor,
+          borderStyle: style.borderTopStyle,
+        };
+      });
+    // Controls fade between looks over 150 ms, and the pointer's hover look
+    // would stand in for the resting one, so move it away and poll.
+    const expectLook = async (button: Locator, expected: Awaited<ReturnType<typeof look>>) => {
+      await page.mouse.move(0, 0);
+      await expect.poll(() => look(button)).toEqual(expected);
+    };
+
+    const boldText = createTextFixture({ id: 'toggle-bold', fontWeight: 'bold' });
+    const plainText = createTextFixture({ id: 'toggle-plain', y: 460 });
+    const image = createImageFixture({ id: 'toggle-image' });
+
+    await openFreshEditor(page);
+    await uploadProject(
+      page,
+      createProjectDocument([boldText, plainText, image]),
+      'toggle-looks.json',
+    );
+    await clickItem(page, 'toggle-bold');
+    await openPropertiesTab(page);
+
+    const bold = page.getByRole('button', { name: 'Bold' });
+    const italic = page.getByRole('button', { name: 'Italic' });
+    const alignOn = await look(page.getByRole('button', { name: 'Align left' }));
+    const alignOff = await look(page.getByRole('button', { name: 'Align center' }));
+    expect(alignOn.background).not.toBe(alignOff.background);
+
+    await expect(bold).toHaveAttribute('aria-pressed', 'true');
+    await expectLook(bold, alignOn);
+    await expectLook(italic, alignOff);
+
+    await bold.click();
+    await expect(bold).toHaveAttribute('aria-pressed', 'false');
+    await expectLook(bold, alignOff);
+    // Under the pointer, as straight after a click, an "on" button stays lit.
+    await italic.click();
+    await expect.poll(() => look(italic)).toEqual(alignOn);
+
+    await bold.click();
+    await clickItem(page, 'toggle-plain', { shiftKey: true });
+    await expect(bold).toHaveClass(/\bmixed\b/);
+    await expect.poll(() => look(bold).then((value) => value.borderStyle)).toBe('dashed');
+
+    await clickItem(page, 'toggle-image');
+    const mirror = page.getByRole('button', { name: 'Mirror' });
+    await expectLook(mirror, alignOff);
+    await mirror.click();
+    await expect(mirror).toHaveAttribute('aria-pressed', 'true');
+    await expectLook(mirror, alignOn);
   });
 });
