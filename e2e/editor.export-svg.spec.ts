@@ -577,6 +577,103 @@ test.describe('SVG export', () => {
     });
   });
 
+  // Regression: bold was exported as faked wherever the family has no bold file.
+  // Chromium does not fake bold with a file that is itself heavy: "Barlow Black"
+  // is a family of its own with one regular-weight file, and Chromium draws its
+  // bold exactly as its regular. The export had about 19% more ink than the
+  // canvas there, and an outline around a see-through fill was drawn on the
+  // canvas for glyphs grown as faked bold grows them. Firefox and WebKit do fake
+  // bold with such a file, so whether the browser does is asked of the browser,
+  // and the reference is the canvas (Export > PNG) either way. The outlined
+  // layers have a see-through fill, which is where the canvas draws the outline
+  // of faked bold from the glyphs' contours.
+  test('exports bold in a heavy file the way the canvas draws it', async ({ page }) => {
+    await openFreshEditor(page);
+    // The bundled fonts have to be in first: see the kerning test above.
+    await waitForBundledFonts(page);
+
+    const row = { x: 20, width: 980, height: 170 };
+    const outlined = { fill: '#ffffff00', secondaryFill: '#ffffff00', stroke: '#ffffff', strokeWidth: 6 };
+    const layers = [
+      { id: 'heavy-bold', fontWeight: 'bold', y: 40, ...row },
+      { id: 'heavy-regular', fontWeight: 'normal', y: 240, ...row },
+      { id: 'heavy-bold-outlined', fontWeight: 'bold', y: 440, ...row, ...outlined },
+      { id: 'heavy-regular-outlined', fontWeight: 'normal', y: 640, ...row, ...outlined },
+    ];
+    const doc = {
+      ...createProjectDocument(
+        layers.map((layer, index) =>
+          createTextFixture({
+            ...layer,
+            name: layer.id,
+            text: 'Hamburg',
+            fontFamily: 'Barlow Black',
+            fontSize: 120,
+            zIndex: index + 1,
+          }),
+        ),
+      ),
+      fonts: [{ family: 'Barlow Black', sourceName: 'Barlow-Black.ttf', kind: 'bundled' }],
+    };
+    await uploadProject(page, doc, 'heavy-bold.json');
+
+    const svg = await readDownloadedSvg(
+      await captureDownload(page, async () => {
+        await clickToolbarPopoverItem(page, 'Export', 'SVG');
+      }),
+    );
+    const pngDownload = await captureDownload(page, async () => {
+      await clickToolbarPopoverItem(page, 'Export', 'PNG');
+    });
+    const png = readFileSync(await pngDownload.path()).toString('base64');
+
+    // Whether this browser fakes the bold of the file: whether it draws an H in
+    // bold differently from one in the regular weight.
+    const fakesBold = await page.evaluate(() => {
+      const drawn = (font: string) => {
+        const surface = document.createElement('canvas');
+        surface.width = 200;
+        surface.height = 200;
+        const context = surface.getContext('2d', { willReadFrequently: true })!;
+        context.font = font;
+        context.fillText('H', 50, 150);
+        return context.getImageData(0, 0, 200, 200).data.join();
+      };
+      return drawn('bold 120px "Barlow Black"') !== drawn('120px "Barlow Black"');
+    });
+
+    const compared = await compareInkWithCanvas(page, svg, png, doc.canvas.width, layers);
+    expect(compared).toHaveLength(layers.length);
+    const inkShare = (layer: InkComparison) => layer.exported.pixels / layer.canvas.pixels;
+
+    // An outline 6 px wide has little ink, and half a pixel of its width is a
+    // twelfth of it: Firefox's outline of smeared bold came out 0.07 apart.
+    for (const [boldIndex, regularIndex, inkTolerance] of [
+      [0, 1, 0.04],
+      [2, 3, 0.1],
+    ]) {
+      const bold = compared[boldIndex];
+      const regular = compared[regularIndex];
+      const { id } = layers[boldIndex];
+      expect(regular.canvas.pixels, id).toBeGreaterThan(5_000);
+      expect(regular.overlap, id).toBeGreaterThan(0.85);
+      // The exported bold sits on the canvas's bold as closely as the exported
+      // regular sits on the canvas's regular, and has the same share of its ink.
+      // With bold faked where the canvas does not fake it, the share was 0.19 over.
+      expect(Math.abs(bold.exported.left - bold.canvas.left), id).toBeLessThanOrEqual(2);
+      expect(Math.abs(bold.exported.right - bold.canvas.right), id).toBeLessThanOrEqual(2);
+      expect(bold.overlap, id).toBeGreaterThan(regular.overlap - 0.05);
+      expect(Math.abs(inkShare(bold) - inkShare(regular)), id).toBeLessThan(inkTolerance);
+      if (!fakesBold) {
+        // Nothing is faked: the canvas draws the bold layer as it draws the
+        // regular one, its outline included, and the export has no stroke for
+        // faked bold.
+        expect(bold.canvas, id).toEqual(regular.canvas);
+        expect(bold.exported, id).toEqual(regular.exported);
+      }
+    }
+  });
+
   // Regression: the exporter kept a hyphenated word on one line, where the canvas
   // (Pixi) ends a line after a hyphen. "Double-click to edit" was exported as two
   // lines, the first running far past the box, against three on the canvas.

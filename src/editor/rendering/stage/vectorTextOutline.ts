@@ -66,9 +66,13 @@ import { clampRasterResolution, getMaxTextureSize } from './rasterCaps';
 const mayUseFallback = (text: string) => [...drawnText(text)].some(isInEmojiFallbackRange);
 
 /**
- * Whether the browser fakes the bold of any of `item`'s text: of the item, of
- * one of its tagged runs, or of the emoji fallback where the text may use it.
- * Told from the files registered for the families, without reading any.
+ * Whether the browser may fake the bold of any of `item`'s text: of the item,
+ * of one of its tagged runs, or of the emoji fallback where the text may use
+ * it. Told from the files registered for the families, without reading any or
+ * drawing anything, so it is also true for bold in a file that is itself heavy,
+ * which Chromium does not fake (see `io/svg/syntheticFontStyle`). That is found
+ * out when the outline is laid out: `textOutlineShapes` then has no faked bold
+ * and leaves the outline to the browser.
  */
 export function hasFakedBold(item: TextCanvasItem): boolean {
   const registered = listRegisteredFonts();
