@@ -25,9 +25,15 @@ exactly.
 ## Visibility
 
 - Begin every message to Mike with the stage in bold, and set this
-  session's title to `PR <number> · <stage>` whenever the stage changes.
-  Stages: `Waiting for review`, `Addressing review`, `Waiting for verdict`,
-  `Waiting for CI`, `Merged`, `Needs Mike`.
+  session's title to `[#<number> · <stage emoji>] <PR title>` whenever the
+  stage changes, for example `[#123 · 🔧] Add support for rotated text`.
+  The prefix is kept this short because session names nest in the sidebar:
+  the title carries the stage's emoji only, never its words, and the PR's
+  title always follows, in full and unchanged, so the sidebar still says
+  what each session is working on. Messages to Mike use the stage's words.
+  Stages and their emoji: `Waiting for review` ⏳, `Addressing review` 🔧,
+  `Waiting for verdict` ⚖️, `Waiting for CI` 🚦, `Merged` ✅,
+  `Needs Mike` 🚨.
 - Paste every reviewer comment into the chat in full, verbatim, as soon as
   you read it, and paste your own response comment too. Mike should not
   have to open GitHub to follow along.
@@ -36,7 +42,7 @@ exactly.
 ## 1. Start
 
 1. Find the PR: `gh pr view <number or nothing> --json
-   number,url,state,isDraft,headRefName,headRefOid,author,body`. Stop and
+   number,title,url,state,isDraft,headRefName,headRefOid,author,body`. Stop and
    say so if there is none, or it is closed or a draft.
 2. Check that the local branch is pushed and its HEAD equals `headRefOid`.
 3. Check CI on the head commit: `gh pr checks <number>`. If anything failed
@@ -49,7 +55,8 @@ exactly.
    - `initiation`: `user_asked`; `context`: `fresh`; `use_worktree`: true;
      `source_branch`: the PR's branch; `wake_when_done`: true
    - `model`: `claude-opus-5-5`
-   - `title`: `PR <number> review`; `name`: `review-pr-<number>`
+   - `title`: `[#<number> review · 🔍] <PR title>`;
+     `name`: `review-pr-<number>`
    - `prompt`, with only the placeholders filled in:
 
      > Review pull request #<number> (<url>). Branch `<branch>`, head commit

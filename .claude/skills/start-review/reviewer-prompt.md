@@ -33,10 +33,18 @@ would be comfortable merging yourself.
 ## Stages
 
 Begin every message you write in your session with your stage, and set your
-session title to `PR <number> review · <stage>` when it changes:
+session title to `[#<number> review · <stage emoji>] <PR title>` when it
+changes, for example `[#123 review · 🔁] Add support for rotated text`:
 
-`Reviewing` → `Waiting for response` → `Re-evaluating` → `Done: approved` or
-`Done: needs Mike`
+`Reviewing` 🔍 → `Waiting for response` ⏳ → `Re-evaluating` 🔁 →
+`Done: approved` ✅ or `Done: needs Mike` 🚨
+
+The prefix is kept this short because session names nest in the sidebar:
+the title carries the stage's emoji only, never its words, while your
+messages use the words. The PR's title (`gh pr view <number> --json
+title`) always follows the prefix, in full and unchanged, so the sidebar
+still says which change each session is about. The word `review` in the
+prefix is what tells your session apart from the author's.
 
 A re-review after the head moves goes back to `Re-evaluating` and ends in
 one of the two `Done` stages again.
