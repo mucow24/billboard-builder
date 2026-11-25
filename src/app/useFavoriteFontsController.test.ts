@@ -122,6 +122,34 @@ describe('favorite fonts', () => {
     expect(loadFavoriteFonts()).toEqual([{ name: 'Arial', files: [] }]);
   });
 
+  it('keeps what another tab starred when a font is starred or unstarred here', () => {
+    const { result } = renderHook(() =>
+      useFavoriteFontsController({
+        availableFonts: [],
+        registerAvailableFont: vi.fn(),
+        setErrorMessage: vi.fn(),
+      }),
+    );
+    act(() => result.current.toggleFavoriteFont('Arial'));
+
+    // Another tab, which read the same favorites, stars Barlow and unstars Arial.
+    saveFavoriteFonts([{ name: 'Barlow', files: [] }]);
+
+    act(() => result.current.toggleFavoriteFont('Georgia'));
+    expect(loadFavoriteFonts().map((favorite) => favorite.name)).toEqual(['Barlow', 'Georgia']);
+    expect(result.current.favoriteFontNames).toEqual(['Barlow', 'Georgia']);
+
+    // Barlow shows as starred here now: unstarring it removes it.
+    act(() => result.current.toggleFavoriteFont('Barlow'));
+    expect(loadFavoriteFonts().map((favorite) => favorite.name)).toEqual(['Georgia']);
+
+    // Georgia was unstarred in the other tab already: unstarring it here changes nothing.
+    saveFavoriteFonts([]);
+    act(() => result.current.toggleFavoriteFont('Georgia'));
+    expect(loadFavoriteFonts()).toEqual([]);
+    expect(result.current.favoriteFontNames).toEqual([]);
+  });
+
   it('brings back the imported fonts of the stored favorites when the editor appears', async () => {
     const files = [{ family: 'Gone', sourceName: 'Gone.ttf', kind: 'uploaded' as const }];
     saveFavoriteFonts([{ name: 'Gone', files }]);

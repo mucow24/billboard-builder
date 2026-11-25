@@ -95,6 +95,18 @@ export function useFavoriteFontsController({
   );
   // What `favoriteFonts` is about to be: several changes can come before a render.
   const latestRef = useRef(favoriteFonts);
+  const saveFailedRef = useRef(false);
+
+  /**
+   * The favorites to change: the stored ones, read again, because another tab
+   * of the editor may have starred fonts since this one read them, and writing
+   * this tab's list back would drop those. If storing has failed, this tab's
+   * list is all there is.
+   */
+  const readStored = useCallback(
+    (): readonly FavoriteFont[] => (saveFailedRef.current ? latestRef.current : loadFavoriteFonts()),
+    [],
+  );
 
   const commit = useCallback(
     (next: readonly FavoriteFont[]) => {
@@ -102,7 +114,9 @@ export function useFavoriteFontsController({
       setFavoriteFonts(next);
       try {
         saveFavoriteFonts(next);
+        saveFailedRef.current = false;
       } catch (error) {
+        saveFailedRef.current = true;
         console.warn('The favorite fonts could not be stored.', error);
         setErrorMessage('The favorite fonts could not be saved in this browser.');
       }
@@ -128,23 +142,34 @@ export function useFavoriteFontsController({
 
   // A weight imported after its family was starred belongs to the favorite too.
   useEffect(() => {
-    const next = addImportedFontFiles(latestRef.current, availableFonts);
-    if (next !== latestRef.current) {
+    const stored = readStored();
+    const next = addImportedFontFiles(stored, availableFonts);
+    if (next !== stored) {
       commit(next);
     }
-  }, [availableFonts, commit]);
+  }, [availableFonts, commit, readStored]);
 
   const toggleFavoriteFont = useCallback(
     (name: string) => {
+      const isFavorite = (favorites: readonly FavoriteFont[]) =>
+        favorites.some((favorite) => favorite.name === name);
+      const stored = readStored();
+      // The star turns into the opposite of what this tab shows. If another
+      // tab already made that change, the stored favorites are right as they are.
       commit(
-        toggleFavoriteFontIn(
-          latestRef.current,
-          name,
-          collectImportedFontFiles(name, useEditorStore.getState().editor.session.availableFonts),
-        ),
+        isFavorite(stored) === isFavorite(latestRef.current)
+          ? toggleFavoriteFontIn(
+              stored,
+              name,
+              collectImportedFontFiles(
+                name,
+                useEditorStore.getState().editor.session.availableFonts,
+              ),
+            )
+          : stored,
       );
     },
-    [commit],
+    [commit, readStored],
   );
 
   const favoriteFontNames = useMemo(

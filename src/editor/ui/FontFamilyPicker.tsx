@@ -70,6 +70,15 @@ const GOOGLE_IMPORT_UNAVAILABLE_HINT =
  */
 const FONT_PREVIEW_MARGIN = 400;
 
+/**
+ * Whether a row is no longer at `top`, where it was when the pointer came onto
+ * it or its submenu opened: the list has scrolled under the pointer, and a
+ * submenu must not open, or stay open, for a row that moved away.
+ */
+function rowHasMoved(rowElement: Element, top: number) {
+  return Math.abs(rowElement.getBoundingClientRect().top - top) > 0.5;
+}
+
 function getFontPreviewFamily(family: string) {
   return `${JSON.stringify(family)}, "Trebuchet MS", sans-serif`;
 }
@@ -722,7 +731,7 @@ export function FontFamilyPicker({
       switchTimerRef.current = null;
       const row = rowKey === null ? undefined : rows.find((candidate) => candidate.key === rowKey);
       const rowIsInPlace =
-        !rowElement || Math.abs(rowElement.getBoundingClientRect().top - (rowTop ?? 0)) <= 0.5;
+        !rowElement || rowTop === undefined || !rowHasMoved(rowElement, rowTop);
       if (row && rowIsInPlace && entries[row.entryIndex]?.kind === 'family') {
         openSubmenu(row);
       } else {
@@ -774,10 +783,7 @@ export function FontFamilyPicker({
     // one that brought the row into view may be reported after a click on the
     // row has opened the submenu.
     const openRowElement = openRowDomId ? document.getElementById(openRowDomId) : null;
-    if (
-      openRowElement &&
-      Math.abs(openRowElement.getBoundingClientRect().top - openRowTopRef.current) > 0.5
-    ) {
+    if (openRowElement && rowHasMoved(openRowElement, openRowTopRef.current)) {
       // Only this submenu: one waiting to open for the row the pointer has moved to still does.
       setOpenRowKey(null);
     }
