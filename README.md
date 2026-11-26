@@ -195,6 +195,7 @@ docs/                   # Interaction test coverage matrix
 | Ctrl+A | Select all |
 | Ctrl+S | Save to the library |
 | Alt+Click | Select through the items under the cursor: each click steps to the next one down, including locked and covered items |
+| Alt+Drag a corner handle | Scales the selection like a picture of itself: the resize is proportional, and font sizes, letter spacing, padding, outlines, corner radii, shadows and blur scale with the boxes |
 | Drag over a covered selected item | Moves the selection, even when another item is on top; a click there selects the top item |
 | Ctrl+G | Group |
 | Ctrl+Shift+G | Ungroup |

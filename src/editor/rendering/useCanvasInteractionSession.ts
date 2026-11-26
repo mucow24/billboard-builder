@@ -593,7 +593,7 @@ export function useCanvasInteractionSession({
   }, [clearPendingItemGesture, finishSession, updateGuides, updateSession]);
 
   const advanceSessionAtPointer = useCallback(
-    (pointer: Point | null, modifiers: { ctrlKey: boolean; shiftKey: boolean }) => {
+    (pointer: Point | null, modifiers: { altKey: boolean; ctrlKey: boolean; shiftKey: boolean }) => {
       if (!pointer) {
         return;
       }
@@ -638,6 +638,7 @@ export function useCanvasInteractionSession({
             ? modifiers.ctrlKey
             : current.snapDisabled,
         shiftConstrain: modifiers.shiftKey,
+        scaleContents: modifiers.altKey,
       } as SessionWithModifiers, pointer);
       clearPendingMarquee();
       updateGuides(next.guides);
@@ -666,6 +667,7 @@ export function useCanvasInteractionSession({
 
   const handleWindowMouseMove = useEffectEvent((event: MouseEvent) => {
     const modifiers = resolveModifierKeys({
+      altKey: event.altKey,
       ctrlKey: event.ctrlKey,
       shiftKey: event.shiftKey,
     });
@@ -1281,6 +1283,7 @@ export function useCanvasInteractionSession({
       const nativeEvent = event.nativeEvent as MouseEvent;
       const pointer = getCanvasPointerFromStageEvent(event);
       advanceSessionAtPointer(pointer, resolveModifierKeys({
+        altKey: nativeEvent.altKey,
         ctrlKey: nativeEvent.ctrlKey,
         shiftKey: nativeEvent.shiftKey,
       }));

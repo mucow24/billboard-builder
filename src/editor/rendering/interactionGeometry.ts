@@ -14,6 +14,7 @@ import type {
   PolygonVertex,
   SnapRect,
 } from '../document/documentTypes';
+import { scaleItemStyle } from '../document/itemStyleScale';
 import { polygonBounds, translatePolygonVertices } from '../document/polygonVertices';
 import { scaleImageSourceTransform } from './imagePresentation';
 import { getItemAABB } from './selectionGeometry';
@@ -468,8 +469,21 @@ const CORNER_RESIZE_HANDLES: ResizeHandle[] = [
   'bottom-right',
 ];
 
-function isCornerResizeHandle(handle: ResizeHandle): boolean {
+export function isCornerResizeHandle(handle: ResizeHandle): boolean {
   return CORNER_RESIZE_HANDLES.includes(handle);
+}
+
+/**
+ * The one factor a proportional resize scaled a box by. Width and height agree
+ * on it except where a minimum size got in the way, so it is taken from the
+ * area.
+ */
+export function getUniformScale(
+  from: { width: number; height: number },
+  to: { width: number; height: number }
+): number {
+  const fromArea = from.width * from.height;
+  return fromArea > 0 ? Math.sqrt((to.width * to.height) / fromArea) : 1;
 }
 
 /**
@@ -515,9 +529,13 @@ export function solveResizeSession(
   snapEnabled = true,
   threshold?: number,
   cache?: SnapCandidateCache,
-  shiftConstrain = false
+  shiftConstrain = false,
+  // Alt on a corner handle: the resize is proportional and the item's
+  // pixel-sized settings (font size, outline, shadow...) scale with the box.
+  scaleContents = false
 ): InteractionItemPreview {
   const renderBox = getRenderBox(item);
+  const scalesContents = scaleContents && isCornerResizeHandle(handle);
   const adjustedPointer = {
     x: pointer.x - pointerOffset.x,
     y: pointer.y - pointerOffset.y,
@@ -559,7 +577,8 @@ export function solveResizeSession(
     rawEdges.right = localPoint.x;
   }
 
-  const shouldConstrain = shiftConstrain || (item.kind === 'image' && item.preserveAspectRatio);
+  const shouldConstrain =
+    shiftConstrain || scalesContents || (item.kind === 'image' && item.preserveAspectRatio);
   const ratioEdges = shouldConstrain
     ? applyAspectRatio(handle, rawEdges, renderBox.width, renderBox.height)
     : rawEdges;
@@ -652,7 +671,10 @@ export function solveResizeSession(
     ratioEdges.bottom
   );
   const localRect = rectFromBounds(normalized);
-  const previewItem = applyShapeFrame(item, localRect);
+  const resizedItem = applyShapeFrame(item, localRect);
+  const previewItem = scalesContents
+    ? scaleItemStyle(resizedItem, getUniformScale(renderBox, localRect))
+    : resizedItem;
 
   if (previewItem.kind === 'text') {
     previewItem.height = Math.max(

@@ -77,7 +77,8 @@ export function createTextDescriptors(): InspectorFieldDescriptor[] {
     createFontFamilyField(),
     createNumberField({
       buildChange: (_context, nextValue) => ({ fontSize: nextValue }),
-      digits: 0,
+      // A scaling resize (Alt-drag on a corner) leaves fractional sizes.
+      digits: 2,
       fieldOrder: 30,
       getValue: (item) => (item.kind === 'text' ? item.fontSize : 0),
       label: 'Size',
