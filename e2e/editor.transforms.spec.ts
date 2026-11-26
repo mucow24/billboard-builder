@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import {
+  clickEmptyCanvas,
   clickItem,
   collectLeafNodes,
   dragEmptyCanvas,
@@ -657,5 +658,69 @@ test.describe('editor transforms', () => {
     const finalProject = await saveAndReadProject(page);
 
     expect(JSON.stringify(finalProject.nodes)).not.toBe(JSON.stringify(resizedProject.nodes));
+  });
+
+  test('ST-22 Alt-drag on a group corner scales text and shape settings with the boxes', async ({ page }) => {
+    const word = createTextFixture({
+      id: 'logo-word',
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 60,
+      text: 'Logo',
+      fontSize: 40,
+      letterSpacing: 3,
+      zIndex: 0,
+    });
+    const rule = createRectangleFixture({
+      id: 'logo-rule',
+      x: 100,
+      y: 180,
+      width: 200,
+      height: 20,
+      strokeWidth: 4,
+      zIndex: 1,
+    });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([word, rule]), 'logo.json');
+    await dragEmptyCanvas(page, { x: 80, y: 80 }, { x: 340, y: 220 });
+    await expect(page.getByTestId('canvas-group-rotater')).toBeAttached();
+
+    // Find the corner handle through the hooks, then drag it with the real
+    // mouse while Alt is held. The pointer leaves the diagonal: Alt alone
+    // keeps the resize proportional.
+    await setCanvasTestHooksEnabled(page, true);
+    const handleBox = await page.getByTestId('canvas-group-handle-bottom-right').boundingBox();
+    if (!handleBox) {
+      throw new Error('Expected the group corner handle to be visible.');
+    }
+    await setCanvasTestHooksEnabled(page, false);
+    const start = { x: handleBox.x + handleBox.width / 2, y: handleBox.y + handleBox.height / 2 };
+    await page.keyboard.down('Alt');
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 97, start.y + 11, { steps: 18 });
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+
+    const saved = collectLeafNodes((await saveAndReadProject(page)).nodes as Array<Record<string, unknown>>);
+    const savedWord = saved.find((item) => item.id === 'logo-word');
+    const savedRule = saved.find((item) => item.id === 'logo-rule');
+    const factor = Number(savedWord?.width) / 200;
+    expect(factor).toBeGreaterThan(1.2);
+    expect(Number(savedWord?.height) / 60).toBeCloseTo(factor, 4);
+    expect(Number(savedWord?.fontSize)).toBeCloseTo(40 * factor, 4);
+    expect(Number(savedWord?.letterSpacing)).toBeCloseTo(3 * factor, 4);
+    expect(Number(savedRule?.width) / 200).toBeCloseTo(factor, 4);
+    expect(Number(savedRule?.height) / 20).toBeCloseTo(factor, 4);
+    expect(Number(savedRule?.strokeWidth)).toBeCloseTo(4 * factor, 4);
+
+    // The Size box shows the fractional size to two decimals.
+    await clickEmptyCanvas(page, { x: 700, y: 600 });
+    await clickItem(page, 'logo-word');
+    await openPropertiesTab(page);
+    const shown = Number((40 * factor).toFixed(2)).toString();
+    await expect(page.getByRole('spinbutton', { name: 'Size value', exact: true })).toHaveValue(shown);
   });
 });

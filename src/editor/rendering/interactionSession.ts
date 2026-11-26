@@ -3,6 +3,8 @@ import {
   CREATE_CLICK_THRESHOLD,
   getCreatePreview,
   getShapeHandlePoints,
+  getUniformScale,
+  isCornerResizeHandle,
   solveDragSession,
   solvePolygonVertexSession,
   solveResizeSession,
@@ -30,6 +32,7 @@ import type {
   GuideLine,
   PolygonCanvasItem,
 } from '../document/documentTypes';
+import { getScalableStyle, scaleItemStyle } from '../document/itemStyleScale';
 import { insertPolygonVertex, isLineItem } from '../document/polygonVertices';
 import { flattenVisibleLeafNodes } from '../document/sceneGraph';
 
@@ -143,7 +146,36 @@ export type InteractionSession =
   | GroupResizeSession
   | GroupRotateSession;
 
-export type SessionWithModifiers = InteractionSession & { shiftConstrain?: boolean };
+export type SessionWithModifiers = InteractionSession & {
+  shiftConstrain?: boolean;
+  // Alt held. On a corner handle of a resize it makes the resize proportional
+  // and scales what is inside the boxes with them (see isScalingResize).
+  scaleContents?: boolean;
+};
+
+/**
+ * A resize that scales the selection like a picture of itself: proportional,
+ * with every item's pixel-sized settings (font size, letter spacing, outline,
+ * shadow...) multiplied by the same factor as its box. Alt-drag on a corner
+ * handle. Side handles stretch one axis, which no font size matches, so Alt
+ * does nothing there, the same as Shift.
+ */
+function isScalingResize(session: InteractionSession): boolean {
+  return (
+    (session.kind === 'resize' || session.kind === 'group-resize') &&
+    Boolean((session as SessionWithModifiers).scaleContents) &&
+    isCornerResizeHandle(session.handle)
+  );
+}
+
+function rotateAbout(point: Point, center: Point, degrees: number): Point {
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return { x: center.x + dx * cos - dy * sin, y: center.y + dx * sin + dy * cos };
+}
 
 // Pointer travel (canvas units) up to which a press-and-release on an item or
 // handle is a click rather than a drag.
@@ -780,7 +812,8 @@ export function resolveInteractionSession(
         !current.snapDisabled,
         threshold,
         cache,
-        Boolean(currentWithModifiers.shiftConstrain)
+        Boolean(currentWithModifiers.shiftConstrain),
+        Boolean(currentWithModifiers.scaleContents)
       );
       return { ...current, snapCache: cache, previewItem: next.item, guides: next.guides };
     }
@@ -850,12 +883,46 @@ export function resolveInteractionSession(
       // Guide snapping is intentionally disabled for rotated group resize.
       // Computing snap targets for rotated bounding boxes requires projecting
       // rotated corners onto axis-aligned guides, which is not yet implemented.
-      const groupRatioAnchor = currentWithModifiers.shiftConstrain
+      const scalesContents = isScalingResize(current);
+      const groupRatioAnchor = currentWithModifiers.shiftConstrain || scalesContents
         ? getGroupResizeAnchor(current.bounds, current.handle as ResizeHandle)
         : null;
       const groupRatio = current.bounds.width / current.bounds.height;
+      // The ratio is the frame's own, so a rotated frame is constrained in its
+      // own axes: turn the pointer into them, constrain, and turn it back.
+      const frameCenter = {
+        x: current.bounds.x + current.bounds.width / 2,
+        y: current.bounds.y + current.bounds.height / 2,
+      };
       const constrainGroupPointer = (p: Point) =>
-        groupRatioAnchor ? constrainToRatio(groupRatioAnchor, p, groupRatio) : p;
+        groupRatioAnchor
+          ? rotateAbout(
+              constrainToRatio(
+                groupRatioAnchor,
+                rotateAbout(p, frameCenter, -current.frameRotation),
+                groupRatio
+              ),
+              frameCenter,
+              current.frameRotation
+            )
+          : p;
+      const buildPreviews = (resolvedPointer: Point) => {
+        const previews = buildGroupResizePreviews(
+          current.originalItems,
+          current.bounds,
+          current.handle,
+          resolvedPointer,
+          current.frameRotation
+        );
+        if (!scalesContents) {
+          return previews;
+        }
+        const factor = getUniformScale(
+          current.bounds,
+          getGroupResizeFrame(current.bounds, current.handle, resolvedPointer, current.frameRotation).bounds
+        );
+        return previews.map((item) => scaleItemStyle(item, factor));
+      };
 
       if (current.snapDisabled || Math.abs(current.frameRotation) >= 0.001) {
         const constrained = constrainGroupPointer(pointer);
@@ -863,13 +930,7 @@ export function resolveInteractionSession(
           ...current,
           currentPointer: constrained,
           guides: [],
-          previewItems: buildGroupResizePreviews(
-            current.originalItems,
-            current.bounds,
-            current.handle,
-            constrained,
-            current.frameRotation
-          ),
+          previewItems: buildPreviews(constrained),
         };
       }
       const rawRect = getGroupResizeRect(current.bounds, current.handle, constrainGroupPointer(pointer));
@@ -896,13 +957,7 @@ export function resolveInteractionSession(
         snapCache: cache,
         currentPointer: resolvedPointer,
         guides: resolved.guides,
-        previewItems: buildGroupResizePreviews(
-          current.originalItems,
-          current.bounds,
-          current.handle,
-          resolvedPointer,
-          current.frameRotation
-        ),
+        previewItems: buildPreviews(resolvedPointer),
       };
     }
     case 'group-rotate':
@@ -925,6 +980,11 @@ export function buildInteractionCommit(
   context: { nodes: CanvasNode[]; pointer: Point; canvasBounds: RenderBox }
 ): InteractionCommit {
   const { nodes, pointer } = context;
+  // A scaling resize changed the items' pixel-sized settings as well as their
+  // boxes, so those are committed too.
+  const scaled = isScalingResize(resolved);
+  const commitChanges = (item: CanvasItem): Partial<CanvasItem> =>
+    scaled ? { ...getCommitChanges(item), ...getScalableStyle(item) } : getCommitChanges(item);
 
   if (resolved.kind === 'create') {
     // A click (pointer travel within the threshold) always drops the default
@@ -992,7 +1052,7 @@ export function buildInteractionCommit(
       kind: 'group',
       updates: resolved.previewItems.map((item) => ({
         itemId: item.id,
-        changes: getCommitChanges(item),
+        changes: commitChanges(item),
       })),
       selectionFrame,
     };
@@ -1018,6 +1078,6 @@ export function buildInteractionCommit(
   return {
     kind: 'single-item',
     itemId: resolved.itemId,
-    changes: getCommitChanges(resolved.previewItem),
+    changes: commitChanges(resolved.previewItem),
   };
 }
