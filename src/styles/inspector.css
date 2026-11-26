@@ -321,7 +321,8 @@
 }
 
 .number-input-field-with-slider input[type='number'] {
-  width: 4.1rem;
+  /* Room for seven characters ("-179.95") beside the spin buttons. */
+  width: 4.6rem;
   justify-self: end;
   text-align: right;
 }

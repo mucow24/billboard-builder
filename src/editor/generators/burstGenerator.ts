@@ -22,7 +22,7 @@ export const burstGeneratorSpec: GeneratorSpec<BurstGeneratorParams> = {
   fields: [
     { key: 'accentColor', label: 'Accent Color', tooltip: 'Color of every other ray.', type: 'color' },
     { key: 'bandColorB', label: 'Secondary Color', tooltip: 'Color of the rays in between.', type: 'color' },
-    { key: 'burstRays', label: 'Ray Count', tooltip: 'Number of rays around the center.', type: 'range', min: 1, max: 48, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'burstRays', label: 'Ray Count', tooltip: 'Number of rays around the center.', type: 'range', min: 1, max: 48, step: 1, integer: true, textMin: 1, textMax: Infinity },
     { key: 'burstScale', label: 'Scale', tooltip: 'Length of the rays relative to the size of the canvas.', type: 'range', min: 0.1, max: 2, step: 0.01, textMin: 0, textMax: Infinity },
     { key: 'opacity', label: 'Opacity', tooltip: 'Transparency of the rays, from 0 (invisible) to 1 (solid).', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
     // The fixed range is only a fallback: getBounds sizes the sliders to the canvas.

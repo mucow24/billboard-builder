@@ -107,6 +107,7 @@ function FieldRenderer({
         <NumberInput
           disabled={field.disabled}
           digits={field.descriptor.digits}
+          integer={field.descriptor.integer}
           label={field.descriptor.label}
           tooltip={field.descriptor.tooltip}
           max={field.descriptor.max}

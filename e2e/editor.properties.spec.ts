@@ -748,4 +748,40 @@ test.describe('editor properties flows', () => {
       expect.objectContaining({ id: 'size-lower', fontSize: 90 }),
     ]);
   });
+
+  test('steps a number box by the wheel: five steps with Shift, a tenth with Ctrl', async ({
+    page,
+  }) => {
+    const text = createTextFixture({ id: 'wheel-text', name: 'Wheel', x: 200, y: 120, fontSize: 40 });
+    const sizeBox = page.getByRole('spinbutton', { name: 'Size value', exact: true });
+
+    await openFreshEditor(page);
+    await uploadProject(page, createProjectDocument([text]), 'properties-wheel-step.json');
+    await openPropertiesTab(page);
+    await clickItem(page, 'wheel-text');
+    await expect(sizeBox).toHaveValue('40');
+    const zoomBefore = await page.evaluate(() => window.devicePixelRatio);
+
+    // Real wheel input: Ctrl+wheel must not zoom the page, and Shift+wheel
+    // reaches the page as a sideways scroll.
+    await sizeBox.click();
+    await page.mouse.wheel(0, -100);
+    await expect(sizeBox).toHaveValue('41');
+
+    await page.keyboard.down('Shift');
+    await page.mouse.wheel(0, -100);
+    await page.keyboard.up('Shift');
+    await expect(sizeBox).toHaveValue('46');
+
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, 100);
+    await page.keyboard.up('Control');
+    await expect(sizeBox).toHaveValue('45.9');
+    expect(await page.evaluate(() => window.devicePixelRatio)).toBe(zoomBefore);
+
+    const savedProject = await saveAndReadProject(page);
+    expect(savedProject.nodes).toEqual([
+      expect.objectContaining({ id: 'wheel-text', fontSize: 45.9 }),
+    ]);
+  });
 });

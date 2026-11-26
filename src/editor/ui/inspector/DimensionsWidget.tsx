@@ -54,6 +54,7 @@ export function DimensionsWidget({
         <BareNumberInput
           disabled={disabled}
           digits={0}
+          integer
           label="Width %"
           min={1}
           step={1}
@@ -100,6 +101,7 @@ export function DimensionsWidget({
         <BareNumberInput
           disabled={disabled}
           digits={0}
+          integer
           label="Height %"
           min={1}
           step={1}

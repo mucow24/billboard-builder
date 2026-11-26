@@ -44,6 +44,8 @@ export interface GeneratorFieldSpec {
   textMin?: number;
   textMax?: number;
   step?: number;
+  /** A whole-number field, such as a count. */
+  integer?: boolean;
   options?: ToggleOption[];
 }
 

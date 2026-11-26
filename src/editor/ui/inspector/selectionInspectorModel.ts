@@ -63,6 +63,8 @@ interface BaseInspectorFieldDescriptor<TValue> {
 export interface NumberFieldDescriptor extends BaseInspectorFieldDescriptor<number> {
   controlKind: 'number';
   digits?: number;
+  /** A whole-number field, such as a count. */
+  integer?: boolean;
   max?: number;
   min?: number;
   textMin?: number;

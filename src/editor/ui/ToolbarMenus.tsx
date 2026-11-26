@@ -6,6 +6,7 @@ import type { CanvasSize } from '../document/documentTypes';
 import { ColorPickerControl } from './ColorPickerControl';
 import { ToolbarIcon, ToolbarMenuAction } from './ToolbarPrimitives';
 import { joinClassNames, modKey } from './toolbarUtils';
+import { useWheelStep } from './useWheelStep';
 
 export const GENERATOR_ICONS: Record<string, ReactNode> = {
   bands: (
@@ -153,6 +154,23 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
     onCanvasSizeChange({ width: canvas.width, height: Number(event.target.value), presetId: undefined });
   }
 
+  const widthInputRef = useRef<HTMLInputElement>(null);
+  const heightInputRef = useRef<HTMLInputElement>(null);
+  useWheelStep(widthInputRef, {
+    digits: 0,
+    integer: true,
+    min: 1,
+    step: 1,
+    onStep: (width) => onCanvasSizeChange({ width, height: canvas.height, presetId: undefined }),
+  });
+  useWheelStep(heightInputRef, {
+    digits: 0,
+    integer: true,
+    min: 1,
+    step: 1,
+    onStep: (height) => onCanvasSizeChange({ width: canvas.width, height, presetId: undefined }),
+  });
+
   return (
     <ToolbarSubmenu
       label="Size"
@@ -192,6 +210,7 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
         <span className="top-toolbar-size-menu-label">Custom:</span>
         <div className="top-toolbar-size-menu-fields">
           <input
+            ref={widthInputRef}
             className="top-toolbar-field top-toolbar-size-menu-input"
             aria-label="Canvas width"
             type="number"
@@ -201,6 +220,7 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
           />
           <span className="top-toolbar-size-menu-separator" aria-hidden="true">x</span>
           <input
+            ref={heightInputRef}
             className="top-toolbar-field top-toolbar-size-menu-input"
             aria-label="Canvas height"
             type="number"

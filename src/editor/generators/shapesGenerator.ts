@@ -54,7 +54,7 @@ export const shapesGeneratorSpec: GeneratorSpec<ShapesGeneratorParams> = {
         { key: 'bar', icon: '▬', label: 'Bar' },
       ],
     },
-    { key: 'count', label: 'Count', tooltip: 'Number of shapes drawn.', type: 'range', min: 1, max: 256, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'count', label: 'Count', tooltip: 'Number of shapes drawn.', type: 'range', min: 1, max: 256, step: 1, integer: true, textMin: 1, textMax: Infinity },
     { key: 'shapeMinSize', label: 'Min Size', tooltip: 'Smallest size a shape can be, in pixels.', type: 'range', min: 1, max: 384, step: 1, textMin: 1, textMax: Infinity },
     { key: 'shapeMaxSize', label: 'Max Size', tooltip: 'Largest size a shape can be, in pixels.', type: 'range', min: 1, max: 384, step: 1, textMin: 1, textMax: Infinity },
     { key: 'rotation', label: 'Rotation', tooltip: 'How far shapes are turned at random. 0 keeps them upright, 1 allows any angle.', type: 'range', min: 0, max: 1, step: 0.01, textMin: 0, textMax: 1 },
