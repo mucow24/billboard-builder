@@ -1,4 +1,4 @@
-import type { CanvasItem } from './documentTypes';
+import type { CanvasItem, CanvasLeafKind, CanvasShadow, TextPadding } from './documentTypes';
 
 /**
  * The settings of an item that are sizes in canvas pixels and are not part of
@@ -7,75 +7,64 @@ import type { CanvasItem } from './documentTypes';
  * corner) multiplies them by the same factor as the box, so the item looks
  * the same at its new size.
  *
+ * This list is the only place that names them: what a scaling resize scales
+ * and what it commits are both read from it.
+ *
  * Line height is a multiple of the font size, so it follows without help. A
  * generator's own settings are left out: they describe a pattern, not a box.
  */
-export function getScalableStyle(item: CanvasItem): Partial<CanvasItem> {
-  const shared = { shadow: item.shadow, blurRadius: item.blurRadius };
-  switch (item.kind) {
-    case 'text':
-      return {
-        ...shared,
-        fontSize: item.fontSize,
-        letterSpacing: item.letterSpacing,
-        padding: item.padding,
-        strokeWidth: item.strokeWidth,
-      };
-    case 'rectangle':
-      return { ...shared, strokeWidth: item.strokeWidth, cornerRadius: item.cornerRadius };
-    case 'ellipse':
-    case 'ngon':
-      return { ...shared, strokeWidth: item.strokeWidth };
-    case 'polygon':
-      return { ...shared, strokeWidth: item.strokeWidth, curveRadius: item.curveRadius };
-    default:
-      return shared;
-  }
-}
+const SHARED_FIELDS = ['shadow', 'blurRadius'] as const;
+
+const FIELDS_BY_KIND: Record<CanvasLeafKind, readonly string[]> = {
+  text: [...SHARED_FIELDS, 'fontSize', 'letterSpacing', 'padding', 'strokeWidth'],
+  rectangle: [...SHARED_FIELDS, 'strokeWidth', 'cornerRadius'],
+  ellipse: [...SHARED_FIELDS, 'strokeWidth'],
+  ngon: [...SHARED_FIELDS, 'strokeWidth'],
+  polygon: [...SHARED_FIELDS, 'strokeWidth', 'curveRadius'],
+  image: SHARED_FIELDS,
+  generator: SHARED_FIELDS,
+};
 
 const MIN_FONT_SIZE = 1;
+
+// A field is a plain number of pixels unless it is listed here.
+const FIELD_SCALERS: Record<string, (value: never, factor: number) => unknown> = {
+  fontSize: (value: number, factor) => Math.max(MIN_FONT_SIZE, value * factor),
+  padding: (value: TextPadding, factor): TextPadding => ({
+    top: value.top * factor,
+    right: value.right * factor,
+    bottom: value.bottom * factor,
+    left: value.left * factor,
+  }),
+  shadow: (value: CanvasShadow, factor): CanvasShadow => ({
+    ...value,
+    blur: value.blur * factor,
+    offsetX: value.offsetX * factor,
+    offsetY: value.offsetY * factor,
+  }),
+};
+
+function scaleField(field: string, value: unknown, factor: number): unknown {
+  const scaler = FIELD_SCALERS[field];
+  return scaler ? scaler(value as never, factor) : (value as number) * factor;
+}
+
+/** The item's scalable settings, as changes to commit. */
+export function getScalableStyle(item: CanvasItem): Partial<CanvasItem> {
+  const values = item as unknown as Record<string, unknown>;
+  return Object.fromEntries(
+    FIELDS_BY_KIND[item.kind].map((field) => [field, values[field]])
+  ) as Partial<CanvasItem>;
+}
 
 /** The item with every setting of `getScalableStyle` multiplied by `factor`. */
 export function scaleItemStyle<T extends CanvasItem>(item: T, factor: number): T {
   if (!Number.isFinite(factor) || factor <= 0 || factor === 1) {
     return item;
   }
-  const scaled: CanvasItem = {
-    ...item,
-    shadow: {
-      ...item.shadow,
-      blur: item.shadow.blur * factor,
-      offsetX: item.shadow.offsetX * factor,
-      offsetY: item.shadow.offsetY * factor,
-    },
-    blurRadius: item.blurRadius * factor,
-  };
-  switch (scaled.kind) {
-    case 'text':
-      scaled.fontSize = Math.max(MIN_FONT_SIZE, scaled.fontSize * factor);
-      scaled.letterSpacing *= factor;
-      scaled.padding = {
-        top: scaled.padding.top * factor,
-        right: scaled.padding.right * factor,
-        bottom: scaled.padding.bottom * factor,
-        left: scaled.padding.left * factor,
-      };
-      scaled.strokeWidth *= factor;
-      break;
-    case 'rectangle':
-      scaled.strokeWidth *= factor;
-      scaled.cornerRadius *= factor;
-      break;
-    case 'ellipse':
-    case 'ngon':
-      scaled.strokeWidth *= factor;
-      break;
-    case 'polygon':
-      scaled.strokeWidth *= factor;
-      scaled.curveRadius *= factor;
-      break;
-    default:
-      break;
-  }
-  return scaled as T;
+  const values = item as unknown as Record<string, unknown>;
+  const scaled = Object.fromEntries(
+    FIELDS_BY_KIND[item.kind].map((field) => [field, scaleField(field, values[field], factor)])
+  );
+  return { ...item, ...scaled };
 }

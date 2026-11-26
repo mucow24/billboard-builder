@@ -3,7 +3,7 @@ import { isLineItem } from '../document/polygonVertices';
 
 import { getRenderBox, type Point, type RenderBox } from './transformGeometry';
 
-function rotatePoint(point: Point, center: Point, deltaDegrees: number): Point {
+export function rotatePoint(point: Point, center: Point, deltaDegrees: number): Point {
   const radians = (deltaDegrees * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);

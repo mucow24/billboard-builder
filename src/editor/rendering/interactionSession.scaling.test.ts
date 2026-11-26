@@ -118,6 +118,21 @@ describe('scaling resize (Alt-drag on a corner)', () => {
     expect(b.width / b.height).toBeCloseTo(3, 6);
   });
 
+  it('keeps a Shift resize of a rotated selection frame proportional', () => {
+    // The ratio used to be enforced along the canvas axes instead of the
+    // frame's own, which stretched a rotated selection.
+    const items = [logoText(), rule()];
+    const rotated: SelectionFrame = { bounds: frame.bounds, rotation: 30 };
+    const session = groupSession('bottom-right', items, rotated, { x: 400, y: 200 });
+    const commit = commitGroup({ ...session, shiftConstrain: true }, { x: 520, y: 330 }, items);
+    const b = commit.selectionFrame!.bounds;
+    expect(b.width).toBeGreaterThan(315);
+    expect(b.width / b.height).toBeCloseTo(3, 6);
+    const word = commit.updates[0].changes as Partial<TextCanvasItem>;
+    expect(word.width! / 200).toBeCloseTo(word.height! / 60, 6);
+    expect(word).not.toHaveProperty('fontSize');
+  });
+
   it('scales a single text box', () => {
     const word = logoText();
     const session = createResizeSession(word, 'bottom-right', { x: 300, y: 160 }, []);
