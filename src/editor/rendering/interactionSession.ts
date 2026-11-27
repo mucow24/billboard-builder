@@ -21,7 +21,7 @@ import {
   itemIntersectsSelectionRect,
   type RenderBox,
 } from './transformGeometry';
-import { getSelectionRenderBounds } from './selectionGeometry';
+import { getSelectionRenderBounds, rotatePoint } from './selectionGeometry';
 import { buildCandidateCache, getResizeSnappedRect, getSnappedRect, SNAP_THRESHOLD, type SnapCandidateCache } from './snapping';
 import type { RenderableCanvasItem } from './renderAdapter';
 import type {
@@ -166,15 +166,6 @@ function isScalingResize(session: InteractionSession): boolean {
     Boolean((session as SessionWithModifiers).scaleContents) &&
     isCornerResizeHandle(session.handle)
   );
-}
-
-function rotateAbout(point: Point, center: Point, degrees: number): Point {
-  const radians = (degrees * Math.PI) / 180;
-  const cos = Math.cos(radians);
-  const sin = Math.sin(radians);
-  const dx = point.x - center.x;
-  const dy = point.y - center.y;
-  return { x: center.x + dx * cos - dy * sin, y: center.y + dx * sin + dy * cos };
 }
 
 // Pointer travel (canvas units) up to which a press-and-release on an item or
@@ -896,10 +887,10 @@ export function resolveInteractionSession(
       };
       const constrainGroupPointer = (p: Point) =>
         groupRatioAnchor
-          ? rotateAbout(
+          ? rotatePoint(
               constrainToRatio(
                 groupRatioAnchor,
-                rotateAbout(p, frameCenter, -current.frameRotation),
+                rotatePoint(p, frameCenter, -current.frameRotation),
                 groupRatio
               ),
               frameCenter,

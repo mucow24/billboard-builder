@@ -2,7 +2,7 @@ import type { CanvasItem, PolygonCanvasItem } from '../document/documentTypes';
 import { polygonBounds } from '../document/polygonVertices';
 
 import { scaleImageSourceTransform } from './imagePresentation';
-import { getItemSelectionPoints } from './selectionGeometry';
+import { getItemSelectionPoints, rotatePoint } from './selectionGeometry';
 import { getRenderBox, type Point, type RenderBox } from './transformGeometry';
 
 interface ResizeFrameAxes {
@@ -17,18 +17,6 @@ interface ResizeFrameAxes {
 interface SelectionFrame {
   bounds: RenderBox;
   rotation: number;
-}
-
-function rotatePoint(point: Point, center: Point, deltaDegrees: number): Point {
-  const radians = (deltaDegrees * Math.PI) / 180;
-  const cos = Math.cos(radians);
-  const sin = Math.sin(radians);
-  const dx = point.x - center.x;
-  const dy = point.y - center.y;
-  return {
-    x: center.x + dx * cos - dy * sin,
-    y: center.y + dx * sin + dy * cos,
-  };
 }
 
 // Polygons carry their geometry in the vertex list, so every group transform
