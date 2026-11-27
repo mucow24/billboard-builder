@@ -385,6 +385,28 @@ describe('Toolbar', () => {
     });
   });
 
+  it('steps the custom canvas size boxes with the wheel once the size flyout is open', async () => {
+    const user = userEvent.setup();
+    const onCanvasSizeChange = vi.fn();
+
+    renderToolbar({ onCanvasSizeChange });
+
+    await user.click(screen.getByRole('button', { name: 'Canvas' }));
+    await user.hover(await screen.findByRole('button', { name: 'Size' }));
+
+    const width = screen.getByLabelText('Canvas width');
+    width.focus();
+    fireEvent.wheel(width, { deltaY: -100 });
+    expect(onCanvasSizeChange).toHaveBeenLastCalledWith({ width: 2049, height: 1024, presetId: undefined });
+
+    // A whole number of pixels: Ctrl moves it by 1, and the page does not zoom.
+    const height = screen.getByLabelText('Canvas height');
+    height.focus();
+    const notCancelled = fireEvent.wheel(height, { deltaY: 100, ctrlKey: true });
+    expect(notCancelled).toBe(false);
+    expect(onCanvasSizeChange).toHaveBeenLastCalledWith({ width: 2048, height: 1023, presetId: undefined });
+  });
+
   it('shows keyboard shortcuts in action button tooltips', () => {
     renderToolbar();
 

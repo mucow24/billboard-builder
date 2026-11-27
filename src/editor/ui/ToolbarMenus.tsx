@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- GENERATOR_ICONS shared with ToolPalette */
-import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { CANVAS_PRESETS } from '../document/documentDefaults';
 import type { CanvasSize } from '../document/documentTypes';
@@ -132,6 +132,34 @@ function ToolbarSubmenu({ children, icon, label, panelLabel, panelClassName }: T
   );
 }
 
+interface CanvasSizeInputProps {
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+}
+
+/**
+ * One of the two custom size boxes. It is a component of its own so that its
+ * wheel listener is attached when the box mounts, which is when the Size
+ * flyout opens, not when the menu around it first renders.
+ */
+function CanvasSizeInput({ label, onChange, value }: CanvasSizeInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useWheelStep(inputRef, { digits: 0, integer: true, min: 1, step: 1, onStep: onChange });
+
+  return (
+    <input
+      ref={inputRef}
+      className="top-toolbar-field top-toolbar-size-menu-input"
+      aria-label={label}
+      type="number"
+      min={1}
+      value={value}
+      onChange={(event) => onChange(Number(event.target.value))}
+    />
+  );
+}
+
 interface SizeSubmenuProps {
   canvas: CanvasSize;
   onCanvasSizeChange: (canvas: CanvasSize) => void;
@@ -146,30 +174,13 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
     onCanvasSizeChange({ width: preset.width, height: preset.height, presetId: preset.id });
   }
 
-  function handleCustomWidthChange(event: ChangeEvent<HTMLInputElement>) {
-    onCanvasSizeChange({ width: Number(event.target.value), height: canvas.height, presetId: undefined });
+  function handleCustomWidthChange(width: number) {
+    onCanvasSizeChange({ width, height: canvas.height, presetId: undefined });
   }
 
-  function handleCustomHeightChange(event: ChangeEvent<HTMLInputElement>) {
-    onCanvasSizeChange({ width: canvas.width, height: Number(event.target.value), presetId: undefined });
+  function handleCustomHeightChange(height: number) {
+    onCanvasSizeChange({ width: canvas.width, height, presetId: undefined });
   }
-
-  const widthInputRef = useRef<HTMLInputElement>(null);
-  const heightInputRef = useRef<HTMLInputElement>(null);
-  useWheelStep(widthInputRef, {
-    digits: 0,
-    integer: true,
-    min: 1,
-    step: 1,
-    onStep: (width) => onCanvasSizeChange({ width, height: canvas.height, presetId: undefined }),
-  });
-  useWheelStep(heightInputRef, {
-    digits: 0,
-    integer: true,
-    min: 1,
-    step: 1,
-    onStep: (height) => onCanvasSizeChange({ width: canvas.width, height, presetId: undefined }),
-  });
 
   return (
     <ToolbarSubmenu
@@ -209,25 +220,9 @@ function SizeSubmenu({ canvas, onCanvasSizeChange }: SizeSubmenuProps) {
       <div className="top-toolbar-size-menu-row">
         <span className="top-toolbar-size-menu-label">Custom:</span>
         <div className="top-toolbar-size-menu-fields">
-          <input
-            ref={widthInputRef}
-            className="top-toolbar-field top-toolbar-size-menu-input"
-            aria-label="Canvas width"
-            type="number"
-            min={1}
-            value={canvas.width}
-            onChange={handleCustomWidthChange}
-          />
+          <CanvasSizeInput label="Canvas width" value={canvas.width} onChange={handleCustomWidthChange} />
           <span className="top-toolbar-size-menu-separator" aria-hidden="true">x</span>
-          <input
-            ref={heightInputRef}
-            className="top-toolbar-field top-toolbar-size-menu-input"
-            aria-label="Canvas height"
-            type="number"
-            min={1}
-            value={canvas.height}
-            onChange={handleCustomHeightChange}
-          />
+          <CanvasSizeInput label="Canvas height" value={canvas.height} onChange={handleCustomHeightChange} />
         </div>
       </div>
     </ToolbarSubmenu>

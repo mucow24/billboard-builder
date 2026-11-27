@@ -83,8 +83,9 @@ export function useWheelStep(
       if (!input || document.activeElement !== input || input.disabled || input.readOnly) {
         return;
       }
-      // Shift turns the wheel into a sideways scroll on Windows and Linux.
-      const delta = event.deltaY || event.deltaX;
+      // Shift turns the wheel into a sideways scroll on Windows and Linux. A
+      // sideways scroll without Shift is a trackpad swipe, and is left alone.
+      const delta = event.deltaY || (event.shiftKey ? event.deltaX : 0);
       if (delta === 0) {
         return;
       }

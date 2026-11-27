@@ -140,6 +140,16 @@ describe('wheel over a number box', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('leaves a sideways scroll without Shift, a trackpad swipe, alone', () => {
+    const onChange = vi.fn();
+    render(<Box initial={40} onChange={onChange} />);
+    const input = focusedBox();
+
+    const notCancelled = fireEvent.wheel(input, { deltaX: -100, deltaY: 0 });
+    expect(notCancelled).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('leaves a box without focus alone', () => {
     const onChange = vi.fn();
     render(<Box initial={40} onChange={onChange} />);
