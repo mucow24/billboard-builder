@@ -15,7 +15,13 @@ import type { CanvasItem, CanvasLeafKind, CanvasShadow, TextPadding } from './do
  */
 const SHARED_FIELDS = ['shadow', 'blurRadius'] as const;
 
-const FIELDS_BY_KIND: Record<CanvasLeafKind, readonly string[]> = {
+// Each kind may only list fields its items have, so a misspelled name does
+// not compile.
+type FieldsByKind = {
+  [K in CanvasLeafKind]: readonly (keyof Extract<CanvasItem, { kind: K }>)[];
+};
+
+const FIELDS_BY_KIND = {
   text: [...SHARED_FIELDS, 'fontSize', 'letterSpacing', 'padding', 'strokeWidth'],
   rectangle: [...SHARED_FIELDS, 'strokeWidth', 'cornerRadius'],
   ellipse: [...SHARED_FIELDS, 'strokeWidth'],
@@ -23,12 +29,14 @@ const FIELDS_BY_KIND: Record<CanvasLeafKind, readonly string[]> = {
   polygon: [...SHARED_FIELDS, 'strokeWidth', 'curveRadius'],
   image: SHARED_FIELDS,
   generator: SHARED_FIELDS,
-};
+} as const satisfies FieldsByKind;
+
+type ScalableField = (typeof FIELDS_BY_KIND)[CanvasLeafKind][number];
 
 const MIN_FONT_SIZE = 1;
 
 // A field is a plain number of pixels unless it is listed here.
-const FIELD_SCALERS: Record<string, (value: never, factor: number) => unknown> = {
+const FIELD_SCALERS: Partial<Record<ScalableField, (value: never, factor: number) => unknown>> = {
   fontSize: (value: number, factor) => Math.max(MIN_FONT_SIZE, value * factor),
   padding: (value: TextPadding, factor): TextPadding => ({
     top: value.top * factor,
@@ -44,16 +52,20 @@ const FIELD_SCALERS: Record<string, (value: never, factor: number) => unknown> =
   }),
 };
 
-function scaleField(field: string, value: unknown, factor: number): unknown {
+function scaleField(field: ScalableField, value: unknown, factor: number): unknown {
   const scaler = FIELD_SCALERS[field];
   return scaler ? scaler(value as never, factor) : (value as number) * factor;
+}
+
+function scalableFields(item: CanvasItem): readonly ScalableField[] {
+  return FIELDS_BY_KIND[item.kind];
 }
 
 /** The item's scalable settings, as changes to commit. */
 export function getScalableStyle(item: CanvasItem): Partial<CanvasItem> {
   const values = item as unknown as Record<string, unknown>;
   return Object.fromEntries(
-    FIELDS_BY_KIND[item.kind].map((field) => [field, values[field]])
+    scalableFields(item).map((field) => [field, values[field]])
   ) as Partial<CanvasItem>;
 }
 
@@ -64,7 +76,7 @@ export function scaleItemStyle<T extends CanvasItem>(item: T, factor: number): T
   }
   const values = item as unknown as Record<string, unknown>;
   const scaled = Object.fromEntries(
-    FIELDS_BY_KIND[item.kind].map((field) => [field, scaleField(field, values[field], factor)])
+    scalableFields(item).map((field) => [field, scaleField(field, values[field], factor)])
   );
   return { ...item, ...scaled };
 }
