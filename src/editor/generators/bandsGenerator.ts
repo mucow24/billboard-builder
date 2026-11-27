@@ -85,7 +85,7 @@ export const bandsGeneratorSpec: GeneratorSpec<BandsGeneratorParams> = {
     { key: 'bandColorA', label: 'Band Color A', tooltip: 'Color of the first band. Bands blend from this color to Band Color B.', type: 'color' },
     { key: 'bandColorB', label: 'Band Color B', tooltip: 'Color of the last band.', type: 'color' },
     { key: 'shadowColor', label: 'Shadow Color', tooltip: 'Color of the thin shadow along the edge of each band.', type: 'color' },
-    { key: 'stripeCount', label: 'Band Count', tooltip: 'Number of bands drawn.', type: 'range', min: 2, max: 64, step: 1, textMin: 1, textMax: Infinity },
+    { key: 'stripeCount', label: 'Band Count', tooltip: 'Number of bands drawn.', type: 'range', min: 2, max: 64, step: 1, integer: true, textMin: 1, textMax: Infinity },
     { key: 'stripeAngle', label: 'Band Angle', tooltip: 'Tilt of the bands in degrees. 0 is vertical.', type: 'range', min: -90, max: 90, step: 1, textMin: -Infinity, textMax: Infinity },
     { key: 'stripeThickness', label: 'Band Thickness', tooltip: 'Typical width of a band, in pixels.', type: 'range', min: 8, max: 220, step: 1, textMin: 1, textMax: Infinity },
     { key: 'stripeSpacingJitter', label: 'Band Width Jitter', tooltip: 'How much band widths vary at random. 0 makes every band the same width.', type: 'range', min: 0, max: 5, step: 0.01, textMin: 0, textMax: Infinity },

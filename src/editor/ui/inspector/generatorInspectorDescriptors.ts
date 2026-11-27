@@ -114,6 +114,7 @@ function createGeneratorFieldDescriptor(
     textMax: bounds.textMax ?? field.textMax,
     step: field.step,
     digits: digitsForStep(field.step),
+    integer: field.integer,
     slider: field.type === 'range',
     getValue: (item: CanvasItem) =>
       item.kind === 'generator'

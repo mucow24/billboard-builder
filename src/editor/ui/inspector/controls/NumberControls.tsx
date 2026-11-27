@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
 import { useHistoryInteraction } from '../../../state/useHistoryInteraction';
+import { useWheelStep, wheelDisplayDigits } from '../../useWheelStep';
 import { formatDisplayedNumber } from '../inspectorModel';
 import { FieldShell } from './FieldShell';
 
@@ -25,6 +26,8 @@ function applyDetent(value: number, detentValue?: number, detentThreshold = 0): 
 export interface BareNumberInputProps {
   disabled?: boolean;
   digits?: number;
+  /** A whole-number field: Ctrl+wheel moves it by 1 and it shows no extra decimal. */
+  integer?: boolean;
   label: string;
   max?: number;
   mixed?: boolean;
@@ -49,7 +52,10 @@ function useDraftNumber(
   min: number | undefined,
   max: number | undefined,
   onChange: (value: number) => void,
+  step: number,
+  integer: boolean,
 ) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const formatted = value === null ? '' : formatDisplayedNumber(value, digits);
   const [draft, setDraft] = useState(formatted);
   const isFocusedRef = useRef(false);
@@ -87,12 +93,25 @@ function useDraftNumber(
     }
   }
 
-  return { draft, setDraft, isFocusedRef, commitDraft, handleChange };
+  useWheelStep(inputRef, {
+    digits,
+    integer,
+    max,
+    min,
+    step,
+    onStep: (next) => {
+      setDraft(formatDisplayedNumber(next, digits));
+      onChange(next);
+    },
+  });
+
+  return { draft, setDraft, inputRef, isFocusedRef, commitDraft, handleChange };
 }
 
 export function BareNumberInput({
   disabled = false,
-  digits = 1,
+  digits: baseDigits = 1,
+  integer = false,
   label,
   max,
   min,
@@ -100,13 +119,15 @@ export function BareNumberInput({
   step = 1,
   value,
 }: BareNumberInputProps) {
-  const { draft, setDraft, isFocusedRef, commitDraft, handleChange } = useDraftNumber(
-    value, digits, min, max, onChange,
+  const digits = wheelDisplayDigits(baseDigits, step, integer);
+  const { draft, setDraft, inputRef, isFocusedRef, commitDraft, handleChange } = useDraftNumber(
+    value, digits, min, max, onChange, step, integer,
   );
   const formatted = value === null ? '' : formatDisplayedNumber(value, digits);
 
   return (
     <input
+      ref={inputRef}
       className="inspector-field-control"
       aria-label={label}
       disabled={disabled}
@@ -134,7 +155,8 @@ export function BareNumberInput({
 
 export function NumberInput({
   disabled = false,
-  digits = 1,
+  digits: baseDigits = 1,
+  integer = false,
   label,
   max,
   mixed = false,
@@ -149,14 +171,15 @@ export function NumberInput({
   tooltip,
   value,
 }: NumberInputProps) {
+  const digits = wheelDisplayDigits(baseDigits, step, integer);
   const displayedValue =
     value === null ? '' : formatDisplayedNumber(value, digits);
   const sliderValue =
     value === null ? min ?? sliderDetentValue ?? 0 : Number(displayedValue);
   const sliderId = useId();
 
-  const { draft: textDraft, setDraft: setTextDraft, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft, handleChange: handleTextChange } =
-    useDraftNumber(value, digits, textMin ?? min, textMax ?? max, onChange);
+  const { draft: textDraft, setDraft: setTextDraft, inputRef: textInputRef, isFocusedRef: isTextFocusedRef, commitDraft: commitTextDraft, handleChange: handleTextChange } =
+    useDraftNumber(value, digits, textMin ?? min, textMax ?? max, onChange, step, integer);
 
   const { start: startSliderInteraction, end: endSliderInteraction } = useHistoryInteraction();
 
@@ -198,6 +221,7 @@ export function NumberInput({
               }}
             />
             <input
+              ref={textInputRef}
               aria-label={`${label} value`}
               disabled={disabled}
               max={Number.isFinite(textMax ?? max) ? (textMax ?? max) : undefined}
@@ -229,7 +253,8 @@ export function NumberInput({
     <FieldShell hint={mixed ? 'Mixed' : undefined} label={label} tooltip={tooltip}>
       <BareNumberInput
         disabled={disabled}
-        digits={digits}
+        digits={baseDigits}
+        integer={integer}
         label={label}
         max={max}
         min={min}

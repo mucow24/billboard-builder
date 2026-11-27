@@ -269,6 +269,7 @@ export function createShapeDescriptors(
       createNumberField({
         buildChange: (_context, nextValue) => ({ sides: Math.max(3, Math.trunc(nextValue)) }),
         digits: 0,
+        integer: true,
         fieldOrder: 10,
         getValue: (item) => (item.kind === 'ngon' ? item.sides : 6),
         label: 'Sides',
